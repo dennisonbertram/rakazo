@@ -33,12 +33,27 @@ struct IntegrationsScreen: View {
               } label: {
                 VStack(alignment: .leading) {
                   Text(connection.displayName)
-                  Text(connection.needsReconnect ? "Needs reconnecting" : Self.appName(connection, snapshot))
+                  Text(
+                    connection.needsReconnect
+                      ? "Needs reconnecting" : connection.account ?? Self.appName(connection, snapshot)
+                  )
                     .font(.caption)
                     .foregroundStyle(Color.token(connection.needsReconnect ? .destructive : .mutedForeground))
                 }
               }
               .accessibilityIdentifier("connection-\(connection.id)")
+            }
+          }
+        }
+        if !snapshot.servers.isEmpty {
+          Section("MCP servers") {
+            ForEach(snapshot.servers) { server in
+              NavigationLink {
+                McpServerDetailScreen(server: server, model: model)
+              } label: {
+                Text(server.name)
+              }
+              .accessibilityIdentifier("server-\(server.id)")
             }
           }
         }
@@ -90,14 +105,48 @@ struct IntegrationsScreen: View {
   }
 }
 
+/// The name row of a detail screen: tap to rename in an alert.
+private struct RenameRow: View {
+  let title: String
+  let value: String
+  let save: (String) -> Void
+  @State private var asking = false
+  @State private var draft = ""
+
+  var body: some View {
+    Button {
+      draft = value
+      asking = true
+    } label: {
+      LabeledContent(title, value: value)
+    }
+    .foregroundStyle(Color.primary)
+    .accessibilityIdentifier("rename")
+    .alert("Rename", isPresented: $asking) {
+      TextField("Name", text: $draft)
+      Button("Cancel", role: .cancel) {}
+      Button("Save") { save(draft) }
+    }
+  }
+}
+
 private struct ConnectionDetailScreen: View {
   @Environment(AppModel.self) private var app
   @Environment(\.openURL) private var openURL
   @Environment(\.dismiss) private var dismiss
   let connection: Connection
   let model: IntegrationsModel
+  @State private var access: AccessModel
   @State private var confirmWrites = false
   @State private var confirmRemove = false
+
+  init(connection: Connection, model: IntegrationsModel) {
+    self.connection = connection
+    self.model = model
+    _access = State(
+      initialValue: AccessModel(
+        subject: .connection(id: connection.id, ownerBotID: connection.agentBotId)))
+  }
 
   private var current: Connection {
     model.state.value?.connections.first { $0.id == connection.id } ?? connection
@@ -106,12 +155,16 @@ private struct ConnectionDetailScreen: View {
   var body: some View {
     Form {
       Section {
-        LabeledContent("Account", value: current.displayName)
-        LabeledContent("Access", value: current.writesEnabled ? "Read and write" : "Read only")
+        RenameRow(title: "Name", value: current.displayName) { text in
+          Task { await model.rename(app, connection: current, to: text) }
+        }
+        if let address = current.account {
+          LabeledContent("Address", value: address)
+        }
       }
       Section {
         Toggle(
-          "Allow writes",
+          "Allow changes",
           isOn: Binding(
             get: { current.writesEnabled },
             set: { enabled in
@@ -124,6 +177,10 @@ private struct ConnectionDetailScreen: View {
           current.writesEnabled
             ? "Bots can ask to send or change things. You approve each one."
             : "Off: bots can read but not send or change anything.")
+      }
+      if current.isConnected && !current.needsReconnect {
+        AccessSections(
+          model: access, name: current.displayName, subtext: "Which agents can use this account.")
       }
       if current.needsReconnect {
         Section {
@@ -147,9 +204,11 @@ private struct ConnectionDetailScreen: View {
         if let error = model.error { Text(error).foregroundStyle(Color.token(.destructive)) }
       }
     }
+    .accessControls(access)
     .navigationTitle(current.displayName)
     .navigationBarTitleDisplayMode(.inline)
-    .alert("Allow writes to \(current.displayName)?", isPresented: $confirmWrites) {
+    .task { await access.load(app) }
+    .alert("Allow changes to \(current.displayName)?", isPresented: $confirmWrites) {
       Button("Cancel", role: .cancel) {}
       Button("Allow") { Task { await model.setWrites(app, current, enabled: true) } }
     } message: {
@@ -161,6 +220,70 @@ private struct ConnectionDetailScreen: View {
       }
     } message: {
       Text("Bots lose access to this account. You can add it again later.")
+    }
+  }
+}
+
+private struct McpServerDetailScreen: View {
+  @Environment(AppModel.self) private var app
+  let server: McpServer
+  let model: IntegrationsModel
+  @State private var access: AccessModel
+  @State private var confirmWrites = false
+
+  init(server: McpServer, model: IntegrationsModel) {
+    self.server = server
+    self.model = model
+    _access = State(initialValue: AccessModel(subject: .server(server)))
+  }
+
+  private var current: McpServer {
+    model.state.value?.servers.first { $0.id == server.id } ?? server
+  }
+
+  var body: some View {
+    Form {
+      Section {
+        RenameRow(title: "Name", value: current.name) { text in
+          Task { await model.rename(app, server: current, to: text) }
+        }
+      } footer: {
+        if let error = model.error { Text(error).foregroundStyle(Color.token(.destructive)) }
+      }
+      if current.agentBotId != nil {
+        Section {
+          Toggle(
+            "Allow changes",
+            isOn: Binding(
+              get: { current.writesEnabled },
+              set: { enabled in
+                if enabled {
+                  confirmWrites = true
+                } else {
+                  Task { await model.setServerWrites(app, current, enabled: false) }
+                }
+              })
+          )
+          .accessibilityIdentifier("allowWrites")
+        } footer: {
+          Text(
+            current.writesEnabled
+              ? "The agent asks you before each change."
+              : "Off: the agent can read but not change anything.")
+        }
+      }
+      AccessSections(
+        model: access, name: current.name, subtext: "Which agents can use this connection.")
+    }
+    .accessControls(access)
+    .navigationTitle(current.name)
+    .navigationBarTitleDisplayMode(.inline)
+    .task { await access.load(app) }
+    .alert("Allow changes to \(current.name)?", isPresented: $confirmWrites) {
+      Button("Cancel", role: .cancel) {}
+      Button("Allow") { Task { await model.setServerWrites(app, current, enabled: true) } }
+    } message: {
+      Text("The agent will be able to ask to change things. You still approve each one.")
     }
   }
 }
