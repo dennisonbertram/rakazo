@@ -152,3 +152,27 @@ it("names a person who is only in Review", async () => {
   ]);
   expect(container.textContent).toContain("Alex Reed · Engineer");
 });
+
+it("shows 3 next dates on a phone with See all to the Calendar", async () => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: true,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  try {
+    const [base] = companyFixture.events;
+    const events = [1, 2, 3, 4, 5].map((n) => ({
+      ...base!,
+      id: `e${n}`,
+      title: `Future date ${n}`,
+      occursOn: { date: `2099-0${n}-10`, precision: "day" as const },
+    }));
+    await show("overview", companyFixture.entities, { events });
+    expect(container.textContent).toContain("Future date 3");
+    expect(container.textContent).not.toContain("Future date 4");
+    const link = [...container.querySelectorAll("a")].find((a) => a.textContent === "See all (5)");
+    expect(link?.getAttribute("href")).toBe("/app/company?view=calendar");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
