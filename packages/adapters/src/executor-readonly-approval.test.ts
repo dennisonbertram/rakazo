@@ -1764,7 +1764,7 @@ describe("built-in mail on a connection with an integration agent", () => {
       gmail({ agentBotId: "agent-x", writesEnabled: false }),
     ]);
     await f.run();
-    expect(f.results[0]).toEqual({ error: expect.stringContaining("agent") });
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("Changes are off") });
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
     expect(mail.createDraft).not.toHaveBeenCalled();
   });
@@ -1830,6 +1830,70 @@ describe("built-in mail on a connection with an integration agent", () => {
 
     it("still asks for a write to the account the agent owns", async () => {
       const { f, mail } = twoAccounts("agent@example.test");
+      await f.run();
+      expect(isApprovalPausedResult(f.results[0])).toBe(true);
+      expect(mail.createDraft).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("another bot, by grant", () => {
+    const granted = (grant: boolean, writesEnabled = true) =>
+      gmail({
+        agentBotId: "agent-x",
+        writesEnabled,
+        allAgents: false,
+        botAccess: [{ botId: "bot-1", canWrite: grant }],
+      });
+
+    it("asks for a fresh approval with a write grant, despite a saved Allow rule", async () => {
+      const { f, mail } = draftRun(null, [granted(true)]);
+      await f.run();
+      expect(isApprovalPausedResult(f.results[0])).toBe(true);
+      expect(reviewMock).not.toHaveBeenCalled();
+      expect(mail.createDraft).not.toHaveBeenCalled();
+    });
+
+    it("with a read grant, refuses the write and says how to allow changes", async () => {
+      const { f, mail } = draftRun(null, [granted(false)]);
+      await f.run();
+      expect(f.results[0]).toEqual({
+        error:
+          "This agent can read but not change me@example.test. Change that under Access on that account's Integrations page.",
+      });
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(mail.createDraft).not.toHaveBeenCalled();
+    });
+
+    it("refuses a write grant while the connection's changes switch is off", async () => {
+      const { f, mail } = draftRun(null, [granted(true, false)]);
+      await f.run();
+      expect(f.results[0]).toEqual({
+        error:
+          "Changes are off for me@example.test. Turn on Allow changes on that account's Integrations page.",
+      });
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(mail.createDraft).not.toHaveBeenCalled();
+    });
+
+    it("asks when the call names the account by a unique label prefix, as the mail tools resolve it", async () => {
+      const mail = {
+        listAccounts: vi.fn(async () => [
+          { id: "acct-1", address: "plain@example.test", label: "Plain mail" },
+          { id: "acct-2", address: "agent@example.test", label: "Sales mail" },
+        ]),
+        createDraft: vi.fn(async () => ({ draftId: "d1" })),
+      };
+      const f = fixture({
+        name: "mail_draft",
+        builtin: true,
+        rules: [{ effect: "always_allow", matchKind: "tool", matchValue: "mail_draft" }],
+        mail,
+        connectionRows: [
+          gmail(),
+          gmail({ id: "acct-2", agentBotId: "bot-1", writesEnabled: true }),
+        ],
+      });
+      f.setCalls([{ args: { ...draft, account: "Sales" }, executionId: "call-1" }]);
       await f.run();
       expect(isApprovalPausedResult(f.results[0])).toBe(true);
       expect(mail.createDraft).not.toHaveBeenCalled();
@@ -2293,7 +2357,7 @@ describe("Google agents and linked accounts", () => {
     });
     f.setCalls([{ args: mailSend, executionId: "call-1" }]);
     await f.run();
-    expect(f.results[0]).toEqual({ error: expect.stringContaining("agent") });
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("Changes are off") });
   });
 
   it("does not offer another bot a Gmail linked to the Inbox agent, but does once shared", async () => {
@@ -2722,6 +2786,49 @@ describe("connected app integration agent tools", () => {
     await ordinary.run();
     expect(ordinary.offeredTools).toContain(write.name);
     expect(ordinary.execute).toHaveBeenCalledOnce();
+  });
+
+  describe("another bot with a write grant", () => {
+    const rule = [{ effect: "always_allow", matchKind: "tool", matchValue: ownTool.name }] as const;
+    const row = (grant: boolean, writesEnabled = true) =>
+      connection({
+        agentBotId: "agent-x",
+        writesEnabled,
+        allAgents: false,
+        botAccess: [{ botId: "bot-1", canWrite: grant }],
+      });
+    const run = (rows: Record<string, unknown>[]) =>
+      fixture({
+        name: ownTool.name,
+        spawnKey: null,
+        autoReview: true,
+        rules: [...rule],
+        route: ownTool.route,
+        connectionRows: rows,
+        availableTools: [ownTool, ownReadTool],
+      });
+
+    it("is offered the write and still gets a fresh approval card despite a saved Allow rule", async () => {
+      const f = run([row(true)]);
+      await f.run();
+      expect(f.offeredTools).toContain(ownTool.name);
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(reviewMock).not.toHaveBeenCalled();
+      expect(f.execute).not.toHaveBeenCalled();
+    });
+
+    it("is not offered the write with only a read grant", async () => {
+      const f = run([row(false)]);
+      await f.run();
+      expect(f.offeredTools).toContain(ownReadTool.name);
+      expect(f.offeredTools).not.toContain(ownTool.name);
+    });
+
+    it("is not offered the write while the connection's changes switch is off", async () => {
+      const f = run([row(true, false)]);
+      await f.run();
+      expect(f.offeredTools).not.toContain(ownTool.name);
+    });
   });
 
   it("blocks an ordinary bot write if the account becomes agent-linked after discovery", async () => {

@@ -193,7 +193,23 @@ export function inferScript(
       },
     ];
   }
+  if (lower.includes("archive email card")) {
+    // "archive email card id <mail id> from <address>" archives that message.
+    const id = /\bid\s+(\S+)/i.exec(prompt)?.[1] ?? "unknown";
+    const from = /\bfrom\s+([^\s,]+@[^\s,]+)/i.exec(prompt)?.[1];
+    return [
+      {
+        assistant: "archiving that message.",
+        toolCalls: [
+          { name: "mail_modify", args: { id, archive: true, ...(from ? { account: from } : {}) } },
+        ],
+        complete: true,
+      },
+    ];
+  }
   if (lower.includes("send email card")) {
+    // "send email card from sales@example.test" names the account; otherwise the fixed test one.
+    const from = /\bfrom\s+([^\s,]+@[^\s,]+)/i.exec(prompt)?.[1];
     return [
       {
         assistant: "this email needs your approval.",
@@ -201,7 +217,7 @@ export function inferScript(
           {
             name: "mail_send",
             args: {
-              account: "first@example.test",
+              account: from ?? "first@example.test",
               to: ["Sam Rivera <sam@example.test>"],
               subject: "Offsite dates",
               body: "The 14th works for us.\nSee you then.",

@@ -6,6 +6,7 @@ import {
   connectionRowsForAudience,
   deniedConnectionIds,
   effectiveAccessByConnection,
+  nonOwnerMayWrite,
 } from "./connection-access.js";
 
 const row = (
@@ -404,5 +405,25 @@ describe("an email's own agent shares the Inbox agent's Gmail access", () => {
     expect(withInboxAgentStandIn(gmail, { id: "x", spawnKey: null }).agentBotId).toBe("bot-inbox");
     const other = { ...gmail, agentBot: { spawnKey: "integration-agent:c1" } };
     expect(withInboxAgentStandIn(other, thread).agentBotId).toBe("bot-inbox");
+  });
+});
+
+describe("nonOwnerMayWrite", () => {
+  const grant = (canWrite: boolean) => [{ canWrite }];
+  it("needs the write grant and the connection's changes switch", () => {
+    expect(nonOwnerMayWrite({ writesEnabled: true, botAccess: grant(true) }, {})).toBe(true);
+    expect(nonOwnerMayWrite({ writesEnabled: true, botAccess: grant(false) }, {})).toBe(false);
+    expect(nonOwnerMayWrite({ writesEnabled: false, botAccess: grant(true) }, {})).toBe(false);
+    expect(nonOwnerMayWrite({ writesEnabled: true, botAccess: [] }, {})).toBe(false);
+  });
+  it("never lets an external bot change anything", () => {
+    expect(
+      nonOwnerMayWrite({ writesEnabled: true, botAccess: grant(true) }, { audience: "external" }),
+    ).toBe(false);
+  });
+  it("does not depend on the Firewall: a firewalled bot with a write grant is allowed here and still asks", () => {
+    expect(
+      nonOwnerMayWrite({ writesEnabled: true, botAccess: grant(true) }, { audience: "internal" }),
+    ).toBe(true);
   });
 });
