@@ -36,8 +36,6 @@ struct ComposerView: View {
         TextField("Message \(model.title)", text: $composer.text, axis: .vertical)
           .lineLimit(1...5)
           .focused($focused)
-          .submitLabel(.send)
-          .onSubmit { if composer.canSend { composer.send(app) } }
           .padding(.horizontal, 16).padding(.vertical, 10)
           .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22))
           .accessibilityIdentifier("messageField")

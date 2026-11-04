@@ -10,9 +10,6 @@ struct ThreadScreen: View {
   @State private var atBottom = true
   /// True while a finger is on the thread or it is still coasting from a drag.
   @State private var userScrolling = false
-  @State private var scrolledToDivider = false
-  /// The latest measured position; read after a programmatic scroll that may not change the geometry.
-  @State private var edgeNearBottom = true
   @State private var confirmingArchive = false
 
   init(target: ThreadTarget) {
@@ -61,8 +58,16 @@ struct ThreadScreen: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 8) {
           if snapshot.olderCursor != nil {
-            ProgressView().frame(maxWidth: .infinity)
-              .onAppear { Task { await model.loadOlder(app) } }
+            if model.olderError != nil {
+              Button("Couldn’t load earlier messages. Try again") {
+                model.olderError = nil
+                Task { await model.loadOlder(app) }
+              }
+              .font(.footnote).frame(maxWidth: .infinity)
+            } else {
+              ProgressView().frame(maxWidth: .infinity)
+                .onAppear { Task { await model.loadOlder(app) } }
+            }
           }
           if let error = model.refreshError {
             Text("Couldn’t refresh. Showing the last loaded messages.")
@@ -91,6 +96,11 @@ struct ThreadScreen: View {
       }
       .defaultScrollAnchor(.bottom)
       .scrollDismissesKeyboard(.interactively)
+      .simultaneousGesture(
+        TapGesture().onEnded {
+          UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        })
       .onScrollPhaseChange { _, phase in
         userScrolling = phase == .tracking || phase == .interacting || phase == .decelerating
       }
@@ -100,7 +110,6 @@ struct ThreadScreen: View {
           nearBottom: geometry.visibleRect.maxY >= geometry.contentSize.height - 48,
           height: geometry.contentSize.height)
       } action: { old, new in
-        edgeNearBottom = new.nearBottom
         if BottomFollow.shouldFollow(
           heightChanged: new.height != old.height, atBottom: atBottom, userScrolling: userScrolling)
         {
@@ -120,16 +129,6 @@ struct ThreadScreen: View {
       }
       .onChange(of: model.runningRuns.count) { _, _ in
         if atBottom { withAnimation { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
-      }
-      .task(id: divider) {
-        guard let divider, !scrolledToDivider else { return }
-        scrolledToDivider = true
-        atBottom = false
-        try? await Task.sleep(for: .milliseconds(150))
-        proxy.scrollTo(divider, anchor: .top)
-        // A short thread does not move, so no geometry change reports that it is still at the bottom.
-        try? await Task.sleep(for: .milliseconds(350))
-        atBottom = edgeNearBottom
       }
       .overlay(alignment: .bottomTrailing) {
         if !atBottom {
