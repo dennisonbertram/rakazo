@@ -32,7 +32,10 @@ export function fundraisingToolsAllowed(
 const dollars = (cents: number | null | undefined) => (cents == null ? null : cents / 100);
 
 type FundraisingToolDeps = {
-  prisma: Pick<PrismaClient, "$transaction" | "contact" | "fundraiseRound" | "safe">;
+  prisma: Pick<
+    PrismaClient,
+    "$transaction" | "$executeRaw" | "contact" | "fundraiseRound" | "safe"
+  >;
   /** The agent running the tool, from the run, for "added by". */
   botId?: string;
   /** From the run (the bot owner), never from model input. */

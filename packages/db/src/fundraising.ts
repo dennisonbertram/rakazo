@@ -1,9 +1,9 @@
 import type {
   Contact,
+  ContactStage,
   FundraiseRound,
   FundraiseRoundSaveInput,
   FundraisingOverview,
-  ContactStage,
   ProspectImportResult,
   ProspectImportRow,
   ProspectSaveInput,
@@ -197,7 +197,7 @@ const normalized = (value: string | null | undefined) =>
   (value ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 
 type Known = { id: string; name: string; organization: string | null; email: string | null };
-type ImportDb = Pick<PrismaClient, "$transaction" | "contact" | "fundraiseRound">;
+type ImportDb = Pick<PrismaClient, "$transaction" | "$executeRaw" | "contact" | "fundraiseRound">;
 
 /**
  * Finds the saved prospect a row means. A firm-only row (no person, or the firm as the name) means
@@ -307,11 +307,12 @@ async function importRows(
         checkSizeCents: input.checkSizeCents,
         stage: input.stage,
       };
-      const changes: Partial<Record<keyof typeof wanted, string | number | null>> = {};
+      const changes: Prisma.ContactUncheckedUpdateManyInput = {};
       for (const key of Object.keys(wanted) as (keyof typeof wanted)[]) {
         const next = wanted[key];
         if (next == null || next === current[key]) continue;
-        if (options.overwrite || current[key] == null || current[key] === "") changes[key] = next;
+        if (options.overwrite || current[key] == null || current[key] === "")
+          Object.assign(changes, { [key]: next });
       }
       if (Object.keys(changes).length === 0) {
         report("skipped", "Already saved; nothing to change.");
