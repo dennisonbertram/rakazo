@@ -58,8 +58,9 @@ import type { Sort } from "../../lib/list-params";
 import { useListParams } from "../../lib/list-params";
 import { errorText } from "../../lib/user-error";
 import { AskBotButton } from "../AskBotButton";
+import { SeeAll, useCappedRows } from "../CappedList";
 import { ShowAmountsButton } from "../HideAmountsToggle";
-import { PickFilter, SearchField, SortControl } from "../ListControls";
+import { PickFilter, SearchField, SortControl, usePhone } from "../ListControls";
 import { PageNavButton } from "../PageHeader";
 import { StillLoading } from "../ShellSkeleton";
 
@@ -888,6 +889,8 @@ export function TransactionTable({
   );
 }
 
+/** Most rows a transaction list with a full page shows on a wide screen. */
+const TRANSACTION_ROWS = 25;
 const FILTER_PARAMS = ["q", "category", "status"] as const;
 
 /**
@@ -901,11 +904,14 @@ export function TransactionsSection({
   rows,
   empty,
   fixedCategory = false,
+  seeAll,
 }: {
   title?: ReactNode;
   rows: FinanceTransaction[];
   empty?: ReactNode;
   fixedCategory?: boolean;
+  /** The page with every row, search and filters. Set, the list shows 3 rows on a phone and 25 wide, then "See all (N)". */
+  seeAll?: string;
 }) {
   // Remembered per page, so choosing By vendor on one page does not hide dates on the next.
   const page = useLocation().pathname;
@@ -921,11 +927,17 @@ export function TransactionsSection({
     status: list.param("status"),
   };
   const filtered = Object.values(filters).some(Boolean);
-  const shown = sortTransactions(
+  const sorted = sortTransactions(
     filterTransactions(rows, filters, categoryLabel),
     list.sort,
     categoryLabel,
   );
+  const capped = useCappedRows(
+    sorted,
+    seeAll ? { desktop: TRANSACTION_ROWS } : { phone: Number.POSITIVE_INFINITY },
+  );
+  const shown = capped.rows;
+  const phone = usePhone();
   // Grouping one vendor's charges by vendor changes nothing, so the switch is left out. It follows
   // all the rows, not the filtered ones, so filtering never makes the switch vanish.
   const manyVendors = groupByVendor(rows).length > 1;
@@ -941,7 +953,7 @@ export function TransactionsSection({
   };
   const categories = unique(rows.map(categoryLabel));
   const toolbar =
-    rows.length > 1 ? (
+    rows.length > 1 && !(seeAll && phone) ? (
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <SearchField
           name="transactions-search"
@@ -1020,6 +1032,11 @@ export function TransactionsSection({
           )
         }
       />
+      {seeAll ? (
+        <div className="mt-2 flex justify-end">
+          <SeeAll list={capped} to={seeAll} desktop="link" />
+        </div>
+      ) : null}
     </Section>
   );
 }
