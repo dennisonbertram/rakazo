@@ -119,6 +119,7 @@ const SYNC_POLL_MS = 2_000;
 const SYNC_POLL_MAX_MS = 10_000;
 const SYNC_POLL_MAX = 60;
 const couldNotArchive = (count: number) => t`Couldn't archive ${count}`;
+const couldNotRestore = (count: number) => t`Couldn't restore ${count}`;
 // ponytail: bounded polling while triage runs; add a user-level event if it often takes longer than 30 seconds.
 const CONSENT_DISMISSED_KEY = "rakazo.inboxConsentDismissed";
 /** The dismissal belongs to one user in one space; without that scope it lasts only until the page closes. */
@@ -170,8 +171,8 @@ let rememberedTab: string | undefined;
 
 type Status =
   | { kind: "marked"; messageId: string; mark: InboxMark; sender: string }
-  | { kind: "archived"; messageId: string; subject: string }
-  | { kind: "archivedMany"; messageIds: string[] }
+  | { kind: "archived"; messageId: string; subject: string; row?: MailRow }
+  | { kind: "archivedMany"; messageIds: string[]; rows: MailRow[] }
   | { kind: "tracked"; messageId: string; subject: string }
   | {
       kind: "junked";
@@ -855,13 +856,14 @@ function InboxListPage({
     !category &&
     (pileCounts ? Object.values(pileCounts).every((n) => n === 0) : true);
   // Applies a change to every copy of the rows: the list, the pages after it and the cached lists.
-  const patchRows = (change: (rows: MailRow[], searched: boolean) => MailRow[]) => {
+  // `first` is false for the pages loaded after the first one.
+  const patchRows = (change: (rows: MailRow[], searched: boolean, first: boolean) => MailRow[]) => {
     const patch = (list: InboxListOutput, searched: boolean) => ({
       ...list,
-      rows: change(list.rows, searched),
+      rows: change(list.rows, searched, true),
     });
     setData((list) => list && patch(list, Boolean(query)));
-    setMore((m) => ({ ...m, rows: change(m.rows, Boolean(query)) }));
+    setMore((m) => ({ ...m, rows: change(m.rows, Boolean(query), false) }));
     // The key is [tab, filter, query, pile, category].
     for (const [key, list] of cache.current)
       cache.current.set(key, patch(list, Boolean(JSON.parse(key)[2])));
@@ -895,20 +897,39 @@ function InboxListPage({
     setStatus(tracked ? { kind: "tracked", messageId, subject } : null);
     change(tracked ? rpc.inbox.track({ messageId }) : rpc.inbox.untrack({ messageId }));
   };
+  // A search also finds archived mail, so its row stays and says Archived.
+  const takeOut = (gone: Set<string>) =>
+    patchRows((list, searched) =>
+      searched
+        ? list.map((row) => (gone.has(row.id) ? { ...row, inInbox: false } : row))
+        : list.filter((row) => !gone.has(row.id)),
+    );
+  // Undo shows the rows again before the server answers, in their place by date; a failed Undo takes them out again.
+  const putBack = (back: MailRow[]) =>
+    patchRows((list, searched, first) => {
+      if (searched)
+        return list.map((row) =>
+          back.some((b) => b.id === row.id) ? { ...row, inInbox: true } : row,
+        );
+      // The pages after the first reload with the list; only the first list takes the rows.
+      if (!first) return list;
+      const next = [...list];
+      for (const row of back) {
+        if (next.some((r) => r.id === row.id)) continue;
+        const at = next.findIndex((r) => r.receivedAt < row.receivedAt);
+        next.splice(at < 0 ? next.length : at, 0, row);
+      }
+      return next;
+    });
   const archive = (messageId: string) => {
     // The selection and the open message move on to a neighbor before the row goes.
     const index = ids.indexOf(messageId);
     const neighbor = ids[index + 1] ?? ids[index - 1];
     // A touch screen has no keyboard cursor to carry over, so no row stays highlighted.
     if (selectedId === messageId) setSelectedId(coarsePointer() ? undefined : neighbor);
-    const subject = rows.find((row) => row.id === messageId)?.subject ?? "";
-    // A search also finds archived mail, so its row stays and says Archived.
-    patchRows((list, searched) =>
-      searched
-        ? list.map((row) => (row.id === messageId ? { ...row, inInbox: false } : row))
-        : list.filter((row) => row.id !== messageId),
-    );
-    setStatus({ kind: "archived", messageId, subject });
+    const row = rows.find((r) => r.id === messageId);
+    takeOut(new Set([messageId]));
+    setStatus({ kind: "archived", messageId, subject: row?.subject ?? "", row });
     // A pending Move to Inbox finishes first, so the archive is not overtaken by it.
     const call = (archiving.current.get(messageId) ?? Promise.resolve()).then(() =>
       rpc.inbox.archive({ messageId }),
@@ -924,8 +945,9 @@ function InboxListPage({
     change(call);
     return neighbor;
   };
-  const unarchive = async (messageId: string) => {
+  const unarchive = async (messageId: string, row?: MailRow) => {
     setStatus(null);
+    if (row) putBack([row]);
     const saved = await archiving.current.get(messageId);
     archiving.current.delete(messageId);
     // A failed archive already showed its error and reloaded the list.
@@ -934,7 +956,10 @@ function InboxListPage({
     rpc.inbox
       .unarchive({ messageId })
       .then(onRefreshed)
-      .catch((cause) => setError(errorText(cause)))
+      .catch((cause) => {
+        takeOut(new Set([messageId]));
+        setError(errorText(cause));
+      })
       .then(() => setReload((n) => n + 1));
   };
   // The row leaves Needs reply at once; the server counts it and says when this was the third.
@@ -1003,17 +1028,17 @@ function InboxListPage({
               ids.slice(0, Math.max(index, 0)).reverse().find(stays)),
       );
     }
-    patchRows((list, searched) =>
-      searched
-        ? list.map((row) => (gone.has(row.id) ? { ...row, inInbox: false } : row))
-        : list.filter((row) => !gone.has(row.id)),
-    );
+    takeOut(gone);
   };
   const archiveMany = (candidates: MailRow[]) => {
     const messageIds = archivableIds(candidates, spamView);
     if (messageIds.length === 0) return;
     dropFromView(new Set(messageIds));
-    setStatus({ kind: "archivedMany", messageIds });
+    setStatus({
+      kind: "archivedMany",
+      messageIds,
+      rows: candidates.filter((row) => messageIds.includes(row.id)),
+    });
     setError("");
     // A pending Move to Inbox finishes first, so the archive is not overtaken by it.
     const call = Promise.all(messageIds.map((id) => archiving.current.get(id))).then(() =>
@@ -1042,8 +1067,9 @@ function InboxListPage({
         setReload((n) => n + 1);
       });
   };
-  const unarchiveMany = async (messageIds: string[]) => {
+  const unarchiveMany = async (messageIds: string[], back: MailRow[]) => {
     setStatus(null);
+    putBack(back);
     const saved = await Promise.all(messageIds.map((id) => archiving.current.get(id)));
     for (const id of messageIds) archiving.current.delete(id);
     // An id whose archive failed is already back with the reloaded list.
@@ -1051,9 +1077,18 @@ function InboxListPage({
     if (restore.length === 0) return;
     setError("");
     bulkInChunks(restore, (slice) => rpc.inbox.unarchiveMany({ messageIds: slice }))
-      // A thread Gmail could not put back stays archived, and the reloaded list shows that.
-      .then(onRefreshed)
-      .catch((cause) => setError(errorText(cause)))
+      // A thread Gmail could not put back stays archived, so its row leaves again.
+      .then((result) => {
+        onRefreshed();
+        if (result.failed.length) {
+          takeOut(new Set(result.failed.map((f) => f.messageId)));
+          setError(couldNotRestore(result.failed.length));
+        }
+      })
+      .catch((cause) => {
+        takeOut(new Set(restore));
+        setError(errorText(cause));
+      })
       .then(() => setReload((n) => n + 1));
   };
   // Spam, not spam and trash work like a bulk archive: the rows leave at once and Undo reverses the logged batches.
@@ -1404,13 +1439,13 @@ function InboxListPage({
           size="sm"
           onClick={() =>
             status.kind === "archivedMany"
-              ? unarchiveMany(status.messageIds)
+              ? unarchiveMany(status.messageIds, status.rows)
               : status.kind === "tracked"
                 ? setTracked(status.messageId, false)
                 : status.kind === "junked"
                   ? undoMove(status.batches)
                   : status.kind === "archived"
-                    ? unarchive(status.messageId)
+                    ? unarchive(status.messageId, status.row)
                     : status.kind === "moved"
                       ? archive(status.messageId)
                       : status.kind === "stopped"

@@ -727,6 +727,34 @@ it("waits for a slow archive to finish before Undo restores the thread", async (
   expect(rpcMock.unarchive).toHaveBeenCalledWith({ messageId: "b" });
 });
 
+it("Undo brings the row back at once, before the server or the list answers", async () => {
+  const c = await render();
+  await click(byText(c, "archive b"));
+  expect(c.querySelector('[data-row-id="b"]')).toBeNull();
+  rpcMock.unarchive.mockReturnValue(new Promise(() => {}));
+  rpcMock.list.mockReturnValue(new Promise(() => {}));
+  await click(byText(c.querySelector('[role="status"]') as HTMLElement, "Undo"));
+  expect(c.querySelector('[data-row-id="b"]')).not.toBeNull();
+});
+
+it("Undo while the archive is still running brings the row back at once", async () => {
+  rpcMock.archive.mockReturnValue(new Promise(() => {}));
+  const c = await render();
+  await click(byText(c, "archive b"));
+  await click(byText(c.querySelector('[role="status"]') as HTMLElement, "Undo"));
+  expect(c.querySelector('[data-row-id="b"]')).not.toBeNull();
+});
+
+it("a failed Undo removes the row again and shows the error", async () => {
+  const c = await render();
+  await click(byText(c, "archive b"));
+  rpcMock.unarchive.mockRejectedValue(new Error("Gmail said no"));
+  rpcMock.list.mockReturnValue(new Promise(() => {}));
+  await click(byText(c.querySelector('[role="status"]') as HTMLElement, "Undo"));
+  expect(c.querySelector('[role="alert"]')?.textContent).toContain("Gmail said no");
+  expect(c.querySelector('[data-row-id="b"]')).toBeNull();
+});
+
 it("skips Undo when the archive itself failed", async () => {
   rpcMock.archive.mockRejectedValue(new Error("nope"));
   const c = await render();
@@ -1867,6 +1895,21 @@ describe("selecting rows", () => {
     await act(async () => finish({ done: ["a", "b"], failed: [] }));
     expect(rpcMock.unarchiveMany).toHaveBeenCalledTimes(1);
     expect(rpcMock.unarchiveMany).toHaveBeenCalledWith({ messageIds: ["a", "b"] });
+  });
+
+  it("Undo brings the whole selection back at once, and a failed Undo removes it again", async () => {
+    const c = await pickTwo(await render());
+    await press("e");
+    expect(c.querySelector('[data-row-id="a"]')).toBeNull();
+    rpcMock.unarchiveMany.mockResolvedValue({
+      done: ["a"],
+      failed: [{ messageId: "b", reason: "unavailable" }],
+    });
+    rpcMock.list.mockReturnValue(new Promise(() => {}));
+    await click(byText(toast(c), "Undo"));
+    expect(c.querySelector('[data-row-id="a"]')).not.toBeNull();
+    expect(c.querySelector('[data-row-id="b"]')).toBeNull();
+    expect(c.querySelector('[role="alert"]')).not.toBeNull();
   });
 
   it("undoes only the threads that were archived, and reloads the list for a partial failure", async () => {
