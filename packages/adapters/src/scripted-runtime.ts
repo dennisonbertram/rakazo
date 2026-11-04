@@ -444,6 +444,29 @@ code-b
       },
     ];
   }
+  // "fundraising fixture round|prospects <json>": the Investors agent's writes, for demo and tests.
+  const fundraisingFixture = /fundraising fixture (round|prospects)\s+(\{[\s\S]*\})/i.exec(prompt);
+  if (fundraisingFixture) {
+    try {
+      const args = JSON.parse(fundraisingFixture[2] as string) as Record<string, unknown>;
+      return [
+        {
+          toolCalls: [
+            {
+              name:
+                fundraisingFixture[1]?.toLowerCase() === "round"
+                  ? "fundraising_round_save"
+                  : "fundraising_prospects_save",
+              args,
+            },
+          ],
+          complete: true,
+        },
+      ];
+    } catch {
+      // Not JSON: fall through to the other intents.
+    }
+  }
   if (
     lower.includes("create a space") ||
     lower.includes("create space") ||
