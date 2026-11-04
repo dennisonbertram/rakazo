@@ -73,16 +73,21 @@ it("shows 3 SAFEs on a phone and expands the rest in place", async () => {
   expect(el.querySelectorAll("[data-safe-id]").length).toBe(5);
 });
 
-it("links the cap table's SAFE rows to the Fundraising page past 3", async () => {
+it("expands the cap table's SAFE rows in place past 3", async () => {
   await render(<SafeRows safes={five.map(safe)} />);
   expect(el.querySelectorAll("li").length).toBe(3);
-  const link = [...el.querySelectorAll("a")].find((a) => a.textContent === "See all (5)");
-  expect(link?.getAttribute("href")).toBe("/app/fundraising");
+  expect([...el.querySelectorAll("a")].some((a) => a.textContent?.startsWith("See all"))).toBe(
+    false,
+  );
+  const button = [...el.querySelectorAll("button")].find((b) => b.textContent === "See all (5)");
+  await act(async () => button?.click());
+  expect(el.querySelectorAll("li").length).toBe(5);
 });
 
-it("opens a stage when the just-saved prospect would be hidden", async () => {
-  await render(
-    <Pipeline prospects={five.map(prospect)} savedId="c5" onEdit={() => {}} onMove={() => {}} />,
-  );
-  expect(el.querySelectorAll("[data-contact-id]").length).toBe(5);
+it("shows exactly 3 rows in the Target stage with See all (5), and not fewer", async () => {
+  const target = (n: number) => ({ ...prospect(n), stage: "target" }) as Contact;
+  await render(<Pipeline prospects={five.map(target)} onEdit={() => {}} onMove={() => {}} />);
+  const section = el.querySelector("section[aria-label='Target']");
+  expect(section?.querySelectorAll("[data-contact-id]").length).toBe(3);
+  expect(section?.textContent).toContain("See all (5)");
 });

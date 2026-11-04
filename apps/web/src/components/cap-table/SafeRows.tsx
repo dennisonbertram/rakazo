@@ -55,7 +55,7 @@ export function SafeRows({ safes }: { safes: readonly Safe[] }) {
         ))}
       </ul>
       <div className="flex justify-end">
-        <SeeAll list={list} to="/app/fundraising" />
+        <SeeAll list={list} />
       </div>
     </section>
   );
