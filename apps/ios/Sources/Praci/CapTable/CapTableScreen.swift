@@ -20,13 +20,13 @@ struct CapTableScreen: View {
               }
             }
           }
-          Section("Holders") {
-            ForEach(snapshot.holders.sortedByOwnership()) { holder in
-              NavigationLink {
-                HolderDetailView(holder: holder, hide: model.hideAmounts)
-              } label: {
-                HolderRow(holder: holder, hide: model.hideAmounts)
-              }
+          CappedSection(
+            title: "Holders", items: snapshot.holders, spec: holdersSpec(snapshot.holders)
+          ) { holder in
+            NavigationLink {
+              HolderDetailView(holder: holder, hide: model.hideAmounts)
+            } label: {
+              HolderRow(holder: holder, hide: model.hideAmounts)
             }
           }
         }
