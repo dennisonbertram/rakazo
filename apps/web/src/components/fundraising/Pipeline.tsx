@@ -14,10 +14,12 @@ import {
   DropdownMenuTrigger,
 } from "@rakazo/ui-web";
 import { ChevronRight, MoreHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { shortDay, usdFigure } from "../../lib/finance-format";
 import { useHideAmounts } from "../../lib/hide-amounts-preference";
 import { SAVED_ROW_CLASS } from "../../lib/use-contact-notices";
+import { SeeAll, useCappedRows } from "../CappedList";
 import { contactStageNames } from "../ContactDialog";
 
 function ProspectRow({
@@ -195,7 +197,11 @@ export function Pipeline({
               {stageNames[stage]}
               <span className="font-normal">{inStage(stage).length}</span>
             </h3>
-            <ul>{inStage(stage).map(row)}</ul>
+            <StageRows
+              prospects={inStage(stage)}
+              row={row}
+              seeAll={`/app/investors?tab=contacts&stage=${stage}`}
+            />
           </section>
         ))}
       {passed.length > 0 ? (
@@ -213,9 +219,36 @@ export function Pipeline({
             />
             {stageNames.passed} {passed.length}
           </Button>
-          {showPassed ? <ul>{passed.map(row)}</ul> : null}
+          {showPassed ? (
+            <StageRows
+              prospects={passed}
+              row={row}
+              seeAll="/app/investors?tab=contacts&stage=passed"
+            />
+          ) : null}
         </section>
       ) : null}
     </div>
+  );
+}
+
+/** One stage's rows: 3 on a phone and 10 wide, then See all opens them in the Contacts list, filtered to the stage. */
+function StageRows({
+  prospects,
+  row,
+  seeAll,
+}: {
+  prospects: Contact[];
+  row: (prospect: Contact) => ReactNode;
+  seeAll: string;
+}) {
+  const list = useCappedRows(prospects, { desktop: 10 });
+  return (
+    <>
+      <ul>{list.rows.map(row)}</ul>
+      <div className="flex justify-end">
+        <SeeAll list={list} to={seeAll} desktop="link" />
+      </div>
+    </>
   );
 }
