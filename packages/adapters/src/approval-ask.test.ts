@@ -658,3 +658,36 @@ describe("Brex cards approval preview", () => {
     );
   });
 });
+
+describe("mail_reply_batch card", () => {
+  const rows = [
+    {
+      to: ["Sam Rivera <sam@customer.example>"],
+      cc: ["Billing <billing@other.example>"],
+      bcc: [],
+      subject: "Re: one",
+      flags: ["not_on_thread", "has_link"] as const,
+    },
+    { to: ["lee@customer.example"], cc: [], bcc: [], subject: "Re: two", flags: [] },
+  ];
+
+  it("offers only Discard, even without the noAlwaysAllow option", () => {
+    const block = buildApprovalAskBlock("e1", "mail_reply_batch", {}, [], { mailBatch: rows });
+    expect(block).toMatchObject({
+      kind: "ask",
+      text: "2 replies",
+      mailBatch: { count: 2, sent: 0, failed: 0, unknown: 0 },
+      actions: [{ id: "deny", label: "Discard" }],
+    });
+    // Not the exact tool id: this card's title is written by hand.
+    expect(block).not.toHaveProperty("toolId");
+  });
+
+  it("lists every recipient as a bare address with the most serious flag", () => {
+    const block = buildApprovalAskBlock("e1", "mail_reply_batch", {}, [], { mailBatch: rows });
+    if (block.kind !== "ask") throw new Error("not an ask");
+    expect(block.detail).toBe(
+      "sam@customer.example, billing@other.example: Re: one (Not on this thread)\nlee@customer.example: Re: two",
+    );
+  });
+});

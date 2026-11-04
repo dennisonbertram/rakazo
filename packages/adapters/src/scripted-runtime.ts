@@ -207,6 +207,35 @@ export function inferScript(
       },
     ];
   }
+  if (lower.includes("reply batch card to ")) {
+    // "reply batch card to id1,id2,id3 from a@b.test": one row per id, to a fixed test address.
+    // "with stranger" puts a Cc that is on no thread on the first row.
+    const ids =
+      /reply batch card to\s+([^\s]+)/i.exec(prompt)?.[1]?.split(",").filter(Boolean) ?? [];
+    const from = /\bfrom\s+([^\s,]+@[^\s,]+)/i.exec(prompt)?.[1];
+    const stranger = lower.includes("with stranger");
+    return [
+      {
+        assistant: "these replies need your approval.",
+        toolCalls: [
+          {
+            name: "mail_reply_batch",
+            args: {
+              ...(from ? { account: from } : {}),
+              replies: ids.map((replyToId, index) => ({
+                replyToId,
+                to: ["customer@example.test"],
+                ...(stranger && index === 0 ? { cc: ["stranger@elsewhere.example.test"] } : {}),
+                subject: `Re: thread ${index + 1}`,
+                body: `Thanks for writing. This is reply ${index + 1}.`,
+              })),
+            },
+          },
+        ],
+      },
+      { assistant: "the replies are handled on the card.", complete: true },
+    ];
+  }
   if (lower.includes("send email card")) {
     // "send email card from sales@example.test" names the account; otherwise the fixed test one.
     const from = /\bfrom\s+([^\s,]+@[^\s,]+)/i.exec(prompt)?.[1];

@@ -40,6 +40,7 @@ export const MAIL_TOOL_NAMES = new Set([
   "mail_draft",
   "mail_modify",
   "mail_send",
+  "mail_reply_batch",
 ]);
 
 const SEARCH_TTL_MS = 24 * 3_600_000;
@@ -279,7 +280,11 @@ export function findAccount(accounts: MailAccount[], wanted: string): MailAccoun
   return named.length === 1 ? named[0] : undefined;
 }
 
-async function noAccount(deps: MailToolDeps, usable: MailAccount[], wanted: string) {
+async function noAccount(
+  deps: Pick<MailToolDeps, "ownerAccounts" | "readableAccounts">,
+  usable: MailAccount[],
+  wanted: string,
+) {
   const owned = deps.ownerAccounts ? await deps.ownerAccounts().catch(() => []) : [];
   const forbidden = findAccount(owned, wanted);
   if (!forbidden) return { error: `No connected mail account ${wanted.trim().slice(0, 200)}` };
@@ -737,8 +742,8 @@ export async function recoveryMailAccount(
 }
 
 /** The account named by `args.account`, the only connected one, or the one the message is in. */
-async function resolveAccount(
-  deps: MailToolDeps,
+export async function resolveAccount(
+  deps: Pick<MailToolDeps, "accounts" | "ownerAccounts" | "readableAccounts" | "prisma" | "scope">,
   args: Record<string, unknown>,
 ): Promise<{ account: MailAccount } | { error: string }> {
   const accounts = await deps.accounts();

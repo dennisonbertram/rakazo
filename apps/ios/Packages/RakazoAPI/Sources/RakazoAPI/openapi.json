@@ -8803,6 +8803,38 @@
                                                   ],
                                                   "additionalProperties": false
                                                 },
+                                                "mailBatch": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "count": {
+                                                      "type": "integer",
+                                                      "exclusiveMinimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "sent": {
+                                                      "type": "integer",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "failed": {
+                                                      "type": "integer",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "unknown": {
+                                                      "type": "integer",
+                                                      "minimum": 0,
+                                                      "maximum": 9007199254740991
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "count",
+                                                    "sent",
+                                                    "failed",
+                                                    "unknown"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
                                                 "share": {
                                                   "type": "boolean"
                                                 },
@@ -45599,6 +45631,38 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "mailBatch": {
+                                          "type": "object",
+                                          "properties": {
+                                            "count": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "sent": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "failed": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "unknown": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            }
+                                          },
+                                          "required": [
+                                            "count",
+                                            "sent",
+                                            "failed",
+                                            "unknown"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "share": {
                                           "type": "boolean"
                                         },
@@ -62783,6 +62847,38 @@
                                             "bcc",
                                             "subject",
                                             "body"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "mailBatch": {
+                                          "type": "object",
+                                          "properties": {
+                                            "count": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "sent": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "failed": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "unknown": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            }
+                                          },
+                                          "required": [
+                                            "count",
+                                            "sent",
+                                            "failed",
+                                            "unknown"
                                           ],
                                           "additionalProperties": false
                                         },
@@ -121965,6 +122061,38 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "mailBatch": {
+                                          "type": "object",
+                                          "properties": {
+                                            "count": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "sent": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "failed": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "unknown": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            }
+                                          },
+                                          "required": [
+                                            "count",
+                                            "sent",
+                                            "failed",
+                                            "unknown"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "share": {
                                           "type": "boolean"
                                         },
@@ -124374,6 +124502,38 @@
                                             "bcc",
                                             "subject",
                                             "body"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "mailBatch": {
+                                          "type": "object",
+                                          "properties": {
+                                            "count": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "sent": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "failed": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            },
+                                            "unknown": {
+                                              "type": "integer",
+                                              "minimum": 0,
+                                              "maximum": 9007199254740991
+                                            }
+                                          },
+                                          "required": [
+                                            "count",
+                                            "sent",
+                                            "failed",
+                                            "unknown"
                                           ],
                                           "additionalProperties": false
                                         },
@@ -134496,7 +134656,7 @@
         ]
       },
       "RpcBotsUpdateInputSchema22": {
-        "maxItems": 138,
+        "maxItems": 139,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"

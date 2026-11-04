@@ -350,3 +350,25 @@ describe("inferScript send email card", () => {
     ]);
   });
 });
+
+describe("inferScript reply batch card", () => {
+  it("proposes one row per id from the named account", () => {
+    const [step] = inferScript("reply batch card to m1,m2,m3 from support@example.test");
+    const call = step?.toolCalls?.[0];
+    expect(call?.name).toBe("mail_reply_batch");
+    const args = call?.args as {
+      account?: string;
+      replies: { replyToId: string; cc?: string[] }[];
+    };
+    expect(args.account).toBe("support@example.test");
+    expect(args.replies.map((reply) => reply.replyToId)).toEqual(["m1", "m2", "m3"]);
+    expect(args.replies.some((reply) => reply.cc)).toBe(false);
+  });
+
+  it("puts an off-thread Cc on the first row with stranger", () => {
+    const [step] = inferScript("reply batch card to m1,m2 from support@example.test with stranger");
+    const args = step?.toolCalls?.[0]?.args as { replies: { cc?: string[] }[] };
+    expect(args.replies[0]?.cc).toEqual(["stranger@elsewhere.example.test"]);
+    expect(args.replies[1]?.cc).toBeUndefined();
+  });
+});

@@ -202,10 +202,13 @@ export interface AnswerRunInput {
   mailDenial?: { note: string; mail: Partial<MailApproval> };
 }
 
-export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send"]);
+export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send", "mail_reply_batch"]);
 
 /** The compose record key of an edited mail approval: one record per approval effect. */
 export const mailApprovalComposeClientId = (effectId: string) => `approval_${effectId}`;
+
+/** The compose record of one batch reply: one per row, so only one worker can move it to pending. */
+export const mailReplyClientId = (itemId: string) => `agent:batch_${itemId}`;
 
 export interface SendUserMessageInput {
   spaceId: string;

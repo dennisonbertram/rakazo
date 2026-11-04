@@ -205,6 +205,32 @@ export const MailEditsSchema = z
   .strict();
 export type MailEdits = z.infer<typeof MailEditsSchema>;
 
+/** The tool that proposes several replies on one card. */
+export const MAIL_REPLY_BATCH_TOOL = "mail_reply_batch";
+/** Rows per call. Over this the call is refused with a message to split it. */
+export const MAX_MAIL_REPLY_BATCH = 20;
+
+/** What a reply batch card shows at a glance; the rows come from `threads.mailBatch`. */
+export const MailBatchCountsSchema = z.object({
+  count: z.number().int().positive(),
+  sent: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  unknown: z.number().int().nonnegative(),
+});
+export type MailBatchCounts = z.infer<typeof MailBatchCountsSchema>;
+
+/** Reasons to look at one reply, most serious first. All but `has_link` start the row unticked. */
+export const MAIL_REPLY_FLAGS = [
+  "not_on_thread",
+  "new_message",
+  "important_sender",
+  "no_reply_address",
+  "no_reply_needed",
+  "has_link",
+] as const;
+export const MailReplyFlagSchema = z.enum(MAIL_REPLY_FLAGS);
+export type MailReplyFlag = z.infer<typeof MailReplyFlagSchema>;
+
 /** The effect kind of a bot-to-bot message held for the owner before it reaches an external bot. */
 export const BOT_SHARE_EFFECT_KIND = "bot_message_share";
 /** Server-written replies to the external bot; never model text. */
@@ -231,6 +257,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     /** The service that must still approve a money request on its own side after the person allows it. */
     waitsFor: z.string().optional(),
     mail: MailApprovalSchema.optional(),
+    /** A reply batch: Discard is the card's only action; Send selected is its own request. */
+    mailBatch: MailBatchCountsSchema.optional(),
     /**
      * A held message from one bot to an external bot: Allow delivers exactly the text on the card,
      * once. It is answered without a waiting run.

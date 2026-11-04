@@ -996,6 +996,44 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "mail_reply_batch",
+    description:
+      "Propose separate replies to several email threads at once, each in its own thread, on one approval card. The user reviews and edits them, picks which to send, and presses Send selected; nothing goes out before that. Replies only: every row needs replyToId, and each thread can appear once. At most 20 rows per call, all from one account; for more, or for a second account, call it again after the result.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        account: {
+          type: "string",
+          description:
+            "Address of the connected account. Without it, the account the first replyToId is in.",
+        },
+        replies: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              replyToId: {
+                type: "string",
+                description: "Id of the message this answers.",
+              },
+              to: {
+                type: "array",
+                items: { type: "string" },
+                description: "Addresses, e.g. Name <a@b.com>.",
+              },
+              cc: { type: "array", items: { type: "string" } },
+              bcc: { type: "array", items: { type: "string" } },
+              subject: { type: "string" },
+              body: { type: "string", description: "Plain text." },
+            },
+            required: ["replyToId", "to", "subject", "body"],
+          },
+        },
+      },
+      required: ["replies"],
+    },
+  },
+  {
     name: "mail_modify",
     description:
       "Change a conversation in the user's mail: mark read or unread, archive or move back to the inbox, add or remove labels. Marking read, archiving and labels apply to every message of the conversation; marking unread applies to the one message. Use the id from a mail_grep row. Cannot delete, trash or report spam. Needs the user's approval.",
