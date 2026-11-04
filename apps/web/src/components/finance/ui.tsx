@@ -58,6 +58,7 @@ import type { Sort } from "../../lib/list-params";
 import { useListParams } from "../../lib/list-params";
 import { errorText } from "../../lib/user-error";
 import { AskBotButton } from "../AskBotButton";
+import { SeeAll, useCappedRows } from "../CappedList";
 import { ShowAmountsButton } from "../HideAmountsToggle";
 import { PickFilter, SearchField, SortControl } from "../ListControls";
 import { PageNavButton } from "../PageHeader";
@@ -901,11 +902,14 @@ export function TransactionsSection({
   rows,
   empty,
   fixedCategory = false,
+  seeAll,
 }: {
   title?: ReactNode;
   rows: FinanceTransaction[];
   empty?: ReactNode;
   fixedCategory?: boolean;
+  /** The page with every row, search and filters. Set, the list shows 3 rows on a phone and 25 wide, then "See all (N)". */
+  seeAll?: string;
 }) {
   // Remembered per page, so choosing By vendor on one page does not hide dates on the next.
   const page = useLocation().pathname;
@@ -921,7 +925,7 @@ export function TransactionsSection({
     status: list.param("status"),
   };
   const filtered = Object.values(filters).some(Boolean);
-  const shown = sortTransactions(
+  const sorted = sortTransactions(
     filterTransactions(rows, filters, categoryLabel),
     list.sort,
     categoryLabel,
@@ -930,6 +934,22 @@ export function TransactionsSection({
   // all the rows, not the filtered ones, so filtering never makes the switch vanish.
   const manyVendors = groupByVendor(rows).length > 1;
   const grouped = preferGrouped && manyVendors;
+  // A phone caps what is drawn, never what is totalled: By vendor caps whole vendors, so each
+  // vendor's total still covers all its charges.
+  const units: (FinanceTransaction | VendorGroup)[] = grouped
+    ? sortTransactionGroups(groupByVendor(sorted), list.sort, categoryLabel)
+    : sorted;
+  const capped = useCappedRows(units, seeAll ? {} : { phone: Number.POSITIVE_INFINITY });
+  const shown = capped.rows.flatMap((unit) => ("rows" in unit ? unit.rows : [unit]));
+  // The full page lists transactions, so it matches only the flat list; the filters and sort go with it.
+  const { search } = useLocation();
+  const carried = new URLSearchParams(search);
+  for (const key of [...carried.keys()])
+    if (!["q", "status", "sort", "dir"].includes(key)) carried.delete(key);
+  const fullPage =
+    seeAll && !grouped
+      ? `${seeAll}${carried.size ? `${seeAll.includes("?") ? "&" : "?"}${carried}` : ""}`
+      : undefined;
   const unique = (values: string[]): [string, string][] =>
     [...new Set(values)].sort((a, b) => a.localeCompare(b)).map((v) => [v, v]);
   const statuses = [...new Set(rows.map((row) => row.status))];
@@ -978,6 +998,11 @@ export function TransactionsSection({
             onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
           />
         </span>
+        {filtered ? (
+          <Button variant="ghost" size="sm" onClick={() => list.clear(...FILTER_PARAMS)}>
+            <Trans>Clear filters</Trans>
+          </Button>
+        ) : null}
       </div>
     ) : null;
   return (
@@ -1007,19 +1032,13 @@ export function TransactionsSection({
         rows={shown}
         grouped={grouped}
         sort={{ value: list.sort, onToggle: list.toggleSort }}
-        empty={
-          filtered ? (
-            <span className="flex items-center gap-3">
-              <Trans>No matches</Trans>
-              <Button variant="outline" size="sm" onClick={() => list.clear(...FILTER_PARAMS)}>
-                <Trans>Clear filters</Trans>
-              </Button>
-            </span>
-          ) : (
-            empty
-          )
-        }
+        empty={filtered ? <Trans>No matches</Trans> : empty}
       />
+      {seeAll ? (
+        <div className="mt-2 flex justify-end">
+          <SeeAll list={capped} {...(fullPage ? { to: fullPage } : {})} />
+        </div>
+      ) : null}
     </Section>
   );
 }

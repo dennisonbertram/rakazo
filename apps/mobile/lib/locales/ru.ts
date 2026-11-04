@@ -1016,4 +1016,8 @@ export const RU_MESSAGES: Record<string, string> = {
   "Needs reply stopped": "Ответ не требуется: остановлено",
   "No reply needed": "Ответ не нужен",
   "Stopped Needs reply for {sender}": "Остановлено «Нужен ответ» для {sender}",
+  "See all ({count})": "Показать все ({count})",
+  Overdue: "Просрочено",
+  Upcoming: "Предстоящие",
+  "No date": "Без даты",
 };

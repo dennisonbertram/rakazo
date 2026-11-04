@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { SeeAll, useCappedRows } from "../components/CappedList";
 import { dueLabel } from "../components/inbox/TodoCard";
 import { ConfirmDialog } from "../components/integrations/AppDetail";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
@@ -18,13 +19,18 @@ import { formatMeetingDate } from "./Meetings";
 /** How long after it ends a recording may still be waiting for its summary. */
 const SUMMARIZING_WINDOW_MS = 10 * 60 * 1000;
 
-function Section({ title, children }: { title: ReactNode; children: ReactNode }) {
+/** A card of rows; a phone shows the first 3 and opens the rest with See all. */
+function Section({ title, rows }: { title: ReactNode; rows: ReactNode[] }) {
+  const list = useCappedRows(rows);
   return (
     <section className="mt-6 max-w-3xl">
       <h2 className="mb-2 text-sm font-semibold">{title}</h2>
       <ul className="divide-y divide-border rounded-xl border border-border bg-card text-sm">
-        {children}
+        {list.rows}
       </ul>
+      <div className="mt-1 flex justify-end">
+        <SeeAll list={list} />
+      </div>
     </section>
   );
 }
@@ -173,22 +179,21 @@ export function MeetingDetailPage({
             ) : null}
             {meeting.summary ? <p className="mt-2 max-w-3xl text-sm">{meeting.summary}</p> : null}
             {meeting.decisions.length > 0 ? (
-              <Section title={<Trans>Decisions</Trans>}>
-                {meeting.decisions.map((text) => (
-                  <Row key={text}>{text}</Row>
-                ))}
-              </Section>
+              <Section
+                title={<Trans>Decisions</Trans>}
+                rows={meeting.decisions.map((text) => <Row key={text}>{text}</Row>)}
+              />
             ) : null}
             {meeting.followUps.length > 0 ? (
-              <Section title={<Trans>Follow-ups</Trans>}>
-                {meeting.followUps.map((text) => (
-                  <Row key={text}>{text}</Row>
-                ))}
-              </Section>
+              <Section
+                title={<Trans>Follow-ups</Trans>}
+                rows={meeting.followUps.map((text) => <Row key={text}>{text}</Row>)}
+              />
             ) : null}
             {meeting.todos.length > 0 ? (
-              <Section title={<Trans>Your to-dos</Trans>}>
-                {meeting.todos.map((todo) => (
+              <Section
+                title={<Trans>Your to-dos</Trans>}
+                rows={meeting.todos.map((todo) => (
                   <li key={todo.id} className="flex items-center gap-3 px-3.5 py-2.5">
                     <Checkbox
                       checked={todo.doneAt !== null}
@@ -207,7 +212,7 @@ export function MeetingDetailPage({
                     ) : null}
                   </li>
                 ))}
-              </Section>
+              />
             ) : null}
             {meeting.transcript ? (
               <details className="group mt-6 max-w-3xl">

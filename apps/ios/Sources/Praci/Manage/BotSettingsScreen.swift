@@ -16,6 +16,7 @@ struct BotSettingsScreen: View {
   @State private var busy = false
   @State private var error: String?
   @State private var confirmDiscard = false
+  @State private var access: AgentAccessModel?
 
   var body: some View {
     LoadableView(state: state, retry: { Task { await load() } }, content: { bot in
@@ -51,6 +52,7 @@ struct BotSettingsScreen: View {
       Section("Voice") {
         Toggle("Read replies aloud", isOn: $speak).accessibilityIdentifier("botSpeak")
       }
+      if let access { AgentAccessSection(model: access) }
       if let error {
         Section {
           Text(error).foregroundStyle(Color.token(.destructive))
@@ -105,6 +107,11 @@ struct BotSettingsScreen: View {
       sectionID = bot.sectionId
       state = .loaded(bot)
       sections = (try? await ManageClient.agents(app: app).botSections) ?? []
+      let model = AgentAccessModel(
+        agent: AccessAgent(
+          id: bot.id, name: bot.name, spawnKey: bot.spawnKey, restricted: bot.restricted))
+      access = model
+      await model.load(app)
     } catch {
       state = .failed(error.localizedDescription)
     }
