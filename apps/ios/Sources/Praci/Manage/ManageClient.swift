@@ -65,6 +65,17 @@ enum ManageClient {
     String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxNameLength))
   }
 
+  /// The name to save for a rename, or nil when it is blank or unchanged.
+  static func renamed(_ text: String, from current: String) -> String? {
+    let value = clean(text)
+    return value.isEmpty || value == current ? nil : value
+  }
+
+  static func archiveMessage(_ name: String) -> String {
+    let name = clean(name)
+    return name.isEmpty ? String(localized: "Archived") : String(localized: "Archived \(name)")
+  }
+
   static func canCreateGroup(name: String, members: Int) -> Bool {
     !clean(name).isEmpty && memberRange.contains(members)
   }
@@ -117,7 +128,7 @@ enum ManageClient {
     try await archived(target, true, app: app)
     app.path = []
     onChange()
-    UndoToast.show("Archived \(name)") {
+    UndoToast.show(archiveMessage(name)) {
       try? await archived(target, false, app: app)
       onChange()
     }

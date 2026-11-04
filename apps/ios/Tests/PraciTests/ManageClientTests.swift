@@ -23,3 +23,18 @@ func updateSendsNullOnlyWhenClearingTheSection() throws {
   let clearing = try String(bytes: JSONEncoder().encode(input), encoding: .utf8)
   #expect(clearing?.contains(#""sectionId":null"#) == true)
 }
+
+@MainActor
+@Test
+func renameIgnoresBlankAndUnchangedNames() {
+  #expect(ManageClient.renamed("   ", from: "Ada") == nil)
+  #expect(ManageClient.renamed(" Ada ", from: "Ada") == nil)
+  #expect(ManageClient.renamed("  Grace ", from: "Ada") == "Grace")
+}
+
+@MainActor
+@Test
+func archiveMessageHasAFallbackForBlankNames() {
+  #expect(ManageClient.archiveMessage("Ada") == "Archived Ada")
+  #expect(ManageClient.archiveMessage("  ") == "Archived")
+}
