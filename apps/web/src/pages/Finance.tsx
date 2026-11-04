@@ -754,7 +754,7 @@ function Overview({
                 ) : null}
                 <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground">
                   {periodBreakdown ? spentRange : <Trans>Last 90 days</Trans>}
-                  <SeeAll list={breakdownList} to={financePath.spend(period)} />
+                  <SeeAll list={breakdownList} />
                 </div>
               </Section>
             </BackHere>

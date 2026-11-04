@@ -197,11 +197,7 @@ export function Pipeline({
               {stageNames[stage]}
               <span className="font-normal">{inStage(stage).length}</span>
             </h3>
-            <StageRows
-              prospects={inStage(stage)}
-              row={row}
-              seeAll={`/app/investors?tab=contacts&stage=${stage}`}
-            />
+            <StageRows prospects={inStage(stage)} row={row} savedId={savedId} />
           </section>
         ))}
       {passed.length > 0 ? (
@@ -219,35 +215,29 @@ export function Pipeline({
             />
             {stageNames.passed} {passed.length}
           </Button>
-          {showPassed ? (
-            <StageRows
-              prospects={passed}
-              row={row}
-              seeAll="/app/investors?tab=contacts&stage=passed"
-            />
-          ) : null}
+          {showPassed ? <StageRows prospects={passed} row={row} savedId={savedId} /> : null}
         </section>
       ) : null}
     </div>
   );
 }
 
-/** One stage's rows: 3 on a phone and 10 wide, then See all opens them in the Contacts list, filtered to the stage. */
+/** One stage's rows: 3 on a phone, then See all opens the rest in place. A just-saved prospect is never cut off. */
 function StageRows({
   prospects,
   row,
-  seeAll,
+  savedId,
 }: {
   prospects: Contact[];
   row: (prospect: Contact) => ReactNode;
-  seeAll: string;
+  savedId: string | null;
 }) {
-  const list = useCappedRows(prospects, { desktop: 10 });
+  const list = useCappedRows(prospects, { keep: (p) => p.id === savedId });
   return (
     <>
       <ul>{list.rows.map(row)}</ul>
       <div className="flex justify-end">
-        <SeeAll list={list} to={seeAll} desktop="link" />
+        <SeeAll list={list} />
       </div>
     </>
   );

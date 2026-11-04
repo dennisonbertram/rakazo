@@ -457,16 +457,14 @@ function UpdatesSection({
                 options={statuses.map((value) => [value, statusNames[value]])}
                 onChange={(value) => list.setParam("updates-status", value)}
               />
-              <span className="ms-auto">
-                <SortControl
-                  fields={UPDATE_SORTS.map((field) => [field, sortNames[field]])}
-                  field={list.sort.field}
-                  fieldLabel={sortNames[list.sort.field]}
-                  direction={list.sort.dir}
-                  onField={(field) => list.setSort({ field, dir: "asc" })}
-                  onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
-                />
-              </span>
+              <SortControl
+                fields={UPDATE_SORTS.map((field) => [field, sortNames[field]])}
+                field={list.sort.field}
+                fieldLabel={sortNames[list.sort.field]}
+                direction={list.sort.dir}
+                onField={(field) => list.setSort({ field, dir: "asc" })}
+                onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+              />
             </div>
           ) : null}
           <ul>

@@ -25,7 +25,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { SeeAll, useCappedRows } from "../components/CappedList";
 import { useFinanceQuery } from "../components/finance/ui";
-import { PickFilter, SearchField } from "../components/ListControls";
+import { PickFilter, SearchField, usePhone } from "../components/ListControls";
 import { PageEmptyState } from "../components/PageEmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { downloadArtifactBytes } from "../lib/artifact-open";
@@ -548,7 +548,9 @@ function EventList({
   events: CompanyEventRecord[];
   onOpen: (event: CompanyEventRecord) => void;
 }) {
-  const list = useCappedRows(events, { desktop: 5 });
+  // Wide screens show the first 5, as before; a phone shows 3 and opens the rest in place.
+  const phone = usePhone();
+  const list = useCappedRows(phone ? events : events.slice(0, 5));
   return (
     <section>
       <h2 className="mb-3 font-medium">{title}</h2>
@@ -564,7 +566,7 @@ function EventList({
         </button>
       ))}
       <div className="mt-2 flex justify-end">
-        <SeeAll list={list} to="/app/company?view=calendar" desktop="link" />
+        <SeeAll list={list} />
       </div>
     </section>
   );

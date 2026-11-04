@@ -354,6 +354,7 @@ export function FundraisingPage({
                 </p>
               ) : (
                 <SafeList
+                  keepId={cover?.id}
                   safes={overview.safes}
                   round={round}
                   contacts={contacts ?? []}

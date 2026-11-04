@@ -567,7 +567,7 @@ it("caps Breakdown and Upcoming at the same row count and expands inline", async
   expect(rows().upcoming).toBe(7);
 });
 
-it("shows 3 rows and a See all link to each full page on a phone", async () => {
+it("shows 3 rows on a phone, with See all to Upcoming and Subscriptions and in place for Breakdown", async () => {
   vi.stubGlobal("matchMedia", () => ({
     matches: true,
     addEventListener: () => undefined,
@@ -578,11 +578,15 @@ it("shows 3 rows and a See all link to each full page on a phone", async () => {
     await show("/app/finance");
     await flush();
     expect(container.querySelectorAll('a[href^="/app/finance/category/v"]').length).toBe(3);
-    const seeAll = [...container.querySelectorAll("a")]
+    const links = [...container.querySelectorAll("a")]
       .filter((a) => a.textContent?.startsWith("See all"))
       .map((a) => a.getAttribute("href"));
-    expect(seeAll).toContain("/app/finance/upcoming");
-    expect(seeAll).toContain("/app/finance/spend?period=month");
+    // Upcoming has its own page; Breakdown counts categories, so it expands in place.
+    expect(links).toContain("/app/finance/upcoming");
+    expect(links).not.toContain("/app/finance/spend?period=month");
+    expect(
+      [...container.querySelectorAll("button")].some((b) => b.textContent === "See all (12)"),
+    ).toBe(true);
   } finally {
     vi.unstubAllGlobals();
   }

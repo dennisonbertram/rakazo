@@ -164,7 +164,7 @@ export function FinanceCategoryPage({ slug, window }: { slug: string; window?: C
   );
   const rowProps = useRowNavigate();
   const data = q.data;
-  const vendorList = useCappedRows(data?.vendors ?? [], { desktop: 10 });
+  const vendorList = useCappedRows(data?.vendors ?? []);
   // Every transaction of this window, with search, filters and sort, is the Spend page.
   const allTransactions =
     data?.start && data.end
@@ -250,7 +250,7 @@ export function FinanceCategoryPage({ slug, window }: { slug: string; window?: C
                 </TableBody>
               </Table>
               <div className="mt-2 flex justify-end">
-                <SeeAll list={vendorList} to={allTransactions} desktop="link" />
+                <SeeAll list={vendorList} />
               </div>
             </Section>
           )}

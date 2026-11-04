@@ -153,7 +153,7 @@ it("names a person who is only in Review", async () => {
   expect(container.textContent).toContain("Alex Reed · Engineer");
 });
 
-it("shows 3 next dates on a phone with See all to the Calendar", async () => {
+it("shows 3 next dates on a phone and opens the rest in place", async () => {
   vi.stubGlobal("matchMedia", () => ({
     matches: true,
     addEventListener: () => undefined,
@@ -170,8 +170,11 @@ it("shows 3 next dates on a phone with See all to the Calendar", async () => {
     await show("overview", companyFixture.entities, { events });
     expect(container.textContent).toContain("Future date 3");
     expect(container.textContent).not.toContain("Future date 4");
-    const link = [...container.querySelectorAll("a")].find((a) => a.textContent === "See all (5)");
-    expect(link?.getAttribute("href")).toBe("/app/company?view=calendar");
+    const button = [...container.querySelectorAll("button")].find(
+      (b) => b.textContent === "See all (5)",
+    );
+    await act(async () => button?.click());
+    expect(container.textContent).toContain("Future date 5");
   } finally {
     vi.unstubAllGlobals();
   }

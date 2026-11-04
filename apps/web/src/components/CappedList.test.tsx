@@ -27,8 +27,8 @@ const setPhone = (matches: boolean) =>
 
 const items = Array.from({ length: 9 }, (_, i) => `row ${i + 1}`);
 
-function Demo({ to, desktop }: { to?: string; desktop?: "expand" | "link" }) {
-  const list = useCappedRows(items, { desktop: 5 });
+function Demo({ to, keep }: { to?: string; keep?: string }) {
+  const list = useCappedRows(items, { desktop: 5, keep: (row) => row === keep });
   return (
     <div>
       <ul>
@@ -36,7 +36,7 @@ function Demo({ to, desktop }: { to?: string; desktop?: "expand" | "link" }) {
           <li key={row}>{row}</li>
         ))}
       </ul>
-      <SeeAll list={list} {...(to ? { to } : {})} {...(desktop ? { desktop } : {})} />
+      <SeeAll list={list} {...(to ? { to } : {})} />
     </div>
   );
 }
@@ -83,9 +83,9 @@ it("keeps the desktop cap and expands in place", () => {
   expect(rows()).toBe(9);
 });
 
-it("links on desktop for a list that has no bound", () => {
-  setPhone(false);
-  render(<Demo to="/app/all" desktop="link" />);
-  expect(rows()).toBe(5);
-  expect(container.querySelector("a")?.textContent).toBe("See all (9)");
+it("opens the list when a row that must stay visible would be cut off", () => {
+  setPhone(true);
+  render(<Demo keep="row 7" />);
+  expect(rows()).toBe(9);
+  expect(container.querySelector("button")?.textContent).toBe("Show less");
 });

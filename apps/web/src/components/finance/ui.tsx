@@ -60,7 +60,7 @@ import { errorText } from "../../lib/user-error";
 import { AskBotButton } from "../AskBotButton";
 import { SeeAll, useCappedRows } from "../CappedList";
 import { ShowAmountsButton } from "../HideAmountsToggle";
-import { PickFilter, SearchField, SortControl, usePhone } from "../ListControls";
+import { PickFilter, SearchField, SortControl } from "../ListControls";
 import { PageNavButton } from "../PageHeader";
 import { StillLoading } from "../ShellSkeleton";
 
@@ -889,8 +889,6 @@ export function TransactionTable({
   );
 }
 
-/** Most rows a transaction list with a full page shows on a wide screen. */
-const TRANSACTION_ROWS = 25;
 const FILTER_PARAMS = ["q", "category", "status"] as const;
 
 /**
@@ -932,16 +930,26 @@ export function TransactionsSection({
     list.sort,
     categoryLabel,
   );
-  const capped = useCappedRows(
-    sorted,
-    seeAll ? { desktop: TRANSACTION_ROWS } : { phone: Number.POSITIVE_INFINITY },
-  );
-  const shown = capped.rows;
-  const phone = usePhone();
   // Grouping one vendor's charges by vendor changes nothing, so the switch is left out. It follows
   // all the rows, not the filtered ones, so filtering never makes the switch vanish.
   const manyVendors = groupByVendor(rows).length > 1;
   const grouped = preferGrouped && manyVendors;
+  // A phone caps what is drawn, never what is totalled: By vendor caps whole vendors, so each
+  // vendor's total still covers all its charges.
+  const units: (FinanceTransaction | VendorGroup)[] = grouped
+    ? sortTransactionGroups(groupByVendor(sorted), list.sort, categoryLabel)
+    : sorted;
+  const capped = useCappedRows(units, seeAll ? {} : { phone: Number.POSITIVE_INFINITY });
+  const shown = capped.rows.flatMap((unit) => ("rows" in unit ? unit.rows : [unit]));
+  // The full page lists transactions, so it matches only the flat list; the filters and sort go with it.
+  const { search } = useLocation();
+  const carried = new URLSearchParams(search);
+  for (const key of [...carried.keys()])
+    if (!["q", "status", "sort", "dir"].includes(key)) carried.delete(key);
+  const fullPage =
+    seeAll && !grouped
+      ? `${seeAll}${carried.size ? `${seeAll.includes("?") ? "&" : "?"}${carried}` : ""}`
+      : undefined;
   const unique = (values: string[]): [string, string][] =>
     [...new Set(values)].sort((a, b) => a.localeCompare(b)).map((v) => [v, v]);
   const statuses = [...new Set(rows.map((row) => row.status))];
@@ -953,7 +961,7 @@ export function TransactionsSection({
   };
   const categories = unique(rows.map(categoryLabel));
   const toolbar =
-    rows.length > 1 && !(seeAll && phone) ? (
+    rows.length > 1 ? (
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <SearchField
           name="transactions-search"
@@ -990,6 +998,11 @@ export function TransactionsSection({
             onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
           />
         </span>
+        {filtered ? (
+          <Button variant="ghost" size="sm" onClick={() => list.clear(...FILTER_PARAMS)}>
+            <Trans>Clear filters</Trans>
+          </Button>
+        ) : null}
       </div>
     ) : null;
   return (
@@ -1019,22 +1032,11 @@ export function TransactionsSection({
         rows={shown}
         grouped={grouped}
         sort={{ value: list.sort, onToggle: list.toggleSort }}
-        empty={
-          filtered ? (
-            <span className="flex items-center gap-3">
-              <Trans>No matches</Trans>
-              <Button variant="outline" size="sm" onClick={() => list.clear(...FILTER_PARAMS)}>
-                <Trans>Clear filters</Trans>
-              </Button>
-            </span>
-          ) : (
-            empty
-          )
-        }
+        empty={filtered ? <Trans>No matches</Trans> : empty}
       />
       {seeAll ? (
         <div className="mt-2 flex justify-end">
-          <SeeAll list={capped} to={seeAll} desktop="link" />
+          <SeeAll list={capped} {...(fullPage ? { to: fullPage } : {})} />
         </div>
       ) : null}
     </Section>

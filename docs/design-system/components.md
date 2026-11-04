@@ -6,7 +6,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 - Web and shared component files with stories: 335 of 335
 - Web and shared components: 854
 - Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 130 in 71 files, native story pending
+- SwiftUI views: 134 in 74 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -579,7 +579,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
 | AgentPageScreen, FailedSource | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
-| AppShell | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
+| AppShell, ArchivedToast | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
 | RootView | [apps/ios/Sources/Praci/App/RootView.swift](../../apps/ios/Sources/Praci/App/RootView.swift) | native story pending | iOS |
 | ArtifactScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift) | native story pending | iOS |
 | ArtifactsScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift) | native story pending | iOS |
@@ -627,10 +627,13 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | UsageScreen | [apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift) | native story pending | iOS |
 | ApprovalRulesScreen, AddRuleSheet | [apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift](../../apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift) | native story pending | iOS |
 | SettingsScreen | [apps/ios/Sources/Praci/Settings/SettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/SettingsScreen.swift) | native story pending | iOS |
+| SettingsSheet | [apps/ios/Sources/Praci/Settings/SettingsSheet.swift](../../apps/ios/Sources/Praci/Settings/SettingsSheet.swift) | native story pending | iOS |
 | VoiceSettingsScreen, HostedVoiceScreen | [apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift) | native story pending | iOS |
 | BotAvatarView | [apps/ios/Sources/Praci/Shared/BotAvatarView.swift](../../apps/ios/Sources/Praci/Shared/BotAvatarView.swift) | native story pending | iOS |
 | ConsentSheet | [apps/ios/Sources/Praci/Shared/ConsentSheet.swift](../../apps/ios/Sources/Praci/Shared/ConsentSheet.swift) | native story pending | iOS |
+| CappedSection, FullListScreen | [apps/ios/Sources/Praci/Shared/ListBrowsing.swift](../../apps/ios/Sources/Praci/Shared/ListBrowsing.swift) | native story pending | iOS |
 | LoadableView | [apps/ios/Sources/Praci/Shared/Loadable.swift](../../apps/ios/Sources/Praci/Shared/Loadable.swift) | native story pending | iOS |
+| PrimaryActionButton | [apps/ios/Sources/Praci/Shared/PrimaryActionButton.swift](../../apps/ios/Sources/Praci/Shared/PrimaryActionButton.swift) | native story pending | iOS |
 | SafeHTMLView | [apps/ios/Sources/Praci/Shared/SafeHTMLView.swift](../../apps/ios/Sources/Praci/Shared/SafeHTMLView.swift) | native story pending | iOS |
 | NewSpaceSheet | [apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift](../../apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift) | native story pending | iOS |
 | SpaceSettingsSheet | [apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift](../../apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift) | native story pending | iOS |
@@ -644,7 +647,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ComposerView | [apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift](../../apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift) | native story pending | iOS |
 | PendingSendsView | [apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift](../../apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift) | native story pending | iOS |
 | MessageActions | [apps/ios/Sources/Praci/Thread/MessageActions.swift](../../apps/ios/Sources/Praci/Thread/MessageActions.swift) | native story pending | iOS |
-| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView, UnsupportedBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
+| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
 | ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |
 | ThreadScreen, UnreadDivider | [apps/ios/Sources/Praci/Thread/ThreadScreen.swift](../../apps/ios/Sources/Praci/Thread/ThreadScreen.swift) | native story pending | iOS |
 | CallButton, CallView | [apps/ios/Sources/Praci/Voice/CallView.swift](../../apps/ios/Sources/Praci/Voice/CallView.swift) | native story pending | iOS |

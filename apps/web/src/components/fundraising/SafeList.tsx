@@ -342,7 +342,10 @@ export function SafeList({
   onDelete,
   onAssign,
   onUnassign,
+  keepId,
 }: {
+  /** A SAFE just saved, which stays in view on a phone even past the third row. */
+  keepId?: string;
   safes: readonly Safe[];
   round: FundraiseRound | null;
   /** Names a Mercury row's assigned contact. */
@@ -361,7 +364,7 @@ export function SafeList({
       ORDER.indexOf(a.status) - ORDER.indexOf(b.status) ||
       statusDate(b).localeCompare(statusDate(a)),
   );
-  const list = useCappedRows(sorted);
+  const list = useCappedRows(sorted, { keep: (safe) => safe.id === keepId });
   return (
     <>
       <ul>

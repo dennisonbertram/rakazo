@@ -210,7 +210,7 @@ it("says what the month under way has cost, since the chart and the change stop 
   expect(container.textContent).toContain("Oct so far: $2,400");
 });
 
-it("caps a category's vendors and transactions at 3 on a phone and links to the Spend page", async () => {
+it("caps a category's vendors and transactions at 3 on a phone", async () => {
   vi.stubGlobal("matchMedia", () => ({
     matches: true,
     addEventListener: () => undefined,
@@ -258,11 +258,14 @@ it("caps a category's vendors and transactions at 3 on a phone and links to the 
     );
     await act(async () => {});
     expect(container.querySelectorAll('a[href^="/app/finance/vendor/"]').length).toBe(3);
-    const links = [...container.querySelectorAll("a")].filter((a) =>
+    // Vendors expand in place; the transactions link to the Spend page for the same window.
+    expect(
+      [...container.querySelectorAll("button")].filter((b) => b.textContent === "See all (5)"),
+    ).toHaveLength(1);
+    const link = [...container.querySelectorAll("a")].find((a) =>
       a.textContent?.startsWith("See all"),
     );
-    expect(links.map((a) => a.textContent)).toEqual(["See all (5)", "See all (5)"]);
-    expect(links[0]?.getAttribute("href")).toBe(
+    expect(link?.getAttribute("href")).toBe(
       "/app/finance/spend?period=month&cat=software&from=2026-08-01&to=2026-10-31",
     );
   } finally {

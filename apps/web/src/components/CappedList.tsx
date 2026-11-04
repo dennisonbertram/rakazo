@@ -12,42 +12,50 @@ export const PHONE_ROWS = 3;
  */
 export function useCappedRows<T>(
   rows: readonly T[],
-  { phone = PHONE_ROWS, desktop }: { phone?: number; desktop?: number } = {},
+  {
+    phone = PHONE_ROWS,
+    desktop,
+    keep,
+  }: {
+    phone?: number;
+    desktop?: number;
+    /** A row that must stay visible (one just saved): the list opens when it would be cut off. */
+    keep?: (row: T) => boolean;
+  } = {},
 ) {
   const isPhone = usePhone();
   const [expanded, setExpanded] = useState(false);
   const cap = isPhone ? phone : desktop;
   const capped = cap !== undefined && rows.length > cap;
+  const forced = capped && keep !== undefined && rows.slice(cap).some(keep);
+  const open = expanded || forced;
   return {
-    rows: rows.slice(0, capped && !expanded ? cap : undefined),
+    rows: rows.slice(0, capped && !open ? cap : undefined),
     total: rows.length,
     capped,
-    expanded,
+    expanded: open,
     toggle: () => setExpanded((value) => !value),
   };
 }
 
 /**
- * "See all (N)" under a capped list. With `to` a phone opens that page (so it can search, filter
- * and sort); a wider screen, or a list with no `to`, expands in place and offers "Show less".
- * `desktop="link"` makes the link the answer on wide screens too, for lists that can grow without
- * bound.
+ * "See all (N)" under a capped list. `to` must show exactly those N rows (with search, filter and
+ * sort); a phone then opens it. Without `to`, or on a wider screen, it expands in place and offers
+ * "Show less".
  */
 export function SeeAll({
   list,
   to,
-  desktop = "expand",
   className = "",
 }: {
   list: Pick<ReturnType<typeof useCappedRows>, "capped" | "total" | "expanded" | "toggle">;
   to?: string;
-  desktop?: "expand" | "link";
   className?: string;
 }) {
   const phone = usePhone();
   if (!list.capped) return null;
   const style = `text-xs text-muted-foreground hover:text-foreground hover:underline ${className}`;
-  if (to && (phone || desktop === "link")) {
+  if (to && phone) {
     return (
       <Link to={to} className={style}>
         <Trans>See all ({list.total})</Trans>
