@@ -14,6 +14,7 @@ import {
   INVESTORS_AGENT_INSTRUCTIONS,
   setInvestorsReminder,
 } from "./investors-agent.js";
+import { INVESTORS_DEFAULT_WITH_SOURCE_SENTENCE } from "./investors-old-default.fixture.js";
 
 const actor: Actor = {
   userId: "user-1",
@@ -159,6 +160,27 @@ describe("ensureInvestorsAgent", () => {
     replaceBotInstructions.mockClear();
     await run(`${earlier} Mine.`);
     expect(replaceBotInstructions).not.toHaveBeenCalled();
+  });
+
+  it("upgrades an agent storing an old default that is in no previous list", async () => {
+    const { prisma, jobs } = routineFakes();
+    const replaceBotInstructions = vi.fn(async () => undefined);
+    await ensureInvestorsAgent(
+      {
+        prisma,
+        jobs,
+        repos: {
+          createBot: async () =>
+            ({ id: "bot-1", instructions: INVESTORS_DEFAULT_WITH_SOURCE_SENTENCE }) as Bot,
+          replaceBotInstructions,
+        },
+      } as never,
+      actor,
+    );
+    expect(replaceBotInstructions).toHaveBeenCalledWith(actor, "bot-1", {
+      from: INVESTORS_DEFAULT_WITH_SOURCE_SENTENCE,
+      to: INVESTORS_AGENT_INSTRUCTIONS,
+    });
   });
 
   it("upgrades an agent that still has the instructions saying it cannot add rounds or prospects", async () => {

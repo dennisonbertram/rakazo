@@ -4,6 +4,7 @@ import type { Actor, Bot, InvestorReminderCadence } from "@rakazo/contracts";
 import { investorsAgentSpawnKey, pageAgentColor } from "@rakazo/contracts";
 import { nextCronDateAcrossStrict } from "@rakazo/core";
 import type { createRepos, PrismaClient } from "@rakazo/db";
+import { isPastDefault } from "./agent-default-history.js";
 
 export const INVESTOR_UPDATE_ROUTINE_NAME = "Investor update draft";
 
@@ -176,7 +177,11 @@ export async function ensureInvestorsAgent(
     data: { description: INVESTORS_DESCRIPTION },
   });
   await ensureInvestorsRoutine(deps, actor, bot.id);
-  if (!PREVIOUS_INVESTORS_AGENT_INSTRUCTIONS.has(bot.instructions)) return bot;
+  if (
+    !PREVIOUS_INVESTORS_AGENT_INSTRUCTIONS.has(bot.instructions) &&
+    !isPastDefault("investors", bot.instructions)
+  )
+    return bot;
   await deps.repos.replaceBotInstructions(actor, bot.id, {
     from: bot.instructions,
     to: INVESTORS_AGENT_INSTRUCTIONS,
