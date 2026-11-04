@@ -424,7 +424,11 @@ panel in Shell.
 Tools (`INVESTORS_AGENT_BUILTIN_TOOLS` in `packages/contracts/src/investors.ts`):
 `cap_table_read` (now also returns SAFEs), `cap_table_update` (from slice 4), `contacts_*`,
 `fundraising_read` (new, read-only: the open round, prospects with stage and check size,
-SAFEs with derived status and deposit match), `investor_update_draft` (new, one tool:
+SAFEs with derived status and deposit match), `fundraising_round_save` (starts the round or
+edits the open one by id, through `saveRound`; amounts in whole US dollars; asks first),
+`fundraising_prospects_save` (up to 60 prospects per call through `importProspects`: matches by
+email, else normalized name, fills only empty fields unless `overwrite`; asks first, one card per
+call; never creates a SAFE), `investor_update_draft` (new, one tool:
 `history` lists recent sent updates with their bodies, `get` and `save` read and edit one
 existing draft by id and refuse a sent or posted update, `create` adds a draft),
 `audit_request_upsert` (new), `finance_overview`, `finance_breakdown`, `search_data_room`,
