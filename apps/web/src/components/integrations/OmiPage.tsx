@@ -231,7 +231,10 @@ export function OmiAgent({
   }, [access]);
   const pending = useRef(0);
   const failed = useRef(false);
-  function save(next: { allAgents: boolean; botIds: string[] }) {
+  function save(
+    next: { allAgents: boolean; botIds: string[] },
+    send: () => Promise<typeof access> = () => rpc.connections.setAccess({ connectionId, ...next }),
+  ) {
     setError(null);
     // Choosing another agent turns sharing on; switching them all off leaves it on.
     const sharing = {
@@ -247,7 +250,7 @@ export function OmiAgent({
     setSaving((count) => count + 1);
     queue.current = queue.current.then(async () => {
       try {
-        const saved = await rpc.connections.setAccess({ connectionId, ...next });
+        const saved = await send();
         if (latest.current === sharing) setAccess(saved);
       } catch (err) {
         setError(errorText(err, t`Could not update bot access`));
@@ -291,6 +294,7 @@ export function OmiAgent({
           <AgentToggleList
             bots={data.bots}
             appName="Omi"
+            ready={access !== null}
             isOn={isOn}
             ownerBotId={agentBotId}
             saving={saving > 0}
@@ -307,6 +311,7 @@ export function OmiAgent({
             }
             onToggle={(botId, on) => {
               if (botId === agentBotId) return;
+              // The server changes only this agent's grant; the shown state is its guess until it answers.
               save(
                 toggleAccess(
                   latest.current ?? { allAgents: false, botIds: [] },
@@ -314,6 +319,7 @@ export function OmiAgent({
                   botId,
                   on,
                 ),
+                () => rpc.connections.setAgentAccess({ connectionId, botId, on }),
               );
             }}
           />

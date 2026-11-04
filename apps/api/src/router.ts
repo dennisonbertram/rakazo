@@ -513,8 +513,8 @@ import {
   inboxFeedbackSet,
   inboxGet,
   inboxList,
-  inboxRefresh,
   inboxNoReply,
+  inboxRefresh,
   inboxTodoSetDone,
   inboxTodosList,
   inboxUnreadCount,
@@ -958,6 +958,190 @@ async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId
     // Shared once anyone else has access, and it stays shared when they are all switched off.
     agentShared: row.agentShared || row.allAgents || botIds.some((id) => id !== row.agentBotId),
   };
+}
+
+type AccessConnection = {
+  allAgents: boolean;
+  agentBotId: string | null;
+  botAccess: { botId: string }[];
+};
+type AccessBot = { id: string; audience: string; firewall: boolean };
+
+/** Agents the Firewall or an external audience excludes: "all agents" never reaches them, only an explicit grant does. */
+const restrictedBot = (bot: AccessBot) => bot.audience === "external" || bot.firewall === true;
+
+/**
+ * The access after switching one agent. Turning one off while access is "all agents" lists every
+ * agent that was really on (restricted agents were not); turning a restricted agent on adds an
+ * explicit grant, since "all agents" does not reach it. The connection's own agent stays on.
+ */
+export function toggleAgentAccess(
+  connection: AccessConnection,
+  bots: AccessBot[],
+  botId: string,
+  on: boolean,
+): { allAgents: boolean; botIds: string[] } {
+  const target = bots.find((bot) => bot.id === botId);
+  if (!target) throw new IsolationError();
+  const granted = new Set(connection.botAccess.map((entry) => entry.botId));
+  const ids = new Set(
+    connection.allAgents
+      ? [...bots.filter((bot) => !restrictedBot(bot)).map((bot) => bot.id), ...granted]
+      : granted,
+  );
+  if (on) ids.add(botId);
+  else if (botId !== connection.agentBotId) ids.delete(botId);
+  const all = bots.every((bot) => restrictedBot(bot) || ids.has(bot.id));
+  // With "all agents", only restricted agents need a row of their own.
+  return {
+    allAgents: all,
+    botIds: all
+      ? bots.filter((bot) => restrictedBot(bot) && ids.has(bot.id)).map((bot) => bot.id)
+      : [...ids],
+  };
+}
+
+/** Saves a connection's access under its row lock; `decide` reads the locked state and returns the access to store. */
+async function saveConnectionAccess(
+  prisma: PrismaClient,
+  actor: Actor,
+  connectionId: string,
+  decide: (
+    connection: AccessConnection,
+    bots: AccessBot[],
+  ) => { allAgents: boolean; botIds: string[] },
+) {
+  await prisma.$transaction(async (tx) => {
+    // Connection row first, then bots and grants: the same order as every other path.
+    await tx.$queryRaw`SELECT id FROM connections WHERE id = ${connectionId} FOR UPDATE`;
+    const connection = await tx.connection.findFirst({
+      where: { id: connectionId, spaceId: actor.spaceId, userId: actor.userId },
+      select: {
+        id: true,
+        connectorId: true,
+        provider: true,
+        agentBotId: true,
+        privateByDefault: true,
+        agentShared: true,
+        allAgents: true,
+        botAccess: { select: { botId: true } },
+      },
+    });
+    if (!connection) throw new IsolationError();
+    const scopedBots = await tx.bot.findMany({
+      where: { spaceId: actor.spaceId, userId: actor.userId, archivedAt: null },
+      select: { id: true, audience: true, firewall: true },
+    });
+    const decided = decide(connection, scopedBots);
+    let botIds = [...new Set(decided.botIds)];
+    // Sharing is on once anyone besides the agent has access, and None does not turn it off.
+    const agentShared =
+      connection.agentShared ||
+      connection.allAgents ||
+      connection.botAccess.some((entry) => entry.botId !== connection.agentBotId) ||
+      decided.allAgents ||
+      botIds.some((id) => id !== connection.agentBotId);
+    const standalone = Boolean(connection.agentBotId || connection.privateByDefault);
+    if (connection.agentBotId) {
+      const activeAgent = await tx.bot.updateMany({
+        where: {
+          id: connection.agentBotId,
+          spaceId: actor.spaceId,
+          userId: actor.userId,
+          spawnKey: { in: connectionAgentSpawnKeys(actor, connection) },
+          archivedAt: null,
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (!activeAgent.count)
+        throw new ORPCError("CONFLICT", {
+          message: "The connection agent is no longer active",
+        });
+    }
+    // The connection's agent always keeps access, even when a client saved without it.
+    if (connection.agentBotId) botIds = [...new Set([...botIds, connection.agentBotId])];
+    const bots = await tx.bot.count({
+      where: { id: { in: botIds }, spaceId: actor.spaceId, userId: actor.userId },
+    });
+    if (bots !== botIds.length) throw new IsolationError();
+    const siblings = standalone
+      ? [{ id: connection.id }]
+      : await tx.connection.findMany({
+          where: {
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+            connectorId: connection.connectorId,
+            provider: connection.provider,
+            agentBotId: null,
+            privateByDefault: false,
+          },
+          select: { id: true },
+        });
+    const ids = siblings.map((row) => row.id);
+    if (ids.length === 0)
+      throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
+    const updated = await tx.connection.updateMany({
+      where: {
+        id: { in: ids },
+        spaceId: actor.spaceId,
+        userId: actor.userId,
+        agentBotId: connection.agentBotId,
+        // A sibling provisioned or archived since it was listed is never shared with it.
+        privateByDefault: connection.privateByDefault,
+      },
+      data: { allAgents: decided.allAgents, ...(connection.agentBotId ? { agentShared } : {}) },
+    });
+    if (updated.count !== ids.length)
+      throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
+    await tx.botConnectionAccess.deleteMany({
+      where: {
+        connectionId: { in: ids },
+        spaceId: actor.spaceId,
+        userId: actor.userId,
+      },
+    });
+    if (botIds.length > 0) {
+      await tx.botConnectionAccess.createMany({
+        data: ids.flatMap((connectionId) =>
+          botIds.map((botId) => ({
+            connectionId,
+            botId,
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+          })),
+        ),
+      });
+    }
+  });
+}
+
+/** The stored access of every live connection of the caller. */
+async function allConnectionAccess(prisma: PrismaClient, actor: Actor) {
+  const scope = { spaceId: actor.spaceId, userId: actor.userId };
+  const rows = await prisma.connection.findMany({
+    where: { ...scope, status: { not: "revoked" } },
+    select: {
+      id: true,
+      allAgents: true,
+      agentShared: true,
+      agentBotId: true,
+      botAccess: { where: scope, select: { botId: true }, orderBy: { createdAt: "asc" } },
+    },
+  });
+  return Object.fromEntries(
+    rows.map((row) => {
+      const botIds = row.botAccess.map((entry) => entry.botId);
+      return [
+        row.id,
+        {
+          allAgents: row.allAgents,
+          botIds,
+          agentShared:
+            row.agentShared || row.allAgents || botIds.some((id) => id !== row.agentBotId),
+        },
+      ];
+    }),
+  );
 }
 
 /** Every connection of the caller with the agents that can really use it, in one pass. */
@@ -6166,6 +6350,63 @@ export function createRouter(deps: RouterDeps): AppRouter {
           if (!row) throw new IsolationError();
           return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
+        setAgentAssignment: authed.mcp.servers.setAgentAssignment.handler(
+          async ({ context, input }) => {
+            const { actor } = context;
+            const seqs = await deps.prisma.$transaction(async (tx) => {
+              // Server row first, so concurrent changes to one server queue up.
+              await tx.$queryRaw`SELECT id FROM mcp_servers WHERE id = ${input.serverId} FOR UPDATE`;
+              const server = await tx.mcpServer.findFirst({
+                where: { id: input.serverId, spaceId: actor.spaceId, userId: actor.userId },
+                select: { id: true, agentBotId: true, agentExclusive: true },
+              });
+              const bot = await tx.bot.findFirst({
+                where: { id: input.botId, spaceId: actor.spaceId, userId: actor.userId },
+                select: { id: true },
+              });
+              if (!server || !bot) throw new IsolationError();
+              const exclusiveOther =
+                server.agentExclusive && server.agentBotId !== null && server.agentBotId !== bot.id;
+              if (input.on) {
+                if (exclusiveOther)
+                  throw new ORPCError("BAD_REQUEST", { message: EXCLUSIVE_SERVER_MESSAGE });
+                await tx.botMcpServer.createMany({
+                  data: [
+                    {
+                      spaceId: actor.spaceId,
+                      userId: actor.userId,
+                      botId: bot.id,
+                      serverId: server.id,
+                      allowAllTools: true,
+                      allowedTools: [] as Prisma.InputJsonValue,
+                    },
+                  ],
+                  skipDuplicates: true,
+                });
+                return [];
+              }
+              // The server's own agent keeps it; an exclusive server's rows for others are kept as saved.
+              if (server.agentBotId === bot.id || exclusiveOther) return [];
+              const removed = await tx.botMcpServer.deleteMany({
+                where: {
+                  botId: bot.id,
+                  serverId: server.id,
+                  spaceId: actor.spaceId,
+                  userId: actor.userId,
+                },
+              });
+              if (!removed.count) return [];
+              return revertConnectedMcpApprovals(
+                onboardingDeps,
+                actor,
+                { botId: bot.id, serverId: server.id, status: "pending" },
+                tx,
+              );
+            });
+            for (const event of seqs) await deps.events.notify(event.threadId, event.seq);
+            return { ok: true as const };
+          },
+        ),
         setWrites: authed.mcp.servers.setWrites.handler(async ({ context, input }) => {
           const row = await setIntegrationAgentWrites(
             deps.prisma,
@@ -7318,106 +7559,24 @@ export function createRouter(deps: RouterDeps): AppRouter {
       access: authed.connections.access.handler(async ({ context, input }) => {
         return connectionAccess(deps.prisma, context.actor, input.connectionId);
       }),
+      accessAll: authed.connections.accessAll.handler(async ({ context }) =>
+        allConnectionAccess(deps.prisma, context.actor),
+      ),
       setAccess: authed.connections.setAccess.handler(async ({ context, input }) => {
-        const { actor } = context;
-        let botIds = [...new Set(input.botIds)];
-        await deps.prisma.$transaction(async (tx) => {
-          // Connection row first, then bots and grants: the same order as every other path.
-          await tx.$queryRaw`SELECT id FROM connections WHERE id = ${input.connectionId} FOR UPDATE`;
-          const connection = await tx.connection.findFirst({
-            where: { id: input.connectionId, spaceId: actor.spaceId, userId: actor.userId },
-            select: {
-              id: true,
-              connectorId: true,
-              provider: true,
-              agentBotId: true,
-              privateByDefault: true,
-              agentShared: true,
-              allAgents: true,
-              botAccess: { select: { botId: true } },
-            },
-          });
-          if (!connection) throw new IsolationError();
-          // Sharing is on once anyone besides the agent has access, and None does not turn it off.
-          const agentShared =
-            connection.agentShared ||
-            connection.allAgents ||
-            connection.botAccess.some((entry) => entry.botId !== connection.agentBotId) ||
-            input.allAgents ||
-            botIds.some((id) => id !== connection.agentBotId);
-          const standalone = Boolean(connection.agentBotId || connection.privateByDefault);
-          if (connection.agentBotId) {
-            const activeAgent = await tx.bot.updateMany({
-              where: {
-                id: connection.agentBotId,
-                spaceId: actor.spaceId,
-                userId: actor.userId,
-                spawnKey: { in: connectionAgentSpawnKeys(actor, connection) },
-                archivedAt: null,
-              },
-              data: { updatedAt: new Date() },
-            });
-            if (!activeAgent.count)
-              throw new ORPCError("CONFLICT", {
-                message: "The connection agent is no longer active",
-              });
-          }
-          // The connection's agent always keeps access, even when a client saved without it.
-          if (connection.agentBotId) botIds = [...new Set([...botIds, connection.agentBotId])];
-          const bots = await tx.bot.count({
-            where: { id: { in: botIds }, spaceId: actor.spaceId, userId: actor.userId },
-          });
-          if (bots !== botIds.length) throw new IsolationError();
-          const siblings = standalone
-            ? [{ id: connection.id }]
-            : await tx.connection.findMany({
-                where: {
-                  spaceId: actor.spaceId,
-                  userId: actor.userId,
-                  connectorId: connection.connectorId,
-                  provider: connection.provider,
-                  agentBotId: null,
-                  privateByDefault: false,
-                },
-                select: { id: true },
-              });
-          const ids = siblings.map((row) => row.id);
-          if (ids.length === 0)
-            throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
-          const updated = await tx.connection.updateMany({
-            where: {
-              id: { in: ids },
-              spaceId: actor.spaceId,
-              userId: actor.userId,
-              agentBotId: connection.agentBotId,
-              // A sibling provisioned or archived since it was listed is never shared with it.
-              privateByDefault: connection.privateByDefault,
-            },
-            data: { allAgents: input.allAgents, ...(connection.agentBotId ? { agentShared } : {}) },
-          });
-          if (updated.count !== ids.length)
-            throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
-          await tx.botConnectionAccess.deleteMany({
-            where: {
-              connectionId: { in: ids },
-              spaceId: actor.spaceId,
-              userId: actor.userId,
-            },
-          });
-          if (botIds.length > 0) {
-            await tx.botConnectionAccess.createMany({
-              data: ids.flatMap((connectionId) =>
-                botIds.map((botId) => ({
-                  connectionId,
-                  botId,
-                  spaceId: actor.spaceId,
-                  userId: actor.userId,
-                })),
-              ),
-            });
-          }
-        });
-        return connectionAccess(deps.prisma, actor, input.connectionId);
+        await saveConnectionAccess(deps.prisma, context.actor, input.connectionId, () => ({
+          allAgents: input.allAgents,
+          botIds: input.botIds,
+        }));
+        return connectionAccess(deps.prisma, context.actor, input.connectionId);
+      }),
+      setAgentAccess: authed.connections.setAgentAccess.handler(async ({ context, input }) => {
+        await saveConnectionAccess(
+          deps.prisma,
+          context.actor,
+          input.connectionId,
+          (connection, bots) => toggleAgentAccess(connection, bots, input.botId, input.on),
+        );
+        return connectionAccess(deps.prisma, context.actor, input.connectionId);
       }),
       createAgent: authed.connections.createAgent.handler(async ({ context, input }) => {
         const { bot } = await ensureConnectedAppAgent(

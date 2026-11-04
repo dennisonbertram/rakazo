@@ -32,11 +32,12 @@ const loaded = (rows: ReturnType<typeof connection>[]) => ({
   "connections.effectiveAccess": Object.fromEntries(
     rows.map((row, i) => [row.id, { shared: "some", botIds: i % 2 === 0 ? [bot.id] : [] }]),
   ),
-  "connections.access": { allAgents: true, botIds: [], agentShared: true },
-  "connections.setAccess": null,
+  "connections.accessAll": Object.fromEntries(
+    rows.map((row) => [row.id, { allAgents: true, botIds: [], agentShared: true }]),
+  ),
+  "connections.setAgentAccess": null,
   "mcp.servers.list": [],
   "mcp.assignments.list": [],
-  "bots.list": mockBots,
 });
 
 const meta = {

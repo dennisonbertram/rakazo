@@ -16,8 +16,9 @@ vi.mock("@lingui/react/macro", () => ({
 }));
 const access = vi.hoisted(() => vi.fn());
 const setAccess = vi.hoisted(() => vi.fn());
+const setAgentAccess = vi.hoisted(() => vi.fn());
 vi.mock("../../lib/rpc", () => ({
-  rpc: { connections: { access, setAccess, setExclusive: vi.fn() } },
+  rpc: { connections: { access, setAccess, setAgentAccess, setExclusive: vi.fn() } },
 }));
 
 import { OmiAgent } from "./OmiPage";
@@ -42,6 +43,7 @@ async function show(initial: { allAgents: boolean; botIds: string[]; agentShared
     ...input,
     agentShared: full.agentShared,
   }));
+  setAgentAccess.mockResolvedValue(full);
   const container = document.createElement("div");
   document.body.append(container);
   await act(async () =>
@@ -63,8 +65,10 @@ it("Email chats off in Omi revokes every chat, not only the last one", async () 
   await act(async () =>
     container.querySelector<HTMLElement>('[aria-label="Email chats can use Omi"]')?.click(),
   );
-  const last = setAccess.mock.calls.at(-1)?.[0];
-  expect(last).toEqual({ connectionId: "c1", allAgents: false, botIds: ["omi", "ada"] });
+  expect(setAgentAccess.mock.calls.map(([call]) => [call.botId, call.on])).toEqual([
+    ["e1", false],
+    ["e2", false],
+  ]);
 });
 
 it("All and None each save once, and None keeps the Omi agent", async () => {
@@ -96,23 +100,25 @@ it("None keeps Let other agents use Omi on and the list visible, with the other 
 });
 
 it("a failed save refetches only after the newer queued save has finished", async () => {
-  setAccess.mockReset();
+  setAgentAccess.mockReset();
   let failFirst: (error: Error) => void = () => undefined;
   let finishSecond: () => void = () => undefined;
   const all = ["omi", "ada", "e1", "e2"];
-  setAccess.mockImplementationOnce(
+  const container = await show({ allAgents: false, botIds: all });
+  setAgentAccess.mockReset();
+  setAgentAccess.mockImplementationOnce(
     () =>
       new Promise((_, reject) => {
         failFirst = reject;
       }),
   );
-  setAccess.mockImplementationOnce(
-    (input: { allAgents: boolean; botIds: string[] }) =>
+  setAgentAccess.mockImplementationOnce(
+    () =>
       new Promise((resolve) => {
-        finishSecond = () => resolve(input);
+        finishSecond = () => resolve({ allAgents: false, botIds: all, agentShared: true });
       }),
   );
-  const container = await show({ allAgents: false, botIds: all });
+  setAgentAccess.mockResolvedValue({ allAgents: false, botIds: all, agentShared: true });
   access.mockClear();
   const sw = (name: string) =>
     container.querySelector<HTMLElement>(`[aria-label="${name} can use Omi"]`)!;

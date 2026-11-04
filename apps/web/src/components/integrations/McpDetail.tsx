@@ -25,7 +25,6 @@ import {
   isSameMcpEndpoint,
   mcpStatus,
 } from "../../lib/integrations";
-import { assignMcpServer } from "../../lib/mcp-assign";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { ConfirmDialog, Heading } from "./AppDetail";
@@ -147,7 +146,8 @@ export function McpDetail({
       if (name && name !== server.name) await rpc.mcp.servers.rename({ id: server.id, name });
     }, t`Could not rename`);
 
-  const assign = (botId: string, on: boolean) => assignMcpServer(botId, server.id, on);
+  const assign = (botId: string, on: boolean) =>
+    rpc.mcp.servers.setAgentAssignment({ serverId: server.id, botId, on }).then(() => undefined);
   const toggle = (botId: string, on: boolean) =>
     run(() => assign(botId, on), t`Could not update bot access`);
 
@@ -200,6 +200,8 @@ export function McpDetail({
     }, t`Could not update bot access`);
   const usedBy = (
     <AgentToggleList
+      key={server.id}
+      ready={data.loaded}
       bots={[...data.bots].sort(
         (a, b) => Number(b.id === server.agentBotId) - Number(a.id === server.agentBotId),
       )}

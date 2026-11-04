@@ -294,8 +294,14 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     pendingShown.current.get(row.id) ?? data.access[row.id]?.effectiveAccess.botIds ?? allBotIds;
 
   /** Saves one whole access value; `shown` is what the list reads until the save lands. */
-  function saveAccess(row: Connection, next: AccessValue, shown: string[]) {
-    pendingAccess.current.set(row.id, next);
+  function saveAccess(
+    row: Connection,
+    next: AccessValue | null,
+    shown: string[],
+    save: () => Promise<unknown> = () =>
+      rpc.connections.setAccess({ connectionId: row.id, ...(next as AccessValue) }),
+  ) {
+    if (next) pendingAccess.current.set(row.id, next);
     pendingShown.current.set(row.id, shown);
     setOverride({ rowId: row.id, shown });
     setError(null);
@@ -303,7 +309,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     // One save at a time, in click order, so a slow earlier save cannot overwrite a later one.
     saveQueue.current = saveQueue.current.then(async () => {
       try {
-        await rpc.connections.setAccess({ connectionId: row.id, ...next });
+        await save();
       } catch (err) {
         setError(errorText(err, t`Could not update bot access`));
       }
@@ -317,17 +323,14 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     });
   }
 
+  /** One agent's switch: the server changes only that agent's grant, so other changes are never overwritten. */
   function setAgent(row: Connection | undefined, botId: string, on: boolean) {
     if (!row || (row.agentBotId === botId && !on)) return; // the owning agent always keeps access
-    const next = toggleAccess(
-      pendingAccess.current.get(row.id) ?? storedAccess(row),
-      allBotIds,
-      botId,
-      on,
-    );
     // Only this agent's row changes on screen; the others keep what the server said they can use.
     const shown = shownNow(row).filter((id) => id !== botId);
-    saveAccess(row, next, on ? [...shown, botId] : shown);
+    saveAccess(row, null, on ? [...shown, botId] : shown, () =>
+      rpc.connections.setAgentAccess({ connectionId: row.id, botId, on }),
+    );
   }
 
   /** All: every other agent, including ones made later. None: only the owning agent and, on mail, its email chats. One save either way. */
@@ -538,6 +541,8 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                     }
                     usedBy={
                       <AgentToggleList
+                        key={row.id}
+                        ready={data.loaded}
                         bots={ownerFirst(row.agentBotId)}
                         appName={row.displayName}
                         disabled={busy}
@@ -556,6 +561,8 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                       <Trans>Access</Trans>
                     </Heading>
                     <AgentToggleList
+                      key={row.id}
+                      ready={data.loaded}
                       bots={data.bots}
                       appName={row.displayName}
                       disabled={busy}
@@ -586,6 +593,8 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                     <Trans>Access</Trans>
                   </Heading>
                   <AgentToggleList
+                    key={ordinaryAccount?.id}
+                    ready={data.loaded}
                     bots={data.bots}
                     appName={name}
                     disabled={busy}

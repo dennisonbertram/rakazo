@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { Bot } from "@rakazo/contracts";
-import { inboxAgentSpawnKey, mailThreadAgentSpawnKey } from "@rakazo/contracts";
+import { mailThreadAgentSpawnKey } from "@rakazo/contracts";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -11,14 +11,13 @@ const rpc = vi.hoisted(() => ({
   connections: {
     list: vi.fn(),
     effectiveAccess: vi.fn(),
-    access: vi.fn(),
-    setAccess: vi.fn(),
+    accessAll: vi.fn(),
+    setAgentAccess: vi.fn(),
   },
   mcp: {
-    servers: { list: vi.fn() },
-    assignments: { list: vi.fn(), replace: vi.fn() },
+    servers: { list: vi.fn(), setAgentAssignment: vi.fn() },
+    assignments: { list: vi.fn() },
   },
-  bots: { list: vi.fn() },
 }));
 vi.mock("../../lib/rpc", () => ({ rpc }));
 vi.mock("@lingui/react/macro", () => ({
@@ -50,21 +49,21 @@ const conn = (id: string, name: string, account: string, agentBotId: string | nu
 });
 
 const ada = bot("ada", "Ada");
-const bea = bot("bea", "Bea");
-const inbox = bot("inbox", "Inbox agent", inboxAgentSpawnKey("u1"));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  rpc.bots.list.mockResolvedValue([ada, bea, inbox]);
   rpc.mcp.servers.list.mockResolvedValue([]);
   rpc.mcp.assignments.list.mockResolvedValue([]);
-  rpc.connections.access.mockResolvedValue({
-    allAgents: false,
-    botIds: ["bea"],
-    agentShared: true,
-  });
-  rpc.connections.setAccess.mockResolvedValue(undefined);
-  rpc.mcp.assignments.replace.mockResolvedValue(undefined);
+  rpc.connections.accessAll.mockImplementation(async () =>
+    Object.fromEntries(
+      (await rpc.connections.list()).map((row: { id: string }) => [
+        row.id,
+        { allAgents: false, botIds: ["bea"], agentShared: true },
+      ]),
+    ),
+  );
+  rpc.connections.setAgentAccess.mockResolvedValue({});
+  rpc.mcp.servers.setAgentAssignment.mockResolvedValue({ ok: true });
 });
 
 async function mount(agent: Bot) {
@@ -93,15 +92,15 @@ it("lists the accounts the agent can reach with address and the real state", asy
   expect(sw("Ada can use Gmail bob@example.com").getAttribute("aria-checked")).toBe("false");
 });
 
-it("a toggle saves through the same setAccess endpoint as the integration page", async () => {
+it("a toggle changes only this agent through the single-agent endpoint", async () => {
   rpc.connections.list.mockResolvedValue([conn("c2", "Gmail", "bob@example.com")]);
   rpc.connections.effectiveAccess.mockResolvedValue({ c2: { shared: "some", botIds: ["bea"] } });
   const { sw } = await mount(ada);
   await act(async () => sw("Ada can use Gmail bob@example.com").click());
-  expect(rpc.connections.setAccess).toHaveBeenCalledWith({
+  expect(rpc.connections.setAgentAccess).toHaveBeenCalledWith({
     connectionId: "c2",
-    allAgents: false,
-    botIds: ["bea", "ada"],
+    botId: "ada",
+    on: true,
   });
 });
 
@@ -114,7 +113,10 @@ it("an agent's own connection is on and locked; a private one cannot be turned o
     c1: { shared: "some", botIds: ["ada"] },
     c2: { shared: "some", botIds: ["bea"] },
   });
-  rpc.connections.access.mockResolvedValue({ allAgents: true, botIds: [], agentShared: false });
+  rpc.connections.accessAll.mockResolvedValue({
+    c1: { allAgents: true, botIds: [], agentShared: false },
+    c2: { allAgents: true, botIds: [], agentShared: false },
+  });
   const { sw } = await mount(ada);
   const own = sw("Ada can use Mercury");
   expect(own.getAttribute("aria-checked")).toBe("true");
@@ -129,7 +131,6 @@ it("an agent's own connection is on and locked; a private one cannot be turned o
 
 it("an email chat shows the Inbox agent's mail account on and locked", async () => {
   const chat = bot("chat", "Re: hi", mailThreadAgentSpawnKey("c1", "t1"));
-  rpc.bots.list.mockResolvedValue([ada, inbox, chat]);
   rpc.connections.list.mockResolvedValue([conn("c1", "Gmail", "ann@example.com", "inbox")]);
   rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: ["chat"] } });
   const { sw } = await mount(chat);
@@ -140,24 +141,82 @@ it("an email chat shows the Inbox agent's mail account on and locked", async () 
   );
 });
 
-it("a server toggle assigns it to this agent only, keeping its other servers", async () => {
+it("a server toggle assigns it to this agent only", async () => {
   rpc.connections.list.mockResolvedValue([]);
   rpc.connections.effectiveAccess.mockResolvedValue({});
   rpc.mcp.servers.list.mockResolvedValue([
     { id: "s1", name: "Docs", enabled: true, agentBotId: null, agentExclusive: false },
   ]);
-  rpc.mcp.assignments.list.mockResolvedValue([
-    { serverId: "s0", allowAllTools: false, allowedTools: ["x"] },
-  ]);
   const { sw } = await mount(ada);
   await act(async () => sw("Ada can use Docs").click());
-  expect(rpc.mcp.assignments.replace).toHaveBeenCalledWith({
+  expect(rpc.mcp.servers.setAgentAssignment).toHaveBeenCalledWith({
+    serverId: "s1",
     botId: "ada",
-    assignments: [
-      { serverId: "s0", allowAllTools: false, allowedTools: ["x"] },
-      { serverId: "s1", allowAllTools: true, allowedTools: [] },
-    ],
+    on: true,
   });
+});
+
+it("an exclusive server shows other agents as off and locked even with a saved assignment", async () => {
+  rpc.connections.list.mockResolvedValue([]);
+  rpc.connections.effectiveAccess.mockResolvedValue({});
+  rpc.mcp.servers.list.mockResolvedValue([
+    { id: "s1", name: "Docs", enabled: true, agentBotId: "bea", agentExclusive: true },
+  ]);
+  rpc.mcp.assignments.list.mockResolvedValue([{ serverId: "s1" }]);
+  const { sw } = await mount(ada);
+  const row = sw("Ada can use Docs");
+  expect(row.getAttribute("aria-checked")).toBe("false");
+  expect(row.hasAttribute("data-disabled") || row.getAttribute("aria-disabled") === "true").toBe(
+    true,
+  );
+});
+
+it("an email chat's accounts are all locked, following the Inbox agent", async () => {
+  const chat = bot("chat", "Re: hi", mailThreadAgentSpawnKey("c1", "t1"));
+  rpc.connections.list.mockResolvedValue([conn("c9", "Slack", "", null)]);
+  rpc.connections.effectiveAccess.mockResolvedValue({ c9: { shared: "some", botIds: [] } });
+  const { sw } = await mount(chat);
+  const row = sw("Re: hi can use Slack");
+  expect(row.hasAttribute("data-disabled") || row.getAttribute("aria-disabled") === "true").toBe(
+    true,
+  );
+});
+
+it("reloads when the agent's audience changes", async () => {
+  rpc.connections.list.mockResolvedValue([conn("c1", "Gmail", "ann@example.com")]);
+  rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: [] } });
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => root.render(<BotAccessSection bot={ada} />));
+  await act(async () => undefined);
+  const before = rpc.connections.effectiveAccess.mock.calls.length;
+  await act(async () => root.render(<BotAccessSection bot={{ ...ada, audience: "external" }} />));
+  await act(async () => undefined);
+  expect(rpc.connections.effectiveAccess.mock.calls.length).toBeGreaterThan(before);
+});
+
+it("a failed load shows an error with Retry instead of nothing", async () => {
+  rpc.connections.list.mockRejectedValueOnce(new Error("down"));
+  rpc.connections.effectiveAccess.mockResolvedValue({});
+  const { container } = await mount(ada);
+  expect(container.textContent).toContain("Could not load access");
+  rpc.connections.list.mockResolvedValue([conn("c1", "Gmail", "ann@example.com")]);
+  rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: [] } });
+  await act(async () =>
+    [...container.querySelectorAll("button")].find((b) => b.textContent === "Retry")?.click(),
+  );
+  expect(container.textContent).toContain("ann@example.com");
+});
+
+it("says the list could not be refreshed when a change saved but the reload failed", async () => {
+  rpc.connections.list.mockResolvedValueOnce([conn("c1", "Gmail", "ann@example.com")]);
+  rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: [] } });
+  const { container, sw } = await mount(ada);
+  rpc.connections.list.mockRejectedValue(new Error("down"));
+  await act(async () => sw("Ada can use Gmail ann@example.com").click());
+  expect(container.textContent).toContain("could not be refreshed");
+  expect(container.textContent).toContain("ann@example.com");
 });
 
 it("shows search only above 8 rows and renders nothing with no accounts", async () => {
@@ -165,6 +224,7 @@ it("shows search only above 8 rows and renders nothing with no accounts", async 
   rpc.connections.effectiveAccess.mockResolvedValue({});
   const empty = await mount(ada);
   expect(empty.container.textContent).toBe("");
+  rpc.connections.effectiveAccess.mockResolvedValue({});
 
   rpc.connections.list.mockResolvedValue(
     Array.from({ length: 9 }, (_, i) => conn(`c${i}`, `App${i}`, `u${i}@example.com`)),

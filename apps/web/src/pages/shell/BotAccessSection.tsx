@@ -1,87 +1,70 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot, Connection, McpServer } from "@rakazo/contracts";
-import { isInboxAgentSpawnKey, isMailThreadAgentSpawnKey } from "@rakazo/contracts";
-import { Switch } from "@rakazo/ui-web";
+import { isMailThreadAgentSpawnKey } from "@rakazo/contracts";
+import { Button, Switch } from "@rakazo/ui-web";
 import { useCallback, useEffect, useState } from "react";
 import { AGENT_LIST_CONTROLS_MIN } from "../../components/integrations/parts";
 import { SearchField } from "../../components/ListControls";
-import { toggleAccess } from "../../lib/integrations";
-import { assignMcpServer } from "../../lib/mcp-assign";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 
-type Access = { allAgents: boolean; botIds: string[]; agentShared: boolean };
 type Row = {
   key: string;
   name: string;
   address?: string;
   on: boolean;
-  /** The server keeps this one on (its own agent), or it is not shared with other agents. */
+  /** The server keeps this one as it is: the agent's own, a private connection, an exclusive server, or inherited from the Inbox agent. */
   locked: boolean;
-  toggle: (on: boolean) => Promise<void>;
+  toggle: (on: boolean) => Promise<unknown>;
 };
 
 /** What one agent can reach: the connected accounts and servers, each with the switch the integration page has. */
 export function BotAccessSection({ bot }: { bot: Bot }) {
   const { t } = useLingui();
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [connections, servers, bots, effective, assigned] = await Promise.all([
+    const [connections, servers, effective, access, assigned] = await Promise.all([
       rpc.connections.list(),
       rpc.mcp.servers.list(),
-      rpc.bots.list(),
       rpc.connections.effectiveAccess(),
+      rpc.connections.accessAll(),
       rpc.mcp.assignments.list({ botId: bot.id }),
     ]);
-    const owners = new Map(bots.map((entry) => [entry.id, entry]));
+    // An email's own agent has exactly the Inbox agent's access, on every account, so it only follows.
+    const mailChat = isMailThreadAgentSpawnKey(bot.spawnKey);
     const live = connections.filter(
       (row: Connection) => row.status === "connected" && !row.needsReconnect,
     );
-    const access = new Map<string, Access>(
-      await Promise.all(
-        live.map(
-          async (row) =>
-            [row.id, await rpc.connections.access({ connectionId: row.id })] as [string, Access],
-        ),
-      ),
-    );
-    const allBotIds = bots.filter((entry) => !entry.archivedAt).map((entry) => entry.id);
     const accountRows: Row[] = live.map((row) => {
-      const stored = access.get(row.id) ?? { allAgents: true, botIds: [], agentShared: true };
-      const ownerKey = row.agentBotId ? owners.get(row.agentBotId)?.spawnKey : null;
       const own = row.agentBotId === bot.id;
-      // An email's chat has exactly the Inbox agent's access, so it stays on with it.
-      const mailChat = isMailThreadAgentSpawnKey(bot.spawnKey) && isInboxAgentSpawnKey(ownerKey);
-      const private_ = Boolean(row.agentBotId) && !own && !stored.agentShared;
+      const private_ = Boolean(row.agentBotId) && !own && access[row.id]?.agentShared === false;
       return {
         key: `connection:${row.id}`,
         name: row.displayName,
         address: row.account,
         on: effective[row.id]?.botIds.includes(bot.id) ?? false,
         locked: own || mailChat || private_,
-        toggle: async (on) => {
-          // Read the stored grant fresh, so a change made elsewhere is not overwritten.
-          const current = await rpc.connections.access({ connectionId: row.id });
-          const next = toggleAccess(current, allBotIds, bot.id, on);
-          await rpc.connections.setAccess({ connectionId: row.id, ...next });
-        },
+        toggle: (on) => rpc.connections.setAgentAccess({ connectionId: row.id, botId: bot.id, on }),
       };
     });
     const serverRows: Row[] = servers
       .filter((server: McpServer) => server.enabled)
       .map((server) => {
         const own = server.agentBotId === bot.id;
+        // Only its agent may use an exclusive server, whatever the saved assignments say.
+        const exclusiveOther = server.agentBotId !== null && server.agentExclusive && !own;
         return {
           key: `server:${server.id}`,
           name: server.name,
-          on: own || assigned.some((entry) => entry.serverId === server.id),
-          locked: own || (server.agentBotId !== null && server.agentExclusive),
-          toggle: (on) => assignMcpServer(bot.id, server.id, on),
+          on: own || (!exclusiveOther && assigned.some((entry) => entry.serverId === server.id)),
+          locked: own || exclusiveOther,
+          toggle: (on) =>
+            rpc.mcp.servers.setAgentAssignment({ serverId: server.id, botId: bot.id, on }),
         };
       });
     setRows(
@@ -91,35 +74,50 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
     );
   }, [bot.id, bot.spawnKey]);
 
+  const { audience, firewall } = bot;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a changed audience or firewall changes who can reach what
+  const reload = useCallback(() => {
+    setLoadFailed(false);
+    load().catch(() => setLoadFailed(true));
+  }, [load, audience, firewall]);
   useEffect(() => {
-    let active = true;
     setRows(null);
-    load().then(
-      () => active && setFailed(false),
-      () => active && setFailed(true),
-    );
-    return () => {
-      active = false;
-    };
-  }, [load]);
+    reload();
+  }, [reload]);
 
   async function toggle(row: Row, on: boolean) {
     setBusy(true);
     setError(null);
+    let changed = true;
     try {
       await row.toggle(on);
     } catch (err) {
+      changed = false;
       setError(errorText(err, t`Could not update access`));
     }
     try {
       await load();
     } catch {
-      // The switches keep what they showed; the error above, if any, is already visible.
+      // The change may have landed, but the switches no longer show the server's state.
+      if (changed) setError(t`Saved, but the list could not be refreshed`);
     }
     setBusy(false);
   }
 
-  if (failed) return null;
+  if (loadFailed)
+    return (
+      <section data-testid="bot-access" className="mt-6">
+        <div className="mb-2 text-[13.5px] font-medium text-foreground">
+          <Trans>Access</Trans>
+        </div>
+        <p role="alert" className="text-sm text-destructive">
+          <Trans>Could not load access</Trans>
+        </p>
+        <Button variant="outline" size="sm" className="mt-2" onClick={reload}>
+          <Trans>Retry</Trans>
+        </Button>
+      </section>
+    );
   if (!rows || rows.length === 0) return null;
   const needle = query.trim().toLowerCase();
   const shown =

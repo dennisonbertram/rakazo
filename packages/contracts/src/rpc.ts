@@ -292,11 +292,11 @@ import {
   InboxListInputSchema,
   InboxListOutputSchema,
   InboxMarkReadInputSchema,
-  InboxNoReplyInputSchema,
-  InboxNoReplyOutputSchema,
   InboxMessageSchema,
   InboxMoveInputSchema,
   InboxMoveOutputSchema,
+  InboxNoReplyInputSchema,
+  InboxNoReplyOutputSchema,
   InboxPersonContextSchema,
   InboxPersonInputSchema,
   InboxPersonSummaryOutputSchema,
@@ -1247,6 +1247,10 @@ export const appContract = {
       remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
       /** Turns the server's write tools on or off (Carta, or any server that has an agent). */
       setWrites: oc.input(z.object({ id: Id, enabled: z.boolean() })).output(McpServerSchema),
+      /** Gives one agent a server or takes it away, atomically; other agents' assignments are untouched. */
+      setAgentAssignment: oc
+        .input(z.object({ serverId: Id, botId: Id, on: z.boolean() }))
+        .output(z.object({ ok: z.literal(true) })),
     },
     assignments: {
       list: oc.input(botId).output(z.array(BotMcpServerSchema)),
@@ -1371,8 +1375,17 @@ export const appContract = {
     access: oc.input(z.object({ connectionId: Id })).output(ConnectionAccessSchema),
     /** The agents that can really use each of the caller's connections, in one call. */
     effectiveAccess: oc.output(EffectiveAccessSchema),
+    /** The stored access of every live connection of the caller, in one call. */
+    accessAll: oc.output(z.record(Id, ConnectionAccessSchema)),
     setAccess: oc
       .input(z.object({ connectionId: Id, allAgents: z.boolean(), botIds: z.array(Id).max(500) }))
+      .output(ConnectionAccessSchema),
+    /**
+     * Turns one agent on or off for a connection, atomically: the server changes only that agent's
+     * grant under a row lock, so two clients cannot overwrite each other. The connection's own agent stays on.
+     */
+    setAgentAccess: oc
+      .input(z.object({ connectionId: Id, botId: Id, on: z.boolean() }))
       .output(ConnectionAccessSchema),
     createAgent: oc.input(z.object({ connectionId: Id })).output(z.object({ botId: Id })),
     setWrites: oc

@@ -116,6 +116,7 @@ export function AgentToggleList({
   saving = false,
   everyone = false,
   subject = "account",
+  ready = true,
 }: {
   bots: Bot[];
   isOn: (botId: string) => boolean;
@@ -132,6 +133,8 @@ export function AgentToggleList({
   everyone?: boolean;
   /** What the agents get: an account (default) or a server connection. */
   subject?: "account" | "connection";
+  /** False until the access data has arrived, so the first on-first order uses the real state. */
+  ready?: boolean;
 }) {
   const { t } = useLingui();
   const [query, setQuery] = useState("");
@@ -166,7 +169,7 @@ export function AgentToggleList({
       .filter((bot) => bot.name.toLowerCase().includes(needle))
       .filter((bot) => (show === "on" ? on(bot) : show === "off" ? !on(bot) : true))
       .sort((a, b) => Number(on(b)) - Number(on(a)) || a.name.localeCompare(b.name));
-  }, [othersKey, query, show]);
+  }, [othersKey, query, show, ready]);
   const shownOthers = showControls ? visibleOthers : others;
   const agentRow = (bot: Bot) => (
     <div key={bot.id} className="flex items-center gap-3 px-3.5 py-2.5">
