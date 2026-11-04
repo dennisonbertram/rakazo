@@ -27,6 +27,7 @@ import { todayDay } from "../../lib/day-input";
 import { shortDay, usdFigure } from "../../lib/finance-format";
 import { useHideAmounts } from "../../lib/hide-amounts-preference";
 import { errorText } from "../../lib/user-error";
+import { SeeAll, useCappedRows } from "../CappedList";
 import { SectionCard } from "../SectionCard";
 
 export type SafeStep = Exclude<SafeMarkInput["action"], "cancel">;
@@ -341,7 +342,10 @@ export function SafeList({
   onDelete,
   onAssign,
   onUnassign,
+  keepId,
 }: {
+  /** A SAFE just saved, which stays in view on a phone even past the third row. */
+  keepId?: string;
   safes: readonly Safe[];
   round: FundraiseRound | null;
   /** Names a Mercury row's assigned contact. */
@@ -360,22 +364,28 @@ export function SafeList({
       ORDER.indexOf(a.status) - ORDER.indexOf(b.status) ||
       statusDate(b).localeCompare(statusDate(a)),
   );
+  const list = useCappedRows(sorted, { keep: (safe) => safe.id === keepId });
   return (
-    <ul>
-      {sorted.map((safe) => (
-        <SafeRow
-          key={safe.id}
-          safe={safe}
-          round={round}
-          contactName={contacts.find((c) => c.id === safe.contactId)?.name}
-          onOpen={() => onOpen(safe)}
-          onMark={(step) => onMark(safe, step)}
-          onCancel={() => onCancel(safe)}
-          onDelete={() => onDelete(safe)}
-          onAssign={onAssign && (() => onAssign(safe))}
-          onUnassign={onUnassign && (() => onUnassign(safe))}
-        />
-      ))}
-    </ul>
+    <>
+      <ul>
+        {list.rows.map((safe) => (
+          <SafeRow
+            key={safe.id}
+            safe={safe}
+            round={round}
+            contactName={contacts.find((c) => c.id === safe.contactId)?.name}
+            onOpen={() => onOpen(safe)}
+            onMark={(step) => onMark(safe, step)}
+            onCancel={() => onCancel(safe)}
+            onDelete={() => onDelete(safe)}
+            onAssign={onAssign && (() => onAssign(safe))}
+            onUnassign={onUnassign && (() => onUnassign(safe))}
+          />
+        ))}
+      </ul>
+      <div className="flex justify-end">
+        <SeeAll list={list} />
+      </div>
+    </>
   );
 }

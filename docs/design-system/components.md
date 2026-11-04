@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 333 of 333
-- Web and shared components: 850
-- Mobile components: 151 in 101 files, mobile — native story pending
-- SwiftUI views: 130 in 71 files, native story pending
+- Web and shared component files with stories: 336 of 336
+- Web and shared components: 855
+- Mobile components: 153 in 102 files, mobile — native story pending
+- SwiftUI views: 138 in 76 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -83,6 +83,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BotAppControlSection | [apps/web/src/components/BotAppControlSection.tsx](../../apps/web/src/components/BotAppControlSection.tsx) | [BotAppControlSection.stories.tsx](../../apps/web/src/components/BotAppControlSection.stories.tsx) | web |
 | BotAudienceTag | [apps/web/src/components/BotAudienceTag.tsx](../../apps/web/src/components/BotAudienceTag.tsx) | [BotAudienceTag.stories.tsx](../../apps/web/src/components/BotAudienceTag.stories.tsx) | web |
 | BotTodos | [apps/web/src/components/BotTodos.tsx](../../apps/web/src/components/BotTodos.tsx) | [BotTodos.stories.tsx](../../apps/web/src/components/BotTodos.stories.tsx) | web |
+| SeeAll | [apps/web/src/components/CappedList.tsx](../../apps/web/src/components/CappedList.tsx) | [CappedList.stories.tsx](../../apps/web/src/components/CappedList.stories.tsx) | web |
 | CloudAgentCard | [apps/web/src/components/CloudAgentCard.tsx](../../apps/web/src/components/CloudAgentCard.tsx) | [CloudAgentCard.stories.tsx](../../apps/web/src/components/CloudAgentCard.stories.tsx) | web |
 | Row, RecipientSummary, ComposeEmail | [apps/web/src/components/ComposeEmail.tsx](../../apps/web/src/components/ComposeEmail.tsx) | [ComposeEmail.stories.tsx](../../apps/web/src/components/ComposeEmail.stories.tsx), [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
 | ComputerMaintenanceActions | [apps/web/src/components/ComputerMaintenanceActions.tsx](../../apps/web/src/components/ComputerMaintenanceActions.tsx) | [ComputerMaintenanceActions.stories.tsx](../../apps/web/src/components/ComputerMaintenanceActions.stories.tsx) | web |
@@ -101,7 +102,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | HideAmountsMenuItem, ShowAmountsButton | [apps/web/src/components/HideAmountsToggle.tsx](../../apps/web/src/components/HideAmountsToggle.tsx) | [HideAmountsToggle.stories.tsx](../../apps/web/src/components/HideAmountsToggle.stories.tsx) | web |
 | I18nBootstrap | [apps/web/src/components/I18nBootstrap.tsx](../../apps/web/src/components/I18nBootstrap.tsx) | [I18nBootstrap.stories.tsx](../../apps/web/src/components/I18nBootstrap.stories.tsx) | web |
 | PhoneSlot, FilterSheet, Tip, SearchField, PickFilter, PhoneDateRange, SortControl | [apps/web/src/components/ListControls.tsx](../../apps/web/src/components/ListControls.tsx) | [ListControls.stories.tsx](../../apps/web/src/components/ListControls.stories.tsx) | web |
-| Row, MailApprovalCard | [apps/web/src/components/MailApprovalCard.tsx](../../apps/web/src/components/MailApprovalCard.tsx) | [MailApprovalCard.stories.tsx](../../apps/web/src/components/MailApprovalCard.stories.tsx) | web |
+| Row, MailApprovalCard | [apps/web/src/components/MailApprovalCard.tsx](../../apps/web/src/components/MailApprovalCard.tsx) | [MailApprovalCard.stories.tsx](../../apps/web/src/components/MailApprovalCard.stories.tsx), [MailReplyBatchCard.stories.tsx](../../apps/web/src/components/MailReplyBatchCard.stories.tsx) | web |
 | MailOutbox | [apps/web/src/components/MailOutbox.tsx](../../apps/web/src/components/MailOutbox.tsx) | [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
 | MailThreadCard | [apps/web/src/components/MailThreadCard.tsx](../../apps/web/src/components/MailThreadCard.tsx) | [MailThreadCard.stories.tsx](../../apps/web/src/components/MailThreadCard.stories.tsx) | web |
 | MarkdownLinkPrompt | [apps/web/src/components/markdown-link-prompt.tsx](../../apps/web/src/components/markdown-link-prompt.tsx) | [markdown-link-prompt.stories.tsx](../../apps/web/src/components/markdown-link-prompt.stories.tsx) | web |
@@ -216,6 +217,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | StatementReminderBanner | [apps/web/src/components/finance/StatementReminderBanner.tsx](../../apps/web/src/components/finance/StatementReminderBanner.tsx) | [StatementReminderBanner.stories.tsx](../../apps/web/src/components/finance/StatementReminderBanner.stories.tsx) | web |
 | CheckLine, Row, StatementGroup | [apps/web/src/components/finance/StatementReviewCard.tsx](../../apps/web/src/components/finance/StatementReviewCard.tsx) | [StatementReviewCard.stories.tsx](../../apps/web/src/components/finance/StatementReviewCard.stories.tsx) | web |
 | SpaceName, AskAgentButton, WithEndings, HereLink, DetailHead, CompanyMenu, NotFoundNotice, ErrorNotice, DetailPage, Section, Kpi, BreakdownRows, Chevron, TransactionRow, VendorGroupRows, TransactionTable, TransactionsSection, Chip, PeriodTabs, Legend, BurnLegend, Kv, KvRow, ValueLink | [apps/web/src/components/finance/ui.tsx](../../apps/web/src/components/finance/ui.tsx) | [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx), [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx), [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx), [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx), [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |
+| UpcomingRow, SubscriptionsTable | [apps/web/src/components/finance/UpcomingSubscriptions.tsx](../../apps/web/src/components/finance/UpcomingSubscriptions.tsx) | [UpcomingSubscriptions.stories.tsx](../../apps/web/src/components/finance/UpcomingSubscriptions.stories.tsx) | web |
 | WalletDialog | [apps/web/src/components/finance/WalletDialog.tsx](../../apps/web/src/components/finance/WalletDialog.tsx) | [WalletDialog.stories.tsx](../../apps/web/src/components/finance/WalletDialog.stories.tsx) | web |
 
 ## Web components/fundraising
@@ -224,7 +226,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | --- | --- | --- | --- |
 | OneFieldDialog, InvestorEmailDialog, AssignSafeDialog | [apps/web/src/components/fundraising/MercuryDialogs.tsx](../../apps/web/src/components/fundraising/MercuryDialogs.tsx) | [MercuryDialogs.stories.tsx](../../apps/web/src/components/fundraising/MercuryDialogs.stories.tsx) | web |
 | MercuryLine | [apps/web/src/components/fundraising/MercuryLine.tsx](../../apps/web/src/components/fundraising/MercuryLine.tsx) | [MercuryLine.stories.tsx](../../apps/web/src/components/fundraising/MercuryLine.stories.tsx) | web |
-| ProspectRow, Pipeline | [apps/web/src/components/fundraising/Pipeline.tsx](../../apps/web/src/components/fundraising/Pipeline.tsx) | [Pipeline.stories.tsx](../../apps/web/src/components/fundraising/Pipeline.stories.tsx) | web |
+| ProspectRow, Pipeline, StageRows | [apps/web/src/components/fundraising/Pipeline.tsx](../../apps/web/src/components/fundraising/Pipeline.tsx) | [Pipeline.stories.tsx](../../apps/web/src/components/fundraising/Pipeline.stories.tsx) | web |
 | RoundDialog, Segment, Figure, RoundCard | [apps/web/src/components/fundraising/RoundCard.tsx](../../apps/web/src/components/fundraising/RoundCard.tsx) | [RoundCard.stories.tsx](../../apps/web/src/components/fundraising/RoundCard.stories.tsx) | web |
 | SafeDialog, SafeCoverSummary | [apps/web/src/components/fundraising/SafeDialog.tsx](../../apps/web/src/components/fundraising/SafeDialog.tsx) | [SafeDialog.stories.tsx](../../apps/web/src/components/fundraising/SafeDialog.stories.tsx) | web |
 | MarkDateDialog, AttentionStrip, SafeRow, SafeList | [apps/web/src/components/fundraising/SafeList.tsx](../../apps/web/src/components/fundraising/SafeList.tsx) | [SafeList.stories.tsx](../../apps/web/src/components/fundraising/SafeList.stories.tsx) | web |
@@ -361,7 +363,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
 | BotPageView | [apps/web/src/pages/BotPageView.tsx](../../apps/web/src/pages/BotPageView.tsx) | [BotPageView.stories.tsx](../../apps/web/src/pages/BotPageView.stories.tsx) | web |
 | CalendarPage | [apps/web/src/pages/Calendar.tsx](../../apps/web/src/pages/Calendar.tsx) | [Calendar.stories.tsx](../../apps/web/src/pages/Calendar.stories.tsx) | web |
-| CompanyPage | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
+| CompanyPage, EventList | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
 | CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |
 | CompanyFactDetail | [apps/web/src/pages/CompanyFactDetail.tsx](../../apps/web/src/pages/CompanyFactDetail.tsx) | [CompanyFactDetail.stories.tsx](../../apps/web/src/pages/CompanyFactDetail.stories.tsx) | web |
 | CompanyHistory | [apps/web/src/pages/CompanyHistory.tsx](../../apps/web/src/pages/CompanyHistory.tsx) | [CompanyHistory.stories.tsx](../../apps/web/src/pages/CompanyHistory.stories.tsx) | web |
@@ -377,10 +379,11 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | DevinPage, Devin, DevinSkeleton | [apps/web/src/pages/Devin.tsx](../../apps/web/src/pages/Devin.tsx) | [Devin.stories.tsx](../../apps/web/src/pages/Devin.stories.tsx) | web |
 | Badge, Title, Question, PullRequests, DevinSessions | [apps/web/src/pages/devin/DevinSessions.tsx](../../apps/web/src/pages/devin/DevinSessions.tsx) | [DevinSessions.stories.tsx](../../apps/web/src/pages/devin/DevinSessions.stories.tsx) | web |
 | ExternalConversationSettings | [apps/web/src/pages/ExternalConversationSettings.tsx](../../apps/web/src/pages/ExternalConversationSettings.tsx) | [ExternalConversationSettings.stories.tsx](../../apps/web/src/pages/ExternalConversationSettings.stories.tsx) | web |
-| FinancePage, Dashboard, EmptyState, DashboardSkeleton, Overview, ShowAll, HoverRow, UpcomingRow, SubscriptionsTable | [apps/web/src/pages/Finance.tsx](../../apps/web/src/pages/Finance.tsx) | [Finance.stories.tsx](../../apps/web/src/pages/Finance.stories.tsx) | web |
+| FinancePage, Dashboard, EmptyState, DashboardSkeleton, Overview, HoverRow | [apps/web/src/pages/Finance.tsx](../../apps/web/src/pages/Finance.tsx) | [Finance.stories.tsx](../../apps/web/src/pages/Finance.stories.tsx) | web |
 | AccountTable, CryptoGroup, FinanceAccountsPage, FinanceAccountPage | [apps/web/src/pages/finance/FinanceAccounts.tsx](../../apps/web/src/pages/finance/FinanceAccounts.tsx) | [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx) | web |
 | FinanceBurnPage, FinanceMonthPage, Counted, FinanceRunwayPage | [apps/web/src/pages/finance/FinanceBurn.tsx](../../apps/web/src/pages/finance/FinanceBurn.tsx) | [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx) | web |
 | RemoveDialog, WalletRows, UnpricedRows, FinanceCryptoPage | [apps/web/src/pages/finance/FinanceCrypto.tsx](../../apps/web/src/pages/finance/FinanceCrypto.tsx) | [FinanceCrypto.stories.tsx](../../apps/web/src/pages/finance/FinanceCrypto.stories.tsx) | web |
+| NoMatches, FinanceUpcomingPage, FinanceSubscriptionsPage | [apps/web/src/pages/finance/FinanceLists.tsx](../../apps/web/src/pages/finance/FinanceLists.tsx) | [FinanceLists.stories.tsx](../../apps/web/src/pages/finance/FinanceLists.stories.tsx) | web |
 | FinanceNotFound | [apps/web/src/pages/finance/FinanceNotFound.tsx](../../apps/web/src/pages/finance/FinanceNotFound.tsx) | [FinanceNotFound.stories.tsx](../../apps/web/src/pages/finance/FinanceNotFound.stories.tsx) | web |
 | FinanceSpendPage, FinanceCategoryPage, FinanceRecurringPage, FinanceVendorPage | [apps/web/src/pages/finance/FinanceSpend.tsx](../../apps/web/src/pages/finance/FinanceSpend.tsx) | [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx) | web |
 | ReceiptIcon, ReceiptThumb, CheckReceipt, FinanceTransactionPage, FinanceReceiptPage | [apps/web/src/pages/finance/FinanceTransaction.tsx](../../apps/web/src/pages/finance/FinanceTransaction.tsx) | [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |
@@ -514,6 +517,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BotMemberPicker | [apps/mobile/components/bot-member-picker.tsx](../../apps/mobile/components/bot-member-picker.tsx) | mobile — native story pending | mobile |
 | BotOrganizeModal, SectionOption | [apps/mobile/components/bot-organize-modal.tsx](../../apps/mobile/components/bot-organize-modal.tsx) | mobile — native story pending | mobile |
 | CallCard, RoundButton, Waveform | [apps/mobile/components/CallCard.tsx](../../apps/mobile/components/CallCard.tsx) | mobile — native story pending | mobile |
+| CappedList, CappedListSheet | [apps/mobile/components/capped-list.tsx](../../apps/mobile/components/capped-list.tsx) | mobile — native story pending | mobile |
 | ChoiceCard | [apps/mobile/components/ChoiceCard.tsx](../../apps/mobile/components/ChoiceCard.tsx) | mobile — native story pending | mobile |
 | CompanyList | [apps/mobile/components/company-list.ios.tsx](../../apps/mobile/components/company-list.ios.tsx) | mobile — native story pending | mobile |
 | CompanyList | [apps/mobile/components/company-list.tsx](../../apps/mobile/components/company-list.tsx) | mobile — native story pending | mobile |
@@ -577,7 +581,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
 | AgentPageScreen, FailedSource | [apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift](../../apps/ios/Sources/Praci/AgentPages/AgentPageScreen.swift) | native story pending | iOS |
-| AppShell | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
+| AppShell, ArchivedToast | [apps/ios/Sources/Praci/App/AppShell.swift](../../apps/ios/Sources/Praci/App/AppShell.swift) | native story pending | iOS |
 | RootView | [apps/ios/Sources/Praci/App/RootView.swift](../../apps/ios/Sources/Praci/App/RootView.swift) | native story pending | iOS |
 | ArtifactScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactScreen.swift) | native story pending | iOS |
 | ArtifactsScreen | [apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift](../../apps/ios/Sources/Praci/Artifacts/ArtifactsScreen.swift) | native story pending | iOS |
@@ -600,6 +604,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | InboxRowView, LabelText, TimeText | [apps/ios/Sources/Praci/Inbox/List/InboxRowView.swift](../../apps/ios/Sources/Praci/Inbox/List/InboxRowView.swift) | native story pending | iOS |
 | TodosCard, TodosCardContent | [apps/ios/Sources/Praci/Inbox/Todos/TodosCard.swift](../../apps/ios/Sources/Praci/Inbox/Todos/TodosCard.swift) | native story pending | iOS |
 | LegalScreen, ContractRow, DeadlineRow, ContractDetailView, DeadlineDetailView | [apps/ios/Sources/Praci/Legal/LegalScreen.swift](../../apps/ios/Sources/Praci/Legal/LegalScreen.swift) | native story pending | iOS |
+| AgentAccessSection | [apps/ios/Sources/Praci/Manage/AgentAccessSection.swift](../../apps/ios/Sources/Praci/Manage/AgentAccessSection.swift) | native story pending | iOS |
 | AgentRowMenu | [apps/ios/Sources/Praci/Manage/AgentRowMenu.swift](../../apps/ios/Sources/Praci/Manage/AgentRowMenu.swift) | native story pending | iOS |
 | BotSettingsScreen | [apps/ios/Sources/Praci/Manage/BotSettingsScreen.swift](../../apps/ios/Sources/Praci/Manage/BotSettingsScreen.swift) | native story pending | iOS |
 | GroupSettingsScreen | [apps/ios/Sources/Praci/Manage/GroupSettingsScreen.swift](../../apps/ios/Sources/Praci/Manage/GroupSettingsScreen.swift) | native story pending | iOS |
@@ -618,17 +623,21 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | DeleteAccountSheet | [apps/ios/Sources/Praci/Settings/Account/DeleteAccountSheet.swift](../../apps/ios/Sources/Praci/Settings/Account/DeleteAccountSheet.swift) | native story pending | iOS |
 | AIDataSharingScreen | [apps/ios/Sources/Praci/Settings/AIData/AIDataSharingScreen.swift](../../apps/ios/Sources/Praci/Settings/AIData/AIDataSharingScreen.swift) | native story pending | iOS |
 | ArchivedScreen | [apps/ios/Sources/Praci/Settings/Archived/ArchivedScreen.swift](../../apps/ios/Sources/Praci/Settings/Archived/ArchivedScreen.swift) | native story pending | iOS |
-| IntegrationsScreen, ConnectionDetailScreen | [apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift](../../apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift) | native story pending | iOS |
+| AccessSections | [apps/ios/Sources/Praci/Settings/Integrations/AccessViews.swift](../../apps/ios/Sources/Praci/Settings/Integrations/AccessViews.swift) | native story pending | iOS |
+| IntegrationsScreen, RenameRow, ConnectionDetailScreen, McpServerDetailScreen | [apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift](../../apps/ios/Sources/Praci/Settings/Integrations/IntegrationsScreen.swift) | native story pending | iOS |
 | ConnectModelSheet, SignInFlowView, APIKeyForm, LocalServerForm | [apps/ios/Sources/Praci/Settings/Models/ConnectModelSheet.swift](../../apps/ios/Sources/Praci/Settings/Models/ConnectModelSheet.swift) | native story pending | iOS |
 | ModelsScreen, DefaultModelList, ProviderDetailScreen | [apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift](../../apps/ios/Sources/Praci/Settings/Models/ModelsScreen.swift) | native story pending | iOS |
 | NotificationPreferencesScreen | [apps/ios/Sources/Praci/Settings/Preferences/NotificationPreferencesScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/NotificationPreferencesScreen.swift) | native story pending | iOS |
 | UsageScreen | [apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift](../../apps/ios/Sources/Praci/Settings/Preferences/UsageScreen.swift) | native story pending | iOS |
 | ApprovalRulesScreen, AddRuleSheet | [apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift](../../apps/ios/Sources/Praci/Settings/Rules/ApprovalRulesScreen.swift) | native story pending | iOS |
 | SettingsScreen | [apps/ios/Sources/Praci/Settings/SettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/SettingsScreen.swift) | native story pending | iOS |
+| SettingsSheet | [apps/ios/Sources/Praci/Settings/SettingsSheet.swift](../../apps/ios/Sources/Praci/Settings/SettingsSheet.swift) | native story pending | iOS |
 | VoiceSettingsScreen, HostedVoiceScreen | [apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift](../../apps/ios/Sources/Praci/Settings/Voice/VoiceSettingsScreen.swift) | native story pending | iOS |
 | BotAvatarView | [apps/ios/Sources/Praci/Shared/BotAvatarView.swift](../../apps/ios/Sources/Praci/Shared/BotAvatarView.swift) | native story pending | iOS |
 | ConsentSheet | [apps/ios/Sources/Praci/Shared/ConsentSheet.swift](../../apps/ios/Sources/Praci/Shared/ConsentSheet.swift) | native story pending | iOS |
+| CappedSection, FullListScreen | [apps/ios/Sources/Praci/Shared/ListBrowsing.swift](../../apps/ios/Sources/Praci/Shared/ListBrowsing.swift) | native story pending | iOS |
 | LoadableView | [apps/ios/Sources/Praci/Shared/Loadable.swift](../../apps/ios/Sources/Praci/Shared/Loadable.swift) | native story pending | iOS |
+| PrimaryActionButton | [apps/ios/Sources/Praci/Shared/PrimaryActionButton.swift](../../apps/ios/Sources/Praci/Shared/PrimaryActionButton.swift) | native story pending | iOS |
 | SafeHTMLView | [apps/ios/Sources/Praci/Shared/SafeHTMLView.swift](../../apps/ios/Sources/Praci/Shared/SafeHTMLView.swift) | native story pending | iOS |
 | NewSpaceSheet | [apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift](../../apps/ios/Sources/Praci/Spaces/NewSpaceSheet.swift) | native story pending | iOS |
 | SpaceSettingsSheet | [apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift](../../apps/ios/Sources/Praci/Spaces/SpaceSettingsSheet.swift) | native story pending | iOS |
@@ -642,7 +651,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ComposerView | [apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift](../../apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift) | native story pending | iOS |
 | PendingSendsView | [apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift](../../apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift) | native story pending | iOS |
 | MessageActions | [apps/ios/Sources/Praci/Thread/MessageActions.swift](../../apps/ios/Sources/Praci/Thread/MessageActions.swift) | native story pending | iOS |
-| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView, UnsupportedBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
+| MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, ImageBlockView, FileBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
 | ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |
 | ThreadScreen, UnreadDivider | [apps/ios/Sources/Praci/Thread/ThreadScreen.swift](../../apps/ios/Sources/Praci/Thread/ThreadScreen.swift) | native story pending | iOS |
 | CallButton, CallView | [apps/ios/Sources/Praci/Voice/CallView.swift](../../apps/ios/Sources/Praci/Voice/CallView.swift) | native story pending | iOS |

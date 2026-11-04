@@ -51,9 +51,10 @@ vi.mock("../components/finance/StatementImport", () => ({
   ),
 }));
 
+import { UpcomingRow } from "../components/finance/UpcomingSubscriptions";
 import { hereCrumb, shortSpaceName, trailFor, WithEndings } from "../components/finance/ui";
 import { resetHideAmountsMemory, setHideAmounts } from "../lib/hide-amounts-preference";
-import { cryptoSubtitle, FinancePage, UpcomingRow } from "./Finance";
+import { cryptoSubtitle, FinancePage } from "./Finance";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -555,10 +556,10 @@ it("caps Breakdown and Upcoming at the same row count and expands inline", async
   expect(container.textContent).not.toContain("Upcoming 13");
 
   const showAll = [...container.querySelectorAll("button")].filter(
-    (b) => b.textContent === "Show all 24",
+    (b) => b.textContent === "See all (24)",
   );
   expect(showAll.length).toBe(1);
-  expect(button("Show all 12")).toBeDefined();
+  expect(button("See all (12)")).toBeDefined();
   await act(async () => showAll[0]?.click());
   expect(rows().upcoming).toBe(24);
   expect(rows().breakdown).toBe(7);
@@ -566,7 +567,32 @@ it("caps Breakdown and Upcoming at the same row count and expands inline", async
   expect(rows().upcoming).toBe(7);
 });
 
-it("previews the same number of Upcoming rows whatever Breakdown shows, and hides Show all when everything fits", async () => {
+it("shows 3 rows on a phone, with See all to Upcoming and Subscriptions and in place for Breakdown", async () => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: true,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  try {
+    rpcMock.overview.mockResolvedValue(manyRows());
+    await show("/app/finance");
+    await flush();
+    expect(container.querySelectorAll('a[href^="/app/finance/category/v"]').length).toBe(3);
+    const links = [...container.querySelectorAll("a")]
+      .filter((a) => a.textContent?.startsWith("See all"))
+      .map((a) => a.getAttribute("href"));
+    // Upcoming has its own page; Breakdown counts categories, so it expands in place.
+    expect(links).toContain("/app/finance/upcoming");
+    expect(links).not.toContain("/app/finance/spend?period=month");
+    expect(
+      [...container.querySelectorAll("button")].some((b) => b.textContent === "See all (12)"),
+    ).toBe(true);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("previews the same number of Upcoming rows whatever Breakdown shows, and hides See all when everything fits", async () => {
   const base = manyRows();
   rpcMock.overview.mockResolvedValue({
     ...base,
@@ -576,7 +602,7 @@ it("previews the same number of Upcoming rows whatever Breakdown shows, and hide
   await show("/app/finance");
   await flush();
   expect(container.querySelectorAll('a[href^="/app/finance/category/v"]').length).toBe(6);
-  expect(button(/^Show all/)).toBeUndefined();
+  expect(button(/^See all/)).toBeUndefined();
 
   act(() => root.unmount());
   root = createRoot(container);
@@ -587,7 +613,7 @@ it("previews the same number of Upcoming rows whatever Breakdown shows, and hide
   await show("/app/finance");
   await flush();
   // A short Breakdown (or the other Breakdown mode) does not shorten the Upcoming preview.
-  expect(button("Show all 24")).toBeDefined();
+  expect(button("See all (24)")).toBeDefined();
   expect(
     [...container.querySelectorAll("a")].filter((a) => a.textContent?.includes("Upcoming ")).length,
   ).toBe(7);

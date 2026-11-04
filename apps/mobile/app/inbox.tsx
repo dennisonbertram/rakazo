@@ -25,12 +25,15 @@ import {
   Text,
   View,
 } from "react-native";
+import { CappedList } from "../components/capped-list";
 import { MailRowMenu } from "../components/mail-row-menu";
 import { MenuPicker } from "../components/menu-picker";
 import { NativeActionButton } from "../components/native-action-button";
 import { NativeSegmentedControl } from "../components/native-segmented-control";
 import { NativeSymbol } from "../components/native-symbol";
 import { mobileTokens } from "../lib/appearance";
+import type { DueFilter } from "../lib/capped-list";
+import { filterTodosByDue } from "../lib/capped-list";
 import { useI18n } from "../lib/i18n";
 import { formatThreadTime } from "../lib/inbox";
 import {
@@ -621,49 +624,65 @@ function TodoCard({
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{t("To do")}</Text>
-      {todos.map((todo) => {
-        const days = todo.dueOn ? localDaysUntil(todo.dueOn, now) : null;
-        const tone = dueTone(days, todo.priority);
-        const detail = [todo.from, todo.detail].filter(Boolean).join(" · ");
-        return (
-          <View key={todo.id} style={styles.todoRow}>
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: false }}
-              accessibilityLabel={todo.text}
-              // The 22 pt circle plus 11 pt each side is the 44 pt target; the rest of the row does nothing.
-              hitSlop={11}
-              onPress={() => onComplete(todo)}
-            >
-              <NativeSymbol
-                ios="circle"
-                android="ellipse-outline"
-                size={22}
-                color={native.secondaryLabel}
-              />
-            </Pressable>
-            <View style={styles.todoBody}>
-              <Text style={styles.todoText}>{todo.text}</Text>
-              {detail ? (
-                <Text style={styles.meta} numberOfLines={1}>
-                  {detail}
+      <CappedList
+        items={todos}
+        title={t("To do")}
+        keyOf={(todo) => todo.id}
+        searchFields={(todo) => [todo.text, todo.detail ?? "", todo.from ?? ""]}
+        filter={{
+          label: t("To do"),
+          options: [
+            { value: "all", label: t("All") },
+            { value: "overdue", label: t("Overdue") },
+            { value: "upcoming", label: t("Upcoming") },
+            { value: "none", label: t("No date") },
+          ],
+          apply: (list, value) => filterTodosByDue(list, value as DueFilter),
+        }}
+        renderItem={(todo) => {
+          const days = todo.dueOn ? localDaysUntil(todo.dueOn, now) : null;
+          const tone = dueTone(days, todo.priority);
+          const detail = [todo.from, todo.detail].filter(Boolean).join(" · ");
+          return (
+            <View key={todo.id} style={styles.todoRow}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: false }}
+                accessibilityLabel={todo.text}
+                // The 22 pt circle plus 11 pt each side is the 44 pt target; the rest of the row does nothing.
+                hitSlop={11}
+                onPress={() => onComplete(todo)}
+              >
+                <NativeSymbol
+                  ios="circle"
+                  android="ellipse-outline"
+                  size={22}
+                  color={native.secondaryLabel}
+                />
+              </Pressable>
+              <View style={styles.todoBody}>
+                <Text style={styles.todoText}>{todo.text}</Text>
+                {detail ? (
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {detail}
+                  </Text>
+                ) : null}
+              </View>
+              {todo.dueOn && days !== null ? (
+                <Text
+                  style={[
+                    styles.meta,
+                    tone === "crit" && { color: tokens.destructive },
+                    tone === "warn" && { color: tokens.warning },
+                  ]}
+                >
+                  {todoDueLabel(todo.dueOn, days)}
                 </Text>
               ) : null}
             </View>
-            {todo.dueOn && days !== null ? (
-              <Text
-                style={[
-                  styles.meta,
-                  tone === "crit" && { color: tokens.destructive },
-                  tone === "warn" && { color: tokens.warning },
-                ]}
-              >
-                {todoDueLabel(todo.dueOn, days)}
-              </Text>
-            ) : null}
-          </View>
-        );
-      })}
+          );
+        }}
+      />
       {syncing ? (
         <View style={styles.todoRow}>
           <ActivityIndicator />

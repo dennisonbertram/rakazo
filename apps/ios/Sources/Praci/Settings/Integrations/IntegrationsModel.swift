@@ -5,6 +5,8 @@ import RakazoAPI
 struct IntegrationsSnapshot: Sendable {
   var connections: [Connection]
   var catalog: [ConnectorEntry]
+  /// Enabled MCP servers; empty when the list cannot be read.
+  var servers: [McpServer] = []
 }
 
 struct BeginConnectionInput: Encodable, Sendable {
@@ -19,6 +21,14 @@ struct SetWritesInput: Encodable, Sendable {
   var enabled: Bool
 }
 struct CatalogInput: Encodable, Sendable {}
+struct RenameConnectionInput: Encodable, Sendable {
+  var connectionId: String
+  var displayName: String
+}
+struct RenameServerInput: Encodable, Sendable {
+  var id: String
+  var name: String
+}
 
 struct PendingConnection: Equatable {
   var id: String
@@ -40,10 +50,11 @@ final class IntegrationsModel {
       async let catalog: [ConnectorEntry] = app.call(
         "connections/catalog", input: CatalogInput(), timeout: 20)
       let all = try await connections
+      let servers = (try? await AccessClient.servers(app))?.filter(\.enabled) ?? []
       state = .loaded(
         IntegrationsSnapshot(
           connections: all.filter { $0.status != "revoked" && $0.id != pending?.id },
-          catalog: try await catalog))
+          catalog: try await catalog, servers: servers))
     } catch {
       state = .failed(settingsErrorText(error))
     }
@@ -84,6 +95,50 @@ final class IntegrationsModel {
     do {
       let _: Connection = try await app.call(
         "connections/setWrites", input: SetWritesInput(connectionId: connection.id, enabled: enabled))
+      await load(app)
+    } catch {
+      self.error = settingsErrorText(error)
+    }
+  }
+
+  /// Saves a new name (1 to 60 characters for an account, 1 to 120 for a server).
+  func rename(_ app: AppModel, connection: Connection, to text: String) async {
+    await rename(app, text, limit: AccessLogic.accountNameLimit, current: connection.displayName) {
+      let _: Connection = try await app.call(
+        "connections/rename",
+        input: RenameConnectionInput(connectionId: connection.id, displayName: $0))
+    }
+  }
+
+  func rename(_ app: AppModel, server: McpServer, to text: String) async {
+    await rename(app, text, limit: AccessLogic.serverNameLimit, current: server.name) {
+      let _: McpServer = try await app.call(
+        "mcp/servers/rename", input: RenameServerInput(id: server.id, name: $0))
+    }
+  }
+
+  private func rename(
+    _ app: AppModel, _ text: String, limit: Int, current: String,
+    _ send: (String) async throws -> Void
+  ) async {
+    error = nil
+    guard let name = AccessLogic.validName(text, limit: limit) else {
+      error = "Use 1 to \(limit) characters."
+      return
+    }
+    guard name != current else { return }
+    do {
+      try await send(name)
+      await load(app)
+    } catch {
+      self.error = settingsErrorText(error)
+    }
+  }
+
+  func setServerWrites(_ app: AppModel, _ server: McpServer, enabled: Bool) async {
+    error = nil
+    do {
+      try await AccessClient.setServerWrites(app, server: server.id, enabled: enabled)
       await load(app)
     } catch {
       self.error = settingsErrorText(error)
