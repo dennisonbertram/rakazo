@@ -37,7 +37,7 @@ struct AppShell: View {
     case .computer(let id): ComputerScreen(botID: id)
     case .artifacts(let id): ArtifactsScreen(botID: id)
     case .artifact(let id): ArtifactScreen(artifactID: id)
-    case .agentPage(let id): AgentPageScreen(botID: id)
+    case .agentPage(let id, let pageID): AgentPageScreen(botID: id, pageID: pageID)
     case .routines(let id): RoutinesScreen(botID: id)
     case .routine(let id): RoutineScreen(routineID: id)
     case .botSettings(let id): BotSettingsScreen(botID: id)
@@ -46,6 +46,7 @@ struct AppShell: View {
     case .legal: LegalScreen()
     case .capTable: CapTableScreen()
     case .dataRoom: DataRoomScreen()
+    case .dataRoomItem(let id): DataRoomItemLoader(itemID: id)
     case .meetings: MeetingsScreen()
     case .meeting(let id): MeetingDetailScreen(meetingID: id)
     }

@@ -120,6 +120,7 @@ import {
   McpApprovalCard,
   ResultCard,
 } from "./message-cards";
+import { PageCard } from "./page-card";
 import { toolActionLabel } from "./working-label";
 
 /** Opens an in-app path through the router; unset outside the page, where links load normally. */
@@ -1885,6 +1886,13 @@ const MessageView = memo(function MessageView({
                   : block.title || t`Opened its thread.`}
               </div>
             </button>
+          );
+        }
+        if (block.kind === "page") {
+          return (
+            <div key={i} className="flex justify-start">
+              <PageCard botId={block.botId} pageId={block.pageId} title={block.title} />
+            </div>
           );
         }
         if (block.kind === "choice") {

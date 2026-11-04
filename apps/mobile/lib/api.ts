@@ -1112,6 +1112,7 @@ export function blockText(message: MobileMessage) {
       if (block.kind === "child_bot") {
         return `${block.status === "archived" ? "Archived" : block.status === "deleted" ? "Deleted" : "Bot"} ${block.name ?? ""}`;
       }
+      if (block.kind === "page") return block.title;
       if (block.kind === "emails") return emailCardsText(block.emails);
       if (block.kind === "ui") return uiBlockText(block.block);
       if (block.kind === "mail_thread") {

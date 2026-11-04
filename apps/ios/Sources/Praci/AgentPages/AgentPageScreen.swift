@@ -11,9 +11,9 @@ struct AgentPageScreen: View {
   @State private var botName: String?
   @State private var confirmingStop = false
 
-  init(botID: String) {
+  init(botID: String, pageID: String? = nil) {
     self.botID = botID
-    _model = State(initialValue: AgentPageModel(botID: botID))
+    _model = State(initialValue: AgentPageModel(botID: botID, pageID: pageID))
   }
 
   var body: some View {
