@@ -22,7 +22,7 @@ private struct MessageContent: View {
   @State private var model: InboxMessageModel
   @State private var compose: ComposeRequest?
   @State private var confirmingUnsubscribe = false
-  @State private var sentNotice = false
+  @State private var notice: String?
   @Environment(\.dismiss) private var dismiss
 
   init(app: AppModel, messageID: String) {
@@ -45,7 +45,7 @@ private struct MessageContent: View {
         replyTo: request.kind == .forward ? nil : messageID,
         forward: request.kind == .forward ? messageID : nil,
         replyAll: request.kind == .replyAll,
-        onSent: { sentNotice = true })
+        onSent: { notice = "Sent" }, onSaved: { notice = "Draft saved" })
     }
     .quickLookPreview($model.previewURL)
     .confirmationDialog(
@@ -72,10 +72,10 @@ private struct MessageContent: View {
       Text(verbatim: model.actionError ?? "")
     }
     .task { await model.load() }
-    .task(id: sentNotice) {
-      guard sentNotice else { return }
+    .task(id: notice) {
+      guard notice != nil else { return }
       try? await Task.sleep(for: .seconds(3))
-      sentNotice = false
+      notice = nil
     }
   }
 
@@ -99,6 +99,8 @@ private struct MessageContent: View {
           }
         } label: {
           Label("Reply", systemImage: "arrowshape.turn.up.left")
+        } primaryAction: {
+          compose = ComposeRequest(kind: .reply)
         }
         .accessibilityIdentifier("messageReply")
         if model.sender != nil, !message.fromSelf {
@@ -118,21 +120,12 @@ private struct MessageContent: View {
   @ViewBuilder
   private var bottomBar: some View {
     VStack(spacing: 8) {
-      if model.archived {
-        HStack(spacing: 16) {
-          Text("Archived")
-          Button("Undo") { Task { await model.undoArchive() } }.fontWeight(.semibold)
-            .accessibilityIdentifier("messageUndo")
-        }
-        .font(.subheadline)
-        .padding(.horizontal, 20).padding(.vertical, 12)
-        .glassEffect()
-      } else if sentNotice {
-        Text("Sent")
+      if let notice {
+        Text(notice)
           .font(.subheadline)
           .padding(.horizontal, 20).padding(.vertical, 12)
           .glassEffect()
-          .accessibilityIdentifier("messageSent")
+          .accessibilityIdentifier("messageNotice")
       }
       if model.message != nil {
         Button { Task { await ask() } } label: {
@@ -152,11 +145,14 @@ private struct MessageContent: View {
       }
     }
     .padding(.bottom, 8)
-    .animation(.default, value: model.archived)
+    .animation(.default, value: notice)
   }
 
   private func archive() async {
     await model.archive()
+    guard model.archived else { return }
+    NotificationCenter.default.post(name: .inboxMessageArchived, object: messageID)
+    dismiss()
   }
 
   private func ask() async {

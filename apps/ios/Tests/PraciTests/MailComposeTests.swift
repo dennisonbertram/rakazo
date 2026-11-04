@@ -156,3 +156,15 @@ func safeHTMLAddsThePolicyFirstAndDropsBaseAndMeta() {
   #expect(SafeHTML.openableURL(URL(string: "javascript:alert(1)")) == nil)
   #expect(SafeHTML.openableURL(URL(string: "https://example.test")) != nil)
 }
+
+@Test @MainActor
+func aReplyKeepsTheQuoteOutOfTheBodyAndSendsItAfterTheTypedText() async {
+  let fake = FakeCompose()
+  fake.outcomes = [.success(.sent)]
+  let compose = await model(fake)
+  #expect(compose.body.isEmpty && compose.quote == "> Hi")
+  compose.body = "Thanks"
+  #expect(compose.fullBody == "Thanks\n\n> Hi")
+  _ = await compose.send()
+  #expect(fake.sends.first?.body == "Thanks\n\n> Hi")
+}
