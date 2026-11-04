@@ -23,6 +23,8 @@ final class ComputerModel {
   /// Set when the screen page could not be loaded.
   private(set) var screenError: String?
   private(set) var booting = false
+  /// Takeover was refused because the bot is running (HTTP 409); Stop and take control clears it.
+  private(set) var botBlocksTakeover = false
   /// The page the web view keeps loaded; a same-stream token refresh does not replace it.
   private(set) var loadedURL: URL?
   /// Changes whenever the keyboard bridge must start over (control or page changed).
@@ -96,6 +98,7 @@ final class ComputerModel {
   func openComputer(takeControl: Bool, app: AppModel) async {
     guard let session else { return }
     actionError = nil
+    botBlocksTakeover = false
     let needsBoot = status?.state != .running || screen == nil
     let needsTakeover = takeControl && !hasControl
     let bot = botID
@@ -115,7 +118,20 @@ final class ComputerModel {
       }
     } catch {
       actionError = error.localizedDescription
+      if takeControl, case RPCError.server(_, 409, _) = error { botBlocksTakeover = true }
     }
+  }
+
+  /// Stops the bot's run (the same call as Stop in the thread), then takes control.
+  func stopBotAndTakeControl(app: AppModel) async {
+    struct Input: Encodable, Sendable { var botId: String }
+    do {
+      let _: JSONValue = try await app.call("threads/stop", input: Input(botId: botID))
+    } catch {
+      actionError = error.localizedDescription
+      return
+    }
+    await openComputer(takeControl: true, app: app)
   }
 
   func takeControl(app: AppModel) async { await openComputer(takeControl: true, app: app) }
@@ -135,9 +151,15 @@ final class ComputerModel {
     }
   }
 
-  func closeComputer(app: AppModel) {
+  /// Called when the screen closes: stops polling and gives control back, so the lease is not held.
+  func close(app: AppModel) {
     stop()
-    if app.path.last == .computer(botID: botID) { app.path.removeLast() }
+    guard hasControl else { return }
+    let bot = botID
+    Task {
+      let _: ComputerAck? = try? await app.call(
+        "computer/release", input: ComputerReleaseInput(botId: bot, reason: nil))
+    }
   }
 
   /// The page could not be loaded; read a fresh URL on the next poll.

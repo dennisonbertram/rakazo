@@ -47,6 +47,11 @@ struct ComputerKeyBar: View {
         .accessibilityIdentifier("computerKeyboard")
     }
     .onChange(of: text) { _, new in typed(new) }
+    // The bar appears when the user takes control; open the keyboard right away.
+    .task {
+      try? await Task.sleep(for: .milliseconds(400))
+      focused = true
+    }
   }
 
   private func key(_ label: LocalizedStringKey, _ name: ComputerKeyName, _ spoken: LocalizedStringKey? = nil)
