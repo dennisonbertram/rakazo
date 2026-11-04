@@ -21,7 +21,7 @@ import {
 } from "@rakazo/core";
 import { mailReplyHash } from "@rakazo/core/node/approval-effect-key";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { MAIL_REPLY_HASH_HOLD, mailReplyClientId } from "@rakazo/db";
+import { MAIL_REPLY_CLIENT_PREFIX, MAIL_REPLY_HASH_HOLD, mailReplyClientId } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { z } from "zod";
 import { mailRequestIsValid } from "./approval-ask.js";
@@ -593,12 +593,24 @@ export async function reconcileMailReplyBatches(deps: {
       keepExisting: true,
       replaceLockedBefore: cutoff,
     });
-  const claimed = await deps.prisma.mailReplyItem.findMany({
-    where: { dispatch: "claimed", updatedAt: { lte: cutoff } },
-    orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
-    take: deps.batchSize,
-    select: { id: true, effectId: true, spaceId: true, userId: true, updatedAt: true },
-  });
+  // A sent, failed or unknown row stays claimed for good, so the scan leaves those out; otherwise they
+  // would fill every batch and an interrupted row behind them would never be reached.
+  // ponytail: still reads every finished row of the index range each pass; give finished rows their
+  // own dispatch state if this table grows large enough to show up in the reconciler's timing.
+  const claimed = await deps.prisma.$transaction(
+    (tx) => tx.$queryRaw<
+      { id: string; effectId: string; spaceId: string; userId: string; updatedAt: Date }[]
+    >`
+      SELECT r.id, r."effectId", r."spaceId", r."userId", r."updatedAt"
+      FROM mail_reply_items r
+      LEFT JOIN compose_sends c
+        ON c."spaceId" = r."spaceId" AND c."userId" = r."userId"
+        AND c."clientId" = ${MAIL_REPLY_CLIENT_PREFIX} || r.id
+      WHERE r.dispatch = 'claimed' AND r."updatedAt" <= ${cutoff}
+        AND (c.id IS NULL OR c.state IN ('draft', 'pending'))
+      ORDER BY r."updatedAt" ASC, r.id ASC
+      LIMIT ${deps.batchSize}`,
+  );
   for (const row of claimed) {
     const record = await deps.prisma.composeSend.findUnique({
       where: {

@@ -221,7 +221,8 @@ export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send", "mail_rep
 export const mailApprovalComposeClientId = (effectId: string) => `approval_${effectId}`;
 
 /** The compose record of one batch reply: one per row, so only one worker can move it to pending. */
-export const mailReplyClientId = (itemId: string) => `agent:batch_${itemId}`;
+export const MAIL_REPLY_CLIENT_PREFIX = "agent:batch_";
+export const mailReplyClientId = (itemId: string) => `${MAIL_REPLY_CLIENT_PREFIX}${itemId}`;
 
 export interface SendUserMessageInput {
   spaceId: string;

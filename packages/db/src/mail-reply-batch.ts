@@ -314,6 +314,8 @@ export async function settleMailReplyBatch(
   return { settled: true, ...(committed.resumed ? { resumeRunId: runId } : {}) };
 }
 
+class RetryLostRace extends Error {}
+
 export interface RetryMailReplyBatchInput extends Scope {
   effectId: string;
   /** The rows to retry, each with the newest message the owner acknowledged. */
@@ -331,55 +333,65 @@ export async function retryMailReplyBatch(
   input: RetryMailReplyBatchInput,
 ): Promise<{ status: "closed" } | { status: "queued"; count: number }> {
   const scope = { spaceId: input.spaceId, userId: input.userId };
-  return prisma.$transaction(async (tx: Tx) => {
-    const effect = await tx.externalEffect.findFirst({
-      where: {
-        id: input.effectId,
-        spaceId: input.spaceId,
-        kind: MAIL_REPLY_BATCH_TOOL,
-        status: "completed",
-      },
-      select: { id: true },
-    });
-    if (!effect) return { status: "closed" as const };
-    const rows = await tx.mailReplyItem.findMany({
-      where: {
-        ...scope,
-        effectId: input.effectId,
-        id: { in: input.rows.map((row) => row.itemId) },
-      },
-      select: { id: true, dispatch: true, error: true, updatedAt: true },
-    });
-    let count = 0;
-    for (const row of rows) {
-      if (row.dispatch !== "claimed" && row.dispatch !== "held") continue;
-      if (row.dispatch === "held" && row.error === MAIL_REPLY_HASH_HOLD) continue;
-      const key = { ...scope, clientId: mailReplyClientId(row.id) };
-      const record = await tx.composeSend.findUnique({
-        where: { spaceId_userId_clientId: key },
-        select: { state: true },
-      });
-      // A claimed row is retried only from a failed record. Anything else may have gone out.
-      if (row.dispatch === "claimed" && record?.state !== "failed") continue;
-      if (row.dispatch === "held" && record && !["draft", "failed"].includes(record.state)) {
-        continue;
-      }
-      if (record?.state === "failed") {
-        await tx.composeSend.update({
-          where: { spaceId_userId_clientId: key },
-          data: { state: "draft" },
-        });
-      }
-      const moved = await tx.mailReplyItem.updateMany({
-        where: { id: row.id, dispatch: row.dispatch, updatedAt: row.updatedAt },
-        data: {
-          dispatch: "queued",
-          error: null,
-          seenMessageId: input.rows.find((posted) => posted.itemId === row.id)?.seenMessageId,
+  try {
+    return await prisma.$transaction(async (tx: Tx) => {
+      const effect = await tx.externalEffect.findFirst({
+        where: {
+          id: input.effectId,
+          spaceId: input.spaceId,
+          kind: MAIL_REPLY_BATCH_TOOL,
+          status: "completed",
         },
+        select: { id: true },
       });
-      count += moved.count;
-    }
-    return { status: "queued" as const, count };
-  });
+      if (!effect) return { status: "closed" as const };
+      const rows = await tx.mailReplyItem.findMany({
+        where: {
+          ...scope,
+          effectId: input.effectId,
+          id: { in: input.rows.map((row) => row.itemId) },
+        },
+        select: { id: true, dispatch: true, error: true, updatedAt: true },
+      });
+      let count = 0;
+      for (const row of rows) {
+        if (row.dispatch !== "claimed" && row.dispatch !== "held") continue;
+        if (row.dispatch === "held" && row.error === MAIL_REPLY_HASH_HOLD) continue;
+        const key = { ...scope, clientId: mailReplyClientId(row.id) };
+        const record = await tx.composeSend.findUnique({
+          where: { spaceId_userId_clientId: key },
+          select: { state: true },
+        });
+        // A claimed row is retried only from a failed record. Anything else may have gone out.
+        if (row.dispatch === "claimed" && record?.state !== "failed") continue;
+        if (row.dispatch === "held" && record && !["draft", "failed"].includes(record.state)) {
+          continue;
+        }
+        // What was read above may be stale: another retry and its send can finish in between. The
+        // row moves first, so a retry that lost it never touches the record.
+        const moved = await tx.mailReplyItem.updateMany({
+          where: { id: row.id, dispatch: row.dispatch, updatedAt: row.updatedAt },
+          data: {
+            dispatch: "queued",
+            error: null,
+            seenMessageId: input.rows.find((posted) => posted.itemId === row.id)?.seenMessageId,
+          },
+        });
+        if (moved.count !== 1) continue;
+        if (record?.state === "failed") {
+          const reset = await tx.composeSend.updateMany({
+            where: { ...key, state: "failed" },
+            data: { state: "draft" },
+          });
+          if (reset.count !== 1) throw new RetryLostRace();
+        }
+        count += 1;
+      }
+      return { status: "queued" as const, count };
+    });
+  } catch (error) {
+    // The whole press rolled back, so a row that moved cannot wait on a record that did not.
+    if (error instanceof RetryLostRace) return { status: "queued", count: 0 };
+    throw error;
+  }
 }

@@ -13,7 +13,14 @@ import {
 } from "@rakazo/adapters";
 import type { Actor } from "@rakazo/contracts";
 import { mailReplyHash } from "@rakazo/core/node/approval-effect-key";
-import { answerWaitingRunWithTextInTransaction, createThreadEvents } from "@rakazo/db";
+import {
+  answerWaitingRunWithTextInTransaction,
+  createDb,
+  createThreadEvents,
+  retryMailReplyBatch,
+  runAsSystem,
+  runAsTenant,
+} from "@rakazo/db";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
 import { readMailBatch, retryMailBatch, sendMailBatch } from "./mail-reply-batch.js";
@@ -1164,6 +1171,217 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect(sent()).toHaveLength(3);
       expect(resumes()).toHaveLength(1);
     });
+  });
+
+  describe("S2: racing retries", () => {
+    const failedOne = async () => {
+      const c = await card(["t1"]);
+      await press(c, [0]);
+      f.gmail.failNext(400, { urlIncludes: "drafts/send", reason: "invalidArgument" });
+      await work(c);
+      const [row] = await rowsOf(c);
+      expect((await recordOf(row!.id)).state).toBe("failed");
+      const posted = (await read(c)).rows.map((r) => ({
+        itemId: r.itemId,
+        seenMessageId: r.seenMessageId,
+      }));
+      return { c, itemId: row!.id, posted };
+    };
+    /** A client whose retry pauses right after it read the compose record, until `resume`. */
+    const pausedRetryClient = (resume: Promise<void>) => {
+      let reached = () => {};
+      const read = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const client = new Proxy(prisma, {
+        get(target, key, receiver) {
+          if (key !== "$transaction") return Reflect.get(target, key, receiver);
+          return (run: (tx: never) => Promise<unknown>) =>
+            target.$transaction((tx) =>
+              run(
+                new Proxy(tx, {
+                  get(txTarget, txKey, txReceiver) {
+                    const value = Reflect.get(txTarget, txKey, txReceiver);
+                    if (txKey !== "composeSend") return value;
+                    return new Proxy(value as object, {
+                      get(delegate, method) {
+                        const call = Reflect.get(delegate, method) as (
+                          ...args: unknown[]
+                        ) => Promise<unknown>;
+                        if (method !== "findUnique") return call.bind(delegate);
+                        return async (...args: unknown[]) => {
+                          const result = await call.apply(delegate, args);
+                          reached();
+                          await resume;
+                          return result;
+                        };
+                      },
+                    });
+                  },
+                }) as never,
+              ),
+            );
+        },
+      });
+      return { client, read };
+    };
+    const retryInput = (c: Card, rows: { itemId: string; seenMessageId: string | null }[]) => ({
+      ...scope(),
+      effectId: c.effect.id,
+      rows,
+    });
+
+    it("two retries at once send exactly once", async () => {
+      const { c, posted } = await failedOne();
+      const counts = await Promise.all([
+        retryMailBatch(rpcDeps(), f.a, target(), { ...c.ids, rows: posted }),
+        retryMailBatch(rpcDeps(), f.a, target(), { ...c.ids, rows: posted }),
+      ]);
+      expect(counts.reduce((sum, count) => sum + count, 0)).toBe(1);
+      await Promise.all([work(c), work(c)]);
+      await reconcile();
+      await work(c);
+      expect(sent()).toHaveLength(1);
+    });
+
+    it("a retry that read a failed record cannot reset a send that already went out", async () => {
+      const { c, itemId, posted } = await failedOne();
+      let resume = () => {};
+      const paused = pausedRetryClient(
+        new Promise<void>((resolve) => {
+          resume = resolve;
+        }),
+      );
+      const stale = retryMailReplyBatch(paused.client, retryInput(c, posted));
+      await paused.read;
+      // The other retry wins and its send goes out while the first is still holding its stale read.
+      expect(await retryMailReplyBatch(prisma, retryInput(c, posted))).toMatchObject({ count: 1 });
+      await work(c);
+      expect((await recordOf(itemId)).state).toBe("sent");
+      resume();
+      expect(await stale).toMatchObject({ count: 0 });
+      expect((await recordOf(itemId)).state).toBe("sent");
+      await prisma.$executeRaw`UPDATE mail_reply_items SET "updatedAt" = ${new Date(Date.now() - 600_000)} WHERE id = ${itemId}`;
+      await reconcile();
+      await work(c);
+      expect(sent()).toHaveLength(1);
+    });
+
+    it("rolls the row back when the record is no longer failed", async () => {
+      const { c, itemId, posted } = await failedOne();
+      let resume = () => {};
+      const paused = pausedRetryClient(
+        new Promise<void>((resolve) => {
+          resume = resolve;
+        }),
+      );
+      const stale = retryMailReplyBatch(paused.client, retryInput(c, posted));
+      await paused.read;
+      await prisma.composeSend.updateMany({
+        where: { clientId: `agent:batch_${itemId}` },
+        data: { state: "unknown" },
+      });
+      resume();
+      expect(await stale).toMatchObject({ count: 0 });
+      expect((await rowsOf(c))[0]?.dispatch).toBe("claimed");
+      expect((await recordOf(itemId)).state).toBe("unknown");
+      await work(c);
+      expect(sent()).toEqual([]);
+    });
+  });
+
+  describe("S2: recovery past finished rows", () => {
+    it("reaches an interrupted row behind more than a batch of finished ones", async () => {
+      const c = await card(["t1"]);
+      await press(c, [0]);
+      const [interrupted] = await rowsOf(c);
+      await prisma.mailReplyItem.update({
+        where: { id: interrupted!.id },
+        data: { dispatch: "claimed" },
+      });
+      // Finished rows of invented batches, all older than the interrupted row.
+      const older = new Date(Date.now() - 60 * 60_000);
+      const states = ["sent", "failed", "unknown"];
+      const finished = Array.from({ length: 6 }, (_, i) => `finished-${c.effect.id}-${i}`);
+      await prisma.mailReplyItem.createMany({
+        data: finished.map((id, i) => ({
+          id,
+          effectId: c.effect.id,
+          position: 100 + i,
+          ...scope(),
+          connectionId: f.connA,
+          replyToId: `old-${i}`,
+          providerThreadId: `old-t-${i}`,
+          to: ["old@example.test"],
+          cc: [],
+          bcc: [],
+          subject: "Old",
+          body: "Old",
+          dispatch: "claimed",
+        })),
+      });
+      await prisma.composeSend.createMany({
+        data: finished.map((id, i) => ({
+          ...scope(),
+          clientId: `agent:batch_${id}`,
+          connectionId: f.connA,
+          state: states[i % 3]!,
+        })),
+      });
+      await prisma.$executeRaw`UPDATE mail_reply_items SET "updatedAt" = ${older} WHERE id = ANY(${finished})`;
+      const stale = new Date(Date.now() - 10 * 60_000);
+      await prisma.$executeRaw`UPDATE mail_reply_items SET "updatedAt" = ${stale} WHERE id = ${interrupted!.id}`;
+      await reconcileMailReplyBatches({
+        prisma,
+        jobs,
+        events: events(),
+        now: new Date(),
+        batchSize: 5,
+      });
+      const after = await prisma.mailReplyItem.findUniqueOrThrow({
+        where: { id: interrupted!.id },
+      });
+      expect(after.dispatch).toBe("queued");
+      expect(
+        await prisma.mailReplyItem.count({ where: { id: { in: finished }, dispatch: "claimed" } }),
+      ).toBe(6);
+      await prisma.composeSend.deleteMany({
+        where: { clientId: { in: finished.map((id) => `agent:batch_${id}`) } },
+      });
+    });
+
+    it.runIf(process.env.DATABASE_RUNTIME_URL)(
+      "finds interrupted rows as the runtime login, only in a system context",
+      async () => {
+        const runtime = createDb(process.env.DATABASE_RUNTIME_URL as string);
+        try {
+          const c = await card(["t1"]);
+          await press(c, [0]);
+          const [row] = await rowsOf(c);
+          await prisma.mailReplyItem.update({
+            where: { id: row!.id },
+            data: { dispatch: "claimed" },
+          });
+          const stale = new Date(Date.now() - 10 * 60_000);
+          await prisma.$executeRaw`UPDATE mail_reply_items SET "updatedAt" = ${stale} WHERE id = ${row!.id}`;
+          const pass = () =>
+            reconcileMailReplyBatches({
+              prisma: runtime.prisma,
+              jobs,
+              events: createThreadEvents(runtime.prisma),
+              now: new Date(),
+              batchSize: 5,
+            });
+          await runAsTenant({ spaceId: f.c.spaceId, userId: f.c.userId }, pass);
+          expect((await rowsOf(c))[0]?.dispatch).toBe("claimed");
+          await runAsSystem("mail reply batch recovery test", pass);
+          expect((await rowsOf(c))[0]?.dispatch).toBe("queued");
+        } finally {
+          await runtime.prisma.$disconnect();
+          await runtime.pool.end();
+        }
+      },
+    );
   });
 
   describe("S2: open checks", () => {
