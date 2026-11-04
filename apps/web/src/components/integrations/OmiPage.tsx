@@ -11,7 +11,7 @@ import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { toggleAccess } from "../../lib/integrations";
+import { setOthersAccess, toggleAccess } from "../../lib/integrations";
 import type { OmiSyncState } from "../../lib/omi/useOmiSync";
 import { useOmiSync } from "../../lib/omi/useOmiSync";
 import { formatRelativeTime } from "../../lib/relative-time";
@@ -209,6 +209,7 @@ export function OmiAgent({
   const [access, setAccess] = useState<{
     allAgents: boolean;
     botIds: string[];
+    agentShared: boolean;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -220,9 +221,7 @@ export function OmiAgent({
   const allBotIds = data.bots.map((bot) => bot.id);
   const isOn = (botId: string) =>
     botId === agentBotId || (access ? access.allAgents || access.botIds.includes(botId) : false);
-  const shared = access
-    ? !(!access.allAgents && access.botIds.every((id) => id === agentBotId))
-    : false;
+  const shared = access?.agentShared ?? false;
   // Each change builds on the one before it, not on the last server answer, and saves run in click order.
   const latest = useRef(access);
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -234,14 +233,22 @@ export function OmiAgent({
   const failed = useRef(false);
   function save(next: { allAgents: boolean; botIds: string[] }) {
     setError(null);
-    latest.current = next;
-    setAccess(next);
+    // Choosing another agent turns sharing on; switching them all off leaves it on.
+    const sharing = {
+      ...next,
+      agentShared:
+        latest.current?.agentShared === true ||
+        next.allAgents ||
+        next.botIds.some((id) => id !== agentBotId),
+    };
+    latest.current = sharing;
+    setAccess(sharing);
     pending.current += 1;
     setSaving((count) => count + 1);
     queue.current = queue.current.then(async () => {
       try {
         const saved = await rpc.connections.setAccess({ connectionId, ...next });
-        if (latest.current === next) setAccess(saved);
+        if (latest.current === sharing) setAccess(saved);
       } catch (err) {
         setError(errorText(err, t`Could not update bot access`));
         failed.current = true;
@@ -290,7 +297,12 @@ export function OmiAgent({
             everyone={access?.allAgents ?? false}
             onSetAll={(on) =>
               save(
-                on ? { allAgents: true, botIds: [] } : { allAgents: false, botIds: [agentBotId] },
+                setOthersAccess(
+                  latest.current ?? { allAgents: false, botIds: [] },
+                  allBotIds,
+                  [agentBotId],
+                  on,
+                ),
               )
             }
             onToggle={(botId, on) => {

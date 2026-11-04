@@ -12,7 +12,7 @@ const rpcMock = vi.hoisted(() => ({
   connections: {
     catalog: vi.fn(async () => []),
     list: vi.fn(),
-    access: vi.fn(async () => ({ allAgents: true, botIds: [] })),
+    access: vi.fn(async () => ({ allAgents: true, botIds: [], agentShared: true })),
     effectiveAccess: vi.fn(),
   },
   mcp: { servers: { list: vi.fn(async () => []) }, assignments: { all: vi.fn(async () => []) } },

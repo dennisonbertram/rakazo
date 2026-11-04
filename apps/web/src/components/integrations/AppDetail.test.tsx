@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type { Connection, ConnectionCatalogItem } from "@rakazo/contracts";
+import { inboxAgentSpawnKey, mailThreadAgentSpawnKey } from "@rakazo/contracts";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -228,6 +229,7 @@ it("turns changes off immediately and saves sharing for the account", async () =
       access: {
         conn_app: {
           allAgents: false,
+          agentShared: false,
           botIds: ["bot_app"],
           effectiveAccess: { shared: "some", botIds: ["bot_app"] },
         },
@@ -256,6 +258,7 @@ it("lists who can use a shared connection from the server, owner first, and save
       access: {
         conn_app: {
           allAgents: true,
+          agentShared: true,
           botIds: [],
           effectiveAccess: { shared: "all", botIds: ["bot_app", "bot_other"] },
         },
@@ -297,6 +300,7 @@ it("builds each quick toggle on the previous one and saves them in order", async
       access: {
         conn_app: {
           allAgents: true,
+          agentShared: true,
           botIds: [],
           effectiveAccess: { shared: "all", botIds: ["bot_app", "b", "c"] },
         },
@@ -596,6 +600,7 @@ it("All saves allAgents once and None saves the owner alone, once", async () => 
       access: {
         conn_app: {
           allAgents: false,
+          agentShared: true,
           botIds: ["bot_app", "b"],
           effectiveAccess: { shared: "some", botIds: ["bot_app", "b"] },
         },
@@ -613,10 +618,62 @@ it("All saves allAgents once and None saves the owner alone, once", async () => 
   ]);
 });
 
+it("None leaves Let other agents use on with Used by listed and every other agent off", async () => {
+  await show(
+    APP_PAGE,
+    data({
+      bots: sharedBots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app" })],
+      access: {
+        conn_app: {
+          allAgents: false,
+          botIds: ["bot_app"],
+          agentShared: true,
+          effectiveAccess: { shared: "some", botIds: ["bot_app"] },
+        },
+      },
+    }),
+  );
+  expect(container.textContent).toContain("Used by");
+  expect(container.querySelector<HTMLInputElement>("#connection-conn_app-shared")?.checked).toBe(
+    true,
+  );
+  expect(switchOf("b").getAttribute("aria-checked")).toBe("false");
+  expect(switchOf("c").getAttribute("aria-checked")).toBe("false");
+});
+
+it("None on a mail connection leaves the Inbox agent and its email chats as they are", async () => {
+  const bots = [
+    { id: "inbox", name: "Inbox agent", color: "#000", spawnKey: inboxAgentSpawnKey("u1") },
+    { id: "e1", name: "Chat", color: "#000", spawnKey: mailThreadAgentSpawnKey("conn_app", "t") },
+    { id: "a", name: "Ada", color: "#000", spawnKey: null },
+  ];
+  await show(
+    APP_PAGE,
+    data({
+      bots: bots as unknown as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "inbox" })],
+      access: {
+        conn_app: {
+          allAgents: false,
+          botIds: ["inbox", "e1", "a"],
+          agentShared: true,
+          effectiveAccess: { shared: "some", botIds: ["inbox", "e1", "a"] },
+        },
+      },
+    }),
+  );
+  await act(async () => buttonOf("None").click());
+  expect(setAccess.mock.calls).toEqual([
+    [{ connectionId: "conn_app", allAgents: false, botIds: ["inbox", "e1"] }],
+  ]);
+});
+
 it("keeps All available when every agent is on but access is a chosen list", async () => {
   const access = (ids: string[]) => ({
     conn_app: {
       allAgents: false,
+      agentShared: true,
       botIds: ids,
       effectiveAccess: { shared: "some" as const, botIds: ids },
     },
@@ -650,6 +707,7 @@ it("while a save is in flight, switching one agent does not flip an agent the se
       access: {
         conn_app: {
           allAgents: true,
+          agentShared: true,
           botIds: [],
           effectiveAccess: { shared: "all", botIds: ["bot_app", "b"] },
         },
@@ -674,6 +732,7 @@ it("None still saves when everything shown is the owner but access is stored as 
       access: {
         conn_app: {
           allAgents: true,
+          agentShared: true,
           botIds: [],
           effectiveAccess: { shared: "all", botIds: ["bot_app"] },
         },

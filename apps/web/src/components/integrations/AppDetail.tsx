@@ -17,7 +17,14 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { appStatus, groupTools, toggleAccess, toolLabel } from "../../lib/integrations";
+import {
+  appStatus,
+  groupTools,
+  keptAgentIds,
+  setOthersAccess,
+  toggleAccess,
+  toolLabel,
+} from "../../lib/integrations";
 import { appReturnPath } from "../../lib/return-to";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
@@ -25,7 +32,7 @@ import { AppLogo } from "./AppLogo";
 import { ConnectAppDialog } from "./ConnectAppDialog";
 import { IntegrationAgentSection } from "./IntegrationAgentSection";
 import { AgentToggleList, StatusBadge } from "./parts";
-import type { ConnectionAccess, IntegrationsData } from "./useIntegrations";
+import type { AccessValue, IntegrationsData } from "./useIntegrations";
 
 type Tool = { name: string; description: string };
 
@@ -240,7 +247,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
   const ordinaryAccount = rows.find((row) => !row.agentBotId);
   const hasAgentAccount = rows.some((row) => row.agentBotId);
   const allBotIds = data.bots.map((bot) => bot.id);
-  const storedAccess = (row?: Connection): ConnectionAccess =>
+  const storedAccess = (row?: Connection): AccessValue =>
     (row ? data.access[row.id] : undefined) ?? { allAgents: true, botIds: [] };
   /** Who can use the row: the server's answer, except while a toggle is saving. */
   const isOn = (row: Connection | undefined, botId: string) => {
@@ -276,7 +283,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
   }
 
   /** Selections made while saves are in flight: each toggle builds on the last one, not on stored data. */
-  const pendingAccess = useRef(new Map<string, ConnectionAccess>());
+  const pendingAccess = useRef(new Map<string, AccessValue>());
   const pendingShown = useRef(new Map<string, string[]>());
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const unsaved = useRef(0);
@@ -287,7 +294,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     pendingShown.current.get(row.id) ?? data.access[row.id]?.effectiveAccess.botIds ?? allBotIds;
 
   /** Saves one whole access value; `shown` is what the list reads until the save lands. */
-  function saveAccess(row: Connection, next: ConnectionAccess, shown: string[]) {
+  function saveAccess(row: Connection, next: AccessValue, shown: string[]) {
     pendingAccess.current.set(row.id, next);
     pendingShown.current.set(row.id, shown);
     setOverride({ rowId: row.id, shown });
@@ -323,15 +330,16 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     saveAccess(row, next, on ? [...shown, botId] : shown);
   }
 
-  /** All: every agent, including ones made later. None: only the owning agent. One save either way. */
+  /** All: every other agent, including ones made later. None: only the owning agent and, on mail, its email chats. One save either way. */
   function setAllAgents(row: Connection | undefined, on: boolean) {
     if (!row) return;
-    const owner = row.agentBotId ? [row.agentBotId] : [];
-    saveAccess(
-      row,
-      on ? { allAgents: true, botIds: [] } : { allAgents: false, botIds: owner },
-      on ? allBotIds : owner,
+    const next = setOthersAccess(
+      accessOf(row),
+      allBotIds,
+      keptAgentIds(data.bots, row.agentBotId),
+      on,
     );
+    saveAccess(row, next, next.allAgents ? allBotIds : next.botIds);
   }
 
   async function revoke(targets: Connection[], afterRemovingAll: boolean) {
@@ -517,14 +525,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                     }
                     agentHref={`/app/${row.agentBotId}`}
                     writesEnabled={row.writesEnabled ?? false}
-                    shared={
-                      data.access[row.id]
-                        ? !(
-                            data.access[row.id]?.allAgents === false &&
-                            data.access[row.id]?.botIds.every((id) => id === row.agentBotId)
-                          )
-                        : false
-                    }
+                    shared={data.access[row.id]?.agentShared ?? false}
                     disabled={busy || row.status !== "connected" || row.needsReconnect === true}
                     onWrites={(enabled) => setWrites(row, enabled)}
                     onShared={(shared) =>

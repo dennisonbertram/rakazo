@@ -483,7 +483,12 @@ const threadSendInput = threadTarget
     }
   });
 
-const ConnectionAccessSchema = z.object({ allAgents: z.boolean(), botIds: z.array(Id) });
+const ConnectionAccessSchema = z.object({
+  allAgents: z.boolean(),
+  botIds: z.array(Id),
+  /** The "Let other agents use it" switch of an agent-linked connection; stays on while no other agent has access. */
+  agentShared: z.boolean(),
+});
 /** Who can really use each connection, computed by the server with the executor's rules. */
 const EffectiveAccessSchema = z.record(
   Id,
