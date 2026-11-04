@@ -10,6 +10,8 @@ struct HomeScreen: View {
   @Environment(AppModel.self) private var app
   @State private var model = HomeModel()
   @State private var sheet: HomeSheet?
+  /// Set in the two-pane layout, where tapping a row opens it in the right-hand pane.
+  var selection: Binding<Route?> = .constant(nil)
 
   var body: some View {
     LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { boot in
@@ -100,7 +102,7 @@ struct HomeScreen: View {
   private func content(_ boot: Bootstrap) -> some View {
     let roster = Roster(bots: boot.bots, groups: boot.groups, sections: boot.botSections)
     let visible = roster.visibleAgents(expanded: model.agentsExpanded)
-    return List {
+    return List(selection: selection) {
       if let message = model.refreshError {
         Section {
           Label(message, systemImage: "exclamationmark.triangle")
