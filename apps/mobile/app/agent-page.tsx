@@ -148,7 +148,10 @@ export default function AgentPageScreen() {
             : t("No data yet");
   const cellText = ({ text, usd }: LiveCell) => (usd ? maskAmountsWhenHidden(text) : text);
   const warning = (status: string) => (
-    <View accessible accessibilityLabel={status === "paused" ? t("Source paused") : t("Source failed")}>
+    <View
+      accessible
+      accessibilityLabel={status === "paused" ? t("Source paused") : t("Source failed")}
+    >
       <NativeSymbol
         ios="exclamationmark.triangle.fill"
         android="warning-outline"
@@ -222,7 +225,9 @@ export default function AgentPageScreen() {
           <View key={index}>
             <View style={styles.row}>
               <Text style={styles.rowTitle}>{block.label}</Text>
-              {block.status === "failed" || block.status === "paused" ? warning(block.status) : null}
+              {block.status === "failed" || block.status === "paused"
+                ? warning(block.status)
+                : null}
               <Text style={styles.value}>
                 {block.value ? cellText(block.value) : placeholder(block.status)}
               </Text>

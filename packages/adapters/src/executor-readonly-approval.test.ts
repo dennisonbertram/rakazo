@@ -6237,4 +6237,103 @@ describe("agent firewall", () => {
       });
     });
   });
+
+  describe("email thread agent", () => {
+    const threadKey = "mail-thread:acct-1:t1";
+    const threadFixture = (name: string, spawnKey: string | null = threadKey) =>
+      fixture({
+        name,
+        builtin: true,
+        firewall: true,
+        spawnKey,
+        mail: supportMail(),
+        dataRoom: true,
+        connectionRows: [
+          {
+            ...mailConnectionRow(),
+            allAgents: false,
+            botAccess: [{ botId: "inbox-bot" }],
+          },
+        ],
+      });
+
+    it("reads its own thread without a card", async () => {
+      const f = threadFixture("mail_get");
+      f.setCalls([{ args: { id: "m1" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).not.toEqual({ error: expect.anything() });
+    });
+
+    it("asks before a send, with the Firewall reason", async () => {
+      const f = threadFixture("mail_send");
+      f.setCalls([
+        { args: { to: ["a@b.example"], subject: "Hi", body: "Hello" }, executionId: "c1" },
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(cardOf(f).approvalReason).toBe("Firewall");
+    });
+
+    it("asks, not drops, a data room query", async () => {
+      const f = threadFixture("search_data_room");
+      f.setCalls([{ args: { query: "cap table" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.offeredTools).toContain("search_data_room");
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(cardOf(f).approvalReason).toBe("Firewall");
+    });
+
+    it.each([
+      [
+        "search_data_room",
+        { query: "cap table", filters: { folderId: "f1" } },
+        ["query: cap table", "folderId"],
+      ],
+      ["read_data_room_item", { item_id: "item-9" }, ["item_id: item-9"]],
+      ["contacts_list", { query: "Ada", kind: "investor" }, ["query: Ada", "kind: investor"]],
+    ] as const)("shows the requested scope on the %s card", async (name, args, shown) => {
+      const f = threadFixture(name);
+      f.setCalls([{ args: { ...args }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      for (const text of shown) expect(cardOf(f).detail).toContain(text);
+    });
+
+    it("still asks for a send after an approved read", async () => {
+      const f = threadFixture("search_data_room");
+      f.setCalls([{ args: { query: "cap table" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.effects).toHaveLength(1);
+      f.effects[0]!.status = "approved";
+      f.setCalls([
+        { args: { query: "cap table" }, executionId: "c2" },
+        {
+          name: "mail_send",
+          args: { to: ["a@b.example"], subject: "Hi", body: "Hello" },
+          executionId: "c3",
+        },
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledTimes(2);
+      expect(cardOf(f).approvalReason).toBe("Firewall");
+    });
+
+    it("still drops a data room write", async () => {
+      const f = threadFixture("add_to_data_room");
+      f.setCalls([{ args: {}, executionId: "c1" }]);
+      await f.run();
+      expect(f.offeredTools).not.toContain("add_to_data_room");
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("not available") });
+    });
+
+    it("leaves another firewalled agent's data room query dropped", async () => {
+      const f = threadFixture("search_data_room", null);
+      f.setCalls([{ args: { query: "cap table" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.offeredTools).not.toContain("search_data_room");
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("not available") });
+    });
+  });
 });

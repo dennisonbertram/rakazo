@@ -895,8 +895,13 @@ export async function inboxTodoSetDone(
   // Finishing a to-do for mail still in Needs reply, with no reply sent, says that mail needed none.
   const stopped =
     input.done && row.messageId
-      ? (await dismissReply(deps.prisma, { spaceId: actor.spaceId, userId: actor.userId }, row.messageId))
-          .stopped
+      ? (
+          await dismissReply(
+            deps.prisma,
+            { spaceId: actor.spaceId, userId: actor.userId },
+            row.messageId,
+          )
+        ).stopped
       : null;
   return { ...todoOut(row), ...(stopped ? { stoppedSender: stopped } : {}) };
 }

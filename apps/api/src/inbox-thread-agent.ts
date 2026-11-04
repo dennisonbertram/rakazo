@@ -118,6 +118,8 @@ export async function inboxAskAgent(
     description: "Handles one email thread.",
     instructions: INSTRUCTIONS,
     notifyOnFinish: true,
+    // The thread is untrusted mail: the agent starts firewalled. The owner can turn it off.
+    firewall: true,
     initialMessage: {
       role: "system",
       blocks: [{ kind: "mail_thread", subject: row.subject, messages }],

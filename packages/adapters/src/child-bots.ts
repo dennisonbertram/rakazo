@@ -329,7 +329,7 @@ async function releaseAgentServers(
       );
       const reshare = (
         await tx.connection.findMany({
-          where: { ...scope, allAgents: false, privateByDefault: false },
+          where: { ...scope, allAgents: false, agentShared: false, privateByDefault: false },
           select: { id: true },
         })
       )
@@ -337,7 +337,7 @@ async function releaseAgentServers(
         .filter((id) => !others.has(id));
       const released = await tx.connection.updateMany({
         where: scope,
-        data: { agentBotId: null, writesEnabled: false },
+        data: { agentBotId: null, writesEnabled: false, agentShared: false },
       });
       if (reshare.length > 0)
         await tx.connection.updateMany({

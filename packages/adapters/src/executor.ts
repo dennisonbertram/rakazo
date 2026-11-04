@@ -3827,7 +3827,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Agent firewall: only tools on the two closed lists are offered. The model is not told the
         // others exist, and a call to one is refused (see applyToolCall).
         const tools = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])].filter(
-          (tool) => !bot.firewall || firewallToolClass(tool.name) !== "dropped",
+          (tool) =>
+            !bot.firewall ||
+            firewallToolClass(tool.name, isMailThreadAgentSpawnKey(bot.spawnKey)) !== "dropped",
         );
         const offeredToolNames = new Set(tools.map((tool) => tool.name));
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
@@ -4454,7 +4456,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const firewalled = await firewallNow();
           if (firewalled) {
             if (run.externalTaint !== true) await storeExternalTaint();
-            if (firewallToolClass(name) === "dropped") {
+            if (firewallToolClass(name, isMailThreadAgentSpawnKey(bot.spawnKey)) === "dropped") {
               return { error: `Tool ${name} is not available to this bot.` };
             }
             // The to-do's stored botId becomes the recipient, so the firewalled author would be lost.
@@ -5007,7 +5009,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           let firewallScopeLabelIds: Record<string, string> = {};
           let firewallAskCall = false;
           if (firewalled) {
-            if (firewallToolClass(name) === "ask") {
+            if (firewallToolClass(name, isMailThreadAgentSpawnKey(bot.spawnKey)) === "ask") {
               firewallLifted =
                 firewallMail !== undefined &&
                 (name === "mail_modify"

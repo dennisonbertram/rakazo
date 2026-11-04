@@ -152,3 +152,39 @@ it("with access stored as all agents, All is done and None stays available", () 
   expect(view.button("All").disabled).toBe(true);
   expect(view.button("None").disabled).toBe(false);
 });
+
+it("sets the Inbox agent and Email chats apart from the other agents on a mail connection", async () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const bots = [
+    bot("ada", "Ada", null),
+    bot("e1", "Legal notice", mailThreadAgentSpawnKey("conn", "t1")),
+    bot("inbox", "Inbox agent", inboxAgentSpawnKey("u1")),
+    bot("chief", "Chief", null),
+  ];
+  await act(async () =>
+    createRoot(container).render(
+      <AgentToggleList
+        bots={bots}
+        appName="Gmail"
+        isOn={(id) => id === "inbox"}
+        onToggle={() => undefined}
+        onSetAll={() => undefined}
+        ownerBotId="inbox"
+      />,
+    ),
+  );
+  const labels = [...container.querySelectorAll('[role="switch"]')].map((el) =>
+    el.getAttribute("aria-label"),
+  );
+  expect(labels).toEqual([
+    "Inbox agent can use Gmail",
+    "Email chats can use Gmail",
+    "Ada can use Gmail",
+    "Chief can use Gmail",
+  ]);
+  expect(container.textContent).toContain("Other agents");
+  // Without a mail owner nothing is grouped and no subheading shows.
+  const plain = await renderEmailRow(() => true);
+  expect(plain.container.textContent).not.toContain("Other agents");
+});

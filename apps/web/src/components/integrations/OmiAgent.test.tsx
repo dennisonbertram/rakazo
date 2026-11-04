@@ -34,9 +34,14 @@ const bots = [
   { id: "e2", name: "Two", color: "#000", spawnKey: mailThreadAgentSpawnKey("c", "t2") },
 ];
 
-async function show(initial: { allAgents: boolean; botIds: string[] }) {
-  access.mockResolvedValue(initial);
-  setAccess.mockImplementation(async (input: { allAgents: boolean; botIds: string[] }) => input);
+async function show(initial: { allAgents: boolean; botIds: string[]; agentShared?: boolean }) {
+  const full = { agentShared: true, ...initial };
+  access.mockResolvedValue(full);
+  // Like the server: None keeps sharing on.
+  setAccess.mockImplementation(async (input: { allAgents: boolean; botIds: string[] }) => ({
+    ...input,
+    agentShared: full.agentShared,
+  }));
   const container = document.createElement("div");
   document.body.append(container);
   await act(async () =>
@@ -76,6 +81,18 @@ it("All and None each save once, and None keeps the Omi agent", async () => {
   expect(setAccess.mock.calls).toEqual([
     [{ connectionId: "c1", allAgents: false, botIds: ["omi"] }],
   ]);
+});
+
+it("None keeps Let other agents use Omi on and the list visible, with the other agents off", async () => {
+  const container = await show({ allAgents: false, botIds: ["omi", "ada"], agentShared: true });
+  await act(async () =>
+    [...container.querySelectorAll("button")].find((b) => b.textContent === "None")?.click(),
+  );
+  expect(container.querySelector<HTMLInputElement>("#omi-shared")?.checked).toBe(true);
+  expect(container.textContent).toContain("Used by");
+  expect(
+    container.querySelector('[aria-label="Ada can use Omi"]')?.getAttribute("aria-checked"),
+  ).toBe("false");
 });
 
 it("a failed save refetches only after the newer queued save has finished", async () => {

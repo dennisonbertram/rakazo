@@ -1565,6 +1565,8 @@ model Connection {
   composeSends        ComposeSend[]
   /// false: only bots with a BotConnectionAccess row may use this connection's tools.
   allAgents           Boolean               @default(true)
+  /// Agent-linked connection: other agents may be given access. Stays true while every other agent is off.
+  agentShared         Boolean               @default(false)
   botAccess           BotConnectionAccess[]
   writesEnabled       Boolean               @default(false)
   agentBotId          String?
