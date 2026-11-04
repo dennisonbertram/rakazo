@@ -236,6 +236,7 @@ describe("connections.access and setAccess", () => {
     expect((await h.call("connections/access", { connectionId: "a" })).json).toEqual({
       allAgents: true,
       botIds: [],
+      agentShared: true,
     });
   });
 
@@ -290,14 +291,14 @@ describe("connections.access and setAccess", () => {
       allAgents: false,
       botIds: ["b1", "b2", "b1"],
     });
-    expect(set.json).toEqual({ allAgents: false, botIds: ["b1", "b2"] });
+    expect(set.json).toEqual({ allAgents: false, botIds: ["b1", "b2"], agentShared: true });
     expect((await h.call("connections/access", { connectionId: "a" })).json).toEqual(set.json);
     const reset = await h.call("connections/setAccess", {
       connectionId: "a",
       allAgents: true,
       botIds: [],
     });
-    expect(reset.json).toEqual({ allAgents: true, botIds: [] });
+    expect(reset.json).toEqual({ allAgents: true, botIds: [], agentShared: true });
   });
 
   it("rejects another user's connection and another user's bot", async () => {

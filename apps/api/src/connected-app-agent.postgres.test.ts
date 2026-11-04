@@ -46,6 +46,12 @@ describePostgres("connected app agents (PostgreSQL)", () => {
         writesEnabled: boolean;
       }>;
       setExclusive(input: { connectionId: string; exclusive: boolean }): Promise<unknown>;
+      access(input: { connectionId: string }): Promise<{ agentShared: boolean }>;
+      setAccess(input: {
+        connectionId: string;
+        allAgents: boolean;
+        botIds: string[];
+      }): Promise<{ agentShared: boolean }>;
     };
   const createConnection = (who = owner, status = "connected") =>
     prisma.connection.create({
@@ -169,10 +175,44 @@ describePostgres("connected app agents (PostgreSQL)", () => {
       agentBotId: null,
     });
 
+    // Sharing on starts every other agent off: the owner adds them one by one.
     await connections().setExclusive({ connectionId: exclusive.id, exclusive: false });
     expect(
       await prisma.connection.findUniqueOrThrow({ where: { id: exclusive.id } }),
-    ).toMatchObject({ allAgents: true, agentBotId: agent.botId });
+    ).toMatchObject({ allAgents: false, agentBotId: agent.botId });
+    expect(
+      (
+        await prisma.botConnectionAccess.findMany({
+          where: { connectionId: exclusive.id },
+          select: { botId: true },
+        })
+      ).map((row) => row.botId),
+    ).toEqual([agent.botId]);
+    expect(await connections().access({ connectionId: exclusive.id })).toMatchObject({
+      agentShared: true,
+    });
+  });
+
+  it("keeps sharing on when every other agent is switched off, until sharing is turned off", async () => {
+    const connection = await createConnection();
+    const agent = await connections().createAgent({ connectionId: connection.id });
+    await connections().setExclusive({ connectionId: connection.id, exclusive: false });
+    // Stored as all agents (a pre-existing share), then None: owner alone, still shared.
+    await prisma.connection.update({ where: { id: connection.id }, data: { allAgents: true } });
+    expect(
+      await connections().setAccess({
+        connectionId: connection.id,
+        allAgents: false,
+        botIds: [agent.botId],
+      }),
+    ).toMatchObject({ agentShared: true });
+    expect(await connections().access({ connectionId: connection.id })).toMatchObject({
+      agentShared: true,
+    });
+    await connections().setExclusive({ connectionId: connection.id, exclusive: true });
+    expect(await connections().access({ connectionId: connection.id })).toMatchObject({
+      agentShared: false,
+    });
   });
 
   it("requires connected state and owner scope for create and toggles", async () => {

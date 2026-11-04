@@ -224,7 +224,7 @@ export function ConnectAppDialog({
     if (!row) return;
     setSaving(true);
     setAccessError(null);
-    const all = botIds.length === data.bots.length;
+    const all = botIds.length > 0 && botIds.length === data.bots.length;
     try {
       await rpc.connections.setAccess({
         connectionId: row.id,

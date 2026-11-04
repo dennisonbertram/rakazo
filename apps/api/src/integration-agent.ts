@@ -428,7 +428,8 @@ export async function setConnectedAppExclusive(
         status: "connected",
         agentBotId,
       },
-      data: { allAgents: !exclusive },
+      // Sharing on starts every other agent off; the owner adds them one by one.
+      data: { allAgents: false, agentShared: !exclusive },
     });
     if (!updated.count)
       throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
