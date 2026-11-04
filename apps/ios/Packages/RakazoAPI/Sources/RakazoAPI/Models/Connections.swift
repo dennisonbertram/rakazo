@@ -123,16 +123,21 @@ public struct Connection: Sendable, Hashable, Decodable, Identifiable {
   public let connectorId: String
   public let provider: String
   public let displayName: String
+  /// The account's own address (the mailbox), when known.
+  public let account: String?
   public let status: String
   public let error: String?
   public let needsReconnect: Bool
   public let writesEnabled: Bool
+  /// The connection's own agent, when it has one.
+  public let agentBotId: String?
 
   public var isConnected: Bool { status == "connected" }
   public var isPending: Bool { status == "pending" }
 
   private enum CodingKeys: String, CodingKey {
-    case id, connectorId, provider, displayName, status, error, needsReconnect, writesEnabled
+    case id, connectorId, provider, displayName, account, status, error, needsReconnect
+    case writesEnabled, agentBotId
   }
 
   public init(from decoder: Decoder) throws {
@@ -141,8 +146,10 @@ public struct Connection: Sendable, Hashable, Decodable, Identifiable {
     connectorId = try container.decodeIfPresent(String.self, forKey: .connectorId) ?? ""
     provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? ""
     displayName = try container.decodeIfPresent(String.self, forKey: .displayName) ?? provider
+    account = try container.decodeIfPresent(String.self, forKey: .account)
     status = try container.decodeIfPresent(String.self, forKey: .status) ?? "error"
     error = try container.decodeIfPresent(String.self, forKey: .error)
+    agentBotId = try container.decodeIfPresent(String.self, forKey: .agentBotId)
     needsReconnect = try container.decodeIfPresent(Bool.self, forKey: .needsReconnect) ?? false
     writesEnabled = try container.decodeIfPresent(Bool.self, forKey: .writesEnabled) ?? false
   }
