@@ -1,61 +1,33 @@
 import { plural, t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type {
-  FinanceOverview,
-  FinanceProvider,
-  SpendPeriod,
-  UpcomingItem,
-} from "@rakazo/contracts";
+import type { FinanceOverview, FinanceProvider, SpendPeriod } from "@rakazo/contracts";
 import { SpendPeriodSchema } from "@rakazo/contracts";
-import {
-  Button,
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableHeadRow,
-  TableRow,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@rakazo/ui-web";
-import { cn } from "@rakazo/ui-web/lib/utils";
+import { Button, Skeleton, Tooltip, TooltipContent, TooltipTrigger } from "@rakazo/ui-web";
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { SeeAll, useCappedRows } from "../components/CappedList";
 import type { CryptoChoice } from "../components/finance/AddAccountDialog";
 import { AddAccountDialog } from "../components/finance/AddAccountDialog";
 import type { BarGranularity } from "../components/finance/charts";
 import { BurnLines } from "../components/finance/charts";
 import { StatementReminderBanner } from "../components/finance/StatementReminderBanner";
+import { SubscriptionsTable, UpcomingRow } from "../components/finance/UpcomingSubscriptions";
 import type { FinanceChrome } from "../components/finance/ui";
 import {
   AskAgentButton,
   BackHere,
   BreakdownRows,
   BurnLegend,
-  Chevron,
   CompanyMenu,
   cashSubtitle,
   ErrorNotice,
   FinanceChromeProvider,
-  HereLink,
   Kpi,
-  Kv,
-  KvRow,
   PeriodTabs,
   Section,
   toneClass,
   useFinanceQuery,
-  useRowNavigate,
 } from "../components/finance/ui";
 import { WalletDialog } from "../components/finance/WalletDialog";
 import { AppLogo } from "../components/integrations/AppLogo";
@@ -66,15 +38,10 @@ import { StillLoading } from "../components/ShellSkeleton";
 import {
   changeText,
   dayRange,
-  fullDay,
   lastDayOf,
   money,
-  moneyExact,
   monthFull,
-  paidWithLabel,
   runwayText,
-  shortDay,
-  trendText,
 } from "../lib/finance-format";
 import { financePath, parseFinanceRoute } from "../lib/finance-route";
 import { useHideAmounts } from "../lib/hide-amounts-preference";
@@ -85,6 +52,7 @@ import { errorText } from "../lib/user-error";
 import { FinanceAccountPage, FinanceAccountsPage } from "./finance/FinanceAccounts";
 import { FinanceBurnPage, FinanceMonthPage, FinanceRunwayPage } from "./finance/FinanceBurn";
 import { FinanceCryptoPage } from "./finance/FinanceCrypto";
+import { FinanceSubscriptionsPage, FinanceUpcomingPage } from "./finance/FinanceLists";
 import { FinanceNotFound } from "./finance/FinanceNotFound";
 import {
   FinanceCategoryPage,
@@ -131,6 +99,10 @@ export function FinancePage(chrome: FinanceChrome) {
             <FinanceRunwayPage />
           ) : route.page === "crypto" ? (
             <FinanceCryptoPage />
+          ) : route.page === "upcoming" ? (
+            <FinanceUpcomingPage />
+          ) : route.page === "subscriptions" ? (
+            <FinanceSubscriptionsPage />
           ) : route.page === "spend" ? (
             <FinanceSpendPage
               period={route.period}
@@ -367,9 +339,6 @@ function Overview({
   const setPeriod = (next: SpendPeriod) => setQuery({ period: next });
   const setBy = (mode: "category" | "vendor") => setQuery({ by: mode });
 
-  const [allBreakdown, setAllBreakdown] = useState(false);
-  const [allUpcoming, setAllUpcoming] = useState(false);
-  const [allSubs, setAllSubs] = useState(false);
   const totals = data.spendTotals[period];
   // A period under a week old is a few days against a few days: too little to call a trend.
   const elapsedDays = (Date.parse(totals.end) - Date.parse(totals.start)) / 86_400_000;
@@ -385,6 +354,9 @@ function Overview({
   const upcomingRows = [...data.upcoming.items].sort((a, b) =>
     (a.dates[0] ?? "").localeCompare(b.dates[0] ?? ""),
   );
+  const breakdownList = useCappedRows(breakdownRows, { desktop: MAX_ROWS });
+  const upcomingList = useCappedRows(upcomingRows, { desktop: MAX_ROWS });
+  const subsList = useCappedRows(data.subscriptions.items, { desktop: MAX_ROWS });
   const runwayMonths = runwayText(data.runway.months);
   const stablecoins = data.cash.stablecoinCents ?? 0;
   const otherCounted = data.cash.otherCryptoCents ?? 0;
@@ -768,7 +740,7 @@ function Overview({
                 }
               >
                 <BreakdownRows
-                  rows={allBreakdown ? breakdownRows : breakdownRows.slice(0, MAX_ROWS)}
+                  rows={breakdownList.rows}
                   to={(row) =>
                     by === "category"
                       ? financePath.category(row.key, { period })
@@ -782,12 +754,7 @@ function Overview({
                 ) : null}
                 <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground">
                   {periodBreakdown ? spentRange : <Trans>Last 90 days</Trans>}
-                  <ShowAll
-                    total={breakdownRows.length}
-                    cap={MAX_ROWS}
-                    expanded={allBreakdown}
-                    onToggle={() => setAllBreakdown((v) => !v)}
-                  />
+                  <SeeAll list={breakdownList} />
                 </div>
               </Section>
             </BackHere>
@@ -805,7 +772,7 @@ function Overview({
                 }
               >
                 <div className="-mx-2">
-                  {(allUpcoming ? upcomingRows : upcomingRows.slice(0, MAX_ROWS)).map((item) => (
+                  {upcomingList.rows.map((item) => (
                     <UpcomingRow key={`${item.kind}:${item.key}`} item={item} />
                   ))}
                 </div>
@@ -815,12 +782,7 @@ function Overview({
                   </div>
                 ) : null}
                 <div className="mt-auto flex justify-end text-xs text-muted-foreground">
-                  <ShowAll
-                    total={upcomingRows.length}
-                    cap={MAX_ROWS}
-                    expanded={allUpcoming}
-                    onToggle={() => setAllUpcoming((v) => !v)}
-                  />
+                  <SeeAll list={upcomingList} to={financePath.upcoming()} />
                 </div>
               </Section>
             </BackHere>
@@ -836,10 +798,7 @@ function Overview({
                 </div>
               ) : (
                 <div>
-                  <SubscriptionsTable
-                    subs={subs}
-                    rows={allSubs ? subs.items : subs.items.slice(0, MAX_ROWS)}
-                  />
+                  <SubscriptionsTable subs={subs} rows={subsList.rows} />
                   <div className="flex items-center justify-between border-t border-border pt-2 text-xs text-muted-foreground">
                     <span>
                       {plural(subs.items.length, {
@@ -848,12 +807,7 @@ function Overview({
                       })}{" "}
                       · {t`${monthlyTotal}/mo`}
                     </span>
-                    <ShowAll
-                      total={subs.items.length}
-                      cap={MAX_ROWS}
-                      expanded={allSubs}
-                      onToggle={() => setAllSubs((v) => !v)}
-                    />
+                    <SeeAll list={subsList} to={financePath.subscriptions()} />
                   </div>
                 </div>
               )}
@@ -881,220 +835,11 @@ export function cryptoSubtitle(
   return unpriced > 0 ? t`${scope} · ${unpriced} unpriced` : scope;
 }
 
-function ShowAll({
-  total,
-  cap,
-  expanded,
-  onToggle,
-}: {
-  total: number;
-  cap: number;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  if (total <= cap) return null;
-  return (
-    <button
-      type="button"
-      className="-my-1.5 py-1.5 hover:text-foreground hover:underline"
-      onClick={onToggle}
-    >
-      {expanded ? <Trans>Show less</Trans> : <Trans>Show all {total}</Trans>}
-    </button>
-  );
-}
-
 function HoverRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4 tabular-nums">
       <span>{label}</span>
       <span>{value}</span>
     </div>
-  );
-}
-
-const upcomingTag = ({ kind, cardBill }: UpcomingItem) =>
-  cardBill
-    ? t`card bill`
-    : kind === "recurring"
-      ? t`recurring`
-      : kind === "pending"
-        ? t`pending`
-        : t`bill`;
-
-/** `APPROVED` reads `Approved`. */
-const billStatusText = (status: string) =>
-  status.charAt(0).toUpperCase() + status.slice(1).toLowerCase().replaceAll("_", " ");
-
-const upcomingRowClass =
-  "grid w-full grid-cols-[minmax(0,1fr)_auto_0.875rem] items-center gap-2.5 border-t border-border px-2 py-2 text-start first:border-t-0 @md:grid-cols-[minmax(5rem,auto)_1fr_auto_0.875rem]";
-const upcomingLinkClass = `${upcomingRowClass} outline-none hover:bg-background focus-visible:ring-2 focus-visible:ring-foreground`;
-
-export function UpcomingRow({ item }: { item: UpcomingItem }) {
-  useHideAmounts();
-  const to =
-    item.kind === "recurring"
-      ? financePath.recurring(item.key)
-      : item.kind === "pending"
-        ? financePath.transaction(item.key)
-        : null;
-  const dates = item.dates.map((d) => shortDay(d)).join(" · ");
-  const body = (
-    <>
-      <span className="hidden text-muted-foreground @md:inline">{dates}</span>
-      {/* Narrow, the name gets the whole first line; the dates and tag sit under it. */}
-      <span className="flex min-w-0 flex-col items-start gap-0.5 @md:flex-row @md:items-center @md:gap-1.5">
-        <span className="min-w-0 max-w-full truncate">{item.name}</span>
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span className="@md:hidden">{dates}</span>
-          {item.kind === "recurring" && !item.cardBill ? null : (
-            <span className="shrink-0 rounded-full border border-border px-1.5 text-xs">
-              {upcomingTag(item)}
-            </span>
-          )}
-        </span>
-      </span>
-      <span className="text-end tabular-nums">
-        {money(item.amountCents)}
-        {item.dates.length > 1 ? ` ×${item.dates.length}` : ""}
-      </span>
-      <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
-    </>
-  );
-  if (to) {
-    return (
-      <HereLink to={to} className={upcomingLinkClass}>
-        {body}
-      </HereLink>
-    );
-  }
-  // A bill has no page of its own: its details open in place.
-  const due = item.dueAt ?? item.dates[0] ?? "";
-  const overdue = item.dates[0] !== undefined && due < item.dates[0];
-  return (
-    <Popover>
-      <PopoverTrigger className={upcomingLinkClass}>{body}</PopoverTrigger>
-      <PopoverContent align="end">
-        <PopoverHeader>
-          <PopoverTitle>{item.name}</PopoverTitle>
-          <PopoverDescription>
-            <Trans>Brex bill, not paid yet</Trans>
-          </PopoverDescription>
-        </PopoverHeader>
-        <Kv>
-          <KvRow label={t`Amount`}>{moneyExact(item.amountCents)}</KvRow>
-          <KvRow label={t`Due`}>{overdue ? t`${fullDay(due)} (overdue)` : fullDay(due)}</KvRow>
-          {item.billStatus ? (
-            <KvRow label={t`Status`}>{billStatusText(item.billStatus)}</KvRow>
-          ) : null}
-        </Kv>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-/** The other subscription in the same overlap group (the list is largest first), named. */
-function similarTo(
-  items: FinanceOverview["subscriptions"]["items"],
-  sub: { key: string; overlapGroup: string | null },
-) {
-  const other = items.find((o) => o.overlapGroup === sub.overlapGroup && o.key !== sub.key);
-  return other ? t`Similar to ${other.name}` : null;
-}
-
-function SubscriptionsTable({
-  subs,
-  rows,
-}: {
-  subs: FinanceOverview["subscriptions"];
-  rows: FinanceOverview["subscriptions"]["items"];
-}) {
-  useHideAmounts();
-  const rowProps = useRowNavigate();
-  // A column that is empty on most rows reads as broken; the change then shows under the name.
-  const showTrend = rows.filter((r) => trendText(r.trendCents)).length * 2 >= rows.length;
-  return (
-    <Table compact>
-      <TableHeader>
-        <TableHeadRow>
-          <TableHead>
-            <Trans>Vendor</Trans>
-          </TableHead>
-          <TableHead
-            className="text-end whitespace-nowrap"
-            title={t`The usual charge scaled to a month, or for usage-based vendors the average of recent full months. The vendor page shows the same figure.`}
-          >
-            <Trans>Per month</Trans>
-          </TableHead>
-          {showTrend ? (
-            <TableHead className="text-end hidden whitespace-nowrap @md:table-cell">
-              <Trans>3-mo change</Trans>
-            </TableHead>
-          ) : null}
-          <TableHead className="text-end hidden whitespace-nowrap @md:table-cell">
-            <Trans>Last charge</Trans>
-          </TableHead>
-          <TableHead />
-        </TableHeadRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((sub) => {
-          const paidWith = paidWithLabel(sub.paidWith);
-          const similar = sub.overlapGroup ? similarTo(subs.items, sub) : null;
-          const name = sub.name;
-          return (
-            <TableRow
-              key={sub.key}
-              className="group/row cursor-pointer"
-              {...rowProps(financePath.vendor(sub.key))}
-            >
-              <TableCell className="font-semibold">
-                <HereLink
-                  to={financePath.vendor(sub.key)}
-                  aria-label={paidWith ? t`${name}, paid with ${paidWith}` : name}
-                  className="rk-tap outline-none hover:underline focus-visible:underline"
-                >
-                  {sub.name}
-                </HereLink>
-                {trendText(sub.trendCents) ? (
-                  <span
-                    className={`ms-1.5 text-xs font-normal tabular-nums text-muted-foreground ${showTrend ? "@md:hidden" : ""}`}
-                  >
-                    {trendText(sub.trendCents)}
-                  </span>
-                ) : null}
-                {similar ? " " : null}
-                {similar ? (
-                  <span
-                    title={similar}
-                    className="inline-block max-w-full truncate rounded-full border border-border px-1.5 align-middle text-xs font-normal text-muted-foreground"
-                  >
-                    {similar}
-                  </span>
-                ) : null}
-                {paidWith ? (
-                  <span
-                    role="tooltip"
-                    className="pointer-events-none invisible ms-2.5 hidden whitespace-nowrap rounded-full bg-primary px-2.5 py-0.5 align-middle text-xs font-normal leading-4 text-primary-foreground group-focus-within/row:visible group-hover/row:visible @md:inline-block"
-                  >
-                    {paidWith}
-                  </span>
-                ) : null}
-              </TableCell>
-              <TableCell className="text-end tabular-nums">{money(sub.monthlyCents)}</TableCell>
-              {showTrend ? (
-                <TableCell className="hidden w-[90px] whitespace-nowrap text-end tabular-nums text-muted-foreground @md:table-cell">
-                  {trendText(sub.trendCents)}
-                </TableCell>
-              ) : null}
-              <TableCell className="hidden whitespace-nowrap text-end text-muted-foreground @md:table-cell">
-                {shortDay(sub.lastChargeAt)}
-              </TableCell>
-              <Chevron />
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
   );
 }

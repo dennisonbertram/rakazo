@@ -81,6 +81,12 @@ import { emailBreaks } from "../lib/email-breaks";
 import { shareCount, shortDay, usdFigure } from "../lib/finance-format";
 import { useHideAmounts } from "../lib/hide-amounts-preference";
 import { FIRST_PARTY_MCP } from "../lib/integrations";
+import {
+  DEFAULT_UPDATE_SORT,
+  filterUpdates,
+  sortUpdates,
+  UPDATE_SORTS,
+} from "../lib/investor-updates-list";
 import { sortBy, useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import { SAVED_ROW_CLASS, useContactNotices, useWithoutDeleted } from "../lib/use-contact-notices";
@@ -372,6 +378,13 @@ function UpdatesSection({
   /** Present once a request has been closed as done, so the history stays reachable. */
   doneToggle: { shown: boolean; onToggle: () => void } | null;
 }) {
+  // The contacts list shares this page's URL, so this one names its params apart.
+  const list = useListParams(UPDATE_SORTS, DEFAULT_UPDATE_SORT, "updates-");
+  const status = list.param("updates-status");
+  const shown = sortUpdates(filterUpdates(updates ?? [], status), list.sort);
+  const sortNames = { date: t`Date`, subject: t`Subject` };
+  const statusNames = updateStatusNames();
+  const statuses = [...new Set((updates ?? []).map((update) => update.status))];
   return (
     <SectionCard
       title={t`Updates`}
@@ -435,19 +448,47 @@ function UpdatesSection({
           <Trans>No updates yet</Trans>
         </p>
       ) : (
-        <ul>
-          {updates.map((update) => (
-            <UpdateRow
-              key={update.id}
-              update={update}
-              onOpen={() => onOpen(update)}
-              onRetry={() => onRetry(update)}
-              onMarkDelivered={() => onMarkDelivered(update)}
-              onDuplicate={() => onDuplicate(update)}
-              onDelete={() => onDelete(update)}
-            />
-          ))}
-        </ul>
+        <>
+          {updates.length > 1 ? (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <PickFilter
+                label={t`Status`}
+                value={status}
+                options={statuses.map((value) => [value, statusNames[value]])}
+                onChange={(value) => list.setParam("updates-status", value)}
+              />
+              <SortControl
+                fields={UPDATE_SORTS.map((field) => [field, sortNames[field]])}
+                field={list.sort.field}
+                fieldLabel={sortNames[list.sort.field]}
+                direction={list.sort.dir}
+                onField={(field) => list.setSort({ field, dir: "asc" })}
+                onDirection={(dir) => list.setSort({ field: list.sort.field, dir })}
+              />
+            </div>
+          ) : null}
+          <ul>
+            {shown.map((update) => (
+              <UpdateRow
+                key={update.id}
+                update={update}
+                onOpen={() => onOpen(update)}
+                onRetry={() => onRetry(update)}
+                onMarkDelivered={() => onMarkDelivered(update)}
+                onDuplicate={() => onDuplicate(update)}
+                onDelete={() => onDelete(update)}
+              />
+            ))}
+          </ul>
+          {shown.length === 0 ? (
+            <p className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Trans>No matches</Trans>
+              <Button variant="outline" size="sm" onClick={() => list.clear("updates-status")}>
+                <Trans>Clear filters</Trans>
+              </Button>
+            </p>
+          ) : null}
+        </>
       )}
     </SectionCard>
   );

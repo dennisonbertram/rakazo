@@ -14,10 +14,12 @@ import {
   DropdownMenuTrigger,
 } from "@rakazo/ui-web";
 import { ChevronRight, MoreHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { shortDay, usdFigure } from "../../lib/finance-format";
 import { useHideAmounts } from "../../lib/hide-amounts-preference";
 import { SAVED_ROW_CLASS } from "../../lib/use-contact-notices";
+import { SeeAll, useCappedRows } from "../CappedList";
 import { contactStageNames } from "../ContactDialog";
 
 function ProspectRow({
@@ -195,7 +197,7 @@ export function Pipeline({
               {stageNames[stage]}
               <span className="font-normal">{inStage(stage).length}</span>
             </h3>
-            <ul>{inStage(stage).map(row)}</ul>
+            <StageRows prospects={inStage(stage)} row={row} savedId={savedId} />
           </section>
         ))}
       {passed.length > 0 ? (
@@ -213,9 +215,30 @@ export function Pipeline({
             />
             {stageNames.passed} {passed.length}
           </Button>
-          {showPassed ? <ul>{passed.map(row)}</ul> : null}
+          {showPassed ? <StageRows prospects={passed} row={row} savedId={savedId} /> : null}
         </section>
       ) : null}
     </div>
+  );
+}
+
+/** One stage's rows: 3 on a phone, then See all opens the rest in place. A just-saved prospect is never cut off. */
+function StageRows({
+  prospects,
+  row,
+  savedId,
+}: {
+  prospects: Contact[];
+  row: (prospect: Contact) => ReactNode;
+  savedId: string | null;
+}) {
+  const list = useCappedRows(prospects, { keep: (p) => p.id === savedId });
+  return (
+    <>
+      <ul>{list.rows.map(row)}</ul>
+      <div className="flex justify-end">
+        <SeeAll list={list} />
+      </div>
+    </>
   );
 }

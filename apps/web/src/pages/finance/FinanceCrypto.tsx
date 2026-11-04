@@ -26,6 +26,7 @@ import {
 import { ChevronRight, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { SeeAll, useCappedRows } from "../../components/CappedList";
 import { LineChart } from "../../components/finance/charts";
 import { ExchangeGroup } from "../../components/finance/ExchangeGroup";
 import { Sparkline } from "../../components/finance/Sparkline";
@@ -195,6 +196,8 @@ export function FinanceCryptoPage() {
   const priced = holdings.filter((h) => h.usdValueCents !== null);
   // Every unpriced row goes behind one line, scam airdrops included.
   const unpricedRows = holdings.filter((h) => h.usdValueCents === null);
+  // A phone sees the 3 largest holdings; the rest open in place.
+  const holdingList = useCappedRows(priced);
   const walletById = new Map((data?.wallets ?? []).map((w) => [w.id, walletName(w)]));
   // The Wallets section is wallet-only: the summary's totals also include exchanges.
   const walletCents = (data?.summary.byWallet ?? []).reduce((sum, w) => sum + w.cents, 0);
@@ -336,7 +339,7 @@ export function FinanceCryptoPage() {
                   </TableHeadRow>
                 </TableHeader>
                 <TableBody>
-                  {priced.map(renderRow)}
+                  {holdingList.rows.map(renderRow)}
                   {unpricedRows.length > 0 ? (
                     <UnpricedRows count={unpricedRows.length}>
                       {unpricedRows.map(renderRow)}
@@ -344,6 +347,9 @@ export function FinanceCryptoPage() {
                   ) : null}
                 </TableBody>
               </Table>
+              <div className="mt-1 flex justify-end">
+                <SeeAll list={holdingList} />
+              </div>
             </Section>
           ) : null}
           <WalletDialog
