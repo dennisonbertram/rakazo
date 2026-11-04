@@ -202,6 +202,10 @@ final class AuthenticationModel {
   }
 
   private func show(_ error: any Error) {
+    if case AuthClientError.serverUnavailable = error {
+      errorMessage = "Couldn’t reach \(endpoint.serverName)."
+      return
+    }
     errorMessage =
       (error as? any LocalizedError)?.errorDescription ?? "Couldn’t connect. Try again."
   }

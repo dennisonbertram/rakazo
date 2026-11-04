@@ -44,7 +44,7 @@ struct LegalScreen: View {
       }
     }
     .safeAreaInset(edge: .bottom) { undoBanner }
-    .task { await model.load(app) }
+    .task(id: app.settingsClosings) { await model.load(app) }
     .onDisappear { model.stop() }
   }
 
@@ -52,7 +52,7 @@ struct LegalScreen: View {
   private func statusSection(_ overview: LegalOverview) -> some View {
     if model.needsModel {
       Section {
-        Button { app.showingSettings = true } label: {
+        Button { app.openSettings(.models) } label: {
           Label("Add your OpenRouter key", systemImage: "key")
         }
         .accessibilityIdentifier("legalModelBlocker")

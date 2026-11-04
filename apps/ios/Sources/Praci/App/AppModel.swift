@@ -8,6 +8,10 @@ final class AppModel {
   let authentication: AuthenticationModel
   var path: [Route] = []
   var showingSettings = false
+  /// The Settings screen to open first, or nil for the top level.
+  private(set) var settingsDestination: SettingsDestination?
+  /// Counts Settings closings. Pages that Settings can change reload with `.task(id:)` on it.
+  private(set) var settingsClosings = 0
   /// Asks for AI data consent. Before any request that sends data to an AI provider (sending a
   /// thread message, running a cleanup, and so on), call
   /// `try await app.consent.ensure(procedure: "<rpc name>", app: app)`; it returns at once when
@@ -108,6 +112,13 @@ final class AppModel {
     default: throw URLError(.badServerResponse)
     }
   }
+
+  func openSettings(_ destination: SettingsDestination? = nil) {
+    settingsDestination = destination
+    showingSettings = true
+  }
+
+  func settingsDidClose() { settingsClosings += 1 }
 
   func open(_ url: URL) {
     if let route = Route(url: url) { open(route) }

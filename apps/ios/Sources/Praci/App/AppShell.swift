@@ -19,8 +19,8 @@ struct AppShell: View {
     ) {
       Button("OK", role: .cancel) {}
     }
-    .sheet(isPresented: $app.showingSettings) {
-      NavigationStack { SettingsScreen() }
+    .sheet(isPresented: $app.showingSettings, onDismiss: app.settingsDidClose) {
+      SettingsSheet(destination: app.settingsDestination)
     }
   }
 

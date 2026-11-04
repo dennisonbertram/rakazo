@@ -102,3 +102,11 @@ struct ServerView: View {
     }
   }
 }
+
+extension URL {
+  /// The host and port a person recognises, without the scheme.
+  var serverName: String {
+    guard let host = host(percentEncoded: false) else { return absoluteString }
+    return port.map { "\(host):\($0)" } ?? host
+  }
+}

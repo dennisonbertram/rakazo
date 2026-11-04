@@ -19,7 +19,7 @@ private struct InboxContent: View {
 
   var body: some View {
     LoadableView(state: model.state, retry: { Task { await model.retry() } }, content: { list in
-      InboxListView(model: model, list: list, open: open, goToSettings: { app.showingSettings = true })
+      InboxListView(model: model, list: list, open: open, goToSettings: { app.openSettings(.integrations) })
     })
     .background(Color.token(.background))
     .navigationTitle("Inbox")
@@ -64,6 +64,7 @@ private struct InboxContent: View {
       Text(verbatim: model.actionError ?? "")
     }
     .task { await model.start() }
+    .onChange(of: app.settingsClosings) { Task { await model.retry() } }
   }
 
   private var accountSelection: Binding<String?> {

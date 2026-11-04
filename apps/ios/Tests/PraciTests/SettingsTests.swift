@@ -1,4 +1,5 @@
 import Foundation
+import RakazoAPI
 import RakazoCore
 import Testing
 
@@ -120,4 +121,34 @@ func changePasswordFormNeedsEightCharactersAndAMatch() {
   #expect(form.error == .mismatch)
   form.confirmation = "long-enough"
   #expect(form.canSave && form.error == nil)
+}
+
+private func usage(_ json: String) throws -> UsageSummary {
+  try JSONDecoder().decode(UsageSummary.self, from: Data(json.utf8))
+}
+
+@Test
+func usageTotalFallsBackToInputPlusOutput() throws {
+  #expect(try usage(#"{"inputTokens":12,"outputTokens":40,"totalTokens":null,"runs":1}"#).displayTotal == 52)
+  #expect(try usage(#"{"inputTokens":12,"outputTokens":40,"totalTokens":99,"runs":1}"#).displayTotal == 99)
+  #expect(try usage(#"{"inputTokens":null,"outputTokens":40,"totalTokens":null,"runs":1}"#).displayTotal == nil)
+}
+
+@Test
+@MainActor
+func settingsOpensAtItsDestinationAndCountsClosings() async throws {
+  let (app, _) = try await makeApp([])
+  app.openSettings(.models)
+  #expect(app.showingSettings && app.settingsDestination == .models)
+  app.openSettings()
+  #expect(app.settingsDestination == nil)
+  let before = app.settingsClosings
+  app.settingsDidClose()
+  #expect(app.settingsClosings == before + 1)
+}
+
+@Test
+func serverNameShowsHostAndPort() {
+  #expect(URL(string: "https://app.example.com/x")!.serverName == "app.example.com")
+  #expect(URL(string: "http://127.0.0.1:3100")!.serverName == "127.0.0.1:3100")
 }

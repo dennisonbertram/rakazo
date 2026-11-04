@@ -35,7 +35,7 @@ struct CapTableScreen: View {
         ContentUnavailableView {
           Label("See who owns your company", systemImage: "chart.pie")
         } actions: {
-          Button("Connect Carta") { app.showingSettings = true }
+          Button("Connect Carta") { app.openSettings(.integrations) }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("connectCarta")
         }
@@ -53,7 +53,7 @@ struct CapTableScreen: View {
         }
       }
     }
-    .task { await model.load(app) }
+    .task(id: app.settingsClosings) { await model.load(app) }
   }
 
   @ViewBuilder

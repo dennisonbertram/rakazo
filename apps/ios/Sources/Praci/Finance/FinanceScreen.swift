@@ -17,7 +17,7 @@ struct FinanceScreen: View {
         } description: {
           Text("Connect Mercury or Brex")
         } actions: {
-          Button("Connect") { app.showingSettings = true }
+          Button("Connect") { app.openSettings(.integrations) }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("financeConnect")
         }
@@ -37,7 +37,7 @@ struct FinanceScreen: View {
         .accessibilityIdentifier("financeHideAmounts")
       }
     }
-    .task { await model.load(app) }
+    .task(id: app.settingsClosings) { await model.load(app) }
   }
 
   private func content(_ data: FinanceData) -> some View {

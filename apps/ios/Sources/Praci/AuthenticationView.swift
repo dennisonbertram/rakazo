@@ -29,11 +29,7 @@ struct AuthenticationView: View {
             .accessibilityAddTraits(.isHeader)
           authentication
           AuthStatus(error: model.errorMessage, notice: model.notice)
-          Button("Use a custom server") { showingServer = true }
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .foregroundStyle(color(.mutedForeground))
-            .disabled(model.busy)
-            .accessibilityIdentifier("customServer")
+          customServerButton
         }
         .padding(24)
         .frame(maxWidth: 480)
@@ -47,6 +43,24 @@ struct AuthenticationView: View {
         ServerView(model: model)
       }
       .onChange(of: model.page) { _, _ in passwordVisible = false }
+    }
+  }
+
+  /// With no connection, a custom server is the way forward, so the button stands out.
+  private var unreachable: Bool {
+    model.capabilities == nil && !model.busy && model.page != .verification
+  }
+
+  @ViewBuilder
+  private var customServerButton: some View {
+    let button = Button("Use a custom server") { showingServer = true }
+      .frame(maxWidth: .infinity, minHeight: 44)
+      .disabled(model.busy)
+      .accessibilityIdentifier("customServer")
+    if unreachable {
+      button.buttonStyle(.borderedProminent).foregroundStyle(color(.primaryForeground))
+    } else {
+      button.foregroundStyle(color(.mutedForeground))
     }
   }
 
