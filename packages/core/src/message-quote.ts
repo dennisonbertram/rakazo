@@ -163,6 +163,7 @@ function replyBlockText(block: MessageBlock): string {
       return block.steps.map((step) => step.label).join(" · ");
     case "voice_call":
     case "cloud_agent":
+    case "page":
       return block.title;
     case "subagent":
       return block.name || block.task;

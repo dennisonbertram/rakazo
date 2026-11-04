@@ -538,7 +538,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "page_create",
     description:
-      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design. Style it for light and dark (prefers-color-scheme).',
+      'Add an empty page with a title (up to 60 characters). A bot can have 20 pages. kind is "blocks" (default, Markdown) or "html" (one HTML document); it cannot change later. Use html only when blocks cannot express the design. Style it for light and dark (prefers-color-scheme). The chat shows the user a card that opens the new page, so say the page is ready; do not describe where it is or what it sits next to.',
     inputSchema: {
       type: "object",
       properties: { title: { type: "string" }, kind: { type: "string", enum: ["blocks", "html"] } },

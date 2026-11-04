@@ -9090,6 +9090,31 @@
                                               "properties": {
                                                 "kind": {
                                                   "type": "string",
+                                                  "const": "page"
+                                                },
+                                                "botId": {
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+                                                },
+                                                "pageId": {
+                                                  "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+                                                },
+                                                "title": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "botId",
+                                                "pageId",
+                                                "title"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
                                                   "const": "meta"
                                                 },
                                                 "text": {
@@ -45886,6 +45911,31 @@
                                       "properties": {
                                         "kind": {
                                           "type": "string",
+                                          "const": "page"
+                                        },
+                                        "botId": {
+                                          "$ref": "#/components/schemas/RpcExportBotOutputSchema0"
+                                        },
+                                        "pageId": {
+                                          "$ref": "#/components/schemas/RpcExportBotOutputSchema0"
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "botId",
+                                        "pageId",
+                                        "title"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
                                           "const": "meta"
                                         },
                                         "text": {
@@ -63065,6 +63115,31 @@
                                         "kind",
                                         "title",
                                         "farewell"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "page"
+                                        },
+                                        "botId": {
+                                          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema0"
+                                        },
+                                        "pageId": {
+                                          "$ref": "#/components/schemas/RpcGroupsGetOutputSchema0"
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "botId",
+                                        "pageId",
+                                        "title"
                                       ],
                                       "additionalProperties": false
                                     },
@@ -122252,6 +122327,31 @@
                                       "properties": {
                                         "kind": {
                                           "type": "string",
+                                          "const": "page"
+                                        },
+                                        "botId": {
+                                          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
+                                        },
+                                        "pageId": {
+                                          "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "botId",
+                                        "pageId",
+                                        "title"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
                                           "const": "meta"
                                         },
                                         "text": {
@@ -124656,6 +124756,31 @@
                                         "kind",
                                         "title",
                                         "farewell"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "page"
+                                        },
+                                        "botId": {
+                                          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema0"
+                                        },
+                                        "pageId": {
+                                          "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema0"
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "botId",
+                                        "pageId",
+                                        "title"
                                       ],
                                       "additionalProperties": false
                                     },

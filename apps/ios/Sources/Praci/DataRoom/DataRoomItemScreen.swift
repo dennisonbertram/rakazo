@@ -131,3 +131,26 @@ struct DataRoomItemScreen: View {
     }
   }
 }
+
+/// Opens a Data room file from its id, such as from a link an agent wrote.
+struct DataRoomItemLoader: View {
+  let itemID: String
+  @Environment(AppModel.self) private var app
+  @State private var state: Loadable<DataRoomItem> = .idle
+
+  var body: some View {
+    LoadableView(state: state, retry: { Task { await load() } }, content: { item in
+      DataRoomItemScreen(item: item)
+    })
+    .task { await load() }
+  }
+
+  private func load() async {
+    state = .loading
+    do {
+      state = .loaded(try await app.call("dataRoom/item", input: DataRoomIDInput(id: itemID)))
+    } catch {
+      state = .failed(error.localizedDescription)
+    }
+  }
+}

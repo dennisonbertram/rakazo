@@ -482,6 +482,33 @@ code-b
       },
     ];
   }
+  const pageTitle = /\bpage called ([^.\n]+)/i.exec(prompt)?.[1]?.trim();
+  if (pageTitle && lower.includes("make a page called")) {
+    return [
+      {
+        assistant: `the ${pageTitle} page is ready.`,
+        toolCalls: [{ name: "page_create", args: { title: pageTitle } }],
+        complete: true,
+      },
+    ];
+  }
+  if (pageTitle && lower.includes("write the page called")) {
+    return [
+      {
+        assistant: "saved.",
+        toolCalls: [
+          {
+            name: "page_write",
+            args: { page: pageTitle, content: "# Notes\n\nHello", baseRevision: 1 },
+          },
+        ],
+        complete: true,
+      },
+    ];
+  }
+  if (lower.startsWith("say: ")) {
+    return [{ assistant: prompt.slice(5), complete: true }];
+  }
   if (
     lower.includes("spawn a bot") ||
     lower.includes("spawn a child") ||

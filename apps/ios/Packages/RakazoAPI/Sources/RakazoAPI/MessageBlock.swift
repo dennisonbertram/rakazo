@@ -15,6 +15,7 @@ public struct MessageBlock: Codable, Sendable {
     case steps
     case subagent
     case childBot
+    case page
     case cloudAgent
     case skillDraft
     case chart
@@ -45,6 +46,7 @@ public struct MessageBlock: Codable, Sendable {
       case "steps": self = .steps
       case "subagent": self = .subagent
       case "child_bot": self = .childBot
+      case "page": self = .page
       case "cloud_agent": self = .cloudAgent
       case "skill_draft": self = .skillDraft
       case "chart": self = .chart
@@ -77,6 +79,7 @@ public struct MessageBlock: Codable, Sendable {
       case .steps: "steps"
       case .subagent: "subagent"
       case .childBot: "child_bot"
+      case .page: "page"
       case .cloudAgent: "cloud_agent"
       case .skillDraft: "skill_draft"
       case .chart: "chart"
