@@ -945,7 +945,7 @@ async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId
       agentBotId: true,
       botAccess: {
         where: { spaceId: actor.spaceId, userId: actor.userId },
-        select: { botId: true },
+        select: { botId: true, canWrite: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -955,6 +955,7 @@ async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId
   return {
     allAgents: row.allAgents,
     botIds,
+    writeBotIds: row.botAccess.filter((entry) => entry.canWrite).map((entry) => entry.botId),
     // Shared once anyone else has access, and it stays shared when they are all switched off.
     agentShared: row.agentShared || row.allAgents || botIds.some((id) => id !== row.agentBotId),
   };
@@ -963,7 +964,13 @@ async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId
 type AccessConnection = {
   allAgents: boolean;
   agentBotId: string | null;
-  botAccess: { botId: string }[];
+  botAccess: { botId: string; canWrite?: boolean }[];
+};
+type DecidedAccess = {
+  allAgents: boolean;
+  botIds: string[];
+  /** Agents whose "allow changes" is set or cleared by this change; every other grant keeps its setting. */
+  canWrite?: Record<string, boolean>;
 };
 type AccessBot = { id: string; audience: string; firewall: boolean };
 
@@ -980,9 +987,26 @@ export function toggleAgentAccess(
   bots: AccessBot[],
   botId: string,
   on: boolean,
-): { allAgents: boolean; botIds: string[] } {
+  canWrite?: boolean,
+): DecidedAccess {
   const target = bots.find((bot) => bot.id === botId);
   if (!target) throw new IsolationError();
+  if (canWrite === true && on) {
+    if (connection.agentBotId === null)
+      throw new ORPCError("BAD_REQUEST", { message: "This connection has no changes to allow" });
+    if (target.audience === "external")
+      throw new ORPCError("BAD_REQUEST", { message: "External agents cannot make changes" });
+  }
+  const isOwner = botId === connection.agentBotId;
+  // The owner's changes follow the connection's own switch, and a new grant starts read-only.
+  const write: Record<string, boolean> | undefined = isOwner
+    ? undefined
+    : {
+        [botId]: on
+          ? (canWrite ??
+            connection.botAccess.some((entry) => entry.botId === botId && entry.canWrite === true))
+          : false,
+      };
   const granted = new Set(connection.botAccess.map((entry) => entry.botId));
   const ids = new Set(
     connection.allAgents
@@ -998,6 +1022,7 @@ export function toggleAgentAccess(
     botIds: all
       ? bots.filter((bot) => restrictedBot(bot) && ids.has(bot.id)).map((bot) => bot.id)
       : [...ids],
+    ...(write ? { canWrite: write } : {}),
   };
 }
 
@@ -1006,10 +1031,7 @@ async function saveConnectionAccess(
   prisma: PrismaClient,
   actor: Actor,
   connectionId: string,
-  decide: (
-    connection: AccessConnection,
-    bots: AccessBot[],
-  ) => { allAgents: boolean; botIds: string[] },
+  decide: (connection: AccessConnection, bots: AccessBot[]) => DecidedAccess,
 ) {
   await prisma.$transaction(async (tx) => {
     // Connection row first, then bots and grants: the same order as every other path.
@@ -1024,7 +1046,7 @@ async function saveConnectionAccess(
         privateByDefault: true,
         agentShared: true,
         allAgents: true,
-        botAccess: { select: { botId: true } },
+        botAccess: { select: { botId: true, canWrite: true } },
       },
     });
     if (!connection) throw new IsolationError();
@@ -1034,6 +1056,18 @@ async function saveConnectionAccess(
     });
     const decided = decide(connection, scopedBots);
     let botIds = [...new Set(decided.botIds)];
+    // "Allow changes" survives every save for agents that stay on; only an explicit change or None clears it.
+    const writeIds = new Set(
+      connection.agentBotId === null
+        ? []
+        : connection.botAccess.filter((entry) => entry.canWrite).map((entry) => entry.botId),
+    );
+    for (const [id, value] of Object.entries(decided.canWrite ?? {})) {
+      if (value) writeIds.add(id);
+      else writeIds.delete(id);
+    }
+    // Under "all agents" a grant row is otherwise redundant, but it is where the write setting lives.
+    if (decided.allAgents) botIds = [...new Set([...botIds, ...writeIds])];
     // Sharing is on once anyone besides the agent has access, and None does not turn it off.
     const agentShared =
       connection.agentShared ||
@@ -1108,6 +1142,7 @@ async function saveConnectionAccess(
             botId,
             spaceId: actor.spaceId,
             userId: actor.userId,
+            canWrite: writeIds.has(botId) && botId !== connection.agentBotId,
           })),
         ),
       });
@@ -1125,7 +1160,11 @@ async function allConnectionAccess(prisma: PrismaClient, actor: Actor) {
       allAgents: true,
       agentShared: true,
       agentBotId: true,
-      botAccess: { where: scope, select: { botId: true }, orderBy: { createdAt: "asc" } },
+      botAccess: {
+        where: scope,
+        select: { botId: true, canWrite: true },
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
   return Object.fromEntries(
@@ -1136,6 +1175,7 @@ async function allConnectionAccess(prisma: PrismaClient, actor: Actor) {
         {
           allAgents: row.allAgents,
           botIds,
+          writeBotIds: row.botAccess.filter((entry) => entry.canWrite).map((entry) => entry.botId),
           agentShared:
             row.agentShared || row.allAgents || botIds.some((id) => id !== row.agentBotId),
         },
@@ -7574,7 +7614,8 @@ export function createRouter(deps: RouterDeps): AppRouter {
           deps.prisma,
           context.actor,
           input.connectionId,
-          (connection, bots) => toggleAgentAccess(connection, bots, input.botId, input.on),
+          (connection, bots) =>
+            toggleAgentAccess(connection, bots, input.botId, input.on, input.canWrite),
         );
         return connectionAccess(deps.prisma, context.actor, input.connectionId);
       }),
@@ -7660,7 +7701,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           ownership: {
             agentBotId: string | null;
             writesEnabled: boolean;
-            grants: { botId: string; spaceId: string; userId: string }[];
+            grants: { botId: string; spaceId: string; userId: string; canWrite: boolean }[];
           } | null;
         } = { ownership: null };
         const outcome = await retryOnDeadlock(() =>
@@ -7732,7 +7773,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
                   writesEnabled: row.writesEnabled,
                   grants: await tx.botConnectionAccess.findMany({
                     where: { connectionId: row.id },
-                    select: { botId: true, spaceId: true, userId: true },
+                    select: { botId: true, spaceId: true, userId: true, canWrite: true },
                   }),
                 };
                 await tx.connection.update({

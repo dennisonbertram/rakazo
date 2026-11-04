@@ -178,3 +178,41 @@ export const ToggleListLong: StoryObj = {
     );
   },
 };
+
+/** Under each agent that is on, "Allow changes" starts off; the owning agent shows the connection's own switch. */
+export const ToggleListWithChanges: StoryObj = {
+  render: () => {
+    const owner = mockBots[0]!.id;
+    const [on, setOn] = useState(new Set([owner, mockBots[1]!.id]));
+    const [writing, setWriting] = useState(new Set<string>());
+    return (
+      <div className="w-96">
+        <AgentToggleList
+          bots={mockBots}
+          appName="Sample app"
+          ownerBotId={owner}
+          isOn={(id) => on.has(id)}
+          writes={{
+            enabled: true,
+            isWriting: (id) => writing.has(id),
+            onToggle: (id, next) =>
+              setWriting((prev) => {
+                const copy = new Set(prev);
+                if (next) copy.add(id);
+                else copy.delete(id);
+                return copy;
+              }),
+          }}
+          onToggle={(id, next) =>
+            setOn((prev) => {
+              const copy = new Set(prev);
+              if (next) copy.add(id);
+              else copy.delete(id);
+              return copy;
+            })
+          }
+        />
+      </div>
+    );
+  },
+};

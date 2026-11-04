@@ -189,6 +189,8 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [override, setOverride] = useState<{ rowId: string; shown: string[] } | null>(null);
+  /** "Allow changes" switches flipped on this page and not yet confirmed by the server, by row and agent. */
+  const [writeNow, setWriteNow] = useState<Record<string, boolean>>({});
   const connectedCount = connected.length;
   const isGmail =
     matchFeaturedConnectorId(slug) === "gmail" || (connectorId === "google" && /mail/i.test(slug));
@@ -319,6 +321,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
         pendingShown.current.clear();
         await data.refresh();
         setOverride(null);
+        setWriteNow({});
       }
     });
   }
@@ -330,6 +333,14 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
     const shown = shownNow(row).filter((id) => id !== botId);
     saveAccess(row, null, on ? [...shown, botId] : shown, () =>
       rpc.connections.setAgentAccess({ connectionId: row.id, botId, on }),
+    );
+  }
+
+  /** One agent's "Allow changes": the server sets only that grant, and the agent stays on. */
+  function setAgentWrites(row: Connection, botId: string, canWrite: boolean) {
+    setWriteNow((prev) => ({ ...prev, [`${row.id}:${botId}`]: canWrite }));
+    saveAccess(row, null, shownNow(row), () =>
+      rpc.connections.setAgentAccess({ connectionId: row.id, botId, on: true, canWrite }),
     );
   }
 
@@ -549,6 +560,14 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                         isOn={(botId) => isOn(row, botId)}
                         onToggle={(botId, on) => setAgent(row, botId, on)}
                         onSetAll={(on) => setAllAgents(row, on)}
+                        writes={{
+                          enabled: row.writesEnabled ?? false,
+                          isWriting: (botId) =>
+                            writeNow[`${row.id}:${botId}`] ??
+                            data.access[row.id]?.writeBotIds?.includes(botId) ??
+                            false,
+                          onToggle: (botId, next) => setAgentWrites(row, botId, next),
+                        }}
                         ownerBotId={row.agentBotId}
                         saving={override?.rowId === row.id}
                         everyone={accessOf(row).allAgents}

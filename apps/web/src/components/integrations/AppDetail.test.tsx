@@ -284,6 +284,36 @@ it("lists who can use a shared connection from the server, owner first, and save
   });
 });
 
+it("Allow changes under a shared agent sets only that agent's write grant", async () => {
+  const bots = ["bot_app", "b"].map((id) => ({ id, name: id, color: "#000000" }));
+  await show(
+    APP_PAGE,
+    data({
+      bots: bots as IntegrationsData["bots"],
+      connections: [appConnection({ agentBotId: "bot_app", writesEnabled: true })],
+      access: {
+        conn_app: {
+          allAgents: true,
+          agentShared: true,
+          botIds: [],
+          effectiveAccess: { shared: "all", botIds: ["bot_app", "b"] },
+        },
+      },
+    }),
+  );
+  const nested = container.querySelector<HTMLElement>(
+    '[aria-label="b can make changes in Sample workspace"]',
+  )!;
+  expect(nested.getAttribute("aria-checked")).toBe("false");
+  await act(async () => nested.click());
+  expect(setAgentAccess).toHaveBeenCalledWith({
+    connectionId: "conn_app",
+    botId: "b",
+    on: true,
+    canWrite: true,
+  });
+});
+
 it("saves each quick toggle as its own single-agent change, in order", async () => {
   const bots = ["bot_app", "b", "c"].map((id) => ({ id, name: id, color: "#000000" }));
   const saved: unknown[] = [];

@@ -36,13 +36,13 @@ describe("toggleAgentAccess", () => {
   it("turning a firewalled agent on adds an explicit grant even under all agents", () => {
     const withFw = [...bots, bot("fw", { firewall: true })];
     const next = toggleAgentAccess(conn(true), withFw, "fw", true);
-    expect(next).toEqual({ allAgents: true, botIds: ["fw"] });
+    expect(next).toMatchObject({ allAgents: true, botIds: ["fw"] });
   });
 
   it("turning a firewalled agent off removes only its grant", () => {
     const withFw = [...bots, bot("fw", { firewall: true })];
     const next = toggleAgentAccess(conn(true, ["fw"]), withFw, "fw", false);
-    expect(next).toEqual({ allAgents: true, botIds: [] });
+    expect(next).toMatchObject({ allAgents: true, botIds: [] });
   });
 
   it("the connection's own agent cannot be turned off", () => {
@@ -52,5 +52,45 @@ describe("toggleAgentAccess", () => {
 
   it("an unknown agent is refused", () => {
     expect(() => toggleAgentAccess(conn(false), bots, "zzz", true)).toThrow();
+  });
+
+  describe("allow changes", () => {
+    const owned = (ids: { botId: string; canWrite?: boolean }[], allAgents = false) => ({
+      allAgents,
+      agentBotId: "o",
+      botAccess: [{ botId: "o" }, ...ids],
+    });
+    const all = [bot("o"), ...bots];
+
+    it("a newly turned on agent starts read-only", () => {
+      expect(toggleAgentAccess(owned([]), all, "a", true).canWrite).toEqual({ a: false });
+    });
+    it("turning it on with canWrite sets it, and turning it on again keeps it", () => {
+      expect(toggleAgentAccess(owned([]), all, "a", true, true).canWrite).toEqual({ a: true });
+      expect(
+        toggleAgentAccess(owned([{ botId: "a", canWrite: true }]), all, "a", true).canWrite,
+      ).toEqual({ a: true });
+    });
+    it("turning an agent off clears it", () => {
+      expect(
+        toggleAgentAccess(owned([{ botId: "a", canWrite: true }]), all, "a", false).canWrite,
+      ).toEqual({ a: false });
+    });
+    it("the owner has no setting of its own", () => {
+      expect(toggleAgentAccess(owned([]), all, "o", true, true).canWrite).toBeUndefined();
+    });
+    it("refuses changes for an external agent or a connection without an agent", () => {
+      const ext = [...all, bot("ext", { audience: "external" })];
+      expect(() => toggleAgentAccess(owned([]), ext, "ext", true, true)).toThrow();
+      expect(() =>
+        toggleAgentAccess(
+          { allAgents: false, agentBotId: null, botAccess: [] },
+          all,
+          "a",
+          true,
+          true,
+        ),
+      ).toThrow();
+    });
   });
 });

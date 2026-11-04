@@ -155,6 +155,7 @@ import {
   newSiteOutcome,
   nextFence,
   nextRoutineRunDateAcross,
+  nonOwnerMayWrite,
   outboundSiteGate,
   ownsLine,
   PrivateFragments,
@@ -3307,7 +3308,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 privateByDefault: true,
                 botAccess: {
                   where: connectionAccessFilter(bot),
-                  select: { botId: true, supportLabel: true },
+                  select: { botId: true, supportLabel: true, canWrite: true },
                 },
                 agentBot: { select: { spawnKey: true } },
               },
@@ -3329,7 +3330,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (!row || row.status !== "connected" || deniedConnectionIds(rows).has(row.id))
             return false;
           if (!GOOGLE_BUILTIN_WRITES.has(toolName) || row.agentBotId === null) return true;
-          return row.agentBotId === bot.id && row.writesEnabled;
+          if (row.agentBotId === bot.id) return row.writesEnabled;
+          // Another agent changes it only with its own write grant, still asking before each change.
+          return nonOwnerMayWrite(row, bot);
         };
         const accountsAllowedNow = async <T extends { id: string }>(
           accounts: Promise<T[]> | T[],
@@ -3353,6 +3356,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const linked = (await connectionRowsNow()).some(
             (row) => row.agentBotId !== null && all.some((account) => account.id === row.id),
           );
+          if (GOOGLE_BUILTIN_WRITES.has(toolName)) {
+            const rows = await connectionRowsNow();
+            const readable = all.filter((account) => accountAllowedIn(rows, account.id, "read"));
+            if (readable.length > 0) {
+              const names = readable.map(
+                (account) =>
+                  (account as { address?: string; label?: string }).address ??
+                  (account as { label?: string }).label ??
+                  "that account",
+              );
+              return `This agent can read but not change ${names.join(", ")}. Change that under Access on that account's Integrations page.`;
+            }
+          }
           return GOOGLE_BUILTIN_WRITES.has(toolName) && linked
             ? "Only this connected account's agent can make changes to it, and only while changes are on."
             : "This connected account is no longer available to this bot.";
@@ -6821,6 +6837,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 jobs: deps.jobs,
                 accounts: () => accountsAllowedNow(mailAccounts(), name),
                 ownerAccounts: ownerMailAccounts,
+                readableAccounts: () => accountsAllowedNow(mailAccounts(), "mail_search"),
                 scopeLabelIds: (accountId) => firewallScopeLabelIds[accountId],
                 beforeWrite: (account) => writeDenialNow(account, name),
                 publish: (blocks) => publishMessage(deps, run, "bot", blocks),

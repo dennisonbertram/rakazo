@@ -33,7 +33,10 @@ const loaded = (rows: ReturnType<typeof connection>[]) => ({
     rows.map((row, i) => [row.id, { shared: "some", botIds: i % 2 === 0 ? [bot.id] : [] }]),
   ),
   "connections.accessAll": Object.fromEntries(
-    rows.map((row) => [row.id, { allAgents: true, botIds: [], agentShared: true }]),
+    rows.map((row) => [
+      row.id,
+      { allAgents: true, botIds: [], agentShared: true, writeBotIds: [] },
+    ]),
   ),
   "connections.setAgentAccess": null,
   "mcp.servers.list": [],

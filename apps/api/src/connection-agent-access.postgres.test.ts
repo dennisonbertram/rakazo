@@ -1,5 +1,6 @@
 import { createRouterClient } from "@orpc/server";
 import type { Actor } from "@rakazo/contracts";
+import { integrationAgentSpawnKey } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { createDb } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -27,7 +28,7 @@ describePostgres("per-agent access changes (PostgreSQL)", () => {
   let prisma: PrismaClient;
   let close: () => Promise<void>;
 
-  type Access = { allAgents: boolean; botIds: string[] };
+  type Access = { allAgents: boolean; botIds: string[]; writeBotIds: string[] };
   const api = (who = actor(userId)) => {
     const c = createRouterClient(
       createRouter({ prisma, env: { mailWritesDisabled: false } } as unknown as RouterDeps),
@@ -37,8 +38,17 @@ describePostgres("per-agent access changes (PostgreSQL)", () => {
       connections: {
         access(i: { connectionId: string }): Promise<Access>;
         accessAll(): Promise<Record<string, Access>>;
-        setAccess(i: { connectionId: string } & Access): Promise<Access>;
-        setAgentAccess(i: { connectionId: string; botId: string; on: boolean }): Promise<Access>;
+        setAccess(i: {
+          connectionId: string;
+          allAgents: boolean;
+          botIds: string[];
+        }): Promise<Access>;
+        setAgentAccess(i: {
+          connectionId: string;
+          botId: string;
+          on: boolean;
+          canWrite?: boolean;
+        }): Promise<Access>;
       };
       mcp: {
         servers: {
@@ -70,6 +80,20 @@ describePostgres("per-agent access changes (PostgreSQL)", () => {
         status: "connected",
       },
     });
+
+  /** A connection with its own agent, created the way the server expects. */
+  const makeLinked = async (name: string) => {
+    const conn = await makeConnection();
+    const agent = await makeBot(name, { spawnKey: integrationAgentSpawnKey(conn.id) });
+    await prisma.connection.update({
+      where: { id: conn.id },
+      data: { agentBotId: agent.id, writesEnabled: true },
+    });
+    await prisma.botConnectionAccess.create({
+      data: { connectionId: conn.id, botId: agent.id, spaceId, userId },
+    });
+    return { conn, agent };
+  };
 
   beforeAll(async () => {
     const db = createDb(databaseUrl as string);
@@ -185,6 +209,79 @@ describePostgres("per-agent access changes (PostgreSQL)", () => {
         serverId: server.id,
         botId: a.id,
         on: true,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("allow changes starts off, is set per agent, survives All, and None clears it", async () => {
+    const { conn, agent: owner } = await makeLinked("wo");
+    const a = await makeBot("wa");
+    const b = await makeBot("wb");
+    await api().connections.setAccess({
+      connectionId: conn.id,
+      allAgents: false,
+      botIds: [owner.id],
+    });
+    const on = await api().connections.setAgentAccess({
+      connectionId: conn.id,
+      botId: a.id,
+      on: true,
+    });
+    expect(on.botIds).toContain(a.id);
+    expect(on.writeBotIds).toEqual([]);
+    const write = await api().connections.setAgentAccess({
+      connectionId: conn.id,
+      botId: a.id,
+      on: true,
+      canWrite: true,
+    });
+    expect(write.writeBotIds).toEqual([a.id]);
+    // Turning on another agent leaves a's setting alone.
+    await api().connections.setAgentAccess({ connectionId: conn.id, botId: b.id, on: true });
+    expect((await api().connections.access({ connectionId: conn.id })).writeBotIds).toEqual([a.id]);
+    // All keeps it for the agent that is already on.
+    const all = await api().connections.setAccess({
+      connectionId: conn.id,
+      allAgents: true,
+      botIds: [],
+    });
+    expect(all.writeBotIds).toEqual([a.id]);
+    // None clears it.
+    const none = await api().connections.setAccess({
+      connectionId: conn.id,
+      allAgents: false,
+      botIds: [owner.id],
+    });
+    expect(none.writeBotIds).toEqual([]);
+  });
+
+  it("refuses allow changes for an external agent, a plain connection, or another user", async () => {
+    const { agent: owner } = await makeLinked("xo");
+    const ext = await makeBot("xe", { audience: "external" });
+    const plain = await makeConnection();
+    await expect(
+      api().connections.setAgentAccess({
+        connectionId: plain.id,
+        botId: owner.id,
+        on: true,
+        canWrite: true,
+      }),
+    ).rejects.toThrow();
+    const linked = (await makeLinked("xl")).conn;
+    await expect(
+      api().connections.setAgentAccess({
+        connectionId: linked.id,
+        botId: ext.id,
+        on: true,
+        canWrite: true,
+      }),
+    ).rejects.toThrow();
+    await expect(
+      api(actor(otherUserId)).connections.setAgentAccess({
+        connectionId: linked.id,
+        botId: owner.id,
+        on: true,
+        canWrite: true,
       }),
     ).rejects.toThrow();
   });

@@ -232,3 +232,45 @@ it("shows search only above 8 rows and renders nothing with no accounts", async 
   const nine = await mount(ada);
   expect(nine.container.querySelector('input[type="search"]')).not.toBeNull();
 });
+
+it("shows Allow changes under an agent-linked account that is on, and sets only this agent's grant", async () => {
+  rpc.connections.list.mockResolvedValue([
+    { ...conn("c1", "Gmail", "ann@example.com", "inbox"), writesEnabled: true },
+  ]);
+  rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: ["ada"] } });
+  rpc.connections.accessAll.mockResolvedValue({
+    c1: { allAgents: false, botIds: ["inbox", "ada"], agentShared: true, writeBotIds: [] },
+  });
+  const { sw } = await mount(ada);
+  const nested = sw("Ada can make changes in Gmail ann@example.com");
+  expect(nested.getAttribute("aria-checked")).toBe("false");
+  await act(async () => nested.click());
+  expect(rpc.connections.setAgentAccess).toHaveBeenCalledWith({
+    connectionId: "c1",
+    botId: "ada",
+    on: true,
+    canWrite: true,
+  });
+});
+
+it("Allow changes is disabled while the connection's changes switch is off, and absent on plain accounts and email chats", async () => {
+  rpc.connections.list.mockResolvedValue([
+    { ...conn("c1", "Gmail", "ann@example.com", "inbox"), writesEnabled: false },
+    conn("c2", "Slack", "", null),
+  ]);
+  rpc.connections.effectiveAccess.mockResolvedValue({
+    c1: { shared: "some", botIds: ["ada"] },
+    c2: { shared: "some", botIds: ["ada"] },
+  });
+  const { sw } = await mount(ada);
+  const nested = sw("Ada can make changes in Gmail ann@example.com");
+  expect(
+    nested.hasAttribute("data-disabled") || nested.getAttribute("aria-disabled") === "true",
+  ).toBe(true);
+  expect(sw("Ada can make changes in Slack")).toBeNull();
+
+  const chat = bot("chat", "Re: hi", mailThreadAgentSpawnKey("c1", "t1"));
+  rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: ["chat"] } });
+  const mail = await mount(chat);
+  expect(mail.sw("Re: hi can make changes in Gmail ann@example.com")).toBeNull();
+});

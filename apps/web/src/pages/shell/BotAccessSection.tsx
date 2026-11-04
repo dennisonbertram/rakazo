@@ -16,6 +16,14 @@ type Row = {
   /** The server keeps this one as it is: the agent's own, a private connection, an exclusive server, or inherited from the Inbox agent. */
   locked: boolean;
   toggle: (on: boolean) => Promise<unknown>;
+  /** "Allow changes", on connections that have an agent: the connection's own switch gates it. */
+  write?: {
+    on: boolean;
+    /** Not editable here: the connection's own agent follows the connection's switch. */
+    fixed: boolean;
+    enabled: boolean;
+    toggle: (next: boolean) => Promise<unknown>;
+  };
 };
 
 /** What one agent can reach: the connected accounts and servers, each with the switch the integration page has. */
@@ -50,6 +58,23 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
         on: effective[row.id]?.botIds.includes(bot.id) ?? false,
         locked: own || mailChat || private_,
         toggle: (on) => rpc.connections.setAgentAccess({ connectionId: row.id, botId: bot.id, on }),
+        write:
+          row.agentBotId && !mailChat
+            ? {
+                on: own
+                  ? (row.writesEnabled ?? false)
+                  : (access[row.id]?.writeBotIds ?? []).includes(bot.id),
+                fixed: own,
+                enabled: row.writesEnabled ?? false,
+                toggle: (next) =>
+                  rpc.connections.setAgentAccess({
+                    connectionId: row.id,
+                    botId: bot.id,
+                    on: true,
+                    canWrite: next,
+                  }),
+              }
+            : undefined,
       };
     });
     const serverRows: Row[] = servers
@@ -85,12 +110,12 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
     reload();
   }, [reload]);
 
-  async function toggle(row: Row, on: boolean) {
+  async function toggle(row: Row, on: boolean, change?: (next: boolean) => Promise<unknown>) {
     setBusy(true);
     setError(null);
     let changed = true;
     try {
-      await row.toggle(on);
+      await (change ? change(on) : row.toggle(on));
     } catch (err) {
       changed = false;
       setError(errorText(err, t`Could not update access`));
@@ -141,19 +166,41 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
       ) : null}
       <div className="divide-y divide-border rounded-xl border border-border bg-card">
         {shown.map((row) => (
-          <div key={row.key} className="flex items-center gap-3 px-3.5 py-2.5">
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm">{row.name}</span>
-              {row.address ? (
-                <span className="block truncate text-xs text-muted-foreground">{row.address}</span>
-              ) : null}
-            </span>
-            <Switch
-              aria-label={t`${bot.name} can use ${row.name} ${row.address ?? ""}`.trim()}
-              checked={row.on}
-              disabled={busy || row.locked}
-              onCheckedChange={(next) => void toggle(row, next)}
-            />
+          <div key={row.key}>
+            <div className="flex items-center gap-3 px-3.5 py-2.5">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm">{row.name}</span>
+                {row.address ? (
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {row.address}
+                  </span>
+                ) : null}
+              </span>
+              <Switch
+                aria-label={t`${bot.name} can use ${row.name} ${row.address ?? ""}`.trim()}
+                checked={row.on}
+                disabled={busy || row.locked}
+                onCheckedChange={(next) => void toggle(row, next)}
+              />
+            </div>
+            {row.write && row.on ? (
+              <div className="flex items-center gap-3 px-3.5 pb-2.5">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px]">
+                    <Trans>Allow changes</Trans>
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    <Trans>The agent asks you before each change.</Trans>
+                  </span>
+                </span>
+                <Switch
+                  aria-label={t`${bot.name} can make changes in ${row.name} ${row.address ?? ""}`.trim()}
+                  checked={row.write.on}
+                  disabled={busy || row.write.fixed || !row.write.enabled}
+                  onCheckedChange={(next) => void toggle(row, next, row.write?.toggle)}
+                />
+              </div>
+            ) : null}
           </div>
         ))}
         {shown.length === 0 ? (

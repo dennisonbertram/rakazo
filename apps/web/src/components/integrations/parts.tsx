@@ -117,6 +117,7 @@ export function AgentToggleList({
   everyone = false,
   subject = "account",
   ready = true,
+  writes,
 }: {
   bots: Bot[];
   isOn: (botId: string) => boolean;
@@ -135,6 +136,15 @@ export function AgentToggleList({
   subject?: "account" | "connection";
   /** False until the access data has arrived, so the first on-first order uses the real state. */
   ready?: boolean;
+  /**
+   * "Allow changes" under each agent that is on. `enabled` is the connection's own changes switch,
+   * which gates every one of them; the owning agent shows that switch's state and is not editable.
+   */
+  writes?: {
+    enabled: boolean;
+    isWriting: (botId: string) => boolean;
+    onToggle: (botId: string, next: boolean) => void;
+  };
 }) {
   const { t } = useLingui();
   const [query, setQuery] = useState("");
@@ -171,18 +181,41 @@ export function AgentToggleList({
       .sort((a, b) => Number(on(b)) - Number(on(a)) || a.name.localeCompare(b.name));
   }, [othersKey, query, show, ready]);
   const shownOthers = showControls ? visibleOthers : others;
-  const agentRow = (bot: Bot) => (
-    <div key={bot.id} className="flex items-center gap-3 px-3.5 py-2.5">
-      <BotAvatar color={bot.color} identity={bot.id} size={22} />
-      <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
-      <Switch
-        aria-label={t`${bot.name} can use ${appName}`}
-        checked={isOn(bot.id)}
-        disabled={disabled}
-        onCheckedChange={(next) => onToggle(bot.id, next)}
-      />
-    </div>
-  );
+  const agentRow = (bot: Bot) => {
+    const isOwner = bot.id === ownerBotId;
+    return (
+      <div key={bot.id}>
+        <div className="flex items-center gap-3 px-3.5 py-2.5">
+          <BotAvatar color={bot.color} identity={bot.id} size={22} />
+          <span className="min-w-0 flex-1 truncate text-sm">{bot.name}</span>
+          <Switch
+            aria-label={t`${bot.name} can use ${appName}`}
+            checked={isOn(bot.id)}
+            disabled={disabled}
+            onCheckedChange={(next) => onToggle(bot.id, next)}
+          />
+        </div>
+        {writes && isOn(bot.id) ? (
+          <div className="flex items-center gap-3 pe-3.5 ps-[3.25rem] pb-2.5">
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px]">
+                <Trans>Allow changes</Trans>
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                <Trans>The agent asks you before each change.</Trans>
+              </span>
+            </span>
+            <Switch
+              aria-label={t`${bot.name} can make changes in ${appName}`}
+              checked={isOwner ? writes.enabled : writes.isWriting(bot.id)}
+              disabled={disabled || isOwner || !writes.enabled}
+              onCheckedChange={(next) => writes.onToggle(bot.id, next)}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  };
   const chatsRow =
     emailChats.length > 0 ? (
       <div className="flex items-center gap-3 px-3.5 py-2.5">

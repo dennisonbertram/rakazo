@@ -32359,18 +32359,24 @@
                         "botIds": {
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "minLength": 1
+                            "$ref": "#/components/schemas/RpcConnectionsAccessOutputSchema0"
                           }
                         },
                         "agentShared": {
                           "type": "boolean"
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcConnectionsAccessOutputSchema0"
+                          }
                         }
                       },
                       "required": [
                         "allAgents",
                         "botIds",
-                        "agentShared"
+                        "agentShared",
+                        "writeBotIds"
                       ],
                       "additionalProperties": false
                     }
@@ -32526,12 +32532,19 @@
                           },
                           "agentShared": {
                             "type": "boolean"
+                          },
+                          "writeBotIds": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/RpcConnectionsAccessAllOutputSchema0"
+                            }
                           }
                         },
                         "required": [
                           "allAgents",
                           "botIds",
-                          "agentShared"
+                          "agentShared",
+                          "writeBotIds"
                         ],
                         "additionalProperties": false
                       }
@@ -34419,18 +34432,24 @@
                         "botIds": {
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "minLength": 1
+                            "$ref": "#/components/schemas/RpcConnectionsSetAccessOutputSchema0"
                           }
                         },
                         "agentShared": {
                           "type": "boolean"
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcConnectionsSetAccessOutputSchema0"
+                          }
                         }
                       },
                       "required": [
                         "allAgents",
                         "botIds",
-                        "agentShared"
+                        "agentShared",
+                        "writeBotIds"
                       ],
                       "additionalProperties": false
                     }
@@ -34559,6 +34578,9 @@
                       },
                       "on": {
                         "type": "boolean"
+                      },
+                      "canWrite": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -34596,18 +34618,24 @@
                         "botIds": {
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "minLength": 1
+                            "$ref": "#/components/schemas/RpcConnectionsSetAgentAccessOutputSchema0"
                           }
                         },
                         "agentShared": {
                           "type": "boolean"
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcConnectionsSetAgentAccessOutputSchema0"
+                          }
                         }
                       },
                       "required": [
                         "allAgents",
                         "botIds",
-                        "agentShared"
+                        "agentShared",
+                        "writeBotIds"
                       ],
                       "additionalProperties": false
                     }
@@ -137516,6 +137544,10 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcConnectionsAccessOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
       "RpcConnectionsAccessAllOutputSchema0": {
         "type": "string",
         "minLength": 1
@@ -137548,7 +137580,15 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcConnectionsSetAccessOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
       "RpcConnectionsSetAccessInputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcConnectionsSetAgentAccessOutputSchema0": {
         "type": "string",
         "minLength": 1
       },

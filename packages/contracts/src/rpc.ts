@@ -488,6 +488,8 @@ const ConnectionAccessSchema = z.object({
   botIds: z.array(Id),
   /** The "Let other agents use it" switch of an agent-linked connection; stays on while no other agent has access. */
   agentShared: z.boolean(),
+  /** Granted agents that may also make changes (each still asks the owner), while the connection's changes switch is on. */
+  writeBotIds: z.array(Id),
 });
 /** Who can really use each connection, computed by the server with the executor's rules. */
 const EffectiveAccessSchema = z.record(
@@ -1385,7 +1387,15 @@ export const appContract = {
      * grant under a row lock, so two clients cannot overwrite each other. The connection's own agent stays on.
      */
     setAgentAccess: oc
-      .input(z.object({ connectionId: Id, botId: Id, on: z.boolean() }))
+      .input(
+        z.object({
+          connectionId: Id,
+          botId: Id,
+          on: z.boolean(),
+          /** "Allow changes" for this agent. Left out, an agent already on keeps its setting and a new one starts read-only. */
+          canWrite: z.boolean().optional(),
+        }),
+      )
       .output(ConnectionAccessSchema),
     createAgent: oc.input(z.object({ connectionId: Id })).output(z.object({ botId: Id })),
     setWrites: oc

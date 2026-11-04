@@ -171,3 +171,73 @@ it("keeps the Inbox agent and Email chats at the top whatever the search says", 
   view.search("");
   expect(view.order().slice(0, 3)).toEqual(["Inbox agent", "Email chats", "Ada"]);
 });
+
+function mountWrites(props: {
+  start: string[];
+  writing?: string[];
+  enabled?: boolean;
+  bots?: Bot[];
+}) {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const calls: [string, boolean][] = [];
+  const bots = props.bots ?? [bot("owner", "Owner"), bot("ada", "Ada"), bot("bea", "Bea")];
+  act(() =>
+    createRoot(container).render(
+      <AgentToggleList
+        bots={bots}
+        appName="Mercury"
+        ownerBotId="owner"
+        isOn={(id) => props.start.includes(id)}
+        onToggle={() => undefined}
+        writes={{
+          enabled: props.enabled ?? true,
+          isWriting: (id) => (props.writing ?? []).includes(id),
+          onToggle: (id, next) => calls.push([id, next]),
+        }}
+      />,
+    ),
+  );
+  const sw = (label: string) =>
+    container.querySelector<HTMLElement>(`[aria-label="${label}"]`) as HTMLElement;
+  return { container, calls, sw };
+}
+
+const isDisabled = (el: HTMLElement) =>
+  el.hasAttribute("data-disabled") || el.getAttribute("aria-disabled") === "true";
+
+it("shows Allow changes only under agents that are on, off by default", () => {
+  const view = mountWrites({ start: ["owner", "ada"] });
+  expect(view.sw("Ada can make changes in Mercury").getAttribute("aria-checked")).toBe("false");
+  expect(view.sw("Bea can make changes in Mercury")).toBeNull();
+  expect(view.container.textContent).toContain("The agent asks you before each change.");
+});
+
+it("flipping Allow changes calls onToggle for that agent only", () => {
+  const view = mountWrites({ start: ["owner", "ada"] });
+  act(() => view.sw("Ada can make changes in Mercury").click());
+  expect(view.calls).toEqual([["ada", true]]);
+});
+
+it("the connection's own changes switch gates every nested switch", () => {
+  const view = mountWrites({ start: ["owner", "ada"], writing: ["ada"], enabled: false });
+  expect(isDisabled(view.sw("Ada can make changes in Mercury"))).toBe(true);
+});
+
+it("the owning agent shows the connection's switch and cannot be edited here", () => {
+  const view = mountWrites({ start: ["owner"], enabled: true });
+  const owner = view.sw("Owner can make changes in Mercury");
+  expect(owner.getAttribute("aria-checked")).toBe("true");
+  expect(isDisabled(owner)).toBe(true);
+});
+
+it("Email chats get no nested switch", () => {
+  const chat = bot("chat", "Re: hi", mailThreadAgentSpawnKey("c", "t"));
+  const view = mountWrites({
+    start: ["owner", "chat"],
+    bots: [bot("owner", "Inbox agent", inboxAgentSpawnKey("u1")), chat],
+  });
+  expect(
+    view.container.querySelectorAll('[aria-label$="can make changes in Mercury"]'),
+  ).toHaveLength(1);
+});
