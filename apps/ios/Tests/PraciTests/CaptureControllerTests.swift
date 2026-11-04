@@ -125,6 +125,15 @@ struct CaptureControllerTests {
   }
 
   @Test
+  func savedMeetingBarShowsUntilDismissed() {
+    let harness = Harness()
+    harness.controller.showSaved("meeting-1")
+    #expect(harness.controller.savedMeetingID == "meeting-1")
+    harness.controller.dismissSaved()
+    #expect(harness.controller.savedMeetingID == nil)
+  }
+
+  @Test
   func stopUploadsFinishesWithLostChunksAndOpensTheMeeting() async throws {
     let harness = Harness()
     var opened: [String?] = []

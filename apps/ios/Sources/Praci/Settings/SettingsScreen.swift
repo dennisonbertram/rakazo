@@ -6,6 +6,7 @@ struct SettingsScreen: View {
   @Environment(AppModel.self) private var app
   @AppStorage(AppearanceChoice.storageKey) private var appearance = AppearanceChoice.system
   @State private var model = SettingsModel()
+  @State private var showingServer = false
 
   var body: some View {
     LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { profile in
@@ -33,13 +34,8 @@ struct SettingsScreen: View {
         }
         .accessibilityIdentifier("archived")
       }
-      Section {
-        Button("Sign out", role: .destructive) {
-          Task { await app.authentication.signOut() }
-        }
-        .accessibilityIdentifier("signOut")
-      }
     }
+    .sheet(isPresented: $showingServer) { ServerView(model: app.authentication) }
   }
 
   @ViewBuilder
@@ -57,6 +53,15 @@ struct SettingsScreen: View {
         }
       }
       .accessibilityIdentifier("account")
+      Button { showingServer = true } label: {
+        HStack {
+          LabeledContent("Server", value: app.authentication.endpoint.serverName)
+          Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
+            .foregroundStyle(Color.token(.mutedForeground)).accessibilityHidden(true)
+        }
+      }
+      .foregroundStyle(Color.primary)
+      .accessibilityIdentifier("server")
     }
     Section {
       NavigationLink { ModelsScreen() } label: { Label("Models", systemImage: "cpu") }

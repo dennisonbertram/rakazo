@@ -25,6 +25,8 @@ final class InboxModel {
   enum Undo: Equatable {
     case unarchive(messageID: String)
     case batch(id: String)
+    /// A plain confirmation with no Undo.
+    case note(String)
   }
 
   struct Toast: Equatable, Identifiable {
@@ -128,11 +130,26 @@ final class InboxModel {
       switch toast.undo {
       case .unarchive(let id): try await client.unarchive(id)
       case .batch(let id): _ = try await client.undoBatch(id)
+      case .note: return
       }
       await reload()
     } catch {
       actionError = message(for: error)
     }
+  }
+
+  /// The message screen archived this message: take it off the list and offer Undo here.
+  func archivedElsewhere(_ id: String) {
+    update { $0.rows.removeAll { $0.id == id } }
+    toast = Toast(undo: .unarchive(messageID: id))
+  }
+
+  func show(_ text: String) { toast = Toast(undo: .note(text)) }
+
+  /// Coming back to the list: pick up what changed on the message screen.
+  func refreshOnReturn() async {
+    guard case .loaded = state else { return }
+    await reload()
   }
 
   func dismissToast(_ id: UUID) {

@@ -38,6 +38,13 @@ struct ConsentSheet: View {
   }
 
   var body: some View {
+    ScrollView { form }
+      .scrollBounceBehavior(.basedOnSize)
+      .presentationDetents([.medium, .large])
+      .task { await loadIfNeeded() }
+  }
+
+  private var form: some View {
     VStack(spacing: 16) {
       if let target {
         Text(Self.title(for: target.recipient)).font(.title3.bold()).multilineTextAlignment(.center)
@@ -69,9 +76,7 @@ struct ConsentSheet: View {
       }
     }
     .padding(24)
-    .frame(maxHeight: .infinity, alignment: .top)
-    .presentationDetents([.medium])
-    .task { await loadIfNeeded() }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 
   static func title(for recipient: AIRecipient) -> String {

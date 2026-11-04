@@ -28,17 +28,37 @@ final class DataRoomModel {
   var results: [DataRoomSearchHit]?
   var resultsCursor: String?
   var uploads: [Upload] = []
+  /// The consent sheet, shown on demand.
   var consent: DataRoomConsent?
+  /// Set while the space has not allowed AI to read files; reading waits for it.
+  var consentNeeded: DataRoomConsent?
   var notice: String?
   var errorMessage: String?
-  private static var consentAsked = false
+  @ObservationIgnored private var consentAsked = false
   @ObservationIgnored private var uploadTasks: [UUID: Task<Void, Never>] = [:]
 
   init(folder: DataRoomFolder?) { self.folder = folder }
 
   var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
-  func load(_ app: AppModel) async {
+  var hasProcessing: Bool { items.contains { $0.isProcessing } }
+
+  /// Re-reads each file that is still being read every few seconds, in place, so loaded pages and
+  /// the scroll position stay as they are. Errors stay quiet.
+  func pollWhileReading(_ app: AppModel) async {
+    while hasProcessing, !Task.isCancelled {
+      try? await Task.sleep(for: .seconds(4))
+      if Task.isCancelled { return }
+      for id in items.filter(\.isProcessing).prefix(20).map(\.id) {
+        guard let fresh: DataRoomItem = try? await app.call("dataRoom/item", input: DataRoomIDInput(id: id)),
+          let index = items.firstIndex(where: { $0.id == id })
+        else { continue }
+        items[index] = fresh
+      }
+    }
+  }
+
+  func load(_ app: AppModel, quiet: Bool = false) async {
     if case .loaded = state {} else { state = .loading }
     do {
       let folders: [DataRoomFolder] = try await app.call("dataRoom/folders")
@@ -51,7 +71,7 @@ final class DataRoomModel {
       nextCursor = page.nextCursor
       state = .loaded(())
     } catch {
-      if case .loaded = state { errorMessage = settingsErrorText(error) } else {
+      if case .loaded = state { if !quiet { errorMessage = settingsErrorText(error) } } else {
         state = .failed(settingsErrorText(error))
       }
     }
@@ -153,11 +173,13 @@ final class DataRoomModel {
 
   // MARK: Consent
 
-  /// The server asks for AI consent before it reads files. Ask once per screen, when it is missing.
+  /// The server reads files only after AI consent. Check on every load, open the sheet once per
+  /// screen when a file is waiting, and keep a banner for later.
   private func askConsentOnce(_ app: AppModel) async {
-    guard !Self.consentAsked else { return }
-    Self.consentAsked = true
-    if let status: DataRoomConsent = try? await app.call("dataRoom/consent"), !status.allowed {
+    guard let status: DataRoomConsent = try? await app.call("dataRoom/consent") else { return }
+    consentNeeded = status.allowed ? nil : status
+    if !status.allowed, hasProcessing, !consentAsked {
+      consentAsked = true
       consent = status
     }
   }
@@ -170,6 +192,8 @@ final class DataRoomModel {
         input: DataRoomConsentGrantInput(
           key: pending.key, version: pending.version, spaceId: pending.spaceId))
       consent = nil
+      consentNeeded = nil
+      await load(app, quiet: true)
     } catch {
       errorMessage = settingsErrorText(error)
     }

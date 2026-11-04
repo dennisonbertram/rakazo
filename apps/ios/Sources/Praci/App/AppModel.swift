@@ -8,6 +8,12 @@ final class AppModel {
   let authentication: AuthenticationModel
   var path: [Route] = []
   var showingSettings = false
+  /// A message archived from a screen with no Inbox list behind it; the shell offers Undo.
+  var archivedMessageID: String?
+  /// The Settings screen to open first, or nil for the top level.
+  private(set) var settingsDestination: SettingsDestination?
+  /// Counts Settings closings. Pages that Settings can change reload with `.task(id:)` on it.
+  private(set) var settingsClosings = 0
   /// Asks for AI data consent. Before any request that sends data to an AI provider (sending a
   /// thread message, running a cleanup, and so on), call
   /// `try await app.consent.ensure(procedure: "<rpc name>", app: app)`; it returns at once when
@@ -109,6 +115,16 @@ final class AppModel {
     }
   }
 
+  func openSettings(_ destination: SettingsDestination? = nil) {
+    settingsDestination = destination
+    showingSettings = true
+  }
+
+  func settingsDidClose() {
+    settingsClosings += 1
+    settingsDestination = nil
+  }
+
   func open(_ url: URL) {
     if let route = Route(url: url) { open(route) }
   }
@@ -122,6 +138,7 @@ final class AppModel {
   func reset() {
     path = []
     showingSettings = false
+    archivedMessageID = nil
     spaceID = nil
     forgetUser()
   }

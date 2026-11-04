@@ -40,6 +40,8 @@ final class ThreadModel {
   var botColor: String?
   var anchor: UnreadAnchor?
   var loadingOlder = false
+  /// Set when loading an earlier page fails; the thread shows a retry row instead of the spinner.
+  var olderError: String?
   var archiveError: String?
   /// "Mark unread" must not be undone by the very next scroll to the bottom.
   private var readHeld = false
@@ -169,9 +171,15 @@ final class ThreadModel {
     defer { loadingOlder = false }
     var input = ThreadInput(target)
     input.before = before
-    guard let page: ThreadMessagePage = try? await app.call("threads/messages", input: input),
-      var current = snapshot
-    else { return }
+    let page: ThreadMessagePage
+    do {
+      page = try await app.call("threads/messages", input: input)
+    } catch {
+      olderError = error.localizedDescription
+      return
+    }
+    olderError = nil
+    guard var current = snapshot else { return }
     let known = Set(current.messages.map(\.id))
     current.messages = page.messages.filter { !known.contains($0.id) } + current.messages
     current.olderCursor = page.olderCursor

@@ -20,13 +20,13 @@ struct CapTableScreen: View {
               }
             }
           }
-          Section("Holders") {
-            ForEach(snapshot.holders.sortedByOwnership()) { holder in
-              NavigationLink {
-                HolderDetailView(holder: holder, hide: model.hideAmounts)
-              } label: {
-                HolderRow(holder: holder, hide: model.hideAmounts)
-              }
+          CappedSection(
+            title: "Holders", items: snapshot.holders, spec: holdersSpec(snapshot.holders)
+          ) { holder in
+            NavigationLink {
+              HolderDetailView(holder: holder, hide: model.hideAmounts)
+            } label: {
+              HolderRow(holder: holder, hide: model.hideAmounts)
             }
           }
         }
@@ -35,8 +35,7 @@ struct CapTableScreen: View {
         ContentUnavailableView {
           Label("See who owns your company", systemImage: "chart.pie")
         } actions: {
-          Button("Connect Carta") { app.showingSettings = true }
-            .buttonStyle(.borderedProminent)
+          PrimaryActionButton("Connect Carta") { app.openSettings(.integrations) }
             .accessibilityIdentifier("connectCarta")
         }
       }
@@ -53,7 +52,7 @@ struct CapTableScreen: View {
         }
       }
     }
-    .task { await model.load(app) }
+    .task(id: app.settingsClosings) { await model.load(app) }
   }
 
   @ViewBuilder
