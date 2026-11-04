@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 332 of 332
-- Web and shared components: 849
+- Web and shared component files with stories: 335 of 335
+- Web and shared components: 854
 - Mobile components: 151 in 101 files, mobile — native story pending
 - SwiftUI views: 130 in 71 files, native story pending
 
@@ -83,6 +83,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BotAppControlSection | [apps/web/src/components/BotAppControlSection.tsx](../../apps/web/src/components/BotAppControlSection.tsx) | [BotAppControlSection.stories.tsx](../../apps/web/src/components/BotAppControlSection.stories.tsx) | web |
 | BotAudienceTag | [apps/web/src/components/BotAudienceTag.tsx](../../apps/web/src/components/BotAudienceTag.tsx) | [BotAudienceTag.stories.tsx](../../apps/web/src/components/BotAudienceTag.stories.tsx) | web |
 | BotTodos | [apps/web/src/components/BotTodos.tsx](../../apps/web/src/components/BotTodos.tsx) | [BotTodos.stories.tsx](../../apps/web/src/components/BotTodos.stories.tsx) | web |
+| SeeAll | [apps/web/src/components/CappedList.tsx](../../apps/web/src/components/CappedList.tsx) | [CappedList.stories.tsx](../../apps/web/src/components/CappedList.stories.tsx) | web |
 | CloudAgentCard | [apps/web/src/components/CloudAgentCard.tsx](../../apps/web/src/components/CloudAgentCard.tsx) | [CloudAgentCard.stories.tsx](../../apps/web/src/components/CloudAgentCard.stories.tsx) | web |
 | Row, RecipientSummary, ComposeEmail | [apps/web/src/components/ComposeEmail.tsx](../../apps/web/src/components/ComposeEmail.tsx) | [ComposeEmail.stories.tsx](../../apps/web/src/components/ComposeEmail.stories.tsx), [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
 | ComputerMaintenanceActions | [apps/web/src/components/ComputerMaintenanceActions.tsx](../../apps/web/src/components/ComputerMaintenanceActions.tsx) | [ComputerMaintenanceActions.stories.tsx](../../apps/web/src/components/ComputerMaintenanceActions.stories.tsx) | web |
@@ -216,6 +217,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | StatementReminderBanner | [apps/web/src/components/finance/StatementReminderBanner.tsx](../../apps/web/src/components/finance/StatementReminderBanner.tsx) | [StatementReminderBanner.stories.tsx](../../apps/web/src/components/finance/StatementReminderBanner.stories.tsx) | web |
 | CheckLine, Row, StatementGroup | [apps/web/src/components/finance/StatementReviewCard.tsx](../../apps/web/src/components/finance/StatementReviewCard.tsx) | [StatementReviewCard.stories.tsx](../../apps/web/src/components/finance/StatementReviewCard.stories.tsx) | web |
 | SpaceName, AskAgentButton, WithEndings, HereLink, DetailHead, CompanyMenu, NotFoundNotice, ErrorNotice, DetailPage, Section, Kpi, BreakdownRows, Chevron, TransactionRow, VendorGroupRows, TransactionTable, TransactionsSection, Chip, PeriodTabs, Legend, BurnLegend, Kv, KvRow, ValueLink | [apps/web/src/components/finance/ui.tsx](../../apps/web/src/components/finance/ui.tsx) | [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx), [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx), [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx), [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx), [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |
+| UpcomingRow, SubscriptionsTable | [apps/web/src/components/finance/UpcomingSubscriptions.tsx](../../apps/web/src/components/finance/UpcomingSubscriptions.tsx) | [UpcomingSubscriptions.stories.tsx](../../apps/web/src/components/finance/UpcomingSubscriptions.stories.tsx) | web |
 | WalletDialog | [apps/web/src/components/finance/WalletDialog.tsx](../../apps/web/src/components/finance/WalletDialog.tsx) | [WalletDialog.stories.tsx](../../apps/web/src/components/finance/WalletDialog.stories.tsx) | web |
 
 ## Web components/fundraising
@@ -224,7 +226,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | --- | --- | --- | --- |
 | OneFieldDialog, InvestorEmailDialog, AssignSafeDialog | [apps/web/src/components/fundraising/MercuryDialogs.tsx](../../apps/web/src/components/fundraising/MercuryDialogs.tsx) | [MercuryDialogs.stories.tsx](../../apps/web/src/components/fundraising/MercuryDialogs.stories.tsx) | web |
 | MercuryLine | [apps/web/src/components/fundraising/MercuryLine.tsx](../../apps/web/src/components/fundraising/MercuryLine.tsx) | [MercuryLine.stories.tsx](../../apps/web/src/components/fundraising/MercuryLine.stories.tsx) | web |
-| ProspectRow, Pipeline | [apps/web/src/components/fundraising/Pipeline.tsx](../../apps/web/src/components/fundraising/Pipeline.tsx) | [Pipeline.stories.tsx](../../apps/web/src/components/fundraising/Pipeline.stories.tsx) | web |
+| ProspectRow, Pipeline, StageRows | [apps/web/src/components/fundraising/Pipeline.tsx](../../apps/web/src/components/fundraising/Pipeline.tsx) | [Pipeline.stories.tsx](../../apps/web/src/components/fundraising/Pipeline.stories.tsx) | web |
 | RoundDialog, Segment, Figure, RoundCard | [apps/web/src/components/fundraising/RoundCard.tsx](../../apps/web/src/components/fundraising/RoundCard.tsx) | [RoundCard.stories.tsx](../../apps/web/src/components/fundraising/RoundCard.stories.tsx) | web |
 | SafeDialog, SafeCoverSummary | [apps/web/src/components/fundraising/SafeDialog.tsx](../../apps/web/src/components/fundraising/SafeDialog.tsx) | [SafeDialog.stories.tsx](../../apps/web/src/components/fundraising/SafeDialog.stories.tsx) | web |
 | MarkDateDialog, AttentionStrip, SafeRow, SafeList | [apps/web/src/components/fundraising/SafeList.tsx](../../apps/web/src/components/fundraising/SafeList.tsx) | [SafeList.stories.tsx](../../apps/web/src/components/fundraising/SafeList.stories.tsx) | web |
@@ -361,7 +363,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
 | BotPageView | [apps/web/src/pages/BotPageView.tsx](../../apps/web/src/pages/BotPageView.tsx) | [BotPageView.stories.tsx](../../apps/web/src/pages/BotPageView.stories.tsx) | web |
 | CalendarPage | [apps/web/src/pages/Calendar.tsx](../../apps/web/src/pages/Calendar.tsx) | [Calendar.stories.tsx](../../apps/web/src/pages/Calendar.stories.tsx) | web |
-| CompanyPage | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
+| CompanyPage, EventList | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
 | CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |
 | CompanyFactDetail | [apps/web/src/pages/CompanyFactDetail.tsx](../../apps/web/src/pages/CompanyFactDetail.tsx) | [CompanyFactDetail.stories.tsx](../../apps/web/src/pages/CompanyFactDetail.stories.tsx) | web |
 | CompanyHistory | [apps/web/src/pages/CompanyHistory.tsx](../../apps/web/src/pages/CompanyHistory.tsx) | [CompanyHistory.stories.tsx](../../apps/web/src/pages/CompanyHistory.stories.tsx) | web |
@@ -377,10 +379,11 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | DevinPage, Devin, DevinSkeleton | [apps/web/src/pages/Devin.tsx](../../apps/web/src/pages/Devin.tsx) | [Devin.stories.tsx](../../apps/web/src/pages/Devin.stories.tsx) | web |
 | Badge, Title, Question, PullRequests, DevinSessions | [apps/web/src/pages/devin/DevinSessions.tsx](../../apps/web/src/pages/devin/DevinSessions.tsx) | [DevinSessions.stories.tsx](../../apps/web/src/pages/devin/DevinSessions.stories.tsx) | web |
 | ExternalConversationSettings | [apps/web/src/pages/ExternalConversationSettings.tsx](../../apps/web/src/pages/ExternalConversationSettings.tsx) | [ExternalConversationSettings.stories.tsx](../../apps/web/src/pages/ExternalConversationSettings.stories.tsx) | web |
-| FinancePage, Dashboard, EmptyState, DashboardSkeleton, Overview, ShowAll, HoverRow, UpcomingRow, SubscriptionsTable | [apps/web/src/pages/Finance.tsx](../../apps/web/src/pages/Finance.tsx) | [Finance.stories.tsx](../../apps/web/src/pages/Finance.stories.tsx) | web |
+| FinancePage, Dashboard, EmptyState, DashboardSkeleton, Overview, HoverRow | [apps/web/src/pages/Finance.tsx](../../apps/web/src/pages/Finance.tsx) | [Finance.stories.tsx](../../apps/web/src/pages/Finance.stories.tsx) | web |
 | AccountTable, CryptoGroup, FinanceAccountsPage, FinanceAccountPage | [apps/web/src/pages/finance/FinanceAccounts.tsx](../../apps/web/src/pages/finance/FinanceAccounts.tsx) | [FinanceAccounts.stories.tsx](../../apps/web/src/pages/finance/FinanceAccounts.stories.tsx) | web |
 | FinanceBurnPage, FinanceMonthPage, Counted, FinanceRunwayPage | [apps/web/src/pages/finance/FinanceBurn.tsx](../../apps/web/src/pages/finance/FinanceBurn.tsx) | [FinanceBurn.stories.tsx](../../apps/web/src/pages/finance/FinanceBurn.stories.tsx) | web |
 | RemoveDialog, WalletRows, UnpricedRows, FinanceCryptoPage | [apps/web/src/pages/finance/FinanceCrypto.tsx](../../apps/web/src/pages/finance/FinanceCrypto.tsx) | [FinanceCrypto.stories.tsx](../../apps/web/src/pages/finance/FinanceCrypto.stories.tsx) | web |
+| NoMatches, FinanceUpcomingPage, FinanceSubscriptionsPage | [apps/web/src/pages/finance/FinanceLists.tsx](../../apps/web/src/pages/finance/FinanceLists.tsx) | [FinanceLists.stories.tsx](../../apps/web/src/pages/finance/FinanceLists.stories.tsx) | web |
 | FinanceNotFound | [apps/web/src/pages/finance/FinanceNotFound.tsx](../../apps/web/src/pages/finance/FinanceNotFound.tsx) | [FinanceNotFound.stories.tsx](../../apps/web/src/pages/finance/FinanceNotFound.stories.tsx) | web |
 | FinanceSpendPage, FinanceCategoryPage, FinanceRecurringPage, FinanceVendorPage | [apps/web/src/pages/finance/FinanceSpend.tsx](../../apps/web/src/pages/finance/FinanceSpend.tsx) | [FinanceSpend.stories.tsx](../../apps/web/src/pages/finance/FinanceSpend.stories.tsx) | web |
 | ReceiptIcon, ReceiptThumb, CheckReceipt, FinanceTransactionPage, FinanceReceiptPage | [apps/web/src/pages/finance/FinanceTransaction.tsx](../../apps/web/src/pages/finance/FinanceTransaction.tsx) | [FinanceTransaction.stories.tsx](../../apps/web/src/pages/finance/FinanceTransaction.stories.tsx) | web |
