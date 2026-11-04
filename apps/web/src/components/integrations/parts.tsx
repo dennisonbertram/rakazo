@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
-import { isMailThreadAgentSpawnKey } from "@rakazo/contracts";
+import { isInboxAgentSpawnKey, isMailThreadAgentSpawnKey } from "@rakazo/contracts";
 import {
   Badge,
   BotAvatar,
@@ -106,12 +106,24 @@ export function AgentToggleList({
   appName,
   disabled,
   onToggle,
+  onSetAll,
+  ownerBotId,
+  saving = false,
+  everyone = false,
 }: {
   bots: Bot[];
   isOn: (botId: string) => boolean;
   appName: string;
   disabled?: boolean;
   onToggle: (botId: string, next: boolean) => void;
+  /** Shows All / None above the list; one call sets every agent. */
+  onSetAll?: (on: boolean) => void;
+  /** The connection's own agent: None leaves it on. */
+  ownerBotId?: string | null;
+  /** A save is in flight: All and None wait for it. */
+  saving?: boolean;
+  /** Access is stored as "all agents" (including future ones): All is already done; None still has work. */
+  everyone?: boolean;
 }) {
   const { t } = useLingui();
   // Each email's own chat is one agent; they share a single row, as in the sidebar.
@@ -120,8 +132,34 @@ export function AgentToggleList({
   // Mixed access reads as on (some chats still have it), so one click revokes all and never grants first.
   const someEmailOn = emailChats.some((bot) => isOn(bot.id));
   const allEmailOn = emailChats.every((bot) => isOn(bot.id));
+  const owner = bots.find((bot) => bot.id === ownerBotId);
+  // An email's chat has exactly the Inbox agent's access, so it stays on with the Inbox agent.
+  const locked = (bot: Bot) =>
+    bot.id === ownerBotId ||
+    (isMailThreadAgentSpawnKey(bot.spawnKey) && isInboxAgentSpawnKey(owner?.spawnKey));
+  const noneOn = bots.every((bot) => locked(bot) || !isOn(bot.id));
   return (
     <div className="divide-y divide-border rounded-xl border border-border bg-card">
+      {onSetAll && bots.length > 1 ? (
+        <div className="flex justify-end gap-1 px-2 py-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={disabled || saving || everyone}
+            onClick={() => onSetAll(true)}
+          >
+            <Trans>All</Trans>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={disabled || saving || (noneOn && !everyone)}
+            onClick={() => onSetAll(false)}
+          >
+            <Trans>None</Trans>
+          </Button>
+        </div>
+      ) : null}
       {rows.map((bot) => (
         <div key={bot.id} className="flex items-center gap-3 px-3.5 py-2.5">
           <BotAvatar color={bot.color} identity={bot.id} size={22} />
