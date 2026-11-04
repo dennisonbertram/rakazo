@@ -8,6 +8,8 @@ struct ThreadScreen: View {
   @State private var model: ThreadModel
   @State private var attempt = 0
   @State private var atBottom = true
+  /// True while a finger is on the thread or it is still coasting from a drag.
+  @State private var userScrolling = false
   @State private var scrolledToDivider = false
   /// The latest measured position; read after a programmatic scroll that may not change the geometry.
   @State private var edgeNearBottom = true
@@ -88,6 +90,10 @@ struct ThreadScreen: View {
         .padding(.vertical, 8)
       }
       .defaultScrollAnchor(.bottom)
+      .scrollDismissesKeyboard(.interactively)
+      .onScrollPhaseChange { _, phase in
+        userScrolling = phase == .tracking || phase == .interacting || phase == .decelerating
+      }
       .accessibilityIdentifier("threadList")
       .onScrollGeometryChange(for: ScrollEdge.self) { geometry in
         ScrollEdge(
@@ -95,9 +101,11 @@ struct ThreadScreen: View {
           height: geometry.contentSize.height)
       } action: { old, new in
         edgeNearBottom = new.nearBottom
-        if new.height != old.height && atBottom && old.nearBottom {
-          // New content makes the bottom move away; keep following only while the reader had not
-          // dragged up. Without the old.nearBottom check a streaming reply pulled every drag back down.
+        if BottomFollow.shouldFollow(
+          heightChanged: new.height != old.height, atBottom: atBottom, userScrolling: userScrolling)
+        {
+          // New content makes the bottom move away; keep following unless the reader is dragging.
+          // Otherwise a streaming reply pulls every drag back down.
           proxy.scrollTo(Self.bottomID, anchor: .bottom)
         } else {
           atBottom = new.nearBottom
@@ -237,6 +245,13 @@ struct ThreadScreen: View {
 
 extension ThreadTarget {
   fileprivate var isGroup: Bool { if case .group = self { true } else { false } }
+}
+
+enum BottomFollow {
+  /// Follow new content to the bottom only when the reader is at the bottom and not dragging.
+  static func shouldFollow(heightChanged: Bool, atBottom: Bool, userScrolling: Bool) -> Bool {
+    heightChanged && atBottom && !userScrolling
+  }
 }
 
 private struct ScrollEdge: Equatable {
