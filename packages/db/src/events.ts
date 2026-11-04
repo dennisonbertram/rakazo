@@ -221,6 +221,8 @@ export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send", "mail_rep
 export const mailApprovalComposeClientId = (effectId: string) => `approval_${effectId}`;
 
 /** The compose record of one batch reply: one per row, so only one worker can move it to pending. */
+/** A row held because its thread was cleared before a worker took it. */
+export const MAIL_REPLY_CLEARED_HOLD = "thread_cleared";
 export const MAIL_REPLY_CLIENT_PREFIX = "agent:batch_";
 export const mailReplyClientId = (itemId: string) => `${MAIL_REPLY_CLIENT_PREFIX}${itemId}`;
 
@@ -335,6 +337,15 @@ export async function clearThread(
     const now = new Date();
     const runIds = activeRuns.map((run) => run.id);
     await cancelRunsInTransaction(tx, activeRuns, now);
+    // Clearing is a strong signal, and the card with its Retry is gone: replies not yet claimed stop.
+    await tx.mailReplyItem.updateMany({
+      where: {
+        spaceId: input.spaceId,
+        dispatch: "queued",
+        effect: { run: { threadId: input.threadId } },
+      },
+      data: { dispatch: "held", error: MAIL_REPLY_CLEARED_HOLD },
+    });
     // Expire as tombstones so a still-open provider screen claim cannot reset fencing to 1.
     await expireComputerExecutionLeases(tx, { runId: { in: runIds } });
     await tx.computer.updateMany({

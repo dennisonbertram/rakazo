@@ -8,7 +8,14 @@ import {
   parseRecipients,
   startsUnticked,
 } from "@rakazo/adapters";
-import type { Actor, MailBatch, MailBatchPressRow } from "@rakazo/contracts";
+import type {
+  Actor,
+  MailBatch,
+  MailBatchComposerDraft,
+  MailBatchPressRow,
+  MailBatchPreview,
+  MailReplyFlag,
+} from "@rakazo/contracts";
 import {
   disabledBuiltinToolSet,
   MAIL_REPLY_BATCH_TOOL,
@@ -20,6 +27,7 @@ import {
   MAIL_REPLY_HASH_HOLD,
   mailReplyClientId,
   mailReplyState,
+  moveMailReplyRowToComposer,
   retryMailReplyBatch,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -32,7 +40,7 @@ export type MailBatchDeps = {
   prisma: PrismaClient;
   mail: Pick<MailProvider, "listAccounts">;
   jobs: JobPublisher;
-  events: Pick<ThreadEvents, "acceptMailReplyBatch">;
+  events: Pick<ThreadEvents, "acceptMailReplyBatch" | "setMailBatchCounts">;
   mailWritesDisabled?: boolean;
 };
 
@@ -137,6 +145,77 @@ export async function readMailBatch(
   };
 }
 
+/**
+ * The flags a row would have with these edits, so an edit that adds a recipient flags and unticks
+ * the row at once. Reads only: nothing is stored, and the press checks the text again.
+ */
+export async function previewMailBatch(
+  deps: Pick<MailBatchDeps, "prisma">,
+  actor: Actor,
+  target: Target,
+  input: CardInput & { rows: { itemId: string; edits?: MailBatchPressRow["edits"] }[] },
+): Promise<MailBatchPreview> {
+  const { effect } = await findCard(deps.prisma, actor, target, input);
+  const stored = await storedRows(deps.prisma, actor, effect.id);
+  const merged = input.rows.map((posted) => {
+    const row = stored.find((candidate) => candidate.id === posted.itemId);
+    if (!row) throw new ORPCError("CONFLICT", { message: CHANGED });
+    const checked = normalizeMailEdits(posted.edits ?? {});
+    if (!checked.ok) return { row, invalid: true };
+    return { row: { ...row, ...checked.edits }, invalid: false };
+  });
+  const flags = await mailReplyFlags(
+    deps.prisma,
+    { spaceId: actor.spaceId, userId: actor.userId },
+    merged.map(({ row }) => row),
+  );
+  return {
+    rows: merged.map(({ row, invalid }, index) => {
+      // An entry that does not parse cannot be checked, so it counts as off the thread.
+      const rowFlags: MailReplyFlag[] = invalid ? ["not_on_thread"] : (flags[index]?.flags ?? []);
+      return { itemId: row.id, flags: rowFlags, startsUnticked: startsUnticked(rowFlags) };
+    }),
+  };
+}
+
+/**
+ * Open in composer: the owner takes a row that did not go out and sends it themselves. The row moves
+ * to `composer` first, so a later Retry cannot also send it. Only after settlement, and never for a
+ * row whose stored text no longer matches what was approved.
+ */
+export async function mailBatchRowToComposer(
+  deps: Pick<MailBatchDeps, "prisma" | "mail">,
+  actor: Actor,
+  target: Target,
+  input: CardInput & { itemId: string },
+): Promise<MailBatchComposerDraft> {
+  const { effect } = await findCard(deps.prisma, actor, target, input);
+  const scope = { spaceId: actor.spaceId, userId: actor.userId };
+  const row = await moveMailReplyRowToComposer(deps.prisma, {
+    ...scope,
+    effectId: effect.id,
+    itemId: input.itemId,
+  });
+  if (!row) throw new ORPCError("CONFLICT", { message: CHANGED });
+  const [accounts, original] = await Promise.all([
+    deps.mail.listAccounts(scope, mailContext(actor, "mail.batch.composer")),
+    deps.prisma.cachedMailMessage.findFirst({
+      where: { ...scope, connectionId: row.connectionId, providerMessageId: row.replyToId },
+      select: { id: true },
+    }),
+  ]);
+  return {
+    connectionId: row.connectionId,
+    account: accounts.find((account) => account.id === row.connectionId)?.address ?? "",
+    to: bare(row.to),
+    cc: bare(row.cc),
+    bcc: bare(row.bcc),
+    subject: row.subject,
+    body: row.body,
+    ...(original ? { replyToId: original.id } : {}),
+  };
+}
+
 const sendingOff = () =>
   new ORPCError("PRECONDITION_FAILED", { message: "Sending is turned off." });
 
@@ -211,7 +290,7 @@ export async function sendMailBatch(
  * repeats every check, so a revoked grant holds the row again. Only the run's own user may press it.
  */
 export async function retryMailBatch(
-  deps: Pick<MailBatchDeps, "prisma" | "jobs" | "mailWritesDisabled">,
+  deps: Pick<MailBatchDeps, "prisma" | "jobs" | "events" | "mailWritesDisabled">,
   actor: Actor,
   target: Target,
   input: CardInput & { rows: { itemId: string; seenMessageId: string | null }[] },
@@ -236,6 +315,10 @@ export async function retryMailBatch(
     throw new ORPCError("CONFLICT", { message: "These replies are still being sent." });
   }
   if (retried.count > 0) {
+    // The rows left the failed count; the card shows it, and shows it again if they fail again.
+    await deps.events
+      .setMailBatchCounts({ ...scope, effectId: effect.id })
+      .catch((error) => getLogger().error("mail batch retry counts", error));
     await deps.jobs
       .enqueue(mailReplyBatchJob({ effectId: effect.id, ...scope }))
       .catch((error) => getLogger().error("mail batch retry enqueue", error));

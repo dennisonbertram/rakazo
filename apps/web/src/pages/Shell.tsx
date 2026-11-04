@@ -4642,6 +4642,7 @@ export function ShellPage() {
                   html: "",
                   text: composerDraft.body,
                 },
+                ...(composerDraft.replyToId ? { replyToId: composerDraft.replyToId } : {}),
                 forwarded: [],
                 files: [],
                 saved: false,

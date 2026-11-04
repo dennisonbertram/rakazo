@@ -21,7 +21,12 @@ import {
 } from "@rakazo/core";
 import { mailReplyHash } from "@rakazo/core/node/approval-effect-key";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
-import { MAIL_REPLY_CLIENT_PREFIX, MAIL_REPLY_HASH_HOLD, mailReplyClientId } from "@rakazo/db";
+import {
+  MAIL_REPLY_CLEARED_HOLD,
+  MAIL_REPLY_CLIENT_PREFIX,
+  MAIL_REPLY_HASH_HOLD,
+  mailReplyClientId,
+} from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { z } from "zod";
 import { mailRequestIsValid } from "./approval-ask.js";
@@ -599,10 +604,18 @@ export async function reconcileMailReplyBatches(deps: {
   // own dispatch state if this table grows large enough to show up in the reconciler's timing.
   const claimed = await deps.prisma.$transaction(
     (tx) => tx.$queryRaw<
-      { id: string; effectId: string; spaceId: string; userId: string; updatedAt: Date }[]
+      {
+        id: string;
+        effectId: string;
+        spaceId: string;
+        userId: string;
+        updatedAt: Date;
+        runId: string;
+      }[]
     >`
-      SELECT r.id, r."effectId", r."spaceId", r."userId", r."updatedAt"
+      SELECT r.id, r."effectId", r."spaceId", r."userId", r."updatedAt", e."runId"
       FROM mail_reply_items r
+      JOIN external_effects e ON e.id = r."effectId"
       LEFT JOIN compose_sends c
         ON c."spaceId" = r."spaceId" AND c."userId" = r."userId"
         AND c."clientId" = ${MAIL_REPLY_CLIENT_PREFIX} || r.id
@@ -623,9 +636,15 @@ export async function reconcileMailReplyBatches(deps: {
       select: { id: true, state: true, updatedAt: true },
     });
     if (!record || record.state === "draft") {
+      // A cleared thread has no messages of the run left: this row never reached the provider, and
+      // the owner has stopped the batch, so it does not go out now.
+      const cleared =
+        (await deps.prisma.message.count({ where: { runId: row.runId, role: "bot" } })) === 0;
       await deps.prisma.mailReplyItem.updateMany({
         where: { id: row.id, dispatch: "claimed", updatedAt: row.updatedAt },
-        data: { dispatch: "queued" },
+        data: cleared
+          ? { dispatch: "held", error: MAIL_REPLY_CLEARED_HOLD }
+          : { dispatch: "queued" },
       });
     } else if (record.state === "pending" && record.updatedAt <= cutoff) {
       // It may have reached the provider, so it is never sent again.

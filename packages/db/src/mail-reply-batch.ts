@@ -238,7 +238,7 @@ export async function setMailBatchCounts(
 ): Promise<void> {
   const effect = await prisma.externalEffect.findFirst({
     where: { id: input.effectId, spaceId: input.spaceId, kind: MAIL_REPLY_BATCH_TOOL },
-    select: { runId: true, run: { select: { threadId: true, botId: true } } },
+    select: { runId: true, status: true, run: { select: { threadId: true, botId: true } } },
   });
   if (!effect) return;
   const { threadId, botId } = effect.run;
@@ -248,7 +248,7 @@ export async function setMailBatchCounts(
     return writeCardCounts(
       tx,
       { spaceId: input.spaceId, threadId, botId, runId: effect.runId, effectId: input.effectId },
-      countsOf(rows),
+      { ...countsOf(rows), ...(effect.status === "completed" ? { settled: true } : {}) },
     );
   });
   if (event) await notifyRealtime(realtime, event.threadId, event.seq);
@@ -304,7 +304,7 @@ export async function settleMailReplyBatch(
     const event = await writeCardCounts(
       tx,
       { spaceId: input.spaceId, threadId, botId, runId, effectId: input.effectId },
-      counts,
+      { ...counts, settled: true },
     );
     return { resumed: resumed.count === 1, seq: event?.seq };
   });
@@ -394,4 +394,46 @@ export async function retryMailReplyBatch(
     if (error instanceof RetryLostRace) return { status: "queued", count: 0 };
     throw error;
   }
+}
+
+/**
+ * Takes a row that did not go out to the composer. Conditional on the row being unchanged, so it
+ * cannot cross with a Retry. Returns the row, or null when it may not move.
+ */
+export async function moveMailReplyRowToComposer(
+  prisma: PrismaClient,
+  input: Scope & { effectId: string; itemId: string },
+) {
+  const scope = { spaceId: input.spaceId, userId: input.userId };
+  return prisma.$transaction(async (tx: Tx) => {
+    const effect = await tx.externalEffect.findFirst({
+      where: {
+        id: input.effectId,
+        spaceId: input.spaceId,
+        kind: MAIL_REPLY_BATCH_TOOL,
+        status: "completed",
+      },
+      select: { id: true },
+    });
+    if (!effect) return null;
+    const row = await tx.mailReplyItem.findFirst({
+      where: { ...scope, effectId: input.effectId, id: input.itemId },
+    });
+    if (!row || (row.dispatch !== "claimed" && row.dispatch !== "held")) return null;
+    if (row.error === MAIL_REPLY_HASH_HOLD) return null;
+    const record = await tx.composeSend.findUnique({
+      where: { spaceId_userId_clientId: { ...scope, clientId: mailReplyClientId(row.id) } },
+      select: { state: true },
+    });
+    const notSent =
+      row.dispatch === "claimed"
+        ? record?.state === "failed"
+        : !record || record.state === "draft" || record.state === "failed";
+    if (!notSent) return null;
+    const moved = await tx.mailReplyItem.updateMany({
+      where: { id: row.id, dispatch: row.dispatch, updatedAt: row.updatedAt },
+      data: { dispatch: "composer" },
+    });
+    return moved.count === 1 ? row : null;
+  });
 }

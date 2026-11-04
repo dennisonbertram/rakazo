@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 337 of 337
-- Web and shared components: 856
+- Web and shared component files with stories: 338 of 338
+- Web and shared components: 859
 - Mobile components: 153 in 102 files, mobile — native story pending
-- SwiftUI views: 139 in 76 files, native story pending
+- SwiftUI views: 140 in 76 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -102,8 +102,9 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | HideAmountsMenuItem, ShowAmountsButton | [apps/web/src/components/HideAmountsToggle.tsx](../../apps/web/src/components/HideAmountsToggle.tsx) | [HideAmountsToggle.stories.tsx](../../apps/web/src/components/HideAmountsToggle.stories.tsx) | web |
 | I18nBootstrap | [apps/web/src/components/I18nBootstrap.tsx](../../apps/web/src/components/I18nBootstrap.tsx) | [I18nBootstrap.stories.tsx](../../apps/web/src/components/I18nBootstrap.stories.tsx) | web |
 | PhoneSlot, FilterSheet, Tip, SearchField, PickFilter, PhoneDateRange, SortControl | [apps/web/src/components/ListControls.tsx](../../apps/web/src/components/ListControls.tsx) | [ListControls.stories.tsx](../../apps/web/src/components/ListControls.stories.tsx) | web |
-| Row, MailApprovalCard | [apps/web/src/components/MailApprovalCard.tsx](../../apps/web/src/components/MailApprovalCard.tsx) | [MailApprovalCard.stories.tsx](../../apps/web/src/components/MailApprovalCard.stories.tsx), [MailReplyBatchCard.stories.tsx](../../apps/web/src/components/MailReplyBatchCard.stories.tsx) | web |
+| Row, MailApprovalCard | [apps/web/src/components/MailApprovalCard.tsx](../../apps/web/src/components/MailApprovalCard.tsx) | [MailApprovalCard.stories.tsx](../../apps/web/src/components/MailApprovalCard.stories.tsx) | web |
 | MailOutbox | [apps/web/src/components/MailOutbox.tsx](../../apps/web/src/components/MailOutbox.tsx) | [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
+| FlagBadge, RowState, MailReplyBatchCard | [apps/web/src/components/MailReplyBatchCard.tsx](../../apps/web/src/components/MailReplyBatchCard.tsx) | [MailReplyBatchCard.stories.tsx](../../apps/web/src/components/MailReplyBatchCard.stories.tsx) | web |
 | MailThreadCard | [apps/web/src/components/MailThreadCard.tsx](../../apps/web/src/components/MailThreadCard.tsx) | [MailThreadCard.stories.tsx](../../apps/web/src/components/MailThreadCard.stories.tsx) | web |
 | MarkdownLinkPrompt | [apps/web/src/components/markdown-link-prompt.tsx](../../apps/web/src/components/markdown-link-prompt.tsx) | [markdown-link-prompt.stories.tsx](../../apps/web/src/components/markdown-link-prompt.stories.tsx) | web |
 | MeetingRecordingSettings | [apps/web/src/components/MeetingRecordingSettings.tsx](../../apps/web/src/components/MeetingRecordingSettings.tsx) | [MeetingRecordingSettings.stories.tsx](../../apps/web/src/components/MeetingRecordingSettings.stories.tsx) | web |
@@ -590,7 +591,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | CapTableScreen, HolderRow, HolderDetailView | [apps/ios/Sources/Praci/CapTable/CapTableScreen.swift](../../apps/ios/Sources/Praci/CapTable/CapTableScreen.swift) | native story pending | iOS |
 | ComputerKeyBar | [apps/ios/Sources/Praci/Computer/ComputerKeyBar.swift](../../apps/ios/Sources/Praci/Computer/ComputerKeyBar.swift) | native story pending | iOS |
 | ComputerScreen | [apps/ios/Sources/Praci/Computer/ComputerScreen.swift](../../apps/ios/Sources/Praci/Computer/ComputerScreen.swift) | native story pending | iOS |
-| DataRoomItemScreen | [apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift) | native story pending | iOS |
+| DataRoomItemScreen, DataRoomItemLoader | [apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift) | native story pending | iOS |
 | DataRoomFolderRow, DataRoomItemRow, DataRoomUploadRow, DataRoomConsentSheet | [apps/ios/Sources/Praci/DataRoom/DataRoomRows.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomRows.swift) | native story pending | iOS |
 | DataRoomScreen, DataRoomListView | [apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift) | native story pending | iOS |
 | FinanceScreen, TransactionRow, BurnChart | [apps/ios/Sources/Praci/Finance/FinanceScreen.swift](../../apps/ios/Sources/Praci/Finance/FinanceScreen.swift) | native story pending | iOS |

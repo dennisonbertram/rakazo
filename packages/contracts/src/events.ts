@@ -216,6 +216,8 @@ export const MailBatchCountsSchema = z.object({
   sent: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
   unknown: z.number().int().nonnegative(),
+  /** Nothing is left to send, so Retry failed is open. */
+  settled: z.boolean().optional(),
 });
 export type MailBatchCounts = z.infer<typeof MailBatchCountsSchema>;
 
@@ -271,6 +273,32 @@ export const MailBatchPressRowSchema = z.object({
   edits: MailEditsSchema.omit({ account: true, send: true }).optional(),
 });
 export type MailBatchPressRow = z.infer<typeof MailBatchPressRowSchema>;
+
+/** The flags rows would have with their unsaved edits. */
+export const MailBatchPreviewSchema = z.object({
+  rows: z.array(
+    z.object({
+      itemId: Id,
+      flags: z.array(MailReplyFlagSchema),
+      startsUnticked: z.boolean(),
+    }),
+  ),
+});
+export type MailBatchPreview = z.infer<typeof MailBatchPreviewSchema>;
+
+/** What the composer opens with when the owner takes a row that did not go out. */
+export const MailBatchComposerDraftSchema = z.object({
+  connectionId: z.string(),
+  account: z.string(),
+  to: z.array(z.string()),
+  cc: z.array(z.string()),
+  bcc: z.array(z.string()),
+  subject: z.string(),
+  body: z.string(),
+  /** The synced message answered, so the reply stays in its thread. */
+  replyToId: z.string().optional(),
+});
+export type MailBatchComposerDraft = z.infer<typeof MailBatchComposerDraftSchema>;
 
 /** The effect kind of a bot-to-bot message held for the owner before it reaches an external bot. */
 export const BOT_SHARE_EFFECT_KIND = "bot_message_share";

@@ -583,7 +583,13 @@ import {
 } from "./legal.js";
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
 import { sendSavedMailDraft } from "./mail-draft-send.js";
-import { readMailBatch, retryMailBatch, sendMailBatch } from "./mail-reply-batch.js";
+import {
+  mailBatchRowToComposer,
+  previewMailBatch,
+  readMailBatch,
+  retryMailBatch,
+  sendMailBatch,
+} from "./mail-reply-batch.js";
 import {
   dismissMcpServerApprovals,
   resolveMcpApprovalCards,
@@ -3835,6 +3841,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
         }).catch((error) => getLogger().error("thread mail batch notification", error));
         return { ok: true as const };
       }),
+      previewMailBatch: authed.threads.previewMailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return previewMailBatch(deps, context.actor, target, input);
+      }),
+      mailBatchToComposer: authed.threads.mailBatchToComposer.handler(
+        async ({ context, input }) => {
+          const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+          return mailBatchRowToComposer(deps, context.actor, target, input);
+        },
+      ),
       retryMailBatch: authed.threads.retryMailBatch.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         const count = await retryMailBatch(

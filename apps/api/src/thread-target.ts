@@ -14,6 +14,7 @@ import type {
 import {
   botCanReadDataRoom,
   GROUP_MEMBER_MIN,
+  MAIL_REPLY_BATCH_TOOL,
   MessageBlock as MessageBlockSchema,
   RunPhaseSchema,
 } from "@rakazo/contracts";
@@ -858,7 +859,25 @@ export async function sendThreadMessage(
           },
           select: { id: true, taskId: true, status: true, trigger: true },
         });
-        const waitingRuns = activeRuns.filter((run) => run.status === "waiting_input");
+        // A run whose reply batch is sending has no question left to answer: its card is answered and
+        // it waits only for the sends. The message waits too, and is answered after that run ends.
+        const allWaiting = activeRuns.filter((run) => run.status === "waiting_input");
+        const sendingRunIds = allWaiting.length
+          ? new Set(
+              (
+                await tx.externalEffect.findMany({
+                  where: {
+                    spaceId: actor.spaceId,
+                    runId: { in: allWaiting.map((run) => run.id) },
+                    kind: MAIL_REPLY_BATCH_TOOL,
+                    status: "executing",
+                  },
+                  select: { runId: true },
+                })
+              ).map((effect) => effect.runId),
+            )
+          : new Set<string>();
+        const waitingRuns = allWaiting.filter((run) => !sendingRunIds.has(run.id));
         if (waitingRuns.length && !activeRuns.some(steersUserMessage)) {
           const answerText = input.text?.trim();
           if (!answerText) {

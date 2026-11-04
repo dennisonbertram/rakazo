@@ -248,7 +248,7 @@ function buildMailBatchAskBlock(
   return {
     kind: "ask",
     approvalEffectId: effectId,
-    text: `${rows.length} replies`,
+    text: rows.length === 1 ? "1 reply" : `${rows.length} replies`,
     detail: rows
       .map((row) => {
         const to = [...bare(row.to), ...bare(row.cc), ...bare(row.bcc)].join(", ");

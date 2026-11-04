@@ -16,6 +16,7 @@ import { mailReplyHash } from "@rakazo/core/node/approval-effect-key";
 import {
   answerWaitingRunWithTextInTransaction,
   createDb,
+  createPendingSteeringRun,
   createThreadEvents,
   retryMailReplyBatch,
   runAsSystem,
@@ -23,7 +24,13 @@ import {
 } from "@rakazo/db";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
-import { readMailBatch, retryMailBatch, sendMailBatch } from "./mail-reply-batch.js";
+import {
+  mailBatchRowToComposer,
+  previewMailBatch,
+  readMailBatch,
+  retryMailBatch,
+  sendMailBatch,
+} from "./mail-reply-batch.js";
 import type { MailFixture } from "./test-support/mail-fixture.js";
 import { createMailFixture, daysAgo } from "./test-support/mail-fixture.js";
 import { sendThreadMessage, stopThreadRuns } from "./thread-target.js";
@@ -701,7 +708,9 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       const message = await prisma.message.findUniqueOrThrow({ where: { id: c.message.id } });
       expect((message.blocks as { mailBatch: unknown; status: string }[])[0]).toMatchObject({
         status: "answered",
-        mailBatch: { count: 3, sent: 1, failed: 1, unknown: 0 },
+        // The settled mark changes the card even when the last row left the counts as they were,
+        // so a client reads Retry failed once it opens.
+        mailBatch: { count: 3, sent: 1, failed: 1, unknown: 0, settled: true },
       });
     });
 
@@ -1173,6 +1182,155 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
     });
   });
 
+  describe("S3: edit preview", () => {
+    const preview = (c: Card, rows: { itemId: string; edits: object }[], who: Actor = f.a) =>
+      previewMailBatch(rpcDeps(), who, target(), { ...c.ids, rows });
+
+    it("an edit adding a recipient flags and unticks that row; taking it out clears it", async () => {
+      const c = await card(["t1", "t2"]);
+      const [row] = (await read(c)).rows;
+      expect(row?.flags).toEqual([]);
+      expect(
+        await preview(c, [{ itemId: row!.itemId, edits: { cc: "new@elsewhere.example.test" } }]),
+      ).toEqual({
+        rows: [{ itemId: row!.itemId, flags: ["not_on_thread"], startsUnticked: true }],
+      });
+      expect(await preview(c, [{ itemId: row!.itemId, edits: { cc: "" } }])).toEqual({
+        rows: [{ itemId: row!.itemId, flags: [], startsUnticked: false }],
+      });
+    });
+
+    it("a link added in an edit flags the row and stays ticked", async () => {
+      const c = await card(["t1"]);
+      const [row] = (await read(c)).rows;
+      expect(
+        await preview(c, [{ itemId: row!.itemId, edits: { body: "See https://example.test" } }]),
+      ).toEqual({
+        rows: [{ itemId: row!.itemId, flags: ["has_link"], startsUnticked: false }],
+      });
+    });
+
+    it("an address that does not parse counts as off the thread", async () => {
+      const c = await card(["t1"]);
+      const [row] = (await read(c)).rows;
+      const result = await preview(c, [{ itemId: row!.itemId, edits: { to: "not an address" } }]);
+      expect(result.rows[0]).toMatchObject({ flags: ["not_on_thread"], startsUnticked: true });
+    });
+
+    it("nothing is stored, and another user or batch cannot preview", async () => {
+      const c = await card(["t1"]);
+      const other = await card(["t2"]);
+      const [row] = (await read(c)).rows;
+      const [foreign] = (await read(other)).rows;
+      await preview(c, [{ itemId: row!.itemId, edits: { body: "Changed" } }]);
+      expect((await rowsOf(c))[0]?.body).toBe("Hello t1");
+      await expect(preview(c, [{ itemId: row!.itemId, edits: {} }], f.b)).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
+      await expect(preview(c, [{ itemId: foreign!.itemId, edits: {} }])).rejects.toMatchObject({
+        code: "CONFLICT",
+      });
+    });
+  });
+
+  describe("S3: open in composer", () => {
+    const failed = async (threads = ["t1"]) => {
+      const c = await card(threads);
+      await press(
+        c,
+        threads.map((_, i) => i),
+      );
+      f.gmail.failNext(400, { urlIncludes: "drafts/send", reason: "invalidArgument" });
+      await work(c);
+      return c;
+    };
+    const open = (c: Card, itemId: string, who: Actor = f.a) =>
+      mailBatchRowToComposer(rpcDeps(), who, target(), { ...c.ids, itemId });
+
+    it("moves a failed row to composer and returns its fields, so Retry cannot send it", async () => {
+      const c = await failed();
+      const [row] = await rowsOf(c);
+      const draft = await open(c, row!.id);
+      expect(draft).toMatchObject({
+        connectionId: f.connA,
+        account: "box-a@example.test",
+        to: [customer("t1")],
+        subject: "Re: Subject t1",
+        body: "Hello t1",
+        replyToId: expect.any(String),
+      });
+      expect((await rowsOf(c))[0]?.dispatch).toBe("composer");
+      const [read1] = (await read(c)).rows;
+      expect(read1).toMatchObject({ state: "composer", retryable: false });
+      expect(
+        await retryMailBatch(rpcDeps(), f.a, target(), {
+          ...c.ids,
+          rows: [{ itemId: row!.id, seenMessageId: read1!.seenMessageId }],
+        }),
+      ).toBe(0);
+      await work(c);
+      await reconcile();
+      expect(sent()).toEqual([]);
+    });
+
+    it("a second press and a race with Retry move the row once", async () => {
+      const c = await failed();
+      const [row] = await rowsOf(c);
+      await open(c, row!.id);
+      await expect(open(c, row!.id)).rejects.toMatchObject({ code: "CONFLICT" });
+    });
+
+    it("is refused for a sent row, a hash hold, before settlement, and for another user", async () => {
+      const c = await card(["t1", "t2"]);
+      await press(c, [0, 1]);
+      const [first, second] = await rowsOf(c);
+      await expect(open(c, first!.id)).rejects.toMatchObject({ code: "CONFLICT" });
+      await prisma.mailReplyItem.update({ where: { id: second!.id }, data: { body: "Tampered" } });
+      await work(c);
+      await expect(open(c, first!.id)).rejects.toMatchObject({ code: "CONFLICT" });
+      await expect(open(c, second!.id)).rejects.toMatchObject({ code: "CONFLICT" });
+      await expect(open(c, second!.id, f.b)).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect((await rowsOf(c))[1]?.dispatch).toBe("held");
+    });
+
+    it("mail_send cannot repeat a row taken to the composer", async () => {
+      const c = await failed();
+      const [row] = await rowsOf(c);
+      await open(c, row!.id);
+      const refusal = mailSendRefusal(
+        { to: [customer("t1")], subject: "Re: Subject t1", body: "Other", replyToId: "t1-m1" },
+        await priorBatchRows(prisma, scope(), c.run.id),
+        c.run.id,
+      );
+      expect(refusal).toEqual(expect.stringContaining("Do not send it again"));
+    });
+  });
+
+  describe("S3: card counts on Retry", () => {
+    it("a retried row leaves the failed count at once and comes back if it fails again", async () => {
+      const c = await card(["t1"]);
+      await press(c, [0]);
+      f.gmail.failNext(400, { urlIncludes: "drafts/send", reason: "invalidArgument" });
+      await work(c);
+      const counts = async () =>
+        (
+          (await prisma.message.findUniqueOrThrow({ where: { id: c.message.id } })).blocks as {
+            mailBatch: { failed: number };
+          }[]
+        )[0]?.mailBatch.failed;
+      expect(await counts()).toBe(1);
+      const { rows } = await read(c);
+      await retryMailBatch(rpcDeps(), f.a, target(), {
+        ...c.ids,
+        rows: [{ itemId: rows[0]!.itemId, seenMessageId: rows[0]!.seenMessageId }],
+      });
+      expect(await counts()).toBe(0);
+      f.gmail.failNext(400, { urlIncludes: "drafts/send", reason: "invalidArgument" });
+      await work(c);
+      expect(await counts()).toBe(1);
+    });
+  });
+
   describe("S2: racing retries", () => {
     const failedOne = async () => {
       const c = await card(["t1"]);
@@ -1385,21 +1543,41 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
   });
 
   describe("S2: open checks", () => {
-    it("a new owner message during sending is refused, and the run stays paused", async () => {
+    const say = (text: string) =>
+      sendThreadMessage(
+        { prisma, events: events(), jobs } as never,
+        f.a,
+        { kind: "bot", botId, threadId } as never,
+        { text } as never,
+      );
+
+    it("a new owner message during sending waits for settlement, and the run stays paused", async () => {
       const c = await card();
       await press(c, [0, 1]);
-      await expect(
-        sendThreadMessage(
-          { prisma, events: events(), jobs } as never,
-          f.a,
-          { kind: "bot", botId, threadId } as never,
-          { text: "One more thing" } as never,
-        ),
-      ).rejects.toMatchObject({ code: "CONFLICT" });
+      await say("One more thing");
       expect(await runStatus(c)).toBe("waiting_input");
+      const pending = await prisma.steeringMessage.findMany({
+        where: { botId, message: { threadId } },
+      });
+      // Not claimed by the waiting run: the follow-up after it ends answers it.
+      expect(pending).toMatchObject([{ runId: null }]);
+      expect(await prisma.run.count({ where: { threadId } })).toBe(1);
       await work(c);
       expect(sent()).toHaveLength(2);
       expect((await effectOf(c)).status).toBe("completed");
+      expect(await runStatus(c)).toBe("queued");
+      await prisma.run.update({ where: { id: c.run.id }, data: { status: "completed" } });
+      const followUp = await prisma.$transaction((tx) =>
+        createPendingSteeringRun(tx, { spaceId: f.a.spaceId, threadId, botId }),
+      );
+      expect(followUp).toEqual(expect.any(String));
+    });
+
+    it("a message while the card still waits for the owner is refused as before", async () => {
+      const c = await card();
+      await expect(say("One more thing")).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(await runStatus(c)).toBe("waiting_input");
+      expect(await prisma.steeringMessage.count({ where: { botId } })).toBe(0);
     });
 
     it("Stop during sending: approved rows still send, settlement wakes nothing, the results stay", async () => {
@@ -1437,16 +1615,78 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect(enqueued).toEqual([]);
     });
 
-    it("clearing the thread during sending: approved rows still send and settle with no card", async () => {
-      const c = await card();
-      await press(c, [0, 1]);
+    it("clearing the thread during sending holds unsent rows; a claimed row finishes", async () => {
+      const c = await card(["t1", "t2", "t3"]);
+      await press(c, [0, 1, 2]);
+      const [first, second, third] = await rowsOf(c);
+      // The worker has claimed the first row and is about to send it.
+      await prisma.mailReplyItem.update({
+        where: { id: first!.id },
+        data: { dispatch: "claimed" },
+      });
       await events().clearThread({ spaceId: f.a.spaceId, threadId, botId });
       expect(await prisma.message.count({ where: { id: c.message.id } })).toBe(0);
       expect(await runStatus(c)).toBe("cancelled");
+      expect((await rowsOf(c)).map((row) => [row.dispatch, row.error])).toEqual([
+        ["claimed", null],
+        ["held", "thread_cleared"],
+        ["held", "thread_cleared"],
+      ]);
+      expect([second?.id, third?.id]).toHaveLength(2);
       await work(c);
-      expect(sent()).toHaveLength(2);
-      expect((await effectOf(c)).status).toBe("completed");
+      expect(sent()).toEqual([]);
+      // Nothing is queued, and the claimed row settles once its record is resolved.
+      await prisma.composeSend.create({
+        data: {
+          ...scope(),
+          clientId: `agent:batch_${first!.id}`,
+          connectionId: f.connA,
+          state: "sent",
+        },
+      });
+      await work(c);
+      expect((await effectOf(c)).result).toMatchObject({ sent: 1, failed: 2 });
       expect(resumes()).toEqual([]);
+    });
+
+    it("a claimed row that lost its worker is held, not sent, once the thread is cleared", async () => {
+      const c = await card(["t1"]);
+      await press(c, [0]);
+      const [row] = await rowsOf(c);
+      await prisma.mailReplyItem.update({ where: { id: row!.id }, data: { dispatch: "claimed" } });
+      await events().clearThread({ spaceId: f.a.spaceId, threadId, botId });
+      const old = new Date(Date.now() - 10 * 60_000);
+      await prisma.$executeRaw`UPDATE mail_reply_items SET "updatedAt" = ${old} WHERE id = ${row!.id}`;
+      await reconcileMailReplyBatches({
+        prisma,
+        jobs,
+        events: events(),
+        now: new Date(),
+        batchSize: 5,
+      });
+      expect((await rowsOf(c)).map((item) => [item.dispatch, item.error])).toEqual([
+        ["held", "thread_cleared"],
+      ]);
+      await work(c);
+      expect(sent()).toEqual([]);
+    });
+
+    it("clearing leaves other threads' queued rows alone", async () => {
+      const c = await card(["t1"]);
+      await press(c, [0]);
+      const otherThread = await prisma.thread.create({
+        data: {
+          ...scope(),
+          botId: (await prisma.bot.create({ data: { ...scope(), name: "Other", color: "blue" } }))
+            .id,
+        },
+      });
+      await events().clearThread({
+        spaceId: f.a.spaceId,
+        threadId: otherThread.id,
+        botId: otherThread.botId as string,
+      });
+      expect((await rowsOf(c))[0]?.dispatch).toBe("queued");
     });
 
     it("clearing the thread before the press closes the batch: the press finds no card", async () => {
