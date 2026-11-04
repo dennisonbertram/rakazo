@@ -187,9 +187,9 @@ it("never offers Create agent for Gmail: every account belongs to the Inbox agen
   expect(container.textContent).not.toContain("Create agent");
 });
 
-it("hides the ordinary access list and Used by while a private agent connection is not shared", async () => {
+it("hides the ordinary access list and the Access list while a private agent connection is not shared", async () => {
   await show(APP_PAGE, data({ connections: [appConnection({ agentBotId: "bot_app" })] }));
-  expect(container.textContent).not.toContain("Used by");
+  expect(container.textContent).not.toContain("Which agents can use");
   expect(container.textContent).not.toContain("Only this agent");
   expect(container.textContent).not.toContain("Other agents ask");
 });
@@ -265,7 +265,7 @@ it("lists who can use a shared connection from the server, owner first, and save
       },
     }),
   );
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   const toggles = [
     ...container.querySelectorAll<HTMLElement>('[aria-label$="can use Sample workspace"]'),
   ];
@@ -618,7 +618,7 @@ it("All saves allAgents once and None saves the owner alone, once", async () => 
   ]);
 });
 
-it("None leaves Let other agents use on with Used by listed and every other agent off", async () => {
+it("None leaves Let other agents use on with Access listed and every other agent off", async () => {
   await show(
     APP_PAGE,
     data({
@@ -634,7 +634,7 @@ it("None leaves Let other agents use on with Used by listed and every other agen
       },
     }),
   );
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   expect(container.querySelector<HTMLInputElement>("#connection-conn_app-shared")?.checked).toBe(
     true,
   );

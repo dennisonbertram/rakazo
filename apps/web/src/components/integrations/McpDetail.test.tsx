@@ -239,17 +239,17 @@ it("asks before the agent's changes switch turns on, not off", async () => {
   expect(setWrites).toHaveBeenLastCalledWith({ id: "s1", enabled: false });
 });
 
-it("Letting other agents use it saves at once and reveals Used by only while on", async () => {
+it("Letting other agents use it saves at once and reveals Access only while on", async () => {
   setExclusive.mockResolvedValue({});
   await show(false, OTHER, { ...withAgent, agentExclusive: true });
-  expect(container.textContent).not.toContain("Used by");
+  expect(container.textContent).not.toContain("Which agents can use");
   expect(container.querySelectorAll('[role="switch"][aria-label$="can use Carta"]')).toHaveLength(
     0,
   );
   await act(async () => container.querySelector<HTMLElement>("#server-shared")?.click());
   expect(setExclusive).toHaveBeenCalledWith({ serverId: "s1", exclusive: false });
   await show(false, OTHER, { ...withAgent, agentExclusive: false });
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   expect(
     container.querySelectorAll('[role="switch"][aria-label$="can use Carta"]').length,
   ).toBeGreaterThan(1);
@@ -530,7 +530,7 @@ it("Brex cards: the owner sees Cards, Controls and Replace token, and no sharing
   expect(writesSwitch()).not.toBeNull();
   expect(container.querySelector("#server-shared")).toBeNull();
   expect(container.textContent).not.toContain("Let other agents use");
-  expect(container.textContent).not.toContain("Used by");
+  expect(container.textContent).not.toContain("Which agents can use");
   expect(container.textContent).not.toMatch(/unlock/i);
   // The token is pasted, not OAuth: no sign-in menu and no host line.
   expect(container.querySelector('[aria-label="Sign-in options"]')).toBeNull();
@@ -734,7 +734,7 @@ it("All assigns every other agent and None removes them all except the owner", a
   expect(replaceAssignments.mock.calls.every(([call]) => call.assignments.length === 0)).toBe(true);
   // None never turns sharing off.
   expect(setExclusive).not.toHaveBeenCalled();
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   listAssignments.mockResolvedValue([]);
 });
 

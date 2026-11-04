@@ -553,7 +553,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
                 ) : hasAgentAccount && row.status === "connected" ? (
                   <>
                     <Heading>
-                      <Trans>Used by</Trans>
+                      <Trans>Access</Trans>
                     </Heading>
                     <AgentToggleList
                       bots={data.bots}
@@ -583,7 +583,7 @@ export function AppDetail({ data, activeBotId }: { data: IntegrationsData; activ
               {!hasAgentAccount ? (
                 <>
                   <Heading>
-                    <Trans>Used by</Trans>
+                    <Trans>Access</Trans>
                   </Heading>
                   <AgentToggleList
                     bots={data.bots}

@@ -25,6 +25,7 @@ import {
   isSameMcpEndpoint,
   mcpStatus,
 } from "../../lib/integrations";
+import { assignMcpServer } from "../../lib/mcp-assign";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { ConfirmDialog, Heading } from "./AppDetail";
@@ -146,33 +147,7 @@ export function McpDetail({
       if (name && name !== server.name) await rpc.mcp.servers.rename({ id: server.id, name });
     }, t`Could not rename`);
 
-  const assign = async (botId: string, on: boolean) => {
-    // replace() overwrites the bot's whole list, so start from what it already has.
-    const current = await rpc.mcp.assignments.list({ botId });
-    const others = current
-      .filter((entry) => entry.serverId !== server.id)
-      .map(({ serverId: id, allowAllTools, allowedTools }) => ({
-        serverId: id,
-        allowAllTools,
-        allowedTools,
-      }));
-    const kept = current.find((entry) => entry.serverId === server.id);
-    await rpc.mcp.assignments.replace({
-      botId,
-      assignments: on
-        ? [
-            ...others,
-            kept
-              ? {
-                  serverId: server.id,
-                  allowAllTools: kept.allowAllTools,
-                  allowedTools: kept.allowedTools,
-                }
-              : { serverId: server.id, allowAllTools: true, allowedTools: [] },
-          ]
-        : others,
-    });
-  };
+  const assign = (botId: string, on: boolean) => assignMcpServer(botId, server.id, on);
   const toggle = (botId: string, on: boolean) =>
     run(() => assign(botId, on), t`Could not update bot access`);
 
@@ -234,6 +209,7 @@ export function McpDetail({
       onToggle={(botId, on) => void toggle(botId, on)}
       onSetAll={(on) => void setAllAgents(on)}
       ownerBotId={server.agentBotId}
+      subject="connection"
     />
   );
   return (
@@ -411,7 +387,7 @@ export function McpDetail({
         {hasAgent || bank ? null : (
           <>
             <Heading>
-              <Trans>Used by</Trans>
+              <Trans>Access</Trans>
             </Heading>
             {usedBy}
           </>

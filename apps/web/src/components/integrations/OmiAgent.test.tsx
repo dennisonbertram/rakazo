@@ -89,7 +89,7 @@ it("None keeps Let other agents use Omi on and the list visible, with the other 
     [...container.querySelectorAll("button")].find((b) => b.textContent === "None")?.click(),
   );
   expect(container.querySelector<HTMLInputElement>("#omi-shared")?.checked).toBe(true);
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   expect(
     container.querySelector('[aria-label="Ada can use Omi"]')?.getAttribute("aria-checked"),
   ).toBe("false");

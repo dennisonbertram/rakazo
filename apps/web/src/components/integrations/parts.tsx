@@ -14,10 +14,15 @@ import {
 } from "@rakazo/ui-web";
 import { MoreHorizontal } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { StatusKind } from "../../lib/integrations";
 import { providerLabel } from "../../lib/integrations";
+import { PickFilter, SearchField } from "../ListControls";
 import { AppLogo } from "./AppLogo";
+
+/** Search and the On/Off filter show once a list is longer than this. */
+export const AGENT_LIST_CONTROLS_MIN = 8;
 
 /** The tile's one main link, like "Open Inbox" on Gmail. It never wraps; all share one width. */
 export const OPEN_LINK =
@@ -110,6 +115,7 @@ export function AgentToggleList({
   ownerBotId,
   saving = false,
   everyone = false,
+  subject = "account",
 }: {
   bots: Bot[];
   isOn: (botId: string) => boolean;
@@ -124,11 +130,18 @@ export function AgentToggleList({
   saving?: boolean;
   /** Access is stored as "all agents" (including future ones): All is already done; None still has work. */
   everyone?: boolean;
+  /** What the agents get: an account (default) or a server connection. */
+  subject?: "account" | "connection";
 }) {
   const { t } = useLingui();
+  const [query, setQuery] = useState("");
+  const [show, setShow] = useState<string | undefined>();
+  const isOnRef = useRef(isOn);
+  isOnRef.current = isOn;
   // Each email's own chat is one agent; they share a single row, as in the sidebar.
   const emailChats = bots.filter((bot) => isMailThreadAgentSpawnKey(bot.spawnKey));
   const rows = bots.filter((bot) => !isMailThreadAgentSpawnKey(bot.spawnKey));
+  const showControls = bots.length > AGENT_LIST_CONTROLS_MIN;
   // Mixed access reads as on (some chats still have it), so one click revokes all and never grants first.
   const someEmailOn = emailChats.some((bot) => isOn(bot.id));
   const allEmailOn = emailChats.every((bot) => isOn(bot.id));
@@ -140,6 +153,21 @@ export function AgentToggleList({
   const noneOn = bots.every((bot) => locked(bot) || !isOn(bot.id));
   // On a mail connection the Inbox agent and email chats sit together at the top, apart from the rest.
   const mail = isInboxAgentSpawnKey(owner?.spawnKey);
+  // The connection's own agent stays pinned; the rest are searched, filtered and sorted on-first.
+  // The order is taken from the access shown when the list loads or the search/filter changes, so
+  // a row never moves while its switch is flipped.
+  const others = rows.filter((bot) => bot.id !== owner?.id);
+  const othersKey = others.map((bot) => bot.id).join(",");
+  // isOn is read through a ref on purpose, so a toggle does not re-sort.
+  const visibleOthers = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const on = (bot: Bot) => isOnRef.current(bot.id);
+    return others
+      .filter((bot) => bot.name.toLowerCase().includes(needle))
+      .filter((bot) => (show === "on" ? on(bot) : show === "off" ? !on(bot) : true))
+      .sort((a, b) => Number(on(b)) - Number(on(a)) || a.name.localeCompare(b.name));
+  }, [othersKey, query, show]);
+  const shownOthers = showControls ? visibleOthers : others;
   const agentRow = (bot: Bot) => (
     <div key={bot.id} className="flex items-center gap-3 px-3.5 py-2.5">
       <BotAvatar color={bot.color} identity={bot.id} size={22} />
@@ -176,46 +204,91 @@ export function AgentToggleList({
         />
       </div>
     ) : null;
+  const noMatches =
+    showControls && shownOthers.length === 0 ? (
+      <div className="px-3.5 py-2.5 text-sm text-muted-foreground">
+        <Trans>No matching agents</Trans>
+      </div>
+    ) : null;
   return (
-    <div className="divide-y divide-border rounded-xl border border-border bg-card">
-      {onSetAll && bots.length > 1 ? (
-        <div className="flex justify-end gap-1 px-2 py-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={disabled || saving || everyone}
-            onClick={() => onSetAll(true)}
-          >
-            <Trans>All</Trans>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={disabled || saving || (noneOn && !everyone)}
-            onClick={() => onSetAll(false)}
-          >
-            <Trans>None</Trans>
-          </Button>
-        </div>
-      ) : null}
-      {mail && owner ? (
-        <>
-          {agentRow(owner)}
-          {chatsRow}
-          {rows.some((bot) => bot.id !== owner.id) ? (
-            <div className="px-3.5 pb-1 pt-2.5 text-xs font-semibold text-muted-foreground">
-              <Trans>Other agents</Trans>
-            </div>
-          ) : null}
-          {rows.filter((bot) => bot.id !== owner.id).map(agentRow)}
-        </>
-      ) : (
-        <>
-          {rows.map(agentRow)}
-          {chatsRow}
-        </>
-      )}
-    </div>
+    <>
+      <p className="mb-2 text-sm text-muted-foreground">
+        {subject === "connection" ? (
+          <Trans>Which agents can use this connection.</Trans>
+        ) : (
+          <Trans>Which agents can use this account.</Trans>
+        )}
+      </p>
+      <div className="divide-y divide-border rounded-xl border border-border bg-card">
+        {showControls || (onSetAll && bots.length > 1) ? (
+          <div className="flex flex-wrap items-center gap-1.5 px-2 py-1">
+            {showControls ? (
+              <>
+                <SearchField
+                  name="agent-search"
+                  className="basis-full"
+                  value={query}
+                  placeholder={t`Search agents`}
+                  label={t`Search agents`}
+                  onChange={setQuery}
+                />
+                <PickFilter
+                  inline
+                  label={t`Show`}
+                  anyLabel={t`All agents`}
+                  value={show}
+                  options={[
+                    ["on", t`On`],
+                    ["off", t`Off`],
+                  ]}
+                  onChange={setShow}
+                />
+              </>
+            ) : null}
+            {onSetAll && bots.length > 1 ? (
+              <span className="ms-auto flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled || saving || everyone}
+                  onClick={() => onSetAll(true)}
+                >
+                  <Trans>All</Trans>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled || saving || (noneOn && !everyone)}
+                  onClick={() => onSetAll(false)}
+                >
+                  <Trans>None</Trans>
+                </Button>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {mail && owner ? (
+          <>
+            {agentRow(owner)}
+            {chatsRow}
+            {others.length > 0 ? (
+              <div className="px-3.5 pb-1 pt-2.5 text-xs font-semibold text-muted-foreground">
+                <Trans>Other agents</Trans>
+              </div>
+            ) : null}
+            {shownOthers.map(agentRow)}
+            {noMatches}
+          </>
+        ) : (
+          <>
+            {owner ? agentRow(owner) : null}
+            {shownOthers.map(agentRow)}
+            {noMatches}
+            {chatsRow}
+          </>
+        )}
+      </div>
+    </>
   );
 }
 

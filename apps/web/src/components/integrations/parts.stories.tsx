@@ -148,3 +148,33 @@ export const OpenLinks: StoryObj = {
     </div>
   ),
 };
+
+/** Above 8 agents the list gets search and an On/Off filter; agents that are on come first. */
+export const ToggleListLong: StoryObj = {
+  render: () => {
+    const bots = Array.from({ length: 12 }, (_, i) => ({
+      ...mockBots[i % mockBots.length]!,
+      id: `bot_${i}`,
+      name: `Agent ${String.fromCharCode(65 + i)}`,
+    }));
+    const [on, setOn] = useState(new Set(["bot_3", "bot_7"]));
+    return (
+      <div className="w-96">
+        <AgentToggleList
+          bots={bots}
+          appName="Sample app"
+          isOn={(id) => on.has(id)}
+          onSetAll={() => undefined}
+          onToggle={(id, next) =>
+            setOn((prev) => {
+              const copy = new Set(prev);
+              if (next) copy.add(id);
+              else copy.delete(id);
+              return copy;
+            })
+          }
+        />
+      </div>
+    );
+  },
+};

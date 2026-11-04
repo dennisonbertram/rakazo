@@ -122,7 +122,7 @@ export function IntegrationAgentSection({
       {shared && onShared && usedBy ? (
         <>
           <Heading>
-            <Trans>Used by</Trans>
+            <Trans>Access</Trans>
           </Heading>
           {usedBy}
         </>
