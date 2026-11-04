@@ -85,6 +85,10 @@ it("lists the accounts the agent can reach with address and the real state", asy
     c1: { shared: "some", botIds: ["ada"] },
     c2: { shared: "some", botIds: ["bea"] },
   });
+  rpc.connections.accessAll.mockResolvedValue({
+    c1: { allAgents: false, botIds: ["ada"], agentShared: true, writeBotIds: [] },
+    c2: { allAgents: false, botIds: ["bea"], agentShared: true, writeBotIds: [] },
+  });
   const { container, sw } = await mount(ada);
   expect(container.textContent).toContain("ann@example.com");
   expect(container.textContent).toContain("bob@example.com");
@@ -262,6 +266,10 @@ it("Allow changes is disabled while the connection's changes switch is off, and 
     c1: { shared: "some", botIds: ["ada"] },
     c2: { shared: "some", botIds: ["ada"] },
   });
+  rpc.connections.accessAll.mockResolvedValue({
+    c1: { allAgents: false, botIds: ["ada"], agentShared: true, writeBotIds: [] },
+    c2: { allAgents: true, botIds: [], agentShared: true, writeBotIds: [] },
+  });
   const { sw } = await mount(ada);
   const nested = sw("Ada can make changes in Gmail ann@example.com");
   expect(
@@ -273,4 +281,37 @@ it("Allow changes is disabled while the connection's changes switch is off, and 
   rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: ["chat"] } });
   const mail = await mount(chat);
   expect(mail.sw("Re: hi can make changes in Gmail ann@example.com")).toBeNull();
+});
+
+it("shows a saved grant as on, revocable, with a note, when another account limits access", async () => {
+  rpc.connections.list.mockResolvedValue([
+    { ...conn("c1", "Gmail", "ann@example.com", "inbox"), writesEnabled: true },
+  ]);
+  // Saved for Ada, but not in effect: another Gmail account is limited to other agents.
+  rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "some", botIds: [] } });
+  rpc.connections.accessAll.mockResolvedValue({
+    c1: { allAgents: false, botIds: ["inbox", "ada"], agentShared: true, writeBotIds: [] },
+  });
+  const { container, sw } = await mount(ada);
+  const use = sw("Ada can use Gmail ann@example.com");
+  expect(use.getAttribute("aria-checked")).toBe("true");
+  expect(use.hasAttribute("data-disabled")).toBe(false);
+  expect(container.textContent).toContain("another account of this app limits access");
+  expect(sw("Ada can make changes in Gmail ann@example.com")).not.toBeNull();
+  await act(async () => use.click());
+  expect(rpc.connections.setAgentAccess).toHaveBeenCalledWith({
+    connectionId: "c1",
+    botId: "ada",
+    on: false,
+  });
+});
+
+it("does not count 'all agents' as a grant for a firewalled agent", async () => {
+  rpc.connections.list.mockResolvedValue([conn("c1", "Gmail", "ann@example.com", "inbox")]);
+  rpc.connections.effectiveAccess.mockResolvedValue({ c1: { shared: "all", botIds: [] } });
+  rpc.connections.accessAll.mockResolvedValue({
+    c1: { allAgents: true, botIds: [], agentShared: true, writeBotIds: [] },
+  });
+  const { sw } = await mount({ ...ada, firewall: true } as Bot);
+  expect(sw("Ada can use Gmail ann@example.com").getAttribute("aria-checked")).toBe("false");
 });

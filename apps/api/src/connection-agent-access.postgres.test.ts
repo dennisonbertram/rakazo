@@ -285,4 +285,35 @@ describePostgres("per-agent access changes (PostgreSQL)", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("keeps a firewalled agent's label scope when another agent's access changes", async () => {
+    const { conn, agent: owner } = await makeLinked("lo");
+    const fw = await makeBot("lf", { firewall: true });
+    const other = await makeBot("lx");
+    await api().connections.setAccess({
+      connectionId: conn.id,
+      allAgents: false,
+      botIds: [owner.id, fw.id],
+    });
+    await prisma.botConnectionAccess.update({
+      where: { connectionId_botId: { connectionId: conn.id, botId: fw.id } },
+      data: { supportLabel: "Label_support" },
+    });
+    const label = async () =>
+      (
+        await prisma.botConnectionAccess.findUniqueOrThrow({
+          where: { connectionId_botId: { connectionId: conn.id, botId: fw.id } },
+        })
+      ).supportLabel;
+    await api().connections.setAgentAccess({ connectionId: conn.id, botId: other.id, on: true });
+    expect(await label()).toBe("Label_support");
+    await api().connections.setAgentAccess({ connectionId: conn.id, botId: other.id, on: false });
+    expect(await label()).toBe("Label_support");
+    await api().connections.setAccess({
+      connectionId: conn.id,
+      allAgents: false,
+      botIds: [owner.id, fw.id, other.id],
+    });
+    expect(await label()).toBe("Label_support");
+  });
 });

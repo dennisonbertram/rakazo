@@ -1986,7 +1986,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 writesEnabled: true,
                 agentBotId: true,
                 privateByDefault: true,
-                botAccess: { where: connectionAccessFilter(bot), select: { botId: true } },
+                botAccess: {
+                  where: connectionAccessFilter(bot),
+                  select: { botId: true, canWrite: true },
+                },
                 agentBot: { select: { spawnKey: true } },
               },
             })
@@ -2510,13 +2513,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   // The catalog's execute wrapper has no effect of its own. It resolves to an
                   // underlying tool, and the per-tool rules are enforced at dispatch on that tool.
                   if (isLazyCatalogControlRoute(tool.route)) return true;
-                  const linked = storedConnections.some(
+                  // An agent-linked connection takes changes only from its own agent, or from a bot
+                  // with a write grant (each call still asks, whatever the route).
+                  const blocked = storedConnections.some(
                     (connection) =>
                       connection.agentBotId &&
                       connection.connectorId === tool.route?.connectorId &&
-                      (!tool.route?.connectionId || connection.id === tool.route.connectionId),
+                      (!tool.route?.connectionId || connection.id === tool.route.connectionId) &&
+                      (connection.agentBotId === bot.id || !nonOwnerMayWrite(connection, bot)),
                   );
-                  return !linked;
+                  return !blocked;
                 });
               })()
             : Promise.resolve([]);
@@ -3386,7 +3392,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const accounts = await pending.catch(() => [] as { id: string }[]);
           const wanted = typeof callArgs.account === "string" ? callArgs.account.trim() : "";
           let targets = accounts;
-          if (wanted) {
+          if (wanted && MAIL_TOOL_NAMES.has(toolName)) {
+            // The same resolver the mail tools use, so "Sales" (a unique label prefix) is the
+            // account they will write to. A name that fits none is a possible write to any account.
+            const found = findAccount(accounts as MailAccount[], wanted);
+            targets = found ? [found] : accounts;
+          } else if (wanted) {
             targets = accounts.filter((account) =>
               Object.values(account).some(
                 (value) =>
@@ -5209,6 +5220,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
               scheduleAsks ||
               toolRequiresApproval(name, viaConnector, declaredReadOnly));
           const callRoute = (resolvedTool ?? connectorTools.get(name))?.route;
+          // A write through a connector (Composio, Pipedream, also via the catalog wrapper) on a
+          // connection that has its own agent is by another bot: it always asks, whatever saved rule matches.
+          const connectorWriteOnAgentConnection = await (async () => {
+            if (!viaConnector || appAgentIdentity || declaredReadOnly === true) return false;
+            const route = callRoute ?? connectorCall.route;
+            if (!route?.connectorId) return false;
+            const rows = (await connectionRowsStored()).filter(
+              (row) =>
+                row.status === "connected" &&
+                (route.connectionId
+                  ? row.id === route.connectionId
+                  : row.connectorId === route.connectorId),
+            );
+            return rows.some((row) => row.agentBotId !== null);
+          })();
           // Integration-agent writes use the shared preset classification and always show the full call.
           const integrationWriteTool = isIntegrationAgentWrite(
             bot.spawnKey,
@@ -5291,6 +5317,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             // Integration-agent writes require approval for every call.
             integrationWriteTool !== undefined ||
             writeOnAgentConnection ||
+            connectorWriteOnAgentConnection ||
             // An owner agent's writes on a peer's request never pass on a saved rule or Auto Review.
             (ownerAgentPeer && OWNER_PEER_WRITE_TOOLS.has(name));
           const gateResolved = requiresMandatoryApproval

@@ -90,6 +90,9 @@ function harness(connections: Row[], bots: Row[], access: Row[] = []) {
       })),
     },
     botConnectionAccess: {
+      findMany: vi.fn(async ({ where }: { where: { connectionId: { in: string[] } } }) =>
+        access.filter((r) => where.connectionId.in.includes(String(r.connectionId))),
+      ),
       deleteMany: vi.fn(async ({ where }: { where: Row }) => {
         for (let i = access.length - 1; i >= 0; i--)
           if (matches(access[i] as Row, where)) access.splice(i, 1);

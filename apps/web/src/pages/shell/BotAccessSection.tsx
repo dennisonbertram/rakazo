@@ -13,6 +13,8 @@ type Row = {
   name: string;
   address?: string;
   on: boolean;
+  /** The grant is saved but another account of the same app limits access, so it has no effect yet. */
+  note?: string;
   /** The server keeps this one as it is: the agent's own, a private connection, an exclusive server, or inherited from the Inbox agent. */
   locked: boolean;
   toggle: (on: boolean) => Promise<unknown>;
@@ -51,11 +53,25 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
     const accountRows: Row[] = live.map((row) => {
       const own = row.agentBotId === bot.id;
       const private_ = Boolean(row.agentBotId) && !own && access[row.id]?.agentShared === false;
+      const effectiveOn = effective[row.id]?.botIds.includes(bot.id) ?? false;
+      // The switch shows the saved grant, so it can always be revoked; "all agents" does not reach a firewalled or external agent.
+      const restricted = bot.audience === "external" || bot.firewall === true;
+      const stored = access[row.id];
+      const grantedOn =
+        own ||
+        (stored
+          ? (stored.allAgents && !restricted) || stored.botIds.includes(bot.id)
+          : effectiveOn);
+      const on = mailChat || private_ ? effectiveOn : grantedOn;
       return {
         key: `connection:${row.id}`,
         name: row.displayName,
         address: row.account,
-        on: effective[row.id]?.botIds.includes(bot.id) ?? false,
+        on,
+        note:
+          on && !effectiveOn && !mailChat && !private_
+            ? t`Saved, but another account of this app limits access`
+            : undefined,
         locked: own || mailChat || private_,
         toggle: (on) => rpc.connections.setAgentAccess({ connectionId: row.id, botId: bot.id, on }),
         write:
@@ -174,6 +190,9 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
                   <span className="block truncate text-xs text-muted-foreground">
                     {row.address}
                   </span>
+                ) : null}
+                {row.note ? (
+                  <span className="block text-xs text-muted-foreground">{row.note}</span>
                 ) : null}
               </span>
               <Switch

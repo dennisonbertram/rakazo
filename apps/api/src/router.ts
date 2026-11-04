@@ -1127,6 +1127,15 @@ async function saveConnectionAccess(
     });
     if (updated.count !== ids.length)
       throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
+    // A firewalled agent's label scope is part of its grant: keep it for every grant that stays.
+    const labels = new Map(
+      (
+        await tx.botConnectionAccess.findMany({
+          where: { connectionId: { in: ids }, spaceId: actor.spaceId, userId: actor.userId },
+          select: { connectionId: true, botId: true, supportLabel: true },
+        })
+      ).map((row) => [`${row.connectionId}:${row.botId}`, row.supportLabel]),
+    );
     await tx.botConnectionAccess.deleteMany({
       where: {
         connectionId: { in: ids },
@@ -1143,6 +1152,7 @@ async function saveConnectionAccess(
             spaceId: actor.spaceId,
             userId: actor.userId,
             canWrite: writeIds.has(botId) && botId !== connection.agentBotId,
+            supportLabel: labels.get(`${connectionId}:${botId}`) ?? null,
           })),
         ),
       });
