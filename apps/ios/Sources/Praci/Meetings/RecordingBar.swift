@@ -5,7 +5,26 @@ struct RecordingBar: View {
   @Environment(AppModel.self) private var app
 
   var body: some View {
-    if let live = app.capture.live {
+    if app.capture.live == nil, let id = app.capture.savedMeetingID {
+      HStack(spacing: 10) {
+        Text("Meeting saved").font(.subheadline.weight(.medium))
+        Spacer(minLength: 8)
+        Button("Open") {
+          app.capture.dismissSaved()
+          app.open(.meeting(id: id))
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.small)
+        .accessibilityIdentifier("meetingSavedOpen")
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 8)
+      .glassEffect(.regular, in: Capsule())
+      .padding(.horizontal, 12)
+      .padding(.bottom, 4)
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier("meetingSavedBar")
+    } else if let live = app.capture.live {
       HStack(spacing: 10) {
         Circle().fill(Color.token(.destructive)).frame(width: 10, height: 10)
           .opacity(live.transcribing ? 0.4 : 1)

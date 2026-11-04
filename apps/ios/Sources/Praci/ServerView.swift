@@ -38,11 +38,13 @@ struct ServerView: View {
           Text("Server address")
         }
         Section {
-          Button("Use default server") {
-            address = ServerEndpoint.defaultURL.absoluteString
-            prepareSave()
+          if let builtIn = ServerEndpoint.builtInURL {
+            Button("Use default server") {
+              address = builtIn.absoluteString
+              prepareSave()
+            }
+            .disabled(model.busy)
           }
-          .disabled(model.busy)
           if model.busy { ProgressView("Checking server…") }
           AuthStatus(error: error, notice: nil)
         }
@@ -68,7 +70,7 @@ struct ServerView: View {
       } message: {
         Text(warning)
       }
-      .onAppear { address = model.endpoint.absoluteString }
+      .onAppear { address = model.hasServer ? model.endpoint.absoluteString : "" }
       .interactiveDismissDisabled(model.busy)
     }
   }
@@ -79,7 +81,11 @@ struct ServerView: View {
     do {
       let endpoint = try ServerEndpoint.normalize(address)
       if endpoint == model.endpoint {
-        dismiss()
+        // On a release first launch the screen holds the default address unsaved; save it.
+        Task {
+          await model.confirmCurrentServer()
+          dismiss()
+        }
       } else if endpoint.scheme == "http" || model.isSignedIn {
         pendingEndpoint = endpoint
         confirming = true
@@ -100,5 +106,13 @@ struct ServerView: View {
         error = model.errorMessage
       }
     }
+  }
+}
+
+extension URL {
+  /// The host and port a person recognises, without the scheme.
+  var serverName: String {
+    guard let host = host(percentEncoded: false) else { return absoluteString }
+    return port.map { "\(host):\($0)" } ?? host
   }
 }

@@ -5,6 +5,7 @@ import SwiftUI
 struct NewBotSheet: View {
   @Environment(AppModel.self) private var app
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   let onCreated: (ThreadTarget) -> Void
   @State private var name = ""
   @State private var role = ""
@@ -53,7 +54,7 @@ struct NewBotSheet: View {
       }
       .onAppear { focused = true }
     }
-    .presentationDetents([.medium, .large])
+    .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
   }
 
   private func create() async {

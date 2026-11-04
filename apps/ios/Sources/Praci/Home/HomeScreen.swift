@@ -45,7 +45,7 @@ struct HomeScreen: View {
     }
     // Pushed screens change agents (rename, settings, archive); reload quietly when Home returns.
     .onAppear { if model.state.value != nil { Task { await model.load(app) } } }
-    .sheet(item: $sheet) { sheet in
+    .sheet(item: $sheet, onDismiss: { Task { await model.load(app) } }) { sheet in
       switch sheet {
       case .newAgent:
         NewBotSheet(onCreated: created)

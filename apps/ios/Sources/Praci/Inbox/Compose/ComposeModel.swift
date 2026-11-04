@@ -32,6 +32,8 @@ final class ComposeModel {
   var bcc = ""
   var subject = ""
   var body = ""
+  /// The quoted original of a reply, kept out of the editable body and appended when sending.
+  private(set) var quote = ""
   var showsCcBcc = false
 
   let mode: ComposeMode
@@ -76,7 +78,11 @@ final class ComposeModel {
         to = prefill.to
         cc = prefill.cc
         subject = prefill.subject
-        body = prefill.body
+        if mode.isForward {
+          body = prefill.body
+        } else {
+          quote = prefill.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         attachments = prefill.attachments
         showsCcBcc = !prefill.cc.isEmpty
         replyToMessageID = mode.isForward ? nil : (prefill.replyToMessageId ?? id)
@@ -123,8 +129,11 @@ final class ComposeModel {
     ComposeDraft(
       clientId: clientID, connectionId: connectionID, replyToMessageId: replyToMessageID,
       forwardOf: mode.forwardID.map { ComposeDraft.Forward(messageId: $0, attachmentIds: attachments.map(\.id)) },
-      to: to, cc: cc, bcc: bcc, subject: subject, body: body)
+      to: to, cc: cc, bcc: bcc, subject: subject, body: fullBody)
   }
+
+  /// What is sent: the typed text, then the quoted original after a blank line.
+  var fullBody: String { quote.isEmpty ? body : body + "\n\n" + quote }
 
   /// Returns true when the message went out and the sheet can close.
   func send() async -> Bool {
