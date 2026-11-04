@@ -17,8 +17,7 @@ struct FinanceScreen: View {
         } description: {
           Text("Connect Mercury or Brex")
         } actions: {
-          Button("Connect") { app.openSettings(.integrations) }
-            .buttonStyle(.borderedProminent)
+          PrimaryActionButton("Connect") { app.openSettings(.integrations) }
             .accessibilityIdentifier("financeConnect")
         }
       }

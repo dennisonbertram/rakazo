@@ -82,7 +82,11 @@ struct ThreadMessageView: View {
     case .file: FileBlockView(block: block)
     case .ask, .choice, .mcpApproval, .appConnect, .connect, .card:
       ApprovalCardView(block: block, messageID: message.id, model: model)
-    default: UnsupportedBlockView()
+    default:
+      // Notes (`meta`) and kinds this version cannot draw: show their text, or nothing.
+      if let text = block.text, !text.isEmpty {
+        Text(verbatim: text).font(.footnote).foregroundStyle(Color.token(.mutedForeground))
+      }
     }
   }
 

@@ -197,8 +197,7 @@ struct DataRoomListView: View {
       ContentUnavailableView {
         Label("No files yet", systemImage: "tray")
       } actions: {
-        Button("Add files") { showingImporter = true }
-          .buttonStyle(.borderedProminent)
+        PrimaryActionButton("Add files") { showingImporter = true }
           .accessibilityIdentifier("addFiles")
       }
     }

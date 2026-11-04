@@ -36,13 +36,14 @@ struct ComposerView: View {
         TextField("Message \(model.title)", text: $composer.text, axis: .vertical)
           .lineLimit(1...5)
           .focused($focused)
-          .padding(.horizontal, 16).padding(.vertical, 10)
+          .padding(.horizontal, 16).frame(minHeight: 44)
           .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22))
           .accessibilityIdentifier("messageField")
         trailing
       }
     }
-    .padding(.horizontal, 16).padding(.vertical, 8)
+    // The glass buttons add about 7 pt around a 30 pt label, which makes them 44 pt like the field.
+    .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 16)
     .task { SendQueue.shared.bind(app) }
     .onChange(of: scenePhase) { _, phase in
       // Not on .inactive: the microphone permission prompt itself makes the scene inactive.
@@ -72,7 +73,7 @@ struct ComposerView: View {
       Button { picking = true } label: { Label("Photo Library", systemImage: "photo") }
       Button { importing = true } label: { Label("Files", systemImage: "doc") }
     } label: {
-      Image(systemName: "plus").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+      Image(systemName: "plus").font(.body.weight(.semibold)).frame(width: 30, height: 30)
     }
     .buttonStyle(.glass)
     .buttonBorderShape(.circle)
@@ -85,9 +86,9 @@ struct ComposerView: View {
     if !model.runningRuns.isEmpty {
       Button { Task { await composer.stop(app) } } label: {
         if composer.stopping {
-          ProgressView().frame(width: 44, height: 44)
+          ProgressView().frame(width: 30, height: 30)
         } else {
-          Image(systemName: "stop.fill").frame(width: 44, height: 44)
+          Image(systemName: "stop.fill").frame(width: 30, height: 30)
         }
       }
       .buttonStyle(.glassProminent)
@@ -99,7 +100,7 @@ struct ComposerView: View {
       DictationButton(model: dictation, text: Bindable(composer).text)
     } else {
       Button { composer.send(app) } label: {
-        Image(systemName: "arrow.up").frame(width: 44, height: 44)
+        Image(systemName: "arrow.up").frame(width: 30, height: 30)
       }
       .buttonStyle(.glassProminent)
       .buttonBorderShape(.circle)

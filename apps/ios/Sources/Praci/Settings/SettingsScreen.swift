@@ -54,7 +54,11 @@ struct SettingsScreen: View {
       }
       .accessibilityIdentifier("account")
       Button { showingServer = true } label: {
-        LabeledContent("Server", value: app.authentication.endpoint.serverName)
+        HStack {
+          LabeledContent("Server", value: app.authentication.endpoint.serverName)
+          Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
+            .foregroundStyle(Color.token(.mutedForeground)).accessibilityHidden(true)
+        }
       }
       .foregroundStyle(Color.primary)
       .accessibilityIdentifier("server")
