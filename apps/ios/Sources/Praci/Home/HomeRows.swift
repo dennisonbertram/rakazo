@@ -4,22 +4,23 @@ import SwiftUI
 struct AgentRowView: View {
   let row: RosterRow
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @ScaledMetric(relativeTo: .headline) private var avatarSize = 40
 
   var body: some View {
-    HStack(spacing: 12) {
-      BotAvatarView(name: row.name, avatar: row.color, size: 40)
+    HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: 12) {
+      BotAvatarView(name: row.name, avatar: row.color, size: avatarSize)
       VStack(alignment: .leading, spacing: 2) {
         let stamp = Text(rowTimestamp(row.updatedAt)).font(.subheadline)
           .foregroundStyle(Color.token(.mutedForeground))
         let dot = Circle().fill(Color.token(.primary)).frame(width: 8, height: 8)
           .accessibilityLabel("Unread")
         if dynamicTypeSize.isAccessibilitySize {
-          // Large text: name gets the full width, time sits on its own line.
-          HStack(alignment: .firstTextBaseline) {
+          // Large text: name gets the full width, time and unread dot sit on their own line.
+          Text(row.name).font(.headline).lineLimit(2)
+          HStack(spacing: 6) {
             if row.unread { dot }
-            Text(row.name).font(.headline).lineLimit(2)
+            stamp
           }
-          stamp
         } else {
           HStack {
             Text(row.name).font(.headline).lineLimit(1)

@@ -56,11 +56,17 @@ struct AgentRowMenu: View {
       case .group(let id): try await ManageClient.update(GroupUpdateInput(groupId: id, pinned: flag), app: app)
       }
       onChange()
-    } catch {}
+    } catch {
+      SystemAlert.present(title: String(localized: "Could not update"), message: error.localizedDescription)
+    }
   }
 
   private func archive() async {
-    try? await ManageClient.archive(target, name: name, app: app, onChange: onChange)
+    do {
+      try await ManageClient.archive(target, name: name, app: app, onChange: onChange)
+    } catch {
+      SystemAlert.present(title: String(localized: "Could not archive"), message: error.localizedDescription)
+    }
   }
 
   /// A system alert, because the menu is gone before a SwiftUI alert could appear.
@@ -76,33 +82,53 @@ struct AgentRowMenu: View {
           case .group(let id): try await ManageClient.update(GroupUpdateInput(groupId: id, name: newName), app: app)
           }
           onChange()
-        } catch {}
+        } catch {
+          SystemAlert.present(title: String(localized: "Could not rename"), message: error.localizedDescription)
+        }
       }
     }
   }
 }
 
 @MainActor
-private enum RenameAlert {
-  static func present(current: String, save: @escaping @MainActor (String) -> Void) {
+private enum SystemAlert {
+  static func present(title: String, message: String? = nil, configure: (UIAlertController) -> Void = { _ in }) {
     guard
       let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
         .first(where: { $0.activationState == .foregroundActive }),
       var top = scene.keyWindow?.rootViewController
     else { return }
     while let next = top.presentedViewController { top = next }
-    let alert = UIAlertController(title: String(localized: "Rename"), message: nil, preferredStyle: .alert)
-    alert.addTextField { field in
-      field.text = current
-      field.autocapitalizationType = .words
-      field.accessibilityIdentifier = "renameField"
-    }
-    alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
-    alert.addAction(
-      UIAlertAction(title: String(localized: "Save"), style: .default) { _ in
-        let value = ManageClient.clean(alert.textFields?.first?.text ?? "")
-        if !value.isEmpty, value != current { save(value) }
-      })
+    let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+    configure(alert)
+    if alert.actions.isEmpty { alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .cancel)) }
     top.present(alert, animated: true)
+  }
+}
+
+@MainActor
+private enum RenameAlert {
+  static func present(current: String, save: @escaping @MainActor (String) -> Void) {
+    SystemAlert.present(title: String(localized: "Rename")) { alert in
+      alert.addTextField { field in
+        field.text = current
+        field.autocapitalizationType = .words
+        field.accessibilityIdentifier = "renameField"
+      }
+      alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
+      let saveAction = UIAlertAction(title: String(localized: "Save"), style: .default) { _ in
+        if let value = ManageClient.renamed(alert.textFields?.first?.text ?? "", from: current) { save(value) }
+      }
+      saveAction.isEnabled = false
+      alert.addAction(saveAction)
+      // Save stays disabled for a blank or unchanged name, so the alert cannot close without saving.
+      if let field = alert.textFields?.first {
+        NotificationCenter.default.addObserver(
+          forName: UITextField.textDidChangeNotification, object: field, queue: .main
+        ) { _ in
+          saveAction.isEnabled = ManageClient.renamed(field.text ?? "", from: current) != nil
+        }
+      }
+    }
   }
 }
