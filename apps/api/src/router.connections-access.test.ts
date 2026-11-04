@@ -236,6 +236,7 @@ describe("connections.access and setAccess", () => {
     expect((await h.call("connections/access", { connectionId: "a" })).json).toEqual({
       allAgents: true,
       botIds: [],
+      agentShared: true,
     });
   });
 
@@ -290,14 +291,14 @@ describe("connections.access and setAccess", () => {
       allAgents: false,
       botIds: ["b1", "b2", "b1"],
     });
-    expect(set.json).toEqual({ allAgents: false, botIds: ["b1", "b2"] });
+    expect(set.json).toEqual({ allAgents: false, botIds: ["b1", "b2"], agentShared: true });
     expect((await h.call("connections/access", { connectionId: "a" })).json).toEqual(set.json);
     const reset = await h.call("connections/setAccess", {
       connectionId: "a",
       allAgents: true,
       botIds: [],
     });
-    expect(reset.json).toEqual({ allAgents: true, botIds: [] });
+    expect(reset.json).toEqual({ allAgents: true, botIds: [], agentShared: true });
   });
 
   it("rejects another user's connection and another user's bot", async () => {
@@ -370,15 +371,15 @@ describe("connections.access and setAccess", () => {
     expect(h.access.map((row) => row.botId).sort()).toEqual(["agent", "other"]);
   });
 
-  it("rejects a selection that leaves out the owning agent", async () => {
+  it("keeps the owning agent when a selection leaves it out", async () => {
     const h = agentHarness();
     const result = await h.call("connections/setAccess", {
       connectionId: "a",
       allAgents: false,
       botIds: ["other"],
     });
-    expect(result.status).toBeGreaterThanOrEqual(400);
-    expect(h.access).toEqual([{ connectionId: "a", botId: "agent", userId: "u1", spaceId: "s1" }]);
+    expect(result.status).toBeLessThan(400);
+    expect(h.access.map((row) => row.botId).sort()).toEqual(["agent", "other"]);
   });
 
   it("starts a new account private and copies no sibling's access", async () => {

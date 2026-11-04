@@ -182,11 +182,8 @@ export function McpDetail({
       const exclusive = (value: boolean) =>
         rpc.integrationAgents.setExclusive({ serverId: server.id, exclusive: value });
       if (shared) {
-        // Exclusivity must be off first: the server refuses to grant an exclusive server to other agents.
+        // Other agents start off; the owner turns on the ones they want.
         await exclusive(false);
-        await settleAll(
-          data.bots.filter((bot) => !assigned(bot.id)).map((bot) => assign(bot.id, true)),
-        );
         return;
       }
       await exclusive(true);

@@ -108,23 +108,23 @@ export function buildApprovalAskBlock(
   const detail = shareTarget
     ? `${shareTarget} will ask before every action after it reads the meeting.`
     : options?.schedule
-    ? [options.reviewReason?.trim(), options.schedule.detail].filter(Boolean).join("\n")
-    : options?.imessage
-      ? imessageSendDetail(args, options.imessage, options.reviewReason)
-      : options?.fullMail
-        ? fullMailDetail(args, options.reviewReason)
-        : isSendMoney(toolName)
-          ? moneyDetail(args, options?.moneyNames, options?.reviewReason)
-          : options?.fullCompany
-            ? JSON.stringify(args, null, 2)
-            : options?.integrationWriteTool !== undefined
-              ? integrationWriteDetail(
-                  toolName,
-                  options.integrationWriteTool,
-                  args,
-                  options.reviewReason,
-                )
-              : formatApprovalDetail(toolName, args, options?.reviewReason);
+      ? [options.reviewReason?.trim(), options.schedule.detail].filter(Boolean).join("\n")
+      : options?.imessage
+        ? imessageSendDetail(args, options.imessage, options.reviewReason)
+        : options?.fullMail
+          ? fullMailDetail(args, options.reviewReason)
+          : isSendMoney(toolName)
+            ? moneyDetail(args, options?.moneyNames, options?.reviewReason)
+            : options?.fullCompany
+              ? JSON.stringify(args, null, 2)
+              : options?.integrationWriteTool !== undefined
+                ? integrationWriteDetail(
+                    toolName,
+                    options.integrationWriteTool,
+                    args,
+                    options.reviewReason,
+                  )
+                : formatApprovalDetail(toolName, args, options?.reviewReason);
   const safeDetail = detail ? redactSecrets(detail, secrets) : undefined;
   return {
     kind: "ask",
@@ -559,6 +559,13 @@ const HAND_WRITTEN_TOOLS = new Set([
   "contacts_save",
 ]);
 
+/** The scope an email thread agent's read asks about, so the card shows what would be looked up. */
+const READ_SCOPE_KEYS: Record<string, string[]> = {
+  search_data_room: ["query", "filters"],
+  read_data_room_item: ["item_id"],
+  contacts_list: ["query", "kind"],
+};
+
 function formatApprovalDetail(
   toolName: string,
   args: Record<string, unknown>,
@@ -575,15 +582,17 @@ function formatApprovalDetail(
   }
   // A fetch carries data in its path and query, so the card shows the whole URL.
   const keys =
-    toolName === "contacts_save"
+    READ_SCOPE_KEYS[toolName] ??
+    (toolName === "contacts_save"
       ? ["name", "email", "organization", "kind", "notes"]
       : SITE_GATED_TOOLS.has(toolName)
         ? ["url"]
-        : ["collection", "title", "to", "subject", "amount", "body"];
+        : ["collection", "title", "to", "subject", "amount", "body"]);
   for (const key of keys) {
     const value = args[key];
     if (value == null || value === "") continue;
-    lines.push(`${key}: ${String(value)}`);
+    const text = typeof value === "object" ? JSON.stringify(value) : String(value);
+    lines.push(`${key}: ${READ_SCOPE_KEYS[toolName] ? truncate(text, 300) : text}`);
   }
   if (lines.length === 0) return undefined;
   return lines.join("\n");

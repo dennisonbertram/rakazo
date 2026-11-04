@@ -941,6 +941,8 @@ async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId
     where: { id: connectionId, spaceId: actor.spaceId, userId: actor.userId },
     select: {
       allAgents: true,
+      agentShared: true,
+      agentBotId: true,
       botAccess: {
         where: { spaceId: actor.spaceId, userId: actor.userId },
         select: { botId: true },
@@ -949,7 +951,13 @@ async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId
     },
   });
   if (!row) throw new IsolationError();
-  return { allAgents: row.allAgents, botIds: row.botAccess.map((entry) => entry.botId) };
+  const botIds = row.botAccess.map((entry) => entry.botId);
+  return {
+    allAgents: row.allAgents,
+    botIds,
+    // Shared once anyone else has access, and it stays shared when they are all switched off.
+    agentShared: row.agentShared || row.allAgents || botIds.some((id) => id !== row.agentBotId),
+  };
 }
 
 /** Every connection of the caller with the agents that can really use it, in one pass. */
@@ -7324,9 +7332,19 @@ export function createRouter(deps: RouterDeps): AppRouter {
               provider: true,
               agentBotId: true,
               privateByDefault: true,
+              agentShared: true,
+              allAgents: true,
+              botAccess: { select: { botId: true } },
             },
           });
           if (!connection) throw new IsolationError();
+          // Sharing is on once anyone besides the agent has access, and None does not turn it off.
+          const agentShared =
+            connection.agentShared ||
+            connection.allAgents ||
+            connection.botAccess.some((entry) => entry.botId !== connection.agentBotId) ||
+            input.allAgents ||
+            botIds.some((id) => id !== connection.agentBotId);
           const standalone = Boolean(connection.agentBotId || connection.privateByDefault);
           if (connection.agentBotId) {
             const activeAgent = await tx.bot.updateMany({
@@ -7344,15 +7362,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
                 message: "The connection agent is no longer active",
               });
           }
-          if (
-            connection.agentBotId &&
-            !input.allAgents &&
-            !botIds.includes(connection.agentBotId)
-          ) {
-            throw new ORPCError("BAD_REQUEST", {
-              message: "The connection's agent must keep access",
-            });
-          }
+          // The connection's agent always keeps access, even when a client saved without it.
           if (connection.agentBotId) botIds = [...new Set([...botIds, connection.agentBotId])];
           const bots = await tx.bot.count({
             where: { id: { in: botIds }, spaceId: actor.spaceId, userId: actor.userId },
@@ -7383,7 +7393,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
               // A sibling provisioned or archived since it was listed is never shared with it.
               privateByDefault: connection.privateByDefault,
             },
-            data: { allAgents: input.allAgents },
+            data: { allAgents: input.allAgents, ...(connection.agentBotId ? { agentShared } : {}) },
           });
           if (updated.count !== ids.length)
             throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
