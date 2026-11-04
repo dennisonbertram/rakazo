@@ -630,7 +630,7 @@ async function brexOwnerScope(
 }
 
 export async function setIntegrationExclusive(
-  prisma: Pick<PrismaClient, "mcpServer" | "spaceMember">,
+  prisma: Pick<PrismaClient, "mcpServer" | "spaceMember" | "botMcpServer" | "$transaction">,
   actor: Actor,
   serverId: string,
   exclusive: boolean,
@@ -643,16 +643,20 @@ export async function setIntegrationExclusive(
     throw new ORPCError("BAD_REQUEST", { message: "Zernio is always exclusive" });
   if (!server.agentBotId)
     throw new ORPCError("BAD_REQUEST", { message: "This server has no agent" });
-  // Archiving the agent can release the server after the check above: only the checked agent counts.
-  const { count } = await prisma.mcpServer.updateMany({
-    where: {
-      ...scope(target, server.id),
-      endpoint: server.endpoint,
-      agentBotId: server.agentBotId,
-    },
-    data: { agentExclusive: exclusive },
+  const agentBotId = server.agentBotId;
+  await prisma.$transaction(async (tx) => {
+    // Archiving the agent can release the server after the check above: only the checked agent counts.
+    const { count } = await tx.mcpServer.updateMany({
+      where: { ...scope(target, server.id), endpoint: server.endpoint, agentBotId },
+      data: { agentExclusive: exclusive },
+    });
+    if (!count) throw new ORPCError("CONFLICT", { message: "The integration changed; retry" });
+    // Sharing starts with every other agent off, not with grants left from an earlier share.
+    if (!exclusive)
+      await tx.botMcpServer.deleteMany({
+        where: { serverId: server.id, spaceId: target.spaceId, botId: { not: agentBotId } },
+      });
   });
-  if (!count) throw new ORPCError("CONFLICT", { message: "The integration changed; retry" });
   return loadServer(prisma, target, server.id);
 }
 

@@ -122,6 +122,7 @@ export async function completeNativeOAuth(options: {
             agentBotId: old.agentBotId,
             writesEnabled: old.writesEnabled,
             allAgents: old.allAgents,
+            agentShared: old.agentShared,
             privateByDefault: old.privateByDefault,
           };
           await tx.connection.delete({ where: { id: taken.id } });

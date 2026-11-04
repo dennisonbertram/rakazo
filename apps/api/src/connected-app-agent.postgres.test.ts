@@ -338,6 +338,39 @@ describePostgres("connected app agents (PostgreSQL)", () => {
     ).toMatchObject({ agentBotId: null, writesEnabled: false, allAgents: true });
   });
 
+  it.each(["archive", "delete"] as const)(
+    "keeps a shared connection's explicit owner-only selection on bot %s",
+    async (mode) => {
+      const connection = await createConnection();
+      const { botId } = await connections().createAgent({ connectionId: connection.id });
+      // Sharing on with every other agent off: the owner's choice, not a leftover default.
+      await connections().setExclusive({ connectionId: connection.id, exclusive: false });
+      const bot = await prisma.bot.findUniqueOrThrow({ where: { id: botId } });
+      if (mode === "archive") await archiveBot(lifecycleDeps(), bot, lifecycleContext());
+      else await destroyBot(lifecycleDeps(), bot, lifecycleContext(), { deleteMemories: true });
+      expect(
+        await prisma.connection.findUniqueOrThrow({ where: { id: connection.id } }),
+      ).toMatchObject({ agentBotId: null, allAgents: false });
+    },
+  );
+
+  it("keeps the agent on a least-access save made without it, as Skip can after a background link", async () => {
+    const connection = await createConnection();
+    const { botId } = await connections().createAgent({ connectionId: connection.id });
+    await connections().setAccess({ connectionId: connection.id, allAgents: false, botIds: [] });
+    expect(
+      await prisma.connection.findUniqueOrThrow({ where: { id: connection.id } }),
+    ).toMatchObject({ allAgents: false });
+    expect(
+      (
+        await prisma.botConnectionAccess.findMany({
+          where: { connectionId: connection.id },
+          select: { botId: true },
+        })
+      ).map((entry) => entry.botId),
+    ).toEqual([botId]);
+  });
+
   it("does not create or link an agent for another owner or space", async () => {
     const otherConnection = await createConnection(otherOwner);
     await expect(

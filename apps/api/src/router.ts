@@ -7362,15 +7362,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
                 message: "The connection agent is no longer active",
               });
           }
-          if (
-            connection.agentBotId &&
-            !input.allAgents &&
-            !botIds.includes(connection.agentBotId)
-          ) {
-            throw new ORPCError("BAD_REQUEST", {
-              message: "The connection's agent must keep access",
-            });
-          }
+          // The connection's agent always keeps access, even when a client saved without it.
           if (connection.agentBotId) botIds = [...new Set([...botIds, connection.agentBotId])];
           const bots = await tx.bot.count({
             where: { id: { in: botIds }, spaceId: actor.spaceId, userId: actor.userId },
