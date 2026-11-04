@@ -64,7 +64,7 @@ export function PageCard({
   return (
     <div
       data-testid="page-card"
-      className="w-[min(340px,90%)] rounded-[18px] border border-border bg-muted px-[18px] py-4"
+      className="w-[340px] max-w-full rounded-[18px] border border-border bg-muted px-[18px] py-4"
     >
       {gone ? (
         <>
@@ -90,7 +90,7 @@ export function PageCard({
               type="button"
               disabled={busy}
               onClick={() => void toggle()}
-              className="mt-2 text-[13.5px] text-muted-foreground hover:text-foreground disabled:opacity-60"
+              className="mt-2 block text-start text-[13.5px] text-muted-foreground hover:text-foreground disabled:opacity-60"
             >
               {added ? <Trans>Remove from sidebar</Trans> : <Trans>Add to sidebar</Trans>}
             </button>

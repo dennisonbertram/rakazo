@@ -21,6 +21,7 @@ enum Route: Hashable, Sendable {
   case legal
   case capTable
   case dataRoom
+  case dataRoomItem(itemID: String)
   case meetings
   case meeting(id: String)
 
@@ -35,7 +36,12 @@ enum Route: Hashable, Sendable {
       self = .agentPage(botID: parts[1], pageID: parts[2])
     case "artifacts" where parts.count == 2 && !parts[1].isEmpty:
       self = .artifact(artifactID: parts[1])
-    case "data-room" where parts.count == 1: self = .dataRoom
+    case "data-room" where parts.count == 1:
+      if let id = url.queryItems?.first(where: { $0.name == "item" })?.value, !id.isEmpty {
+        self = .dataRoomItem(itemID: id)
+      } else {
+        self = .dataRoom
+      }
     default: return nil
     }
   }
