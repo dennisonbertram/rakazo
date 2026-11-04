@@ -11,6 +11,7 @@ struct InboxScreen: View {
 private struct InboxContent: View {
   let app: AppModel
   @State private var model: InboxModel
+  @State private var composing = false
 
   init(app: AppModel) {
     self.app = app
@@ -28,6 +29,10 @@ private struct InboxContent: View {
     .onSubmit(of: .search) { Task { await model.search() } }
     .toolbar {
       if let list = model.list {
+        ToolbarItem {
+          Button { composing = true } label: { Label("New message", systemImage: "square.and.pencil") }
+            .accessibilityIdentifier("inboxCompose")
+        }
         if list.accounts.count > 1 {
           ToolbarItem {
             Menu {
@@ -63,7 +68,15 @@ private struct InboxContent: View {
     } message: {
       Text(verbatim: model.actionError ?? "")
     }
+    .sheet(isPresented: $composing) {
+      ComposeSheet(
+        replyTo: nil, forward: nil, onSent: { model.show("Sent") }, onSaved: { model.show("Draft saved") })
+    }
     .task { await model.start() }
+    .onAppear { Task { await model.refreshOnReturn() } }
+    .onReceive(NotificationCenter.default.publisher(for: .inboxMessageArchived)) { note in
+      if let id = note.object as? String { model.archivedElsewhere(id) }
+    }
   }
 
   private var accountSelection: Binding<String?> {
@@ -85,10 +98,13 @@ private struct ToastView: View {
       switch toast.undo {
       case .unarchive: Text("Archived")
       case .batch: Text("Moved to spam")
+      case .note(let text): Text(text)
       }
-      Button("Undo") { Task { await model.undo(toast) } }
-        .fontWeight(.semibold)
-        .accessibilityIdentifier("inboxUndo")
+      if case .note = toast.undo {} else {
+        Button("Undo") { Task { await model.undo(toast) } }
+          .fontWeight(.semibold)
+          .accessibilityIdentifier("inboxUndo")
+      }
     }
     .font(.subheadline)
     .padding(.horizontal, 20)
@@ -96,7 +112,7 @@ private struct ToastView: View {
     .glassEffect()
     .padding(.bottom, 8)
     .task(id: toast.id) {
-      try? await Task.sleep(for: .seconds(5))
+      try? await Task.sleep(for: .seconds(4))
       model.dismissToast(toast.id)
     }
   }

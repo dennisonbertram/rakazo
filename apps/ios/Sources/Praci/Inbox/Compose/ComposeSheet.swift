@@ -8,17 +8,21 @@ struct ComposeSheet: View {
   let forward: String?
   var replyAll = false
   var onSent: (() -> Void)?
+  var onSaved: (() -> Void)?
   @Environment(AppModel.self) private var app
 
-  init(replyTo: String?, forward: String?, replyAll: Bool = false, onSent: (() -> Void)? = nil) {
+  init(replyTo: String?, forward: String?, replyAll: Bool = false, onSent: (() -> Void)? = nil,
+    onSaved: (() -> Void)? = nil
+  ) {
     self.replyTo = replyTo
     self.forward = forward
     self.replyAll = replyAll
     self.onSent = onSent
+    self.onSaved = onSaved
   }
 
   var body: some View {
-    ComposeContent(app: app, mode: mode, onSent: onSent)
+    ComposeContent(app: app, mode: mode, onSent: onSent, onSaved: onSaved)
   }
 
   private var mode: ComposeMode {
@@ -31,6 +35,8 @@ struct ComposeSheet: View {
 private struct ComposeContent: View {
   @State private var model: ComposeModel
   let onSent: (() -> Void)?
+  let onSaved: (() -> Void)?
+  @State private var showsQuote = false
   @State private var asking = false
   @Environment(\.dismiss) private var dismiss
   @FocusState private var focus: Field?
@@ -38,9 +44,10 @@ private struct ComposeContent: View {
   // swiftlint:disable:next identifier_name
   private enum Field { case to, cc, bcc, subject, body }
 
-  init(app: AppModel, mode: ComposeMode, onSent: (() -> Void)?) {
+  init(app: AppModel, mode: ComposeMode, onSent: (() -> Void)?, onSaved: (() -> Void)?) {
     _model = State(initialValue: ComposeModel(mode: mode, client: .live(app)))
     self.onSent = onSent
+    self.onSaved = onSaved
   }
 
   var body: some View {
@@ -68,7 +75,7 @@ private struct ComposeContent: View {
     }
     .interactiveDismissDisabled(model.hasChanges || model.isSending)
     .confirmationDialog("This draft has changes", isPresented: $asking, titleVisibility: .visible) {
-      Button("Save draft") { Task { if await model.saveDraft() { dismiss() } } }
+      Button("Save draft") { Task { if await model.saveDraft() { onSaved?(); dismiss() } } }
         .accessibilityIdentifier("composeSaveDraft")
       Button("Discard draft", role: .destructive) { Task { await model.discard(); dismiss() } }
         .accessibilityIdentifier("composeDiscard")
@@ -127,11 +134,30 @@ private struct ComposeContent: View {
       Section {
         TextEditor(text: $model.body)
           .focused($focus, equals: .body)
-          .frame(minHeight: 220)
+          .frame(minHeight: model.quote.isEmpty ? 220 : 120)
           .accessibilityIdentifier("composeBody")
+        if !model.quote.isEmpty {
+          Button { showsQuote.toggle() } label: {
+            Text("…").foregroundStyle(Color.token(.mutedForeground))
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(showsQuote ? "Hide quoted text" : "Show quoted text")
+          .accessibilityIdentifier("composeQuoteToggle")
+          if showsQuote {
+            Text(verbatim: model.quote)
+              .font(.subheadline)
+              .foregroundStyle(Color.token(.mutedForeground))
+              .textSelection(.enabled)
+          }
+        }
       }
     }
     .scrollDismissesKeyboard(.interactively)
+    .task {
+      // A reply or forward opens ready to type; a new message starts at To.
+      try? await Task.sleep(for: .milliseconds(300))
+      focus = model.mode == .new ? .to : .body
+    }
   }
 
   private func recipient(_ title: LocalizedStringKey, text: Binding<String>, field: Field, invalid: Bool) -> some View {
