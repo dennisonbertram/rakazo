@@ -2108,10 +2108,10 @@ describePostgres("inbox procedures (PostgreSQL)", () => {
         expect(byId("vip-1")).toMatchObject({ feedback: "important", priority: "important" });
         expect(byId("vip-2")).toMatchObject({ feedback: "important", priority: "important" });
         expect(byId("peer")).toMatchObject({ feedback: null, priority: "normal" });
-        // Newer peer mail used to lead Needs reply; the important sender's mail now comes first.
+        // Needs reply lists newest first (d84bb9342); priority no longer reorders it.
         expect(groupInbox(all.rows, new Date()).needsReply.map((r) => r.subject)).toEqual([
-          "Subject vip-2",
           "Subject peer",
+          "Subject vip-2",
         ]);
       });
 
