@@ -3366,13 +3366,25 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const rows = await connectionRowsNow();
             const readable = all.filter((account) => accountAllowedIn(rows, account.id, "read"));
             if (readable.length > 0) {
-              const names = readable.map(
-                (account) =>
-                  (account as { address?: string; label?: string }).address ??
-                  (account as { label?: string }).label ??
-                  "that account",
+              const nameOf = (account: { id: string }) =>
+                (account as { address?: string; label?: string }).address ??
+                (account as { label?: string }).label ??
+                "that account";
+              // The changes switch of the connection is its own reason: say which one to turn on.
+              const off = readable.filter(
+                (account) => rows.find((row) => row.id === account.id)?.writesEnabled === false,
               );
-              return `This agent can read but not change ${names.join(", ")}. Change that under Access on that account's Integrations page.`;
+              const readOnly = readable.filter((account) => !off.includes(account));
+              return [
+                off.length > 0
+                  ? `Changes are off for ${off.map(nameOf).join(", ")}. Turn on Allow changes on that account's Integrations page.`
+                  : "",
+                readOnly.length > 0
+                  ? `This agent can read but not change ${readOnly.map(nameOf).join(", ")}. Change that under Access on that account's Integrations page.`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
             }
           }
           return GOOGLE_BUILTIN_WRITES.has(toolName) && linked

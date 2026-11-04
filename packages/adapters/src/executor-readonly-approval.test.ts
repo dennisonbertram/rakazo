@@ -1764,7 +1764,7 @@ describe("built-in mail on a connection with an integration agent", () => {
       gmail({ agentBotId: "agent-x", writesEnabled: false }),
     ]);
     await f.run();
-    expect(f.results[0]).toEqual({ error: expect.stringContaining("agent") });
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("Changes are off") });
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
     expect(mail.createDraft).not.toHaveBeenCalled();
   });
@@ -1867,7 +1867,10 @@ describe("built-in mail on a connection with an integration agent", () => {
     it("refuses a write grant while the connection's changes switch is off", async () => {
       const { f, mail } = draftRun(null, [granted(true, false)]);
       await f.run();
-      expect(f.results[0]).toEqual({ error: expect.any(String) });
+      expect(f.results[0]).toEqual({
+        error:
+          "Changes are off for me@example.test. Turn on Allow changes on that account's Integrations page.",
+      });
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
       expect(mail.createDraft).not.toHaveBeenCalled();
     });
@@ -2354,7 +2357,7 @@ describe("Google agents and linked accounts", () => {
     });
     f.setCalls([{ args: mailSend, executionId: "call-1" }]);
     await f.run();
-    expect(f.results[0]).toEqual({ error: expect.stringContaining("agent") });
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("Changes are off") });
   });
 
   it("does not offer another bot a Gmail linked to the Inbox agent, but does once shared", async () => {
