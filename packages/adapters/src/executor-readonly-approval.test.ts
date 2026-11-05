@@ -3468,6 +3468,24 @@ describe("integration agent asked by another bot", () => {
     expect(f.execute).toHaveBeenCalledOnce();
   });
 
+  it("resolves a catalog wrapper to a directly connected source's tool for a peer", async () => {
+    const f = fixture({
+      catalog: true,
+      name: "add_contact",
+      readOnly: false,
+      trigger: "bot_message",
+      spawnKey: agentKey,
+      peer: { senderInScope: true, linked: true },
+      route: { connectorId: "installed", resourceId: "server-1", toolName: "add_contact" },
+    });
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    // Once the user approves, the resolved source tool reaches the connector.
+    f.effects[0]!.status = "approved";
+    await f.run();
+    expect(f.execute).toHaveBeenCalledOnce();
+  });
+
   it("gives a peer from another space or user nothing", async () => {
     const f = peerRun({ senderInScope: false, linked: true }, agentKey);
     await f.run();

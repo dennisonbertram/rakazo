@@ -6033,6 +6033,8 @@ export function createRouter(deps: RouterDeps): AppRouter {
       remove: authed.capabilities.remove.handler(async ({ context, input }) => {
         let agentToArchive: string | null = null;
         await deps.prisma.$transaction(async (tx) => {
+          // Locked first, so provisioning cannot link an agent between this read and the delete.
+          await tx.$queryRaw`SELECT id FROM capability_installs WHERE id = ${input.id} FOR UPDATE`;
           const existing = await tx.capabilityInstall.findFirst({
             where: {
               id: input.id,

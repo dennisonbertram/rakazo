@@ -273,4 +273,38 @@ describePostgres("sources have their own agent and access list (PostgreSQL)", ()
       "New name agent",
     );
   });
+
+  it("backfills a source even when more than ten retired ones come first", async () => {
+    for (let n = 0; n < 11; n += 1) {
+      const retired = await makeSource(`Retired ${n}`);
+      await prisma.bot.create({
+        data: {
+          id: id(`retired-${n}`),
+          name: "old",
+          color: "#000",
+          spaceId,
+          userId,
+          spawnKey: integrationAgentSpawnKey(retired.id),
+          archivedAt: new Date(),
+        } as never,
+      });
+    }
+    const live = await makeSource("Needs an agent");
+    const listed = (await api().capabilities.list()).find((entry) => entry.id === live.id)!;
+    expect(listed.agentBotId).toBeTruthy();
+  });
+
+  it("keeps the agent's name in step with a rename and archives it on remove", async () => {
+    const source = await makeSource("Before");
+    const { botId } = await api().capabilities.createAgent({ id: source.id });
+    await api().capabilities.rename({ id: source.id, name: "After" });
+    expect((await prisma.bot.findUniqueOrThrow({ where: { id: botId } })).name).toBe("After agent");
+    await api().capabilities.setWrites({ id: source.id, enabled: true });
+    await expect(
+      Promise.all([
+        api().capabilities.rename({ id: source.id, name: "Third" }),
+        api().capabilities.setWrites({ id: source.id, enabled: false }),
+      ]),
+    ).resolves.toBeDefined();
+  });
 });

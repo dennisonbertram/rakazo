@@ -808,6 +808,7 @@ describe("installed sources are filtered by agent", () => {
     const fetch = vi.fn(async () => Response.json({ items: [] }));
     const provider = new InstalledConnectorProvider(prisma as never, {} as never, {
       fetch: fetch as unknown as typeof globalThis.fetch,
+      resolveHostname: async () => [{ address: "203.0.113.10", family: 4 as const }],
     });
     const context = (botId?: string) =>
       ({
@@ -911,5 +912,30 @@ describe("installed sources are filtered by agent", () => {
         context("other"),
       ),
     ).resolves.toBeUndefined();
+  });
+
+  it("refuses a change at dispatch when the agent may only read, and lets a read through", async () => {
+    const { provider, context, fetch } = setup(apiInstall({ writesEnabled: false }), {
+      id: "owner",
+    });
+    const run = async (tool: string) => {
+      const events: unknown[] = [];
+      for await (const event of provider.execute(
+        {
+          tool,
+          args: {},
+          executionId: "call-w",
+          route: { connectorId: "installed", resourceId: "api-1", toolName: tool },
+        },
+        context("owner"),
+      ))
+        events.push(event);
+      return events;
+    };
+    expect(await run("add_contact")).toEqual([
+      { type: "error", message: "Installed connector is unavailable" },
+    ]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await run("list_contacts")).toMatchObject([{ type: "result" }]);
   });
 });

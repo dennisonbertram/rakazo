@@ -297,10 +297,21 @@ export class InstalledConnectorProvider implements ConnectorProvider {
       yield { type: "error", message: "Installed connector route is missing" };
       return;
     }
-    const install = (await this.accessibleInstalls(context, installId))[0]?.install;
-    if (!install) {
+    const found = (await this.accessibleInstalls(context, installId))[0];
+    const install = found?.install;
+    if (!found || !install) {
       yield { type: "error", message: "Installed connector is unavailable" };
       return;
+    }
+    // Without a write grant only a read runs, whatever was offered when the tools were listed.
+    if (!found.write) {
+      const toolName = call.route?.toolName ?? call.tool;
+      const tools = await this.discoverInstall(install, context, await this.remoteFor(context));
+      const tool = tools.find((candidate) => candidate.route?.toolName === toolName);
+      if (tool?.readOnly !== true) {
+        yield { type: "error", message: "Installed connector is unavailable" };
+        return;
+      }
     }
     let credential: string | undefined;
     try {

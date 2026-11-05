@@ -120,10 +120,16 @@ export async function ensureSourceAgent(
       });
       if (!linked.count)
         throw new ORPCError("CONFLICT", { message: "The source already has an agent" });
-      return tx.capabilityInstall.findFirstOrThrow({
+      const current = await tx.capabilityInstall.findFirstOrThrow({
         where: scope(actor, installId),
         include: withAccess,
       });
+      // A rename that landed while the agent was made would otherwise leave the old name.
+      await tx.bot.updateMany({
+        where: { id: bot.id, ...scope(actor) },
+        data: { name: `${current.name} agent` },
+      });
+      return current;
     });
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const existed = Boolean(
@@ -169,7 +175,6 @@ export async function provisionMissingSourceAgents(deps: SourceAgentDeps, actor:
   const missing = await deps.prisma.capabilityInstall.findMany({
     where: { ...scope(actor), kind: { in: SOURCE_KINDS }, agentBotId: null },
     select: { id: true },
-    take: 10,
   });
   if (missing.length === 0) return;
   const retired = new Set(
@@ -184,9 +189,11 @@ export async function provisionMissingSourceAgents(deps: SourceAgentDeps, actor:
       })
     ).map((bot) => bot.spawnKey),
   );
-  for (const row of missing)
-    if (!retired.has(integrationAgentSpawnKey(row.id)))
-      await provisionSourceAgent(deps, actor, row.id);
+  // Retired sources are left out before the cap, so they cannot crowd out ones that need an agent.
+  for (const row of missing
+    .filter((entry) => !retired.has(integrationAgentSpawnKey(entry.id)))
+    .slice(0, 10))
+    await provisionSourceAgent(deps, actor, row.id);
 }
 
 /** Runs the change on the source's row under a lock, with the agent still active. */
@@ -290,13 +297,20 @@ export const setSourceAgentAccess = (
     });
   });
 
-/** Renames the source and its agent together. */
-export const renameSource = (prisma: Prisma, actor: Actor, id: string, name: string) =>
-  mutate(prisma, actor, id, async (tx, row) => {
+/**
+ * Renames the source, then its agent. The agent is renamed after the source's row lock is gone,
+ * so no path takes the bot row inside that lock (archive and provisioning take the bot first).
+ * Provisioning reads the current name when it links, so a race still ends with matching names.
+ */
+export async function renameSource(prisma: Prisma, actor: Actor, id: string, name: string) {
+  await mutate(prisma, actor, id, async (tx) => {
     await tx.capabilityInstall.update({ where: { id }, data: { name } });
-    if (row.agentBotId)
-      await tx.bot.updateMany({
-        where: { id: row.agentBotId, ...scope(actor) },
-        data: { name: `${name} agent` },
-      });
   });
+  const row = await loadSource(prisma, actor, id);
+  if (row.agentBotId)
+    await prisma.bot.updateMany({
+      where: { id: row.agentBotId, ...scope(actor) },
+      data: { name: `${row.name} agent` },
+    });
+  return row;
+}
