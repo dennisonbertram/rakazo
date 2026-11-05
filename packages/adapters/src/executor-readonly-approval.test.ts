@@ -1690,8 +1690,9 @@ describe("unattended mail_modify and mail_send", () => {
     ] as never);
     f.prisma.contact.findMany.mockResolvedValue([{ email: "friend@example.test" }]);
     await f.run();
-    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
-    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+    // A routine has nobody to ask: the archive is skipped and the agent is told, so it reports it.
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("was skipped") });
   });
 
   it("asks when INBOX is removed by label name, since that archives the thread too", async () => {
@@ -1703,15 +1704,17 @@ describe("unattended mail_modify and mail_send", () => {
         { fromAddress: "friend@example.test" },
       ] as never);
       await f.run();
-      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("was skipped") });
     }
   });
 
-  it("asks for an archive of a message that is not cached, since its thread is unknown", async () => {
+  it("skips an archive of a message that is not cached, since its thread is unknown", async () => {
     const f = mailFixture("mail_modify", allow("mail_modify"));
     f.prisma.cachedMailMessage.findFirst.mockResolvedValue(null as never);
     await f.run();
-    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("was skipped") });
   });
 
   it("asks for a protected archive even when the call is attended and under a tool Allow", async () => {
@@ -1728,6 +1731,37 @@ describe("unattended mail_modify and mail_send", () => {
     ]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    // A saved rule cannot clear this card, so it says why and offers only Allow once and Deny.
+    const card = JSON.stringify(f.pauseRunForInput.mock.calls[0]);
+    expect(card).toContain(
+      "Asked because this conversation is from someone you marked important or saved as a contact.",
+    );
+    expect(card).not.toContain("Always allow");
+  });
+
+  it("says why an agent-account send asks and offers no Always allow", async () => {
+    const mail = {
+      listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+    };
+    const f = fixture({
+      name: "mail_send",
+      builtin: true,
+      rules: allow("mail_send"),
+      mail,
+      spawnKey: inboxAgentSpawnKey("user-1"),
+      connectionRows: [{ ...mailConnectionRow(), agentBotId: "bot-1", writesEnabled: true }],
+    });
+    f.setCalls([
+      {
+        args: { account: "me@example.test", to: ["a@example.test"], subject: "Hi", body: "Hello" },
+        executionId: "call-1",
+      },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    const card = JSON.stringify(f.pauseRunForInput.mock.calls[0]);
+    expect(card).toContain("Asked because this is another agent's account.");
+    expect(card).not.toContain("Always allow");
   });
 
   it("still runs a tool-Allowed archive of an unprotected thread and a protected thread's mark-read", async () => {
