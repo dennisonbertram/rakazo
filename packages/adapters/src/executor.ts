@@ -2410,7 +2410,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           context.mcpServerIds = [...gtmMcpServerIds];
         }
         const memoryScope = configuredMemory
-          ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
+          ? bot.firewall === true
+            ? "isolated" // never the pool shared across agents
+            : effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
         const semanticMemory: SemanticMemoryProvider | null = configuredMemory?.provider ?? null;
 
@@ -2622,7 +2624,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           messagingChannelRun || voiceAgent || restrictedContext || companyAgent || companyImporter
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context),
+            : // A firewalled agent reads untrusted mail: it gets its own bot memory, never the user's.
+              loadAgentMemoryContext(
+                deps.memory,
+                bot.id,
+                context,
+                undefined,
+                bot.firewall !== true,
+              ),
           messagingChannelRun || voiceAgent || companyAgent || companyImporter
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {

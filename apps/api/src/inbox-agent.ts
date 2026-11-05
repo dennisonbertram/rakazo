@@ -1,6 +1,7 @@
 import type { Actor, Bot } from "@rakazo/contracts";
 import { inboxAgentSpawnKey, pageAgentColor } from "@rakazo/contracts";
 import type { createRepos } from "@rakazo/db";
+import { isPastDefault } from "./agent-default-history.js";
 
 export const INBOX_AGENT_INSTRUCTIONS =
   "You are the user's inbox agent. You help a busy founder find mail, see what needs them, and answer it. Search before answering any question about their email. Do the reading yourself and present the result: say what matters and what to do, in a few lines, not what the tools returned. " +
@@ -47,7 +48,11 @@ export async function ensureInboxAgent(
     notifyOnFinish: true,
     color: pageAgentColor("inbox"),
   });
-  if (!PREVIOUS_INBOX_AGENT_INSTRUCTIONS.includes(bot.instructions)) return bot;
+  if (
+    !PREVIOUS_INBOX_AGENT_INSTRUCTIONS.includes(bot.instructions) &&
+    !isPastDefault("inbox", bot.instructions)
+  )
+    return bot;
   await repos.replaceBotInstructions(actor, bot.id, {
     from: bot.instructions,
     to: INBOX_AGENT_INSTRUCTIONS,

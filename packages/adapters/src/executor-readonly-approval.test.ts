@@ -5818,6 +5818,26 @@ describe("agent firewall", () => {
   ];
 
   describe("tool profile", () => {
+    it("loads no shared memory into the prompt and offers no shared memory write", async () => {
+      const run = async (firewall: boolean) => {
+        const f = fixture({
+          name: "notify_user",
+          builtin: true,
+          firewall,
+          existingSharedMemory: "PRIVATE-USER-MEMORY-FACT",
+        });
+        await f.run();
+        return f;
+      };
+      const open = await run(false);
+      expect(JSON.stringify(open.request()!.instructions)).toContain("PRIVATE-USER-MEMORY-FACT");
+      const walled = await run(true);
+      expect(
+        JSON.stringify([walled.request()!.instructions, walled.request()!.history]),
+      ).not.toContain("PRIVATE-USER-MEMORY-FACT");
+      expect(walled.offeredTools).not.toContain("save_shared_memory");
+    });
+
     it("offers only listed tools", async () => {
       const f = fixture({
         name: "notify_user",
