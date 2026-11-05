@@ -36,6 +36,7 @@ import {
   isConnectionFailure,
   isRetryableProviderUnavailable,
   isTransientModelError,
+  MEMORY_KINDS,
   retryAfterMs,
   TransientModelError,
 } from "@rakazo/adapter-kit";
@@ -1336,6 +1337,7 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         return {
           content: String(raw.content ?? ""),
           path: String(raw.path ?? "MEMORY.md"),
+          ...(raw.kind !== undefined ? { kind: String(raw.kind) } : {}),
         };
       }
       if (tool.name === "request_takeover") {
@@ -1997,7 +1999,11 @@ function builtinParameters(tool: ConnectorTool) {
     });
   }
   if (tool.name === "remember") {
-    return Type.Object({ content: Type.String(), path: Type.String() });
+    return Type.Object({
+      content: Type.String(),
+      path: Type.String(),
+      kind: Type.Optional(stringEnum(MEMORY_KINDS, {})),
+    });
   }
   if (tool.name === "shell") {
     return Type.Object({
