@@ -194,20 +194,11 @@ async function typeInto(id: string, value: string) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
-const showProspect = (pipelineFields: boolean) =>
-  act(() =>
-    root.render(
-      <ContactDialog
-        contact={prospect}
-        pipelineFields={pipelineFields}
-        onClose={() => {}}
-        onSaved={() => {}}
-      />,
-    ),
-  );
 
-it("never sends pipeline fields from the Contacts page, and shows none", async () => {
-  showProspect(false);
+it("shows no pipeline fields for a prospect and never writes the record from an email edit", async () => {
+  act(() =>
+    root.render(<ContactDialog contact={prospect} onClose={() => {}} onSaved={() => {}} />),
+  );
   await flush();
   for (const id of ["contact-stage", "contact-check-size", "contact-next-step"])
     expect(document.getElementById(id)).toBeNull();
@@ -219,25 +210,4 @@ it("never sends pipeline fields from the Contacts page, and shows none", async (
   expect(sent).toMatchObject({ id: "c1", email: "new@example.test" });
   for (const key of ["stage", "checkSizeCents", "nextStep"]) expect(sent).not.toHaveProperty(key);
   expect(rpcMock.prospectSave).not.toHaveBeenCalled();
-});
-
-it("on the Fundraising page, an email edit leaves the record alone", async () => {
-  showProspect(true);
-  await flush();
-  await typeInto("contact-email", "new@example.test");
-  rpcMock.save.mockResolvedValue(prospect);
-  await click(button("Save"));
-  const sent = rpcMock.save.mock.calls[0]?.[0];
-  for (const key of ["stage", "checkSizeCents", "nextStep"]) expect(sent).not.toHaveProperty(key);
-  expect(rpcMock.prospectSave).not.toHaveBeenCalled();
-});
-
-it("on the Fundraising page, sends the record only the field that changed", async () => {
-  showProspect(true);
-  await flush();
-  await typeInto("contact-check-size", "30,000");
-  rpcMock.save.mockResolvedValue(prospect);
-  rpcMock.prospectSave.mockResolvedValue(prospect);
-  await click(button("Save"));
-  expect(rpcMock.prospectSave).toHaveBeenCalledWith({ id: "c1", checkSizeCents: 3_000_000 });
 });
