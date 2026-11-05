@@ -779,9 +779,21 @@ describe("unattendedToolRequiresApproval", () => {
     "legal_upsert_node",
     "legal_link",
     "legal_query",
+    "read_history",
+    "search_history",
+    "page_list",
+    "page_read",
+    "pins_read",
   ])("lets %s run in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
   });
+
+  it.each(["show_emails", "finance_overview", "finance_transactions", "cap_table_read", "page_source_list"])(
+    "still asks for %s in an unattended run",
+    (name) => {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+    },
+  );
 
   it("keeps an internal legal tool asking in a tainted run", () => {
     expect(externalTaintAllowsTool("legal_upsert_contract")).toBe(false);
