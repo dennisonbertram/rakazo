@@ -1024,6 +1024,8 @@ describe("all-sites rule and private data tools", () => {
     expect(
       privateDataAreas(["web_fetch", "web_search", "page_write", "read_file", "calendar_agenda"]),
     ).toEqual([]);
+  });
+});
 
 describe("mail_reply_batch gates", () => {
   const tool = "mail_reply_batch";
