@@ -7,7 +7,6 @@ import { addContactIfNew, deleteContact, listContacts, saveContact } from "./con
 import {
   closeRound,
   getFundraisingOverview,
-  importProspects,
   markWaiting,
   notSent,
   saveProspect,
@@ -332,10 +331,13 @@ describePostgres("pipeline records (PostgreSQL)", () => {
         name: vendor.name,
         kind: "prospect",
       });
-      // The agent's list import.
-      await importProspects(prisma, owner, [
-        { firm: "From Import", stage: "committed", checkSizeCents: 500_000, nextStep: "Call" },
-      ]);
+      await saveContact(prisma, owner, {
+        name: "From Import",
+        kind: "prospect",
+        stage: "committed",
+        checkSizeCents: 500_000,
+        nextStep: "Call",
+      });
       // Add prospect with its pipeline fields.
       const added = await saveContact(prisma, owner, {
         name: "From Page",

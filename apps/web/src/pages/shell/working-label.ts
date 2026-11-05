@@ -13,7 +13,7 @@ export function toolActionLabel(
       return t`Saving a contact`;
     case "fundraising-round-save":
       return t`Saving the round`;
-    case "fundraising-prospects-save":
+    case "pipeline-import":
       return t`Adding prospects`;
     case "contacts-read":
       return t`Reading your contacts`;

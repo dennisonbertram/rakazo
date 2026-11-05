@@ -23,6 +23,7 @@ import {
   inboundRoutineBlock,
 } from "@rakazo/core";
 import { approvalEffectKey, toolEffectIdempotencyKey } from "@rakazo/core/node/approval-effect-key";
+import type { PreparedPipelineImport } from "@rakazo/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as AiConsentModule from "./ai-consent.js";
 import { DENIED_ACTION_MESSAGE, isApprovalPausedResult } from "./approval-effect.js";
@@ -56,6 +57,7 @@ import { catalogEntries, DIRECT_TOOL_LIMIT, resolveCatalogCall } from "./lazy-to
 import { McpConnector } from "./mcp-connector.js";
 import { createEmulatedPhotonPlatform, PhotonEmulator } from "./photon-emulator.js";
 import { PipedreamConnector } from "./pipedream-connector.js";
+import { PIPELINE_IMPORT_REFUSED } from "./pipeline-import-tools.js";
 import { ThirdPartyConnectorEmulator } from "./third-party-connector-emulator.js";
 
 /** Lets a test make the Data room or history tools return text from a meeting. */
@@ -787,6 +789,15 @@ function fixture({
     return true;
   });
   const appendEvent = vi.fn(async (_event: unknown) => undefined);
+  const stagePipelineImportRows = vi.fn(async () => ({
+    importId: "imp-1",
+    staged: 1,
+    added: 1,
+    rejected: [],
+  }));
+  const preparePipelineImportCard = vi.fn(
+    async (): Promise<PreparedPipelineImport> => ({ error: "Nothing is staged." }),
+  );
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
   const execute = vi.fn(async function* (call: ConnectorCall) {
     yield { type: "result" as const, data: { item: call.args.id } };
@@ -908,6 +919,8 @@ function fixture({
     events: {
       append: appendEvent,
       pauseRunForInput,
+      stagePipelineImportRows,
+      preparePipelineImportCard,
       finalizeRun,
       claimSteering: claimSteeringSpy.mockImplementation(async () =>
         steering.splice(0).map((item, index) => ({
@@ -956,6 +969,8 @@ function fixture({
     commit,
     sharedMemoryState,
     pauseRunForInput,
+    stagePipelineImportRows,
+    preparePipelineImportCard,
     prisma,
     setCalls(next: typeof calls) {
       calls = next;
@@ -7236,6 +7251,92 @@ describe("public research apps linked as Composio connections", () => {
     ]);
     await f.run();
     expect(f.fetchedUrls).toEqual([]);
+  });
+});
+
+describe("list import tools", () => {
+  const investors = "investors-agent:user-1";
+  const importRun = (
+    name: string,
+    options: Parameters<typeof fixture>[0] = {},
+    callArgs: Record<string, unknown> = {},
+  ) => {
+    const f = fixture({ name, builtin: true, spawnKey: investors, ...options });
+    f.setCalls([{ args: callArgs, executionId: "call-1" }]);
+    return f;
+  };
+  const prepared = { importId: "imp-1", text: "Add 2 prospects to Fundraising", detail: "Plain" };
+
+  it.each([
+    ["firewalled", { firewall: true }],
+    ["external", { audience: "external" }],
+    ["tainted", { externalTaint: true }],
+  ] as [string, Parameters<typeof fixture>[0]][])("refuses a %s run", async (_label, options) => {
+    for (const name of ["pipeline_import_stage", "pipeline_import_review"]) {
+      const f = importRun(name, options, { rows: [{ firm: "Peak Fund" }] });
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.preparePipelineImportCard).not.toHaveBeenCalled();
+      expect(f.stagePipelineImportRows).not.toHaveBeenCalled();
+      // A firewalled or external agent is held by its tool list before this check.
+      expect(f.results[0]).toEqual({ error: expect.any(String) });
+      if (options?.externalTaint) expect(f.results[0]).toEqual({ error: PIPELINE_IMPORT_REFUSED });
+    }
+  });
+
+  it("is not available to another agent", async () => {
+    const f = importRun("pipeline_import_review", { spawnKey: "legal-agent:user-1" });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({
+      error: "Tool pipeline_import_review is not available to this bot.",
+    });
+  });
+
+  it("staging runs with no card and scopes to the run", async () => {
+    const f = importRun("pipeline_import_stage", {}, { rows: [{ firm: "Peak Fund" }] });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.stagePipelineImportRows).toHaveBeenCalledWith(
+      { spaceId: "space-1", userId: "user-1" },
+      expect.objectContaining({ runId: "run-1", botId: "bot-1", start: false }),
+    );
+  });
+
+  it("a saved Allow and Auto Review do not lift the card, which offers only Deny", async () => {
+    reviewMock.mockClear();
+    const f = importRun("pipeline_import_review", {
+      autoReview: true,
+      rules: [{ effect: "always_allow", matchKind: "tool", matchValue: "pipeline_import_review" }],
+    });
+    f.preparePipelineImportCard.mockResolvedValue(prepared);
+    await f.run();
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    const pause = f.pauseRunForInput.mock.calls[0] as unknown as [
+      { blocks: Record<string, unknown>[] },
+    ];
+    expect(pause[0].blocks[0]).toMatchObject({
+      text: prepared.text,
+      detail: prepared.detail,
+      pipelineImport: { importId: "imp-1" },
+      actions: [{ id: "deny", label: "Deny" }],
+    });
+  });
+
+  it("a call of the removed tool, approved before a deploy, tells the agent to re-stage", async () => {
+    const f = importRun("fundraising_prospects_save", {}, { rows: [{ firm: "Peak Fund" }] });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("pipeline_import_stage") });
+  });
+
+  it("a list with nothing to change ends with no card", async () => {
+    const f = importRun("pipeline_import_review");
+    f.preparePipelineImportCard.mockResolvedValue({ nothing: true, rows: 3 });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toMatchObject({ nothing: true, rows: 3 });
   });
 });
 

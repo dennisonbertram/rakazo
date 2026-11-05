@@ -174,6 +174,9 @@ export type PipelineChanges = {
   nextCallHasTime?: boolean;
   /** A contact of the user, or null; anything else throws IsolationError. */
   referredByContactId?: string | null;
+  group?: string | null;
+  listOrder?: number | null;
+  details?: Prisma.InputJsonValue;
 };
 
 /**
@@ -251,6 +254,9 @@ export async function savePipelineRecord(
     data.amountCents = changes.amountCents === null ? null : BigInt(changes.amountCents);
   if (changes.nextStep !== undefined) data.nextStep = changes.nextStep;
   if (changes.waitingSince !== undefined) data.waitingSince = changes.waitingSince;
+  if (changes.group !== undefined) data.group = changes.group;
+  if (changes.listOrder !== undefined) data.listOrder = changes.listOrder;
+  if (changes.details !== undefined) data.details = changes.details;
   const { count } = await db.pipelineRecord.updateMany({
     where: { id, ...scope, ...guard },
     data,

@@ -4840,20 +4840,59 @@ model PipelineEvent {
   @@map("pipeline_events")
 }
 
-/// Rows staged for one import, reviewed on one card.
+/// One list import, reviewed on one card. At most one is open per user (partial unique index in the migration).
 model PipelineImport {
-  id            String   @id @default(cuid())
-  spaceId       String
-  space         Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pipeline      String   @default("fundraising")
-  rows          Json     @default("[]")
-  status        String   @default("staging")
-  cardMessageId String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(cuid())
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pipeline  String   @default("fundraising")
+  /// "staging" | "reviewing" | "applying" | "done" | "discarded"
+  status    String   @default("staging")
+  /// The run that started it; another run's `start` discards it, a retry of this one does not.
+  runId     String?
+  /// The agent that staged it, for "added by" on its new contacts.
+  botId     String?
+  /// The external effect of its latest card.
+  effectId  String?
+  /// Contacts this import made so far, by person key, so two rows naming one person share one.
+  created   Json     @default("{}")
+  /// The PipelineImportResult, once done.
+  result    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rows      PipelineImportRow[]
 
+  @@unique([id, spaceId, userId])
   @@index([spaceId, userId])
+  @@index([status, updatedAt])
   @@map("pipeline_imports")
+}
+
+/// One firm of a list import.
+model PipelineImportRow {
+  id             String         @id @default(cuid())
+  spaceId        String
+  userId         String
+  importId       String
+  import         PipelineImport @relation(fields: [importId, spaceId, userId], references: [id, spaceId, userId], onDelete: Cascade)
+  position       Int
+  normalizedFirm String
+  /// A PipelineImportRow. On an import closed by migration 20261231000057, whatever the old column held.
+  data           Json
+  /// "staged" | "queued" | "applied" | "skipped" | "unchanged" | "failed"
+  state          String         @default("staged")
+  /// The answered decisions the worker applies.
+  plan           Json?
+  /// What applying it did, for the result.
+  outcome        Json?
+  error          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([importId, normalizedFirm])
+  @@unique([importId, position])
+  @@index([importId, state, position])
+  @@map("pipeline_import_rows")
 }

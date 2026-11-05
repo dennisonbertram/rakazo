@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 344 of 344
-- Web and shared components: 872
+- Web and shared component files with stories: 345 of 345
+- Web and shared components: 876
 - Mobile components: 153 in 102 files, mobile — native story pending
 - SwiftUI views: 140 in 76 files, native story pending
 
@@ -117,6 +117,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | PageNavButton, PageHeader | [apps/web/src/components/PageHeader.tsx](../../apps/web/src/components/PageHeader.tsx) | [PageHeader.stories.tsx](../../apps/web/src/components/PageHeader.stories.tsx), [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx), [CrmPipeline.stories.tsx](../../apps/web/src/pages/CrmPipeline.stories.tsx) | web |
 | PasskeySettings, PasskeyList | [apps/web/src/components/PasskeySettings.tsx](../../apps/web/src/components/PasskeySettings.tsx) | [PasskeySettings.stories.tsx](../../apps/web/src/components/PasskeySettings.stories.tsx) | web |
 | PdfViewer | [apps/web/src/components/PdfViewer.tsx](../../apps/web/src/components/PdfViewer.tsx) | [PdfViewer.stories.tsx](../../apps/web/src/components/PdfViewer.stories.tsx) | web |
+| Choice, ListGroup, Result, PipelineImportCard | [apps/web/src/components/PipelineImportCard.tsx](../../apps/web/src/components/PipelineImportCard.tsx) | [PipelineImportCard.stories.tsx](../../apps/web/src/components/PipelineImportCard.stories.tsx) | web |
 | RowsSkeleton | [apps/web/src/components/RowsSkeleton.tsx](../../apps/web/src/components/RowsSkeleton.tsx) | [RowsSkeleton.stories.tsx](../../apps/web/src/components/RowsSkeleton.stories.tsx) | web |
 | RunsOnPicker, DefaultRunsOnSection | [apps/web/src/components/RunsOnPicker.tsx](../../apps/web/src/components/RunsOnPicker.tsx) | [RunsOnPicker.stories.tsx](../../apps/web/src/components/RunsOnPicker.stories.tsx) | web |
 | SandboxedHtmlViewer | [apps/web/src/components/SandboxedHtmlViewer.tsx](../../apps/web/src/components/SandboxedHtmlViewer.tsx) | [SandboxedHtmlViewer.stories.tsx](../../apps/web/src/components/SandboxedHtmlViewer.stories.tsx), [HtmlPageView.stories.tsx](../../apps/web/src/components/pages/HtmlPageView.stories.tsx) | web |

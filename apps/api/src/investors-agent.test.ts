@@ -208,8 +208,11 @@ describe("ensureInvestorsAgent", () => {
       to: INVESTORS_AGENT_INSTRUCTIONS,
     });
     expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("fundraising_round_save");
-    expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("fundraising_prospects_save");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("pipeline_import_stage");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("pipeline_import_review");
     expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("up to 60 rows per call");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).not.toContain("fundraising_prospects_save");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).not.toMatch(/wave/i);
   });
 
   it("rewrites the old default description only, scoped to the actor", async () => {
