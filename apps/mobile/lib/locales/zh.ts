@@ -993,4 +993,6 @@ export const ZH_MESSAGES: Record<string, string> = {
   Overdue: "已逾期",
   Upcoming: "即将到期",
   "No date": "无日期",
+  "Send selected": "发送所选",
+  Skipped: "已跳过",
 };

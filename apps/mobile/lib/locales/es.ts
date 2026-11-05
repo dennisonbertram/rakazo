@@ -974,4 +974,6 @@ export const ES_MESSAGES: Record<string, string> = {
   Overdue: "Vencidas",
   Upcoming: "Próximas",
   "No date": "Sin fecha",
+  "Send selected": "Enviar seleccionados",
+  Skipped: "Omitido",
 };
