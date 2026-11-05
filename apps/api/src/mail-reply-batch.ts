@@ -4,9 +4,10 @@ import { mailReplyBatchJob } from "@rakazo/adapter-kit";
 import {
   mailReplyFlags,
   mailRequestIsValid,
+  newEmailIsComplete,
   normalizeMailEdits,
   parseRecipients,
-  startsUnticked,
+  rowStartsUnticked,
 } from "@rakazo/adapters";
 import type {
   Actor,
@@ -133,7 +134,7 @@ export async function readMailBatch(
         hash: mailReplyHash(row),
         seenMessageId: flags[index]?.newestInboundId ?? null,
         flags: rowFlags,
-        startsUnticked: startsUnticked(rowFlags),
+        startsUnticked: rowStartsUnticked(row, rowFlags),
         state,
         error: row.error,
         retryable:
@@ -146,8 +147,9 @@ export async function readMailBatch(
 }
 
 /**
- * The flags a row would have with these edits, so an edit that adds a recipient flags and unticks
- * the row at once. Reads only: nothing is stored, and the press checks the text again.
+ * The flags rows would have with these edits, so an edit that adds a recipient flags and unticks the
+ * row at once. The posted rows come first; other new emails follow because an edit can flag them
+ * too (the same address twice on one card). Reads only: nothing is stored, and the press checks the text again.
  */
 export async function previewMailBatch(
   deps: Pick<MailBatchDeps, "prisma">,
@@ -157,13 +159,22 @@ export async function previewMailBatch(
 ): Promise<MailBatchPreview> {
   const { effect } = await findCard(deps.prisma, actor, target, input);
   const stored = await storedRows(deps.prisma, actor, effect.id);
-  const merged = input.rows.map((posted) => {
+  const postedRows = input.rows.map((posted) => {
     const row = stored.find((candidate) => candidate.id === posted.itemId);
     if (!row) throw new ORPCError("CONFLICT", { message: CHANGED });
     const checked = normalizeMailEdits(posted.edits ?? {});
     if (!checked.ok) return { row, invalid: true };
     return { row: { ...row, ...checked.edits }, invalid: false };
   });
+  const merged = [
+    ...postedRows,
+    ...stored
+      .filter(
+        (row) =>
+          row.providerThreadId === null && !input.rows.some((posted) => posted.itemId === row.id),
+      )
+      .map((row) => ({ row, invalid: false })),
+  ];
   const flags = await mailReplyFlags(
     deps.prisma,
     { spaceId: actor.spaceId, userId: actor.userId },
@@ -171,9 +182,14 @@ export async function previewMailBatch(
   );
   return {
     rows: merged.map(({ row, invalid }, index) => {
-      // An entry that does not parse cannot be checked, so it counts as off the thread.
-      const rowFlags: MailReplyFlag[] = invalid ? ["not_on_thread"] : (flags[index]?.flags ?? []);
-      return { itemId: row.id, flags: rowFlags, startsUnticked: startsUnticked(rowFlags) };
+      // An entry that does not parse cannot be checked, so it counts as off the thread or as new.
+      const unchecked: MailReplyFlag = row.providerThreadId ? "not_on_thread" : "new_recipient";
+      const rowFlags: MailReplyFlag[] = invalid ? [unchecked] : (flags[index]?.flags ?? []);
+      return {
+        itemId: row.id,
+        flags: rowFlags,
+        startsUnticked: invalid || rowStartsUnticked(row, rowFlags),
+      };
     }),
   };
 }
@@ -199,10 +215,12 @@ export async function mailBatchRowToComposer(
   if (!row) throw new ORPCError("CONFLICT", { message: CHANGED });
   const [accounts, original] = await Promise.all([
     deps.mail.listAccounts(scope, mailContext(actor, "mail.batch.composer")),
-    deps.prisma.cachedMailMessage.findFirst({
-      where: { ...scope, connectionId: row.connectionId, providerMessageId: row.replyToId },
-      select: { id: true },
-    }),
+    row.replyToId
+      ? deps.prisma.cachedMailMessage.findFirst({
+          where: { ...scope, connectionId: row.connectionId, providerMessageId: row.replyToId },
+          select: { id: true },
+        })
+      : null,
   ]);
   return {
     connectionId: row.connectionId,
@@ -250,7 +268,7 @@ export async function sendMailBatch(
       throw new ORPCError("CONFLICT", { message: CHANGED });
     }
     const checked = normalizeMailEdits(posted.edits ?? {});
-    const position = `Reply ${index + 1}`;
+    const position = row.replyToId ? `Reply ${index + 1}` : `New email ${index + 1}`;
     if (!checked.ok) {
       throw new ORPCError("BAD_REQUEST", { message: `${position}: ${checked.error}` });
     }
@@ -262,7 +280,7 @@ export async function sendMailBatch(
       subject: edits.subject ?? row.subject,
       body: edits.body ?? row.body,
     };
-    if (!mailRequestIsValid("mail_send", final)) {
+    if (!mailRequestIsValid("mail_send", final) || (!row.replyToId && !newEmailIsComplete(final))) {
       throw new ORPCError("BAD_REQUEST", { message: `${position}: The message is not valid.` });
     }
     return { itemId: row.id, hash: posted.hash, seenMessageId: posted.seenMessageId, final };
