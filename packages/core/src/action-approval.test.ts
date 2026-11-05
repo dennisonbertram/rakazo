@@ -44,10 +44,12 @@ describe("toolRequiresApproval", () => {
     expect(toolRequiresApproval("contacts_save", false)).toBe(true);
     expect(toolRequiresApproval("contacts_add", false)).toBe(false);
     expect(toolRequiresApproval("fundraising_round_save", false)).toBe(true);
-    expect(toolRequiresApproval("fundraising_prospects_save", false)).toBe(true);
+    expect(toolRequiresApproval("pipeline_import_review", false)).toBe(true);
+    // Staging holds rows and changes nothing else.
+    expect(toolRequiresApproval("pipeline_import_stage", false)).toBe(false);
     // No saved Allow rule or Auto Review may pass them: the executor's mandatory gate follows this.
     expect(toolRequiresExplicitApproval("fundraising_round_save")).toBe(true);
-    expect(toolRequiresExplicitApproval("fundraising_prospects_save")).toBe(true);
+    expect(toolRequiresExplicitApproval("pipeline_import_review")).toBe(true);
     expect(toolRequiresApproval("cap_table_update", false)).toBe(false);
     expect(toolRequiresExplicitApproval("contacts_save")).toBe(false);
     expect(toolRequiresExplicitApproval("create_space")).toBe(true);
@@ -749,7 +751,7 @@ describe("unattendedToolRequiresApproval", () => {
     "calendar_delete_event",
     "contacts_save",
     "fundraising_round_save",
-    "fundraising_prospects_save",
+    "pipeline_import_review",
   ])("asks for %s in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
   });

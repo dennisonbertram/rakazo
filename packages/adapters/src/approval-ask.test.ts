@@ -1,4 +1,5 @@
 import { cartaAgentSpawnKey, gtmAgentSpawnKey } from "@rakazo/contracts";
+import { isApprovalAskBlock } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildApprovalAskBlock,
@@ -170,58 +171,28 @@ describe("fundraising write cards", () => {
     });
   });
 
-  it("names the count and first firms, with every row behind the Details fold", () => {
-    const rows = Array.from({ length: 12 }, (_, i) => ({
-      firm: `Firm ${i + 1}`,
-      stage: "target",
-      nextStep: "Wave 1",
-    }));
-    const block = buildApprovalAskBlock("e2", "fundraising_prospects_save", { rows }, []);
-    expect(block).toMatchObject({
-      text: "Review before Add or update 12 prospects (Firm 1, Firm 2, Firm 3 and 9 more)",
-      detailFolded: true,
-    });
-    const lines = (block as { detail: string }).detail.split("\n");
-    expect(lines).toHaveLength(12);
-    expect(lines[11]).toBe("Firm 12: target; next step: Wave 1");
-  });
-
-  it("shows overwrite in the visible text and every written field in the details", () => {
-    const rows = [
-      {
-        name: "Jane Doe",
-        firm: "Harbor Angels",
-        email: "jane@example.test",
-        stage: "intro",
-        amountUsd: 250_000,
-        nextStep: "Wave 2",
-        notes: "Met at demo day",
-      },
-    ];
+  it("offers no Always allow for the round", () => {
     const block = buildApprovalAskBlock(
-      "e3",
-      "fundraising_prospects_save",
-      { rows, overwrite: true },
+      "e4",
+      "fundraising_round_save",
+      { name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 },
       [],
-    ) as { text: string; detail: string };
-    expect(block.text).toBe(
-      "Review before Add or update 1 prospect, replacing fields already set (Harbor Angels)",
-    );
-    expect(block.detail).toBe(
-      "Harbor Angels: Jane Doe; jane@example.test; intro; $250,000.00; next step: Wave 2; notes: Met at demo day",
-    );
+    ) as { actions: { id: string }[] };
+    expect(block.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
   });
 
-  it("offers no Always allow for either write", () => {
-    for (const [tool, args] of [
-      ["fundraising_round_save", { name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 }],
-      ["fundraising_prospects_save", { rows: [{ firm: "A" }] }],
-    ] as const) {
-      const block = buildApprovalAskBlock("e4", tool, args, []) as {
-        actions: { id: string }[];
-      };
-      expect(block.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
-    }
+  it("an import card reads plainly and offers only Deny, so a phone cannot apply it", () => {
+    const block = buildApprovalAskBlock("e5", "pipeline_import_review", {}, [], {
+      pipelineImport: { importId: "imp-1", text: "Add 3 prospects", detail: "1 new contact" },
+    });
+    expect(block).toMatchObject({
+      kind: "ask",
+      text: "Add 3 prospects",
+      detail: "1 new contact",
+      pipelineImport: { importId: "imp-1" },
+      actions: [{ id: "deny", label: "Deny" }],
+    });
+    expect(isApprovalAskBlock(block as never)).toBe(true);
   });
 });
 

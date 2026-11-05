@@ -102,6 +102,8 @@ import {
   OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   PINNED_CONNECTION_LOST_MESSAGE,
+  PIPELINE_IMPORT_REVIEW_TOOL,
+  PIPELINE_IMPORT_STAGE_TOOL,
   RunPhaseSchema,
   VOICE_AGENT_BUILTIN_TOOLS,
   ZERNIO_READ_TOOLS,
@@ -595,6 +597,11 @@ import {
 } from "./pi-oauth.js";
 import { namedAgentTools } from "./pi-runtime.js";
 import { pinsToolFromTool } from "./pins.js";
+import {
+  PIPELINE_IMPORT_REFUSED,
+  PIPELINE_IMPORT_TOOL_NAMES,
+  stagePipelineImportFromTool,
+} from "./pipeline-import-tools.js";
 import type { PlotSpec } from "./plot-tool.js";
 import {
   assertPlotDataWithinLimits,
@@ -4708,6 +4715,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (voiceAgent && !offeredToolNames.has(name)) {
             return { error: `Tool ${name} is not available to Elio.` };
           }
+          // A card of the tool this replaced, still open when it was removed. It wrote nothing.
+          if (name === "fundraising_prospects_save") {
+            return {
+              error:
+                "That tool was replaced, so nothing was saved. Stage the list with pipeline_import_stage, then call pipeline_import_review.",
+            };
+          }
           // The Investors agent has a fixed list; a name outside it never reaches a connector.
           if (investorsAgent && !offeredToolNames.has(name)) {
             return { error: `Tool ${name} is not available to this bot.` };
@@ -4717,6 +4731,30 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return {
               error: "This stage was handed off. End the turn without more tool calls.",
             };
+          }
+          if (name === PIPELINE_IMPORT_REVIEW_TOOL) {
+            // The press settled it, so this call is the one that waited; it applies nothing.
+            const stored = await deps.prisma.externalEffect.findUnique({
+              where: { idempotencyKey: approvalEffectKey(runId, name, args) },
+              select: { status: true, result: true },
+            });
+            if (stored?.status === "completed") return stored.result as Record<string, unknown>;
+            if (stored?.status === "executing") {
+              return { error: "This list is still being added. Do not call this again." };
+            }
+          }
+          if (PIPELINE_IMPORT_TOOL_NAMES.has(name) && !fundraisingEnabled) {
+            return { error: `Tool ${name} is not available to this bot.` };
+          }
+          if (
+            PIPELINE_IMPORT_TOOL_NAMES.has(name) &&
+            (bot.audience === "external" ||
+              run.externalTaint === true ||
+              externalTaint() ||
+              runReadMeetingText ||
+              (await firewallNow()))
+          ) {
+            return { error: PIPELINE_IMPORT_REFUSED };
           }
           if (name === MAIL_REPLY_BATCH_TOOL) {
             // The press settled it, so this call is the one that waited: the stored result reaches
@@ -6237,6 +6275,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           };
 
           let preparedMailBatch: PreparedMailReply[] | undefined;
+          let preparedImport: { importId: string; text: string; detail: string } | undefined;
           const showApprovalCard = async () => {
             // A card for a call in a marked thread makes no lookups; it shows the raw ids.
             const moneyNames =
@@ -6275,6 +6314,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   : undefined,
               approvalReason: approvalCardReason,
               mailBatch: preparedMailBatch,
+              pipelineImport: preparedImport,
               noAlwaysAllow,
               routineAlways: routineAllowable,
               serviceName: callRoute?.serverName,
@@ -6488,6 +6528,35 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
             if ("error" in prepared) return refuse(prepared.error);
             preparedMailBatch = prepared.rows;
+          }
+          if (
+            applied &&
+            name === PIPELINE_IMPORT_REVIEW_TOOL &&
+            applied.effect.status === "intended"
+          ) {
+            const prepared = await deps.events.preparePipelineImportCard(
+              { spaceId: run.spaceId, userId: bot.userId },
+              applied.effect.id,
+            );
+            if ("error" in prepared || "nothing" in prepared) {
+              const result =
+                "error" in prepared
+                  ? prepared
+                  : {
+                      nothing: true,
+                      rows: prepared.rows,
+                      note: "Every row is already in Fundraising, so nothing changed and no card was posted. Say so.",
+                    };
+              await completeEffect(deps, applied.effect.id, "intended", result);
+              return result;
+            }
+            if (prepared.resumeRunId) {
+              // The queued run is durable; a missed wake is repaired by the reconciler.
+              await deps.jobs
+                .enqueue(runContinueJob(prepared.resumeRunId))
+                .catch((error) => getLogger().error("pipeline import replaced card wake", error));
+            }
+            preparedImport = prepared;
           }
           // Every parallel call of a denied tool resolves to the denial, not a new card.
           const askUnlessDenied = async () => {
@@ -7720,6 +7789,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : await investorUpdateToolFromTool(investorToolDeps, args),
             );
           }
+          if (name === PIPELINE_IMPORT_STAGE_TOOL && fundraisingEnabled) {
+            return finish(
+              await stagePipelineImportFromTool(
+                {
+                  events: deps.events,
+                  jobs: deps.jobs,
+                  scope: { spaceId: run.spaceId, userId: bot.userId },
+                  runId,
+                  botId: bot.id,
+                },
+                args,
+              ),
+            );
+          }
           if (FUNDRAISING_TOOL_NAMES.has(name) && fundraisingEnabled) {
             return finish(
               await fundraisingToolFromTool(
@@ -7727,7 +7810,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 {
                   prisma: deps.prisma,
                   scope: { spaceId: run.spaceId, userId: bot.userId },
-                  botId: bot.id,
                 },
                 args,
               ),

@@ -78,6 +78,7 @@ import { MailApprovalCard } from "../../components/MailApprovalCard";
 import { MailReplyBatchCard } from "../../components/MailReplyBatchCard";
 import { MailThreadCard } from "../../components/MailThreadCard";
 import { MessageHoverMetadata } from "../../components/MessageHoverMetadata";
+import { PipelineImportCard } from "../../components/PipelineImportCard";
 import {
   LIVE_TOOL_STEP_WINDOW,
   StandaloneToolActivity,
@@ -1994,6 +1995,29 @@ const MessageView = memo(function MessageView({
         if (block.kind === "ask") {
           // A card after text in the same message sits one message-gap (20 px) below it.
           const gap = i > 0 ? "mt-5" : undefined;
+          if (block.pipelineImport && block.approvalEffectId && message.botId) {
+            return (
+              <div key={i} className={gap}>
+                <PipelineImportCard
+                  block={block}
+                  botId={message.botId}
+                  message={message}
+                  canAnswer={canAnswer}
+                  onAnswer={(text) => onAnswer(message, text)}
+                  fallback={
+                    <AskCard
+                      // Its detail is the phone apps' text: it sends the reader here.
+                      block={{ ...block, detail: undefined }}
+                      requestedAt={message.createdAt}
+                      canAnswer={canAnswer}
+                      ownerOnly={ownerOnly}
+                      onAnswer={(text, username) => onAnswer(message, text, username)}
+                    />
+                  }
+                />
+              </div>
+            );
+          }
           if (block.mailBatch && block.approvalEffectId && message.botId) {
             return (
               <div key={i} className={gap}>

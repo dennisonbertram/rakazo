@@ -97,33 +97,100 @@ export const FundraiseRoundSaveInputSchema = z.object({
 });
 export type FundraiseRoundSaveInput = z.infer<typeof FundraiseRoundSaveInputSchema>;
 
-/** Rows one prospects import takes; a longer list is split across calls. */
-export const PROSPECT_IMPORT_MAX = 60;
+/** Rows one `pipeline_import_stage` call takes; a longer list is split across calls. */
+export const PIPELINE_IMPORT_STAGE_MAX = 60;
+/** Rows one import holds, across all its calls. */
+export const PIPELINE_IMPORT_MAX = 1000;
+export const PIPELINE_IMPORT_STAGE_TOOL = "pipeline_import_stage";
+export const PIPELINE_IMPORT_REVIEW_TOOL = "pipeline_import_review";
+
+const importText = (max: number) => z.string().trim().min(1).max(max);
+const ImportPersonSchema = z.strictObject({
+  name: importText(200).refine((name) => !/[,;/&+]|\s(and|or)\s/i.test(name), {
+    message: "Each person needs their own entry in people.",
+  }),
+  email: ContactEmailSchema.optional(),
+});
 
 /**
- * One firm or person to add to the pipeline. It names only fields the owner could type on the
- * Fundraising page: no kind, id or round, so a spreadsheet row cannot reach anything else.
+ * One row of a list. Strict and with no kind, id, round or amount, so a spreadsheet row cannot reach
+ * anything else: Possible amount is the owner's, and a check size is text in `details`.
  */
-export const ProspectImportRowSchema = z
-  .object({
-    name: z.string().trim().min(1).max(200).optional(),
-    firm: z.string().trim().min(1).max(200).optional(),
-    email: ContactEmailSchema.nullish(),
-    stage: ContactStageSchema.optional(),
-    checkSizeCents: Cents.nullish(),
-    nextStep: z.string().trim().max(500).nullish(),
-    notes: z.string().trim().max(5000).nullish(),
-  })
-  .refine((row) => row.name || row.firm, { message: "Each row needs a name or a firm." });
-export type ProspectImportRow = z.infer<typeof ProspectImportRowSchema>;
+export const PipelineImportRowSchema = z.strictObject({
+  firm: importText(200),
+  people: z.array(ImportPersonSchema).max(20).optional(),
+  /** The Wave filter: the list's wave, or its priority tier. */
+  group: importText(60).optional(),
+  /** Breaks ties when sorting. */
+  order: z.number().int().min(0).max(1_000_000).optional(),
+  nextStep: importText(500).optional(),
+  details: z
+    .array(z.strictObject({ label: importText(60), value: importText(1000) }))
+    .max(20)
+    .optional(),
+  introPath: importText(1000).optional(),
+  /** Only when the intro path clearly names one person. */
+  referrer: ImportPersonSchema.optional(),
+});
+export type PipelineImportRow = z.infer<typeof PipelineImportRowSchema>;
 
-export type ProspectImportResult = {
-  added: number;
-  updated: number;
-  /** Already saved with nothing to change, or a contact that is not a prospect. */
-  skipped: { row: number; name: string; reason: string }[];
-  failed: { row: number; name: string; reason: string }[];
-};
+/** One saved contact, or a person earlier on the list, a question offers. */
+export const PipelineImportCandidateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  organization: z.string().nullable(),
+  /** The prospect this person stays on if chosen: a contact sits in one record per pipeline. */
+  stays: z.string().nullable(),
+});
+
+/** A question on the card. Nothing is pre-answered, and the server checks every answer. */
+export const PipelineImportQuestionSchema = z.object({
+  id: z.string(),
+  /** The list row a person belongs to; people of one row are skipped together. Null for a referrer. */
+  row: z.number().int().nullable(),
+  kind: z.enum(["person", "referrer"]),
+  name: z.string(),
+  /** A person's firm. */
+  firm: z.string().nullable(),
+  /** The prospects a referrer introduced. */
+  referred: z.number().int().nonnegative(),
+  /** Skipping this row adds one prospect fewer. */
+  newRecord: z.boolean(),
+  candidates: z.array(PipelineImportCandidateSchema),
+  /** False when a new contact would repeat an email. */
+  allowNew: z.boolean(),
+});
+
+/** Answers beside a contact candidate's id. */
+export const PIPELINE_IMPORT_NEW = "new";
+export const PIPELINE_IMPORT_SKIP = "skip";
+
+export const PipelineImportResultSchema = z.object({
+  added: z.number().int().nonnegative(),
+  updated: z.number().int().nonnegative(),
+  newContacts: z.number().int().nonnegative(),
+  savedContacts: z.number().int().nonnegative(),
+  failed: z.array(z.object({ firm: z.string(), reason: z.string() })),
+});
+export type PipelineImportResult = z.infer<typeof PipelineImportResultSchema>;
+
+/** What an import card shows, as the server reads it now. */
+export const PipelineImportCardSchema = z.object({
+  /** `closed` is a card a newer one replaced, or one that was declined. */
+  status: z.enum(["reviewing", "applying", "done", "closed"]),
+  /** Press sends it back: a list or contact that changed since then rejects the press. */
+  hash: z.string(),
+  add: z.number().int().nonnegative(),
+  update: z.number().int().nonnegative(),
+  questions: z.array(PipelineImportQuestionSchema),
+  newContacts: z.array(z.string()),
+  savedContacts: z.array(z.string()),
+  noPerson: z.array(z.string()),
+  existing: z.array(z.string()),
+  result: PipelineImportResultSchema.nullable(),
+});
+export type PipelineImportCard = z.infer<typeof PipelineImportCardSchema>;
 
 /**
  * Changes only the pipeline fields of an existing prospect, named by its contact or, for a record

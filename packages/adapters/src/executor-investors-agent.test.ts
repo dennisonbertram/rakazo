@@ -274,13 +274,18 @@ describe("Investors agent runs", () => {
     const investors = await runInvestors();
     const names = (investors.request?.tools ?? []).map((tool) => tool.name);
     expect(names).toEqual(
-      expect.arrayContaining(["fundraising_round_save", "fundraising_prospects_save"]),
+      expect.arrayContaining([
+        "fundraising_round_save",
+        "pipeline_import_stage",
+        "pipeline_import_review",
+      ]),
     );
     for (const spawnKey of ["carta-agent:user-1", "legal-agent:user-1", null]) {
       const other = await runInvestors("user", spawnKey);
       const otherNames = (other.request?.tools ?? []).map((tool) => tool.name);
       expect(otherNames).not.toContain("fundraising_round_save");
-      expect(otherNames).not.toContain("fundraising_prospects_save");
+      expect(otherNames).not.toContain("pipeline_import_stage");
+      expect(otherNames).not.toContain("pipeline_import_review");
     }
   });
 
@@ -288,7 +293,8 @@ describe("Investors agent runs", () => {
     const { request } = await runInvestors("bot_message");
     const names = (request?.tools ?? []).map((tool) => tool.name);
     expect(names).not.toContain("fundraising_round_save");
-    expect(names).not.toContain("fundraising_prospects_save");
+    expect(names).not.toContain("pipeline_import_stage");
+    expect(names).not.toContain("pipeline_import_review");
   });
 
   it("is not offered fundraising_read on a run another bot started", async () => {

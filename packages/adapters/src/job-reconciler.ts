@@ -8,9 +8,10 @@ import type { PoolClient } from "pg";
 import { returnBotMessageOutcome } from "./bot-messages.js";
 import { scheduleComputerControlExpiry } from "./computer-control.js";
 import { expireExternalActions, pruneMcpCallLog } from "./external-actions.js";
-import { reconcileMailApprovals } from "./mail-approval-recovery.js";
+import { MAIL_APPROVAL_STALE_MS, reconcileMailApprovals } from "./mail-approval-recovery.js";
 import { reconcileMailReplyBatches } from "./mail-reply-batch.js";
 import { notifyPastDueItems } from "./past-due.js";
+import { reconcilePipelineImports } from "./pipeline-import-tools.js";
 import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
 import { isUserProgressClientNonce } from "./user-progress.js";
@@ -217,6 +218,17 @@ export function createJobReconciler(
         } catch (error) {
           getLogger().error("mail reply batch reconciliation", error);
         }
+      }
+      try {
+        await reconcilePipelineImports({
+          prisma: deps.prisma,
+          jobs: deps.jobs,
+          now,
+          batchSize,
+          staleMs: MAIL_APPROVAL_STALE_MS,
+        });
+      } catch (error) {
+        getLogger().error("pipeline import reconciliation", error);
       }
       controlScanDeadline ??= new Date(now.getTime() + CONTROL_LOOKAHEAD_MS);
       const runCursorFilter = runCursor

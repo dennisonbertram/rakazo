@@ -35,6 +35,13 @@ import {
   createThreadMessageInTransaction,
   RunHistoryWriteError,
 } from "./messages.js";
+import type { AcceptPipelineImportResult } from "./pipeline-import.js";
+import {
+  acceptPipelineImport,
+  preparePipelineImportCard,
+  settlePipelineImport,
+  stagePipelineImportRows,
+} from "./pipeline-import.js";
 import { finalizeRun } from "./run-finalize.js";
 import {
   answerRunInput,
@@ -77,6 +84,20 @@ export interface ThreadEvents {
   findMailApprovalForEdit(input: FindMailApprovalInput): Promise<PendingMailApproval | null>;
   setMailApprovalOutcome(input: SetMailApprovalOutcomeInput): Promise<void>;
   acceptMailReplyBatch(input: AcceptMailReplyBatchInput): Promise<AcceptMailReplyBatchResult>;
+  acceptPipelineImport(
+    input: Parameters<typeof acceptPipelineImport>[1],
+  ): Promise<AcceptPipelineImportResult>;
+  settlePipelineImport(
+    input: Parameters<typeof settlePipelineImport>[1],
+  ): ReturnType<typeof settlePipelineImport>;
+  stagePipelineImportRows(
+    scope: Parameters<typeof stagePipelineImportRows>[1],
+    input: Parameters<typeof stagePipelineImportRows>[2],
+  ): ReturnType<typeof stagePipelineImportRows>;
+  preparePipelineImportCard(
+    scope: Parameters<typeof preparePipelineImportCard>[1],
+    effectId: string,
+  ): ReturnType<typeof preparePipelineImportCard>;
   setMailBatchCounts(input: { spaceId: string; userId: string; effectId: string }): Promise<void>;
   settleMailReplyBatch(input: {
     spaceId: string;
@@ -295,6 +316,12 @@ export function createThreadEvents(
     findMailApprovalForEdit: (input) => findMailApprovalForEdit(prisma, input),
     setMailApprovalOutcome: (input) => setMailApprovalOutcome(prisma, input, realtime),
     acceptMailReplyBatch: (input) => acceptMailReplyBatch(prisma, input, realtime),
+    acceptPipelineImport: (input) => acceptPipelineImport(prisma, input, realtime),
+    settlePipelineImport: (input) => settlePipelineImport(prisma, input, realtime),
+    stagePipelineImportRows: (scope, input) =>
+      stagePipelineImportRows(prisma, scope, input, realtime),
+    preparePipelineImportCard: (scope, effectId) =>
+      preparePipelineImportCard(prisma, scope, effectId, realtime),
     setMailBatchCounts: (input) => setMailBatchCounts(prisma, input, realtime),
     settleMailReplyBatch: (input) => settleMailReplyBatch(prisma, input, realtime),
     setApprovalWaitsFor: (input) => setApprovalWaitsFor(prisma, input, realtime),
