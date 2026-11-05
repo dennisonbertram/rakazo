@@ -90,22 +90,22 @@ export async function listSafes(prisma: Pick<PrismaClient, "safe">, actor: Scope
 
 /**
  * Adds a native Draft: the YC post-money cap form, in the open round when there is one. Throws
- * IsolationError for a contact that is not the user's, SafeActiveError when the contact already
- * has an active SAFE, and SafeCapRequiredError when there is no cap.
+ * IsolationError for a contact that is not the user's, SafeActiveError when its record already has
+ * an active SAFE in that round, and SafeCapRequiredError when there is no cap.
  */
 export async function saveSafe(db: Db, actor: Scope, input: SafeSaveInput): Promise<Safe> {
   const scope = ownerOf(actor);
   return db.$transaction(async (tx) => {
-    if (input.contactId) {
-      const contact = await lockContact(tx, scope, input.contactId);
-      if (!contact) throw new IsolationError("Contact not found");
-      const existing = await listSafesOf(tx, scope, input.contactId);
-      if (existing.some((safe) => isActiveSafe(safe.status))) throw new SafeActiveError();
-    }
     const round = await tx.fundraiseRound.findFirst({
       where: { ...scope, closedAt: null },
       select: { id: true, capCents: true },
     });
+    if (input.contactId) {
+      const contact = await lockContact(tx, scope, input.contactId);
+      if (!contact) throw new IsolationError("Contact not found");
+      if (await hasActiveSafe(tx, scope, input.contactId, round?.id ?? null))
+        throw new SafeActiveError();
+    }
     const capCents = input.capCents ?? cents(round?.capCents ?? null);
     if (!capCents) throw new SafeCapRequiredError();
     const row = await tx.safe.create({
@@ -127,20 +127,70 @@ export async function saveSafe(db: Db, actor: Scope, input: SafeSaveInput): Prom
   });
 }
 
-/** Row lock on the user's contact, so overlapping requests for one investor run one at a time. */
+/**
+ * Row lock on the user's contact, then its record, so overlapping requests for one investor or for
+ * two people of one firm run one at a time.
+ */
 async function lockContact(tx: Prisma.TransactionClient, scope: Scope, id: string) {
   const rows = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM contacts
     WHERE id = ${id} AND "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId}
     FOR UPDATE`;
+  await tx.$queryRaw`
+    SELECT r.id FROM pipeline_records r
+    JOIN pipeline_record_people p ON p."recordId" = r.id
+    WHERE p."contactId" = ${id} AND p."spaceId" = ${scope.spaceId} AND p."userId" = ${scope.userId}
+      AND p.pipeline = ${FUNDRAISING_PIPELINE}
+    FOR UPDATE OF r`;
   return rows[0] ?? null;
 }
 
-const listSafesOf = async (
-  db: Pick<Prisma.TransactionClient, "safe">,
+/**
+ * Whether a SAFE belongs to a record's round: `roundId`, or any round when there is none (null). A
+ * SAFE with no round belongs only when it was created after the record.
+ */
+export const safeInRecordRound = (
+  safe: Pick<Safe, "roundId" | "createdAt">,
+  recordCreatedAt: Date,
+  roundId: string | null,
+) =>
+  safe.roundId
+    ? !roundId || safe.roundId === roundId
+    : new Date(safe.createdAt).getTime() >= recordCreatedAt.getTime();
+
+/**
+ * Whether the contact's record has an active SAFE in this round, through any of its people. A contact
+ * on no record has one when any of its own SAFEs is active, in any round.
+ */
+export async function hasActiveSafe(
+  db: Pick<Prisma.TransactionClient, "safe" | "pipelineRecordPerson">,
   scope: Scope,
   contactId: string,
-) => (await db.safe.findMany({ where: { ...scope, contactId } })).map((row) => toSafe(row));
+  roundId: string | null,
+  exceptSafeId?: string,
+): Promise<boolean> {
+  const own = await db.pipelineRecordPerson.findFirst({
+    where: { ...scope, pipeline: FUNDRAISING_PIPELINE, contactId },
+    select: { recordId: true, record: { select: { createdAt: true } } },
+  });
+  const people = own
+    ? await db.pipelineRecordPerson.findMany({
+        where: { ...scope, recordId: own.recordId },
+        select: { contactId: true },
+      })
+    : [{ contactId }];
+  const rows = await db.safe.findMany({
+    where: { ...scope, contactId: { in: people.map((person) => person.contactId) } },
+  });
+  return rows
+    .filter((row) => row.id !== exceptSafeId)
+    .map((row) => toSafe(row))
+    .some(
+      (safe) =>
+        isActiveSafe(safe.status) &&
+        safeInRecordRound(safe, own?.record.createdAt ?? new Date(0), own ? roundId : null),
+    );
+}
 
 const MARK_FIELDS = {
   sent: (at: Date | null) => ({ sentAt: at }),
@@ -169,11 +219,11 @@ export async function markSafe(db: Db, actor: Scope, input: SafeMarkInput): Prom
     at && row.contactId && (input.action === "signed" || input.action === "funded"),
   );
   await db.$transaction(async (tx) => {
-    // Undoing a cancel must not leave the contact with two active SAFEs.
+    // Undoing a cancel must not leave the record with two active SAFEs in one round.
     if (input.action === "cancel" && !at && row.contactId) {
       await lockContact(tx, scope, row.contactId);
-      const others = (await listSafesOf(tx, scope, row.contactId)).filter((s) => s.id !== row.id);
-      if (others.some((safe) => isActiveSafe(safe.status))) throw new SafeActiveError();
+      if (await hasActiveSafe(tx, scope, row.contactId, row.roundId, row.id))
+        throw new SafeActiveError();
     }
     // Cancel applies only while unpaid and funding only while not canceled, so neither races the other.
     const guard =
@@ -235,8 +285,8 @@ export type MercurySafeInput = {
 /**
  * Writes Mercury's SAFEs as read-only cache rows, owned by the user. A known row (by source and
  * externalId) has its Mercury fields overwritten and keeps its contact and round. A new row attaches
- * to the prospect whose email equals the investor's (case and surrounding spaces ignored), takes that
- * prospect's round and ends its Waiting for Mercury. Then each paid, unlinked SAFE gets its Finance
+ * to the person on a fundraising record whose email equals the investor's (case and surrounding spaces
+ * ignored), takes that record's round and ends its Waiting for Mercury. Then each paid, unlinked SAFE gets its Finance
  * deposit when exactly one transaction fits.
  */
 export const syncMercurySafes = (db: SyncDb, actor: Scope, rows: readonly MercurySafeInput[]) =>
@@ -272,7 +322,8 @@ export async function writeMercurySafes(
                 ON p."contactId" = c.id AND p.pipeline = ${FUNDRAISING_PIPELINE}
               LEFT JOIN pipeline_records r ON r.id = p."recordId"
               WHERE c."spaceId" = ${scope.spaceId} AND c."userId" = ${scope.userId}
-                AND c.kind = 'prospect' AND lower(btrim(c.email)) = ${fields.investorEmail}
+                AND (r.id IS NOT NULL OR c.kind = 'prospect')
+                AND lower(btrim(c.email)) = ${fields.investorEmail}
               LIMIT 1`
           )[0]
         : undefined;
@@ -336,10 +387,10 @@ export async function writeMercurySafes(
 }
 
 /**
- * Attaches a Mercury SAFE that has no contact to a prospect or investor of the user, taking that
- * contact's round and ending its Waiting for Mercury. Throws IsolationError for a SAFE or contact that
- * is not the user's, SafeStateError for a native SAFE, one that already has a contact, or a contact
- * of another kind.
+ * Attaches a Mercury SAFE that has no contact to a prospect, an investor or anyone else on a
+ * fundraising record of the user, taking that record's round and ending its Waiting for Mercury. Throws
+ * IsolationError for a SAFE or contact that is not the user's, SafeStateError for a native SAFE, one
+ * that already has a contact, or a contact of another kind on no record.
  */
 export async function assignSafe(
   db: Db,
@@ -356,9 +407,9 @@ export async function assignSafe(
     const contact = await lockContact(tx, scope, contactId);
     if (!contact) throw new IsolationError("Contact not found");
     const full = await tx.contact.findFirstOrThrow({ where: { id: contactId, ...scope } });
-    if (full.kind !== "prospect" && full.kind !== "investor")
-      throw new SafeStateError("Choose a prospect or an investor.");
     const record = await recordOfContact(tx, scope, contactId);
+    if (!record && full.kind !== "prospect" && full.kind !== "investor")
+      throw new SafeStateError("Choose a prospect or an investor.");
     // An investor who signed before records existed has no record; the round stays on the contact.
     const { count } = await tx.safe.updateMany({
       where: { id, ...scope, contactId: null },

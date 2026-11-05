@@ -22,7 +22,7 @@ import {
   stageOf,
 } from "./pipeline-records.js";
 import { isUniqueViolation } from "./prisma-errors.js";
-import { SafeActiveError, toSafe } from "./safes.js";
+import { hasActiveSafe, SafeActiveError, safeInRecordRound, toSafe } from "./safes.js";
 import { IsolationError } from "./scope.js";
 
 type Scope = { spaceId: string; userId: string };
@@ -80,19 +80,25 @@ export async function getFundraisingOverview(
     prisma.safe.findMany({ where: scope, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
   ]);
   const safes = safeRows.map((safe) => toSafe(safe));
-  // A record with an active SAFE has left the pipeline; it returns once every SAFE is canceled or
-  // deleted, unless signing made its person an investor, who stays off it as before.
+  const open = row && !row.closedAt ? row : null;
+  const created = new Map(records.map((record) => [record.id, record.createdAt]));
+  const personOf = new Map(people.map((person) => [person.contactId, person]));
+  // A record leaves the pipeline while it has an active SAFE in the open round (any round when none
+  // is open). It returns once every SAFE is canceled, expired or deleted, unless the SAFE was signed:
+  // signing makes a prospect an investor, which ends its place in that round, as it always has.
+  const leftRecords = new Set(
+    safes.flatMap((safe) => {
+      const person = safe.contactId ? personOf.get(safe.contactId) : undefined;
+      const since = person && created.get(person.recordId);
+      if (!person || !since || !safeInRecordRound(safe, since, open?.id ?? null)) return [];
+      const signed = safe.signedByOwnerAt && safe.signedByInvestorAt;
+      return isActiveSafe(safe.status) || (signed && person.contact.kind === "investor")
+        ? [person.recordId]
+        : [];
+    }),
+  );
   const withSafe = new Set(
     safes.filter((s) => s.contactId && isActiveSafe(s.status)).map((s) => s.contactId),
-  );
-  const withAnySafe = new Set(safes.map((s) => s.contactId));
-  const leftRecords = new Set(
-    people
-      .filter(
-        ({ contactId, contact }) =>
-          withSafe.has(contactId) || (contact.kind === "investor" && withAnySafe.has(contactId)),
-      )
-      .map((person) => person.recordId),
   );
   const peopled = new Set(people.map((person) => person.recordId));
   const rows = contacts
@@ -104,7 +110,6 @@ export async function getFundraisingOverview(
   const personless = records.filter((record) => !peopled.has(record.id)).map(personlessRow);
   // A prospect not yet on a record reads as Target.
   const withStage = [...rows, ...personless].map((p) => ({ ...p, stage: p.stage ?? "target" }));
-  const open = row && !row.closedAt ? row : null;
   const inRound = safes.filter((s) => row && s.roundId === row.id);
   const sumOf = (...statuses: string[]) =>
     inRound.filter((s) => statuses.includes(s.status)).reduce((sum, s) => sum + s.amountCents, 0);
@@ -177,12 +182,19 @@ export class ProspectEmailRequiredError extends Error {
   }
 }
 
-/** A prospect and its record, giving it a record if it has none. Throws IsolationError for any other contact. */
+/**
+ * A person on a fundraising record, of any kind, and that record. A prospect with no record gets one.
+ * Throws IsolationError for any other contact.
+ */
 async function prospectOf(prisma: WriteDb, scope: Scope, id: string) {
-  const where = { id, ...scope, kind: "prospect" };
-  const row = await prisma.contact.findFirst({ where });
+  const row = await prisma.contact.findFirst({ where: { id, ...scope } });
   if (!row) throw new IsolationError("Contact not found");
-  const record = await prisma.$transaction((tx) => ensureRecord(tx, scope, row));
+  const record =
+    (await recordOfContact(prisma, scope, id)) ??
+    (row.kind === "prospect"
+      ? await prisma.$transaction((tx) => ensureRecord(tx, scope, row))
+      : null);
+  if (!record) throw new IsolationError("Contact not found");
   return { row, record };
 }
 
@@ -194,14 +206,18 @@ const contactRow = async (prisma: Db, scope: Scope, id: string) =>
 /**
  * Send SAFE with Mercury: the record is Waiting for Mercury until a SAFE attaches or Not sent.
  * Throws IsolationError for any other contact, ProspectEmailRequiredError without an email and
- * SafeActiveError while the prospect has an active SAFE (Canceled and Expired ones do not block).
+ * SafeActiveError while its record has an active SAFE in the open round (Canceled and Expired ones
+ * do not block).
  */
 export async function markWaiting(prisma: WriteDb, actor: Scope, id: string): Promise<Contact> {
   const scope = ownerOf(actor);
   const { row, record } = await prospectOf(prisma, scope, id);
   if (!row.email?.trim()) throw new ProspectEmailRequiredError();
-  const safes = await prisma.safe.findMany({ where: { ...scope, contactId: id } });
-  if (safes.some((safe) => isActiveSafe(toSafe(safe).status))) throw new SafeActiveError();
+  const open = await prisma.fundraiseRound.findFirst({
+    where: { ...scope, closedAt: null },
+    select: { id: true },
+  });
+  if (await hasActiveSafe(prisma, scope, id, open?.id ?? null)) throw new SafeActiveError();
   await savePipelineRecord(prisma, scope, record.id, { waitingSince: new Date() });
   return contactRow(prisma, scope, id);
 }
