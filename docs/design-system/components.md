@@ -4,7 +4,7 @@
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
 - Web and shared component files with stories: 345 of 345
-- Web and shared components: 876
+- Web and shared components: 878
 - Mobile components: 153 in 102 files, mobile — native story pending
 - SwiftUI views: 140 in 76 files, native story pending
 
@@ -14,7 +14,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | --- | --- | --- | --- |
 | CopyIcon, CheckIcon, ImageIcon, GlobeIcon | [packages/chat-ui/src/icons.tsx](../../packages/chat-ui/src/icons.tsx) | [icons.stories.tsx](../../packages/chat-ui/src/icons.stories.tsx) | shared |
 | MarkdownTable, TableCard, TableView, SortableColumnHeader, SortIndicator, DownloadIcon, ExpandIcon, CloseIcon, ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon | [packages/chat-ui/src/markdown-table.tsx](../../packages/chat-ui/src/markdown-table.tsx) | [markdown-table.stories.tsx](../../packages/chat-ui/src/markdown-table.stories.tsx) | shared |
-| CodeBlock, ExternalLinkUrl, ExternalLinkAlert, ConfirmableAnchor, RemoteImageButton, MarkdownImage, LinkedRemoteImage, LinkFavicon, WebsiteLink, MarkdownAnchor, LinkifiedText, ChatMarkdown | [packages/chat-ui/src/markdown.web.tsx](../../packages/chat-ui/src/markdown.web.tsx) | [markdown-table.stories.tsx](../../packages/chat-ui/src/markdown-table.stories.tsx), [markdown.web.stories.tsx](../../packages/chat-ui/src/markdown.web.stories.tsx) | shared |
+| CopyButton, CodeBlock, CopyableQuote, ExternalLinkUrl, ExternalLinkAlert, ConfirmableAnchor, RemoteImageButton, MarkdownImage, LinkedRemoteImage, LinkFavicon, WebsiteLink, MarkdownAnchor, LinkifiedText, ChatMarkdown | [packages/chat-ui/src/markdown.web.tsx](../../packages/chat-ui/src/markdown.web.tsx) | [markdown-table.stories.tsx](../../packages/chat-ui/src/markdown-table.stories.tsx), [markdown.web.stories.tsx](../../packages/chat-ui/src/markdown.web.stories.tsx) | shared |
 
 ## Primitives (packages/ui-web)
 

@@ -3055,6 +3055,12 @@ describe("userTurnInstructions", () => {
       expect(prompt.split("Write to the user in plain words").length - 1).toBe(1);
     });
 
+    it("text to paste goes in one fenced block, stated once in normal runs", () => {
+      const rule = "put all of it in one fenced code block";
+      expect(PRESENTATION_GUIDANCE).toContain(rule);
+      expect(everyPrompt().split(rule).length - 1).toBe(1);
+    });
+
     it("render_plot: the tool's own first step is the only one", () => {
       expect(everyPrompt()).not.toContain('"help": true');
       expect(description("render_plot")).toContain('{"charts": true} FIRST');
