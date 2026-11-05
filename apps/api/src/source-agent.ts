@@ -1,11 +1,11 @@
 import { ORPCError } from "@orpc/server";
-import { sourceAccessFor } from "@rakazo/core";
 import type { Actor, Bot, CapabilityInstall } from "@rakazo/contracts";
 import {
   appAgentColor,
   integrationAgentSpawnKey,
   integrationPresetForEndpoint,
 } from "@rakazo/contracts";
+import { sourceAccessFor } from "@rakazo/core";
 import type { createRepos, PrismaClient } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { instructions } from "./integration-agent.js";
@@ -147,7 +147,9 @@ export async function ensureSourceAgent(
     });
     if (install) return { install, bot };
   }
-  throw new ORPCError("CONFLICT", { message: "The agent was archived while it was created; retry" });
+  throw new ORPCError("CONFLICT", {
+    message: "The agent was archived while it was created; retry",
+  });
 }
 
 /** Best effort, for install: a failure leaves the source private with no agent; Create agent repairs it. */

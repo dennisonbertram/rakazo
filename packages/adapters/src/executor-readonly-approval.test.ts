@@ -556,8 +556,9 @@ function fixture({
     capabilityInstall: {
       count: vi.fn(
         async ({ where }: { where: { id: string; agentBotId: string } }) =>
-          sources.filter((source) => source.id === where.id && source.agentBotId === where.agentBotId)
-            .length,
+          sources.filter(
+            (source) => source.id === where.id && source.agentBotId === where.agentBotId,
+          ).length,
       ),
       findMany: vi.fn(async () => []),
     },
@@ -2850,7 +2851,9 @@ describe("connected app integration agent tools", () => {
       readOnly: false,
       route: { connectorId: "installed", resourceId: "src-1", toolName: "add_contact" },
     };
-    const allow = [{ effect: "always_allow", matchKind: "tool", matchValue: "add_contact" }] as const;
+    const allow = [
+      { effect: "always_allow", matchKind: "tool", matchValue: "add_contact" },
+    ] as const;
     const run = (agentBotId: string) =>
       fixture({
         name: sourceWrite.name,

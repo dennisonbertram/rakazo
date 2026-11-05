@@ -3799,7 +3799,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   tool.name !== GTM_POST_TOOL &&
                   !builtinAgentTools.some((builtin) => builtin.name === tool.name) &&
                   (!integrationPeerRun ||
-                    ((tool.route?.connectorId === "mcp" || tool.route?.connectorId === "installed") &&
+                    ((tool.route?.connectorId === "mcp" ||
+                      tool.route?.connectorId === "installed") &&
                       (!tool.route.resourceId || peerServerIds.has(tool.route.resourceId)))) &&
                   (!connectedAppPeerRun || tool.route?.connectionId === appAgentConnection?.id),
               )

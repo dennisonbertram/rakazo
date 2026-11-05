@@ -555,17 +555,6 @@ import {
   setIntegrationAgentWrites,
   setIntegrationExclusive,
 } from "./integration-agent.js";
-import {
-  ensureSourceAgent,
-  listCapabilities,
-  provisionMissingSourceAgents,
-  provisionSourceAgent,
-  renameSource,
-  setSourceAgentAccess,
-  setSourceAllAgents,
-  setSourceExclusive,
-  setSourceWrites,
-} from "./source-agent.js";
 import { searchIntegrationCatalog } from "./integration-catalog.js";
 import {
   deliverPortalLinks,
@@ -654,6 +643,17 @@ import { listPendingApprovalNotifications, listSpaceRuns } from "./runs.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { querySpaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
+import {
+  ensureSourceAgent,
+  listCapabilities,
+  provisionMissingSourceAgents,
+  provisionSourceAgent,
+  renameSource,
+  setSourceAgentAccess,
+  setSourceAllAgents,
+  setSourceExclusive,
+  setSourceWrites,
+} from "./source-agent.js";
 import { requireSpaceOwner } from "./space-owner.js";
 import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { HEARTBEAT, withHeartbeat } from "./stream.js";

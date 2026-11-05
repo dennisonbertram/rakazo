@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { Bot, Connection, McpServer } from "@rakazo/contracts";
+import type { Bot, CapabilityInstall, Connection, McpServer } from "@rakazo/contracts";
 import { isMailThreadAgentSpawnKey } from "@rakazo/contracts";
 import { Button, Switch } from "@rakazo/ui-web";
 import { useCallback, useEffect, useState } from "react";
@@ -38,12 +38,16 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [connections, servers, effective, access, assigned] = await Promise.all([
+    const [connections, servers, effective, access, assigned, installs] = await Promise.all([
       rpc.connections.list(),
       rpc.mcp.servers.list(),
       rpc.connections.effectiveAccess(),
       rpc.connections.accessAll(),
       rpc.mcp.assignments.list({ botId: bot.id }),
+      // Directly connected sources; the section still shows without them if this fails.
+      Promise.resolve()
+        .then(() => rpc.capabilities.list())
+        .catch((): CapabilityInstall[] => []),
     ]);
     // An email's own agent has exactly the Inbox agent's access, on every account, so it only follows.
     const mailChat = isMailThreadAgentSpawnKey(bot.spawnKey);
@@ -108,8 +112,34 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
             rpc.mcp.servers.setAgentAssignment({ serverId: server.id, botId: bot.id, on }),
         };
       });
+    const sourceRows: Row[] = installs
+      .filter((source) => source.agentBotId !== undefined)
+      .map((source) => {
+        const own = source.agentBotId === bot.id;
+        const restricted = bot.audience === "external" || bot.firewall === true;
+        return {
+          key: `source:${source.id}`,
+          name: source.name,
+          on: (source.usableBotIds ?? []).includes(bot.id),
+          // A firewalled or external agent never reaches a source, so its switch cannot be turned on.
+          locked: own || restricted,
+          toggle: (on) => rpc.capabilities.setAgentAccess({ id: source.id, botId: bot.id, on }),
+          write: {
+            on: own ? (source.writesEnabled ?? false) : (source.writeBotIds ?? []).includes(bot.id),
+            fixed: own,
+            enabled: source.writesEnabled ?? false,
+            toggle: (next) =>
+              rpc.capabilities.setAgentAccess({
+                id: source.id,
+                botId: bot.id,
+                on: true,
+                canWrite: next,
+              }),
+          },
+        };
+      });
     setRows(
-      [...accountRows, ...serverRows].sort(
+      [...accountRows, ...serverRows, ...sourceRows].sort(
         (a, b) => a.name.localeCompare(b.name) || (a.address ?? "").localeCompare(b.address ?? ""),
       ),
     );

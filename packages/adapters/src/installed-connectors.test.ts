@@ -455,10 +455,10 @@ describe("OpenAPI connector import", () => {
         source: "https://api.example.test/v1",
         secretId: null,
         createdAt: new Date(0),
-      agentBotId: "bot-1",
-      allAgents: false,
-      writesEnabled: true,
-      botAccess: [],
+        agentBotId: "bot-1",
+        allAgents: false,
+        writesEnabled: true,
+        botAccess: [],
         config: {
           auth: { type: "none" },
           operations: [
@@ -494,8 +494,7 @@ describe("OpenAPI connector import", () => {
       },
     ];
     const provider = new InstalledConnectorProvider(
-      { bot: BOT,
-      capabilityInstall: { findMany: vi.fn().mockResolvedValue(installs) } } as never,
+      { bot: BOT, capabilityInstall: { findMany: vi.fn().mockResolvedValue(installs) } } as never,
       {} as never,
     );
 
@@ -525,8 +524,7 @@ describe("OpenAPI connector import", () => {
 
   it("returns no tools for an empty installed catalog", async () => {
     const provider = new InstalledConnectorProvider(
-      { bot: BOT,
-      capabilityInstall: { findMany: vi.fn().mockResolvedValue([]) } } as never,
+      { bot: BOT, capabilityInstall: { findMany: vi.fn().mockResolvedValue([]) } } as never,
       {} as never,
     );
     await expect(
@@ -749,7 +747,12 @@ describe("private installed connectors", () => {
           executionId: "call-1",
           route: { connectorId: "installed", resourceId: install.id, toolName: "list_items" },
         },
-        { spaceId: "space-1", userId, botId: "bot-1", signal: new AbortController().signal } as never,
+        {
+          spaceId: "space-1",
+          userId,
+          botId: "bot-1",
+          signal: new AbortController().signal,
+        } as never,
       )) {
         events.push(event);
       }
@@ -815,10 +818,8 @@ describe("installed sources are filtered by agent", () => {
       }) as never;
     return { prisma, provider, context, fetch };
   };
-  const names = async (
-    provider: InstalledConnectorProvider,
-    context: never,
-  ): Promise<string[]> => (await provider.discoverTools(context)).map((tool) => tool.name);
+  const names = async (provider: InstalledConnectorProvider, context: never): Promise<string[]> =>
+    (await provider.discoverTools(context)).map((tool) => tool.name);
 
   it("offers a new source to its own agent only, read tools until changes are on", async () => {
     const { provider, context } = setup(apiInstall(), { id: "owner" });

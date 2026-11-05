@@ -507,7 +507,11 @@ describe("GraphQL execution failures", () => {
   async function executeGraphqlProvider(fetchImpl: typeof globalThis.fetch) {
     const install = graphqlInstall();
     const prisma = {
-      bot: { findFirst: vi.fn().mockResolvedValue({ id: "bot-1", audience: "internal", firewall: false }) },
+      bot: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "bot-1", audience: "internal", firewall: false }),
+      },
       capabilityInstall: {
         findMany: vi.fn().mockResolvedValue([install]),
         findFirst: vi.fn().mockResolvedValue(install),
@@ -757,7 +761,11 @@ describe("GraphQL execution failures", () => {
 describe("GraphQL optional-off", () => {
   it("keeps core discovery empty when no GraphQL source is installed", async () => {
     const prisma = {
-      bot: { findFirst: vi.fn().mockResolvedValue({ id: "bot-1", audience: "internal", firewall: false }) },
+      bot: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ id: "bot-1", audience: "internal", firewall: false }),
+      },
       capabilityInstall: {
         findMany: vi.fn().mockResolvedValue([]),
         findFirst: vi.fn(),

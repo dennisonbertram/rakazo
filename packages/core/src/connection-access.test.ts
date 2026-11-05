@@ -463,9 +463,10 @@ describe("sourceAccessFor", () => {
     };
     expect(sourceAccessFor(writer, bot("friend")).write).toBe(true);
     expect(sourceAccessFor(writer, bot("reader")).write).toBe(false);
-    expect(
-      sourceAccessFor({ ...writer, writesEnabled: false }, bot("friend")),
-    ).toEqual({ read: true, write: false });
+    expect(sourceAccessFor({ ...writer, writesEnabled: false }, bot("friend"))).toEqual({
+      read: true,
+      write: false,
+    });
   });
 
   it("opens an all-agents source to every internal agent and changes follow the switch", () => {
