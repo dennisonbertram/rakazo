@@ -302,7 +302,7 @@ describePostgres("row-level security (PostgreSQL)", () => {
         },
       });
       keep("task", task);
-      keep(
+      const run = keep(
         "run",
         await o.run.create({
           data: {
@@ -329,7 +329,7 @@ describePostgres("row-level security (PostgreSQL)", () => {
           },
         }),
       );
-      keep(
+      const connection = keep(
         "connection",
         await o.connection.create({
           data: {
@@ -338,6 +338,35 @@ describePostgres("row-level security (PostgreSQL)", () => {
             provider: "p",
             displayName: "d",
             status: "connected",
+          },
+        }),
+      );
+      const effect = await o.externalEffect.create({
+        data: {
+          spaceId: t.spaceId,
+          runId: run.id,
+          kind: "mail_reply_batch",
+          idempotencyKey: `batch-${tag}`,
+          status: "intended",
+          request: {},
+        },
+      });
+      keep(
+        "mailReplyItem",
+        await o.mailReplyItem.create({
+          data: {
+            effectId: effect.id,
+            position: 0,
+            spaceId: t.spaceId,
+            userId: t.userId,
+            connectionId: connection.id,
+            replyToId: "m1",
+            providerThreadId: "t1",
+            to: ["a@example.test"],
+            cc: [],
+            bcc: [],
+            subject: "s",
+            body: "b",
           },
         }),
       );

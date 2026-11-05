@@ -14859,3 +14859,63 @@ msgstr "Zernio queue incomplete"
 #: src/components/gtm/GtmCalendar.tsx
 msgid "Zernio queue unavailable"
 msgstr "Zernio queue unavailable"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{count} replies"
+msgstr "{count} replies"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "1 reply"
+msgstr "1 reply"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{sent} sent"
+msgstr "{sent} sent"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{notSent} not sent"
+msgstr "{notSent} not sent"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{unknown} unknown"
+msgstr "{unknown} unknown"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Send selected ({0})"
+msgstr "Send selected ({0})"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Review all ({count})"
+msgstr "Review all ({count})"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Skipped"
+msgstr "Skipped"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Opened in composer"
+msgstr "Opened in composer"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Include reply to {first}"
+msgstr "Include reply to {first}"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Not on this thread"
+msgstr "Not on this thread"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Important sender"
+msgstr "Important sender"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "No-reply address"
+msgstr "No-reply address"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "You said no reply needed"
+msgstr "You said no reply needed"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Has a link"
+msgstr "Has a link"

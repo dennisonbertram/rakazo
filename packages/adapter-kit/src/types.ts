@@ -780,6 +780,8 @@ export interface BackgroundJobPayloads {
   "cloud_agent.poll": { agentId: string };
   /** Deletes a saved mail search (and its rows) once it has expired. */
   "mail.search.expire": { searchId: string };
+  /** Sends the approved rows of one reply batch; one queued job per batch. */
+  "mail.reply.batch": { effectId: string; spaceId: string; userId: string };
   /** Classifies a user's new inbox mail and syncs their to-dos; one queued job per user and space. */
   "inbox.triage": { userId: string; spaceId: string };
   /** Syncs one mail connection into the cache; one queued job per connection. */

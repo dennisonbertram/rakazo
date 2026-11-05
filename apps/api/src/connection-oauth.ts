@@ -106,6 +106,7 @@ export async function completeNativeOAuth(options: {
           await tx.mailActionLog.updateMany({ where: { connectionId: taken.id }, data: next });
           await tx.inboxTodo.updateMany({ where: { connectionId: taken.id }, data: next });
           await tx.composeSend.updateMany({ where: { connectionId: taken.id }, data: next });
+          await tx.mailReplyItem.updateMany({ where: { connectionId: taken.id }, data: next });
           // A Calendar or Drive agent is keyed by its connection, so it follows the new id; the
           // Inbox agent keeps its per-user key.
           await tx.bot.updateMany({

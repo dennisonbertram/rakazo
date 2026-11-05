@@ -269,7 +269,10 @@ function fixture({
   groupId = null as string | null,
   ticketAuthor = null as string | null,
   otherGrants = 0,
+  scriptedRuntime = false,
 }: {
+  /** The runtime says it is the scripted one. */
+  scriptedRuntime?: boolean;
   /** The bot's Firewall switch at the start of the run. */
   firewall?: boolean;
   /** Other agents in the space with Firewall on. */
@@ -385,6 +388,7 @@ function fixture({
   const botFlags = { firewall };
   const mark = { at: threadMarkedAtStart ? new Date() : (null as Date | null) };
   const effects: Effect[] = [];
+  const mailReplyRows: Record<string, unknown>[] = [];
   const results: unknown[] = [];
   const sharedMemoryState = {
     content: existingSharedMemory as string | undefined,
@@ -668,6 +672,17 @@ function fixture({
     },
     inboxSenderFeedback: { findMany: vi.fn(async () => [] as Array<{ senderAddress: string }>) },
     contact: { findMany: vi.fn(async () => [] as Array<{ email: string | null }>) },
+    mailSenderStat: { findMany: vi.fn(async () => []) },
+    mailReplyItem: {
+      createMany: vi.fn(async ({ data }: { data: Record<string, unknown>[] }) => {
+        if (mailReplyRows.length === 0) {
+          mailReplyRows.push(...data.map((row, i) => ({ ...row, id: `row-${i + 1}` })));
+        }
+        return { count: data.length };
+      }),
+      findMany: vi.fn(async () => mailReplyRows),
+    },
+    composeSend: { findMany: vi.fn(async () => []) },
     aiDataConsent: {
       // The chat's own gate reads findUnique and is always consented here; findFirst is the
       // tool-time check, which a test can withdraw after the run has started.
@@ -779,7 +794,7 @@ function fixture({
   const executor = createRunExecutor({
     prisma,
     mcpOAuth: { statusFor: async () => "connected" as const },
-    runtime: { describe: () => ({ capabilities: { scripted: false } }), run: runtimeRun },
+    runtime: { describe: () => ({ capabilities: { scripted: scriptedRuntime } }), run: runtimeRun },
     connector: realConnector ?? {
       discoverTools: async () =>
         availableTools ??
@@ -883,6 +898,7 @@ function fixture({
       mark.at = null;
     },
     effects,
+    mailReplyRows,
     results,
     storedTaint: () => run.externalTaint,
     setFirewall: (on: boolean) => {
@@ -6461,6 +6477,397 @@ describe("agent firewall", () => {
       await f.run();
       expect(f.offeredTools).not.toContain("search_data_room");
       expect(f.results[0]).toEqual({ error: expect.stringContaining("not available") });
+    });
+  });
+});
+
+describe("mail_reply_batch", () => {
+  const replies = [
+    { replyToId: "m1", to: ["sam@customer.example"], subject: "Re: one", body: "Hello one" },
+    { replyToId: "m2", to: ["lee@customer.example"], subject: "Re: two", body: "Hello two" },
+  ];
+  const args = { replies };
+  const mailbox = () => ({
+    listAccounts: vi.fn(async () => [{ id: "acct-1", address: "support@us.example" }]),
+    listLabels: vi.fn(async () => [{ id: "L-support", name: "Support", type: "user" }]),
+    getMessage: vi.fn(async () => ({ labelIds: ["L-support"] })),
+  });
+  const synced = [
+    {
+      providerMessageId: "m1",
+      threadId: "t1",
+      connectionId: "acct-1",
+      fromAddress: "sam@customer.example",
+      toAddresses: ["support@us.example"],
+      ccAddresses: [],
+      fromSelf: false,
+      signals: null,
+    },
+    {
+      providerMessageId: "m2",
+      threadId: "t2",
+      connectionId: "acct-1",
+      fromAddress: "lee@customer.example",
+      toAddresses: ["support@us.example"],
+      ccAddresses: [],
+      fromSelf: false,
+      signals: null,
+    },
+  ];
+  const batchRun = (
+    options: Parameters<typeof fixture>[0] = {},
+    callArgs: Record<string, unknown> = args,
+  ) => {
+    const f = fixture({
+      name: "mail_reply_batch",
+      builtin: true,
+      mail: mailbox(),
+      ...options,
+    });
+    f.prisma.cachedMailMessage.findMany.mockResolvedValue(synced as never);
+    f.setCalls([{ args: callArgs, executionId: "call-1" }]);
+    return f;
+  };
+  const card = (f: ReturnType<typeof fixture>) =>
+    (
+      f.pauseRunForInput.mock.calls[0] as unknown as [
+        {
+          blocks: {
+            text: string;
+            detail?: string;
+            approvalReason?: string;
+            mailBatch?: object;
+            mail?: unknown;
+            actions: { id: string; label: string }[];
+          }[];
+        },
+      ]
+    )[0].blocks[0]!;
+
+  it("shows one card whose only action is Discard, and stores a row per reply", async () => {
+    const f = batchRun();
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    const block = card(f);
+    expect(block.actions).toEqual([{ id: "deny", label: "Discard" }]);
+    expect(block.mailBatch).toEqual({ count: 2, sent: 0, failed: 0, unknown: 0 });
+    expect(block.text).toBe("2 replies");
+    expect(block.mail).toBeUndefined();
+    expect(block.detail).toContain("sam@customer.example");
+    expect(block.detail).toContain("Re: two");
+    expect(f.mailReplyRows).toHaveLength(2);
+    expect(f.mailReplyRows[0]).toMatchObject({ position: 0, providerThreadId: "t1" });
+    expect(f.effects[0]?.status).toBe("intended");
+  });
+
+  it.each([
+    ["a firewalled run", { firewall: true }],
+    ["a tainted run", { externalTaint: true }],
+    ["a routine", { trigger: "routine", unattended: true }],
+  ] as [string, { firewall?: boolean }][])(
+    "gives %s the card with no Always allow",
+    async (_label, options) => {
+      const f = batchRun({
+        ...options,
+        connectionRows: [
+          { ...mailConnectionRow(), allAgents: false, botAccess: [{ botId: "bot-1" }] },
+        ],
+      });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(card(f).actions.map((action) => action.id)).toEqual(["deny"]);
+      if (options.firewall) expect(card(f).approvalReason).toBe("Firewall");
+    },
+  );
+
+  it("a saved Allow and Auto Review do not lift the card", async () => {
+    reviewMock.mockClear();
+    const f = batchRun({
+      autoReview: true,
+      rules: [
+        { effect: "always_allow", matchKind: "tool", matchValue: "mail_reply_batch" },
+        { effect: "always_allow", matchKind: "category", matchValue: "send_email" },
+      ],
+    });
+    await f.run();
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [{ effect: "block", matchKind: "tool", matchValue: "mail_reply_batch" }],
+    [{ effect: "block", matchKind: "category", matchValue: "send_email" }],
+    // A Block on the single send is a Block on the same send in a batch.
+    [{ effect: "block", matchKind: "tool", matchValue: "mail_send" }],
+  ] as ActionApprovalRule[][])("a saved Block (%j) refuses with no card", async (rule) => {
+    const f = batchRun({ rules: [rule] });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: BLOCKED_ACTION_MESSAGE });
+    expect(f.mailReplyRows).toEqual([]);
+  });
+
+  describe("non-owner grants", () => {
+    const linked = (botAccess: object[], writesEnabled = true) => [
+      {
+        ...mailConnectionRow(),
+        allAgents: false,
+        agentBotId: "owner-agent",
+        writesEnabled,
+        botAccess,
+      },
+    ];
+
+    it("refuses a read-only agent, with no card and no rows", async () => {
+      const f = batchRun({ connectionRows: linked([{ botId: "bot-1", canWrite: false }]) });
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("can read but not change") });
+      expect(f.mailReplyRows).toEqual([]);
+    });
+
+    it("refuses a write grant while the connection's changes switch is off", async () => {
+      const f = batchRun({ connectionRows: linked([{ botId: "bot-1", canWrite: true }], false) });
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("Changes are off") });
+    });
+
+    it("shows the card to an agent with its own write grant", async () => {
+      const f = batchRun({ connectionRows: linked([{ botId: "bot-1", canWrite: true }]) });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("gives the scripted runtime the claim for queued messages", async () => {
+    const f = batchRun({ scriptedRuntime: true });
+    await f.run().catch(() => undefined);
+    expect(f.request()?.claimSteering).toEqual(expect.any(Function));
+  });
+
+  describe("offering", () => {
+    it("is offered to a chat agent", async () => {
+      const f = batchRun();
+      await f.run();
+      expect(f.offeredTools).toContain("mail_reply_batch");
+    });
+
+    it("is hidden and refused when the bot's mail_send switch is off", async () => {
+      const f = batchRun({ disabledBuiltinTools: ["mail_send"] });
+      await f.run();
+      expect(f.offeredTools).not.toContain("mail_reply_batch");
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.any(String) });
+    });
+
+    it("is hidden from and refused to an email's own agent", async () => {
+      const f = batchRun({ spawnKey: "mail-thread:acct-1:t1" });
+      await f.run();
+      expect(f.offeredTools).not.toContain("mail_reply_batch");
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.any(String) });
+    });
+  });
+
+  describe("refusals name the row and show no card", () => {
+    const refused = async (f: ReturnType<typeof fixture>, text: string) => {
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining(text) });
+      expect(f.mailReplyRows).toEqual([]);
+    };
+
+    it("more than 20 rows", async () => {
+      const many = Array.from({ length: 21 }, (_, i) => ({ ...replies[0]!, replyToId: `m${i}` }));
+      await refused(batchRun({}, { replies: many }), "At most 20");
+    });
+
+    it("a row without replyToId: the tool cannot start a conversation", async () => {
+      const { replyToId: _omitted, ...rest } = replies[0]!;
+      await refused(batchRun({}, { replies: [rest] }), "replyToId");
+    });
+
+    it("a replyToId that is not synced", async () => {
+      await refused(
+        batchRun({}, { replies: [{ ...replies[0]!, replyToId: "unknown" }] }),
+        "Reply 1 (unknown) is not in the synced mail",
+      );
+    });
+
+    it("two rows in one thread", async () => {
+      const f = batchRun();
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        synced[0],
+        { ...synced[1], threadId: "t1" },
+      ] as never);
+      await refused(f, "Reply 2 (m2) is in the same thread as Reply 1 (m1)");
+    });
+
+    it("a thread outside a firewalled agent's support label", async () => {
+      const mail = mailbox();
+      mail.getMessage.mockResolvedValue({ labelIds: ["other"] });
+      await refused(
+        batchRun({
+          firewall: true,
+          mail,
+          connectionRows: [
+            {
+              ...mailConnectionRow(),
+              allAgents: false,
+              botAccess: [{ botId: "bot-1", supportLabel: "Support" }],
+            },
+          ],
+        }),
+        "Reply 1 (m1) is outside this agent's support label",
+      );
+    });
+
+    it("a placeholder", async () => {
+      await refused(
+        batchRun({}, { replies: [{ ...replies[0]!, body: "Thanks, [Your Name]" }] }),
+        "Reply 1 (m1): The email still contains the placeholder [Your Name]",
+      );
+    });
+
+    it("a subject or body that redaction would change", async () => {
+      await refused(
+        batchRun(
+          { secrets: ["sk-super-secret-value"] },
+          { replies: [{ ...replies[0]!, body: "The key is sk-super-secret-value" }] },
+        ),
+        "Reply 1 (m1) contains a saved secret",
+      );
+    });
+
+    it("a recipient entry that hides a second one is parsed, not trusted", async () => {
+      const f = batchRun(
+        {},
+        { replies: [{ ...replies[0]!, to: ["sam@customer.example, bad address"] }] },
+      );
+      await refused(f, "Reply 1 (m1) is not a valid message");
+    });
+  });
+
+  describe("repeat guard", () => {
+    it("a sent row cannot go out again through mail_send", async () => {
+      const f = fixture({ name: "mail_send", builtin: true, mail: mailbox() });
+      f.mailReplyRows.push({
+        id: "row-1",
+        replyToId: "m1",
+        to: ["sam@customer.example"],
+        subject: "Re: one",
+        body: "Hello one",
+        dispatch: "claimed",
+        effect: { status: "completed" },
+      });
+      f.prisma.composeSend.findMany.mockResolvedValue([
+        { clientId: "agent:batch_row-1", state: "sent" },
+      ] as never);
+      f.setCalls([
+        {
+          args: {
+            to: ["sam@customer.example"],
+            subject: "Re: one",
+            body: "Other",
+            replyToId: "m1",
+          },
+          executionId: "call-1",
+        },
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("already sent") });
+    });
+
+    it("an unticked row cannot go out again through mail_send", async () => {
+      const f = fixture({ name: "mail_send", builtin: true, mail: mailbox() });
+      f.mailReplyRows.push({
+        id: "row-1",
+        replyToId: "m1",
+        to: ["sam@customer.example"],
+        subject: "Re: one",
+        body: "Hello one",
+        dispatch: "skipped",
+        effect: { status: "completed" },
+      });
+      f.setCalls([
+        {
+          args: {
+            to: ["sam@customer.example"],
+            subject: "Re: one",
+            body: "Hello one",
+            replyToId: "m1",
+          },
+          executionId: "call-1",
+        },
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("discarded") });
+    });
+  });
+
+  describe("after the card", () => {
+    const stored = (status: string, result: unknown = null) => ({
+      id: "effect-1",
+      runId: "run-1",
+      kind: "mail_reply_batch",
+      status,
+      request: args,
+      idempotencyKey: approvalEffectKey("run-1", "mail_reply_batch", args),
+      result,
+    });
+
+    it("returns the settled result to the resumed call, with no card and no send", async () => {
+      const result = {
+        replies: [
+          { replyToId: "m1", outcome: "sent" },
+          { replyToId: "m2", outcome: "skipped" },
+        ],
+      };
+      const f = batchRun();
+      f.effects.push(stored("completed", result) as never);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual(result);
+    });
+
+    it("returns the settled result even after a Block was saved or the switch went off", async () => {
+      const result = { replies: [{ replyToId: "m1", outcome: "sent" }] };
+      const f = batchRun({
+        rules: [{ effect: "block", matchKind: "tool", matchValue: "mail_reply_batch" }],
+        disabledBuiltinTools: ["mail_send"],
+      });
+      f.effects.push(stored("completed", result) as never);
+      await f.run();
+      expect(f.results[0]).toEqual(result);
+    });
+
+    it("does not settle or replay a call whose replies are still sending", async () => {
+      const f = batchRun();
+      f.effects.push(stored("executing") as never);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("still being sent") });
+      expect(f.effects[0]?.status).toBe("executing");
+    });
+
+    it("a different call after a press gets its own card", async () => {
+      const f = batchRun();
+      f.effects.push(stored("completed", { replies: [] }) as never);
+      f.setCalls([{ args: { replies: [replies[1]!] }, executionId: "call-2" }]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("after Discard a reworded call in the same run gets no new card", async () => {
+      const f = batchRun();
+      f.effects.push(stored("denied") as never);
+      f.setCalls([{ args: { replies: [replies[1]!] }, executionId: "call-2" }]);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: DENIED_ACTION_MESSAGE });
     });
   });
 });

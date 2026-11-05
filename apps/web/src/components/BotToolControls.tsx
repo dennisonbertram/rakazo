@@ -23,6 +23,8 @@ export interface ComposerDraft {
   bcc: string[];
   subject: string;
   body: string;
+  /** The synced message answered, so the reply stays in its thread. */
+  replyToId?: string;
 }
 
 export const BotToolControlsContext = createContext<BotToolControls | null>(null);

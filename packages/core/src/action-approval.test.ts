@@ -981,3 +981,46 @@ describe("bot approval of contact tools (unchanged by MCP writes)", () => {
     expect(toolRequiresApproval("contacts_save", false)).toBe(true);
   });
 });
+
+describe("mail_reply_batch gates", () => {
+  const tool = "mail_reply_batch";
+
+  it("needs approval, cannot be auto-reviewed, and is a send_email action", () => {
+    expect(toolRequiresApproval(tool, false)).toBe(true);
+    expect(toolRequiresExplicitApproval(tool)).toBe(true);
+    expect(actionTypeForTool({ toolName: tool, viaConnector: false })).toBe("send_email");
+  });
+
+  it("a saved Allow leaves it asking; a saved Block, by tool or category, refuses it", () => {
+    const decide = (rules: ActionApprovalRule[]) =>
+      resolveActionApproval({ toolName: tool, rules });
+    expect(decide([{ effect: "always_allow", matchKind: "tool", matchValue: tool }])).toBe("ask");
+    expect(
+      decide([{ effect: "always_allow", matchKind: "category", matchValue: "send_email" }]),
+    ).toBe("ask");
+    expect(decide([{ effect: "block", matchKind: "tool", matchValue: tool }])).toBe("block");
+    expect(decide([{ effect: "block", matchKind: "category", matchValue: "send_email" }])).toBe(
+      "block",
+    );
+    // A rule saved before the table used this category name; the email list covers the new tool.
+    expect(decide([{ effect: "block", matchKind: "category", matchValue: "email" }])).toBe("block");
+  });
+});
+
+describe("isApprovalAskBlock with a reply batch card", () => {
+  const card = (actions: { id: string; label: string }[], mailBatch?: object) => ({
+    kind: "ask",
+    approvalEffectId: "effect-1",
+    actions,
+    ...(mailBatch ? { mailBatch } : {}),
+  });
+  const counts = { count: 2, sent: 0, failed: 0, unknown: 0 };
+
+  it("is an approval card with only Discard, so composer text cannot answer it", () => {
+    expect(isApprovalAskBlock(card([{ id: "deny", label: "Discard" }], counts))).toBe(true);
+  });
+
+  it("does not treat a deny-only card without the batch mark as an approval", () => {
+    expect(isApprovalAskBlock(card([{ id: "deny", label: "Discard" }]))).toBe(false);
+  });
+});
