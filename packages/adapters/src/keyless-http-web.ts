@@ -8,9 +8,10 @@ import type {
   WebSearchRequest,
 } from "@rakazo/adapter-kit";
 import { JSDOM } from "jsdom";
+import { classifyBotWall } from "./bot-wall.js";
 import { clampMaxChars, clampMaxResults } from "./web-limits.js";
 import type { ResolveHostname } from "./web-ssrf.js";
-import { fetchSafeWebText } from "./web-ssrf.js";
+import { fetchSafeWebText, WebHttpError } from "./web-ssrf.js";
 
 export {
   clampMaxChars,
@@ -106,14 +107,42 @@ export class KeylessHttpWebProvider implements WebProvider {
 
   async fetch(request: WebFetchRequest, context: AdapterContext): Promise<WebFetchResult> {
     const maxChars = clampMaxChars(request.maxChars);
-    const { url, body } = await fetchSafeWebText(request.url, {
-      fetch: this.fetchImpl,
-      resolveHostname: this.resolveHostname,
-      timeoutMs: this.fetchTimeoutMs,
-      maxBytes: this.maxBufferBytes,
-      userAgent: this.userAgent,
-      signal: request.signal ?? context.signal,
+    let page: Awaited<ReturnType<typeof fetchSafeWebText>>;
+    try {
+      page = await fetchSafeWebText(request.url, {
+        fetch: this.fetchImpl,
+        resolveHostname: this.resolveHostname,
+        timeoutMs: this.fetchTimeoutMs,
+        maxBytes: this.maxBufferBytes,
+        userAgent: this.userAgent,
+        signal: request.signal ?? context.signal,
+      });
+    } catch (error) {
+      if (!(error instanceof WebHttpError)) throw error;
+      const wall = classifyBotWall({ ...error, body: error.bodyPrefix });
+      if (!wall) throw error;
+      return {
+        url: request.url,
+        title: "",
+        text: "",
+        truncated: false,
+        wall: { ...wall, status: error.status },
+      };
+    }
+    const { url, body } = page;
+    const wall = classifyBotWall({
+      status: page.status ?? 200,
+      headers: page.headers ?? new Headers(),
+      body,
     });
+    if (wall)
+      return {
+        url,
+        title: "",
+        text: "",
+        truncated: false,
+        wall: { ...wall, status: page.status ?? 200 },
+      };
     if (!body.trim()) throw new Error(`Failed to fetch content from ${url}`);
     const extracted = extractReadableText(body, url);
     const truncated = extracted.text.length > maxChars;
