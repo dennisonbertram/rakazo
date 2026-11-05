@@ -22,6 +22,8 @@ export const ProductEventType = z.enum([
   /** payload: { pending: string[] } messages of this thread whose delegate waits for approval */
   "thread.delegate_pending",
   "thread.call.ended",
+  /** payload: { goal: ThreadGoal | null } the thread's open goal after a change; null once none is open */
+  "thread.goal.updated",
   "run.started",
   "run.steering.claimed",
   "run.checkpointed",

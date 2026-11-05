@@ -138,8 +138,8 @@ Issue links follow the pattern `https://github.com/openai/codex/issues/<n>` and 
 | Owner types | Result |
 |---|---|
 | `/goal <text>` (1 to 2,000 characters) | Sets the thread's goal, replacing any active or paused one, and starts a run at once. The message stays in the transcript as typed. |
-| `/goal` | Nothing is sent. Clients show the goal line. The server returns the goal and creates no message or run, so a client that does not intercept it sees no change. |
-| `/goal clear` | Ends the goal as cleared. A goal run that is still working is left to finish. It is not judged afterwards, and no new run starts. |
+| `/goal` | No message or run. The server answers through the send error that every composer already shows: `Goal: {text}` (with ` (paused)` when paused) or `No goal set.` Clients that intercept the command (S3 to S5) show the goal line instead. |
+| `/goal clear` | Ends the goal as cleared, with no message or run, and answers `Goal cleared.` through the same send error. A goal run that is still working is left to finish. It is not judged afterwards, and no new run starts. New clients call `threads.clearGoal` instead. |
 | Stop button | Cancels runs as it does today and **pauses** the goal in the same transaction. |
 | Any other message | Behaves as today: it steers, answers, skips cards or starts a run. If the goal is paused, the message resumes it with fresh limits. |
 | Clear thread | Ends the goal as cleared. |
@@ -356,6 +356,7 @@ Every visible word, and why it is needed.
 | Push body | `{reason}` | The same reason as the block. |
 | Error in a group | `Goals work in a bot's own chat.` | Without it, `/goal` in a group would look like it was ignored. |
 | Error, text too long | `Keep the goal under 2,000 characters.` | The owner needs to know the limit to fix the message. |
+| Composer error after `/goal` or `/goal clear` | `Goal: {text}` / `No goal set.` / `Goal cleared.` | Older clients and native iOS have no goal line yet. The composer error is the only place they can show the answer. |
 
 There is no explainer text, no counters on the line, and no settings.
 

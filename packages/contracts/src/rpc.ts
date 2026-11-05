@@ -842,6 +842,8 @@ export const appContract = {
       )
       .output(z.object({ ok: z.literal(true) })),
     clear: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
+    /** End the bot thread's open goal. */
+    clearGoal: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     answer: oc
       .input(
         threadTarget.safeExtend({

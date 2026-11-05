@@ -65,6 +65,7 @@ export * from "./sessions.js";
 export * from "./sidebar-folders.js";
 export * from "./sidebar-pages.js";
 export * from "./spaces.js";
+export * from "./thread-goals.js";
 export * from "./transaction-retry.js";
 export * from "./usage.js";
 export * from "./voice-credentials.js";

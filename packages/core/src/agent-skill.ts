@@ -147,8 +147,8 @@ export function extractForcedSkillName(prompt: string): { name: string; rest: st
   if (!match) return null;
   const name = (match[1] ?? "").trim().replace(/^\/+/, "").trim();
   if (!name || name.length > 80) return null;
-  // Avoid treating `/` settings actions as skills.
-  if (/^(chat\s+settings|settings:)/i.test(name)) return null;
+  // Avoid treating `/` settings actions and the `/goal` command as skills.
+  if (/^(chat\s+settings|settings:|goal(?:\s|$))/i.test(name)) return null;
   const rest = text.slice(match[0].length).trimStart();
   return { name, rest };
 }
