@@ -351,7 +351,7 @@ Every visible word, and why it is needed.
 | Goal line status, shown only when not working | `Paused` / `Waiting on you` | Without it, a goal that is quietly stopped looks the same as one making progress. "Waiting on you" points to the card above. |
 | Goal line button (accessible name, icon only) | `Clear goal` | A screen reader needs the name. The icon has no visible text. |
 | Goal block | `Goal met` / `Goal blocked` / `Goal stopped` | The outcome, in one word after "Goal". |
-| Goal block, second line | `{reason}` from the goal check; for limits, `After 25 runs.` / `After 4 hours.` / `At $5 spend.` / `No progress in 3 runs.` | It says why the goal ended. For a limit, the owner needs to know which one to decide whether to resume. |
+| Goal block, second line | `{reason}` from the goal check; for limits, `After 25 runs.` / `After 4 hours.` / `At $5 spend.` / `No progress in 3 runs.` / `The model connection is unavailable.` | It says why the goal ended. For a limit, the owner needs to know which one to decide whether to resume. |
 | Push title | `{Bot} met the goal` / `{Bot} is blocked on the goal` / `{Bot} stopped the goal` | One push, with the bot's name, so the owner knows which chat to open. |
 | Push body | `{reason}` | The same reason as the block. |
 | Error in a group | `Goals work in a bot's own chat.` | Without it, `/goal` in a group would look like it was ignored. |
