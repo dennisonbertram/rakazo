@@ -4830,6 +4830,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
               path: doc.path,
               content: input.content,
               expectedRevision: input.expectedRevision,
+              byOwner: true,
             },
             {
               operationId: "mem",

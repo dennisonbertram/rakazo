@@ -1745,6 +1745,13 @@ model MemoryDocument {
   path      String
   content   String
   revision  Int              @default(1)
+  /// "preference", "fact" or "task": how fast recall lets it fade (packages/adapter-kit memory-strength).
+  kind      String           @default("fact")
+  /// Times a run loaded it into its prompt, and when last; both keep it strong.
+  useCount   Int             @default(0)
+  lastUsedAt DateTime?
+  /// Set when the owner edited it by hand: it never fades.
+  pinned     Boolean         @default(false)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   revisions MemoryRevision[]
