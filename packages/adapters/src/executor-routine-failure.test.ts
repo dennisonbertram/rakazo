@@ -181,6 +181,7 @@ async function failRun(scenario: Scenario) {
     externalEffect: { findMany: vi.fn(async () => []) },
     artifact: { findMany: vi.fn(async () => []) },
     $transaction: vi.fn(async () => null),
+    $executeRaw: vi.fn(async () => 1),
   };
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
   const enqueue = vi.fn(async (job: { name: string }) => {
@@ -347,6 +348,39 @@ describe("backing off a routine after its model connection refuses it", () => {
     const { prisma } = await failRun(scenario);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("pausing a connection that ran out of credit", () => {
+  const outOfCredit = () =>
+    Object.assign(new Error("Insufficient credits. Add more to continue."), { status: 402 });
+
+  it("pauses the owner's connection and points the routine at it", async () => {
+    const { prisma } = await failRun({ error: outOfCredit(), personalKey: true });
+
+    expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+    const values = prisma.$executeRaw.mock.calls[0]!.slice(1);
+    expect(values.slice(0, 3)).toEqual(["space-1", "user-1", "personal"]);
+  });
+
+  it("pauses the connection when a chat run hits it too", async () => {
+    const { prisma } = await failRun({
+      error: outOfCredit(),
+      personalKey: true,
+      trigger: "user",
+    });
+
+    expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["the deployment's own key", { error: outOfCredit() }],
+    ["a rate limit", { error: new Error("429 Rate limit reached"), personalKey: true }],
+    ["a refused key", { error: new Error("401 Invalid API key"), personalKey: true }],
+  ] satisfies Array<[string, Scenario]>)("does not pause for %s", async (_label, scenario) => {
+    const { prisma } = await failRun(scenario);
+
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
   });
 });
 

@@ -989,6 +989,7 @@ export const DE_MESSAGES: Record<string, string> = {
   "Last ran": "Zuletzt ausgeführt",
   Next: "Nächste",
   "Paused: no access": "Pausiert: kein Zugriff",
+  "Paused: model connection out of credit": "Pausiert: Modellverbindung ohne Guthaben",
   "Paused: the page changes too often": "Pausiert: Die Seite ändert sich zu oft",
   "Paused: the page could not be checked": "Pausiert: Die Seite konnte nicht geprüft werden",
   "Paused: too many checks today": "Pausiert: heute zu viele Prüfungen",

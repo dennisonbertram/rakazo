@@ -944,6 +944,7 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   "Last ran": "Última execução",
   Next: "Próxima",
   "Paused: no access": "Pausado: sem acesso",
+  "Paused: model connection out of credit": "Pausado: conexão do modelo sem crédito",
   "Paused: the page changes too often": "Pausado: a página muda com frequência demais",
   "Paused: the page could not be checked": "Pausado: não foi possível verificar a página",
   "Paused: too many checks today": "Pausado: verificações demais hoje",

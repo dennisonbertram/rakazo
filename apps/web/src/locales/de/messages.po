@@ -10360,6 +10360,10 @@ msgid "Paused · {0} of {1} min saved"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
+msgid "Paused: model connection out of credit"
+msgstr "Pausiert: Modellverbindung ohne Guthaben"
+
+#: src/pages/RoutineEditor.tsx
 msgid "Paused: no access"
 msgstr ""
 
