@@ -5713,9 +5713,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             !runTainted &&
             bot.audience !== "external" &&
             !(await firewallNow());
+          // Once outside content is in the run (a page, a message, a restored transcript), injected
+          // text could pick the call, so no routine allowance applies any more.
+          const outsideSeen = cleanRoutineRun ? await isOutsideContentSeen() : true;
           // "Always for this routine": the owner chose it on an earlier card of this routine.
           const routineAllowable =
             cleanRoutineRun &&
+            !outsideSeen &&
             routineAlwaysAllowable({
               toolName: name,
               viaConnector,
@@ -5732,12 +5736,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               })
             ).has(name);
           // Auto Review may judge a private read of the routine's owner while nothing outside has
-          // been read; any error, doubt or missing provider asks.
+          // been read; any error, doubt or missing provider asks. A saved routine rule allows it
+          // outright, so the judge is not consulted then.
           const routineReviewRead =
             cleanRoutineRun &&
             !viaConnector &&
             ROUTINE_AUTO_REVIEW_READ_TOOLS.has(name) &&
-            !(await isOutsideContentSeen());
+            !outsideSeen &&
+            !routineLifted;
           const requiresMandatoryApproval =
             (requiresUnattendedApproval && !routineLifted && !routineReviewRead) || otherMandatory;
           const gateResolved = routineLifted

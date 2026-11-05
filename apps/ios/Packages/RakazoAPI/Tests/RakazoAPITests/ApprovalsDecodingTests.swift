@@ -104,3 +104,18 @@ func answerInputEncodesOnlyTheGivenFields() throws {
   #expect(Set(json?.keys ?? [:].keys) == ["botId", "runId", "messageId", "answer", "mail"])
   #expect((json?["mail"] as? [String: Bool]) == ["send": true])
 }
+
+@Test
+func routineAndAllSitesAnswersHaveTheirOwnOutcomes() throws {
+  func answered(_ answer: String) throws -> AskOutcome? {
+    let json = """
+    {"kind":"ask","text":"Review before Write file","approvalEffectId":"e","toolId":"write_file","status":"answered","answer":"\(answer)","actions":[{"id":"allow","label":"Allow once"},{"id":"always_routine","label":"Always for this routine"},{"id":"always_bot_sites","label":"Allow all sites for this agent"},{"id":"deny","label":"Deny"}]}
+    """
+    let block = try JSONDecoder().decode(AskBlock.self, from: Data(json.utf8))
+    #expect(block.isApproval)
+    return block.outcome
+  }
+  #expect(try answered("always_routine") == .alwaysAllowedForRoutine)
+  #expect(try answered("always_bot_sites") == .alwaysAllowedForSites)
+  #expect(try answered("always") == .alwaysAllowed)
+}

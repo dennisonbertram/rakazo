@@ -7606,6 +7606,29 @@ describe("Always for this routine and Auto Review of routine reads", () => {
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 
+  it("stops honouring a routine rule once the run has read outside content", async () => {
+    const f = routine("write_file", { routineRules: ["write_file"] });
+    f.setCalls([
+      { name: "web_search", args: { query: "news" }, executionId: "call-1" },
+      { args: { path: "a.txt", content: "x" }, executionId: "call-2" },
+    ]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("runs a listed read the owner allowed for this routine, without asking the judge", async () => {
+    reviewMock.mockReset();
+    reviewMock.mockResolvedValue({ decision: "ask", reason: "no", model: "mock" });
+    const f = routine("ticket_get", {
+      ticketBoard: true,
+      autoReview: true,
+      routineRules: ["ticket_get"],
+    });
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(reviewMock).not.toHaveBeenCalled();
+  });
+
   describe("Auto Review of routine reads", () => {
     const read = (decision: "pass" | "ask" | "throw", extra: Record<string, unknown> = {}) => {
       reviewMock.mockReset();

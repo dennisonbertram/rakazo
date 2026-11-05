@@ -78,7 +78,7 @@ public struct SecretCredential: Decodable, Equatable, Sendable {
 
 /// How a decided ask reads once answered. The app maps each case to localized text.
 public enum AskOutcome: Equatable, Sendable {
-  case allowedOnce, alwaysAllowed, denied, approved
+  case allowedOnce, alwaysAllowed, alwaysAllowedForRoutine, alwaysAllowedForSites, denied, approved
   case approvedWaiting(String)
   case allowed, notNow, shared, notShared
   case created, cancelled
@@ -166,7 +166,9 @@ public struct AskBlock: Decodable, Equatable, Sendable {
     }
     switch answer {
     case "allow": return waitsFor.map(AskOutcome.approvedWaiting) ?? .allowedOnce
-    case "always", "always_bot_sites", "always_routine": return .alwaysAllowed
+    case "always": return .alwaysAllowed
+    case "always_bot_sites": return .alwaysAllowedForSites
+    case "always_routine": return .alwaysAllowedForRoutine
     case "deny": return .denied
     default: return .answered(actions.first { $0.id == answer }?.label ?? answer)
     }
