@@ -102,4 +102,8 @@ describe("routineActivityLine", () => {
     expect(routineActivityLine(paused, now)).toBe("Paused: the page changes too often");
     expect(routineActivityLine(routine({}), now)).toBeNull();
   });
+  it("says a routine is held because its model connection ran out of credit", () => {
+    const held = routine({ status: { ...routine({}).status, pausedReason: "credit" } });
+    expect(routineActivityLine(held, now)).toBe("Paused: model connection out of credit");
+  });
 });

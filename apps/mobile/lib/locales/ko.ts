@@ -935,6 +935,7 @@ export const KO_MESSAGES: Record<string, string> = {
   "Last ran": "마지막 실행",
   Next: "다음",
   "Paused: no access": "일시중지됨: 접근 권한 없음",
+  "Paused: model connection out of credit": "일시중지됨: 모델 연결의 크레딧 소진",
   "Paused: the page changes too often": "일시중지됨: 페이지가 너무 자주 바뀜",
   "Paused: the page could not be checked": "일시중지됨: 페이지를 확인할 수 없음",
   "Paused: too many checks today": "일시중지됨: 오늘 확인 횟수 초과",

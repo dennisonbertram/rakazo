@@ -221,6 +221,8 @@ export function routineStatusLine(
         return t`Paused: no access`;
       case "budget":
         return t`Paused: too many checks today`;
+      case "credit":
+        return t`Paused: model connection out of credit`;
     }
   }
   const parts: string[] = [];

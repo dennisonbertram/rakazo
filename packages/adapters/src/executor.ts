@@ -36,6 +36,7 @@ import type {
 import {
   DEFAULT_CONTEXT_STRATEGY,
   historyCompactJob,
+  isOutOfCredit,
   MEMORY_KINDS,
   MEMORY_REVISION_CONFLICT_ERROR,
   routineJobKey,
@@ -562,6 +563,7 @@ import { loadAgentMemoryContext } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { selectMemoryTools } from "./memory-tools.js";
 import { MESSAGING_AI_DISCLOSURE } from "./messaging-delivery.js";
+import type { ModelChoice } from "./model-selection.js";
 import {
   isCatalogModelChoice,
   PINNED_PROVIDER_NOT_CONNECTED,
@@ -618,8 +620,10 @@ import { assertSafeRemoteUrl } from "./remote-mcp.js";
 import { loadReplyContext, messageToAgentHistoryText } from "./reply-context.js";
 import {
   backOffRoutineAfterAccountError,
+  clearConnectionPause,
   clearRoutineBackoff,
   isModelAccountRefusal,
+  pauseConnectionForCredit,
 } from "./routine-backoff.js";
 import { routineTimerNonce } from "./routine-coalescing.js";
 import { lateRoutineRunInstruction } from "./routine-lateness.js";
@@ -1243,6 +1247,56 @@ export function isTerminalModelSetupError(error: unknown): boolean {
   );
 }
 
+/**
+ * The owner's connection a routine's run would start on, when that connection is paused for
+ * credit in the routine's space; null otherwise. Most owners have no pause, so the model lookup
+ * runs only when one exists.
+ */
+async function pausedRoutineConnection(
+  deps: ExecutorDeps,
+  routine: ModelChoice & { spaceId: string; userId: string },
+  bot: ModelChoice,
+): Promise<string | null> {
+  const scope = { spaceId: routine.spaceId, userId: routine.userId };
+  // A failed read never holds a routine back; the run then meets the provider as before.
+  let pauses: { credentialId: string }[];
+  try {
+    pauses = await deps.prisma.modelConnectionPause.findMany({
+      where: { ...scope, pausedUntil: { gt: new Date() } },
+      select: { credentialId: true },
+    });
+  } catch (error) {
+    getLogger().error("model_connection.credit_pause_read", error);
+    return null;
+  }
+  if (pauses.length === 0) return null;
+  // The same choice continueRun makes: the routine's pin, else the bot's, else the space default.
+  const choice = runModelChoice(
+    { modelProvider: null, modelId: null, thinkingLevel: null, ...routineRunModelPin(routine) },
+    bot,
+  );
+  const [overrideCredential, defaultCredential] = await Promise.all([
+    choice.modelProvider && choice.modelId
+      ? findBotModelCredential(deps.prisma, scope, {
+          modelProvider: choice.modelProvider,
+          modelId: choice.modelId,
+          modelCredentialId: choice.modelCredentialId,
+        }).catch(() => null)
+      : null,
+    findDefaultModelCredential(deps.prisma, scope),
+  ]);
+  const { credential } = selectConfiguredModel({
+    override: choice,
+    overrideCredential,
+    defaultCredential,
+    settings: null,
+    deployment: null,
+  });
+  return credential && pauses.some((pause) => pause.credentialId === credential.id)
+    ? credential.id
+    : null;
+}
+
 /** The model a run for this scope would use: the bot override, else the space default, else the deployment. */
 async function resolveRunModel(
   deps: ExecutorDeps,
@@ -1465,6 +1519,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           : ((await taughtSkillPromptForRoutine(deps.prisma, routine)) ?? routine.prompt),
         skillRecords,
       );
+      // A connection that ran out of credit holds its routines without starting a run.
+      const pausedConnectionId = await pausedRoutineConnection(deps, routine, bot);
       let gtmItemId: string | undefined;
       let claimed: Awaited<ReturnType<typeof claimOccurrence>> | "duplicate";
       const claimOccurrence = () =>
@@ -1480,17 +1536,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
               lastRunAt: new Date(),
               nextRunAt,
               ...(nextRunAt ? {} : { active: false }),
+              pausedConnectionId: null,
             },
           });
           if (updated.count !== 1) return null;
           // A skipped wake moves the schedule on but did not run, so Last ran stays as it was.
-          const skipped = async <Reason extends "active-run" | "no-work">(reason: Reason) => {
+          const skipped = async <Reason extends "active-run" | "no-work" | "paused">(
+            reason: Reason,
+          ) => {
             await tx.routine.update({
               where: { id: routine.id },
-              data: { lastRunAt: previousLastRunAt },
+              data: {
+                lastRunAt: previousLastRunAt,
+                ...(reason === "paused" ? { pausedConnectionId } : {}),
+              },
             });
             return reason;
           };
+          if (pausedConnectionId) return skipped("paused");
           if (gtmAgent) {
             const active = await tx.run.findFirst({
               where: {
@@ -1607,7 +1670,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         claimed = "duplicate";
       }
       if (!claimed) return;
-      if (claimed === "active-run" || claimed === "no-work" || claimed === "duplicate") {
+      if (
+        claimed === "active-run" ||
+        claimed === "no-work" ||
+        claimed === "paused" ||
+        claimed === "duplicate"
+      ) {
         if (!isOneShotRoutineCrons(routine.crons) && nextRunAt) {
           await deps.jobs.enqueue(routineWakeupJob(routine.id, nextRunAt));
         }
@@ -2806,6 +2874,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           deployment: runDeployment,
         });
         const { credential, thinkingLevel } = selected;
+        // A backup that took over answers for itself, not for the run's own connection.
+        let switchedToBackup = false;
+        const connectionScope = credential
+          ? { spaceId: run.spaceId, userId: run.userId, credentialId: credential.id }
+          : null;
         const runModelProvider = selected.provider ?? runtimeFallback?.provider;
         const runModelId = selected.id ?? runtimeFallback?.id;
         // A missing or refused connection of the user's own fails every scheduled run alike.
@@ -9821,6 +9894,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 void phases.write({ kind: "retrying", name: reason });
               },
               onModelChange: async (provider, modelId) => {
+                switchedToBackup = true;
                 const key = JSON.stringify([provider, modelId]);
                 if (meetingMarkedMidRun || !fallbackModelKeys.has(key)) {
                   throw new Error("Backup model is not selected");
@@ -10217,6 +10291,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 if (run.trigger === "routine" && run.routineId) {
                   await clearRoutineBackoff(deps, run.routineId);
                 }
+                if (connectionScope && !switchedToBackup) {
+                  await clearConnectionPause(deps, connectionScope);
+                }
                 if (stopped.continuationRunId) {
                   await deps.jobs
                     .enqueue(runContinueJob(stopped.continuationRunId))
@@ -10495,6 +10572,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (run.trigger === "routine" && run.routineId) {
             await clearRoutineBackoff(deps, run.routineId);
           }
+          if (connectionScope && !switchedToBackup) {
+            await clearConnectionPause(deps, connectionScope);
+          }
           if (completed.continuationRunId) {
             await deps.jobs
               .enqueue(runContinueJob(completed.continuationRunId))
@@ -10611,6 +10691,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
             isModelAccountRefusal(error)
           ) {
             await backOffRoutineAfterAccountError(deps, run.routineId);
+          }
+          // The deployment's own key is the operator's to top up, so only the owner's pauses.
+          if (connectionScope && !switchedToBackup && isOutOfCredit(error)) {
+            await pauseConnectionForCredit(
+              deps,
+              connectionScope,
+              run.trigger === "routine" ? run.routineId : null,
+            );
           }
         }
       } catch (setupError) {

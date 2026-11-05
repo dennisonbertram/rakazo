@@ -965,6 +965,7 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Last ran": "上次运行",
   Next: "下次",
   "Paused: no access": "已暂停：无权访问",
+  "Paused: model connection out of credit": "已暂停：模型连接额度已用完",
   "Paused: the page changes too often": "已暂停：页面变化过于频繁",
   "Paused: the page could not be checked": "已暂停：无法检查该页面",
   "Paused: too many checks today": "已暂停：今天检查次数过多",
