@@ -36,6 +36,7 @@ import type {
 import {
   DEFAULT_CONTEXT_STRATEGY,
   historyCompactJob,
+  MEMORY_KINDS,
   MEMORY_REVISION_CONFLICT_ERROR,
   routineJobKey,
   routineRetryJob,
@@ -7406,6 +7407,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 botId: bot.id,
                 path: String(args.path ?? "MEMORY.md"),
                 content: String(args.content ?? ""),
+                kind: MEMORY_KINDS.find((kind) => kind === args.kind),
                 sourceRunId: runId,
                 sourceThreadId: thread.id,
               },
