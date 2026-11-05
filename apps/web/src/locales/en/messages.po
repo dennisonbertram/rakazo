@@ -927,6 +927,10 @@ msgstr "A folder with that name already exists"
 msgid "A recording is already running."
 msgstr "A recording is already running."
 
+#: src/components/ApprovalRulesSettings.tsx
+msgid "A routine"
+msgstr "A routine"
+
 #: src/components/finance/WalletDialog.tsx
 msgid "A Safe multisig. Its owners and threshold are shown."
 msgstr "A Safe multisig. Its owners and threshold are shown."
@@ -1597,6 +1601,14 @@ msgstr "Always allow this"
 msgid "Always allowed"
 msgstr "Always allowed"
 
+#: src/components/AskCard.tsx
+msgid "Always allowed for this routine"
+msgstr "Always allowed for this routine"
+
+#: src/components/AskCard.tsx
+msgid "Always for this routine"
+msgstr "Always for this routine"
+
 #: src/components/cap-table/SafeRows.tsx
 #: src/components/data-room/Preview.tsx
 #: src/components/finance/ui.tsx
@@ -2177,8 +2189,8 @@ msgid "Back to sign in"
 msgstr "Back to sign in"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed."
-msgstr "Background runs always ask before they send, change or run anything, except mail changes you always allowed."
+msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
+msgstr "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Backup models"

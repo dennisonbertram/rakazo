@@ -927,6 +927,10 @@ msgstr ""
 msgid "A recording is already running."
 msgstr ""
 
+#: src/components/ApprovalRulesSettings.tsx
+msgid "A routine"
+msgstr ""
+
 #: src/components/finance/WalletDialog.tsx
 msgid "A Safe multisig. Its owners and threshold are shown."
 msgstr ""
@@ -1597,6 +1601,14 @@ msgstr ""
 msgid "Always allowed"
 msgstr "Всегда разрешено"
 
+#: src/components/AskCard.tsx
+msgid "Always allowed for this routine"
+msgstr ""
+
+#: src/components/AskCard.tsx
+msgid "Always for this routine"
+msgstr ""
+
 #: src/components/cap-table/SafeRows.tsx
 #: src/components/data-room/Preview.tsx
 #: src/components/finance/ui.tsx
@@ -2177,7 +2189,7 @@ msgid "Back to sign in"
 msgstr "Вернуться ко входу"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed."
+msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
 msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx

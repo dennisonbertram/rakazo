@@ -50,6 +50,8 @@ export function buildApprovalAskBlock(
     integrationWriteTool?: string;
     /** Offer "Allow all sites for this agent" on a new-site card; lists the private data the agent can read. */
     allSites?: { privateAccess: string[] };
+    /** Offer "Always for this routine": a rule that only this routine's runs use. */
+    routineAlways?: boolean;
     /** Never offer "Always allow": the call asks every time (a run holding untrusted meeting text). */
     noAlwaysAllow?: boolean;
     /** The From account the mail call will use when it named none (see inferMailAccount). */
@@ -214,6 +216,9 @@ export function buildApprovalAskBlock(
                     label: fetchSite ? `Always allow ${fetchSite}` : "Always allow this tool",
                   },
                 ]),
+            ...(options?.routineAlways
+              ? [{ id: "always_routine", label: "Always for this routine" }]
+              : []),
             ...(options?.allSites && fetchSite
               ? [
                   {
