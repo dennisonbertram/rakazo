@@ -111,7 +111,7 @@ describe("Data room guidance", () => {
 
   it("tells every agent to describe its abilities in plain words", () => {
     expect(instructions({})).toContain(PLAIN_CAPABILITY_GUIDANCE);
-    expect(PLAIN_CAPABILITY_GUIDANCE).toContain("never as raw tool names");
+    expect(PLAIN_CAPABILITY_GUIDANCE).toContain("Never name your internal tools");
   });
 
   it("appears only when add_to_data_room is offered", () => {
