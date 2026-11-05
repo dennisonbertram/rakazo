@@ -500,6 +500,30 @@ describe("mobile API authentication", () => {
     await expect(signUp("ada", "", "Ada")).rejects.toThrow(new Error("Enter a valid email"));
   });
 
+  it("keeps the server's /goal answer verbatim and flags it as a reply", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse(
+          {
+            json: {
+              code: "BAD_REQUEST",
+              message: "Goal: Find suppliers",
+              data: { goalReply: true },
+            },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    const error = await rpc("bots/list").catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
+      message: "Goal: Find suppliers",
+      status: 400,
+      data: { goalReply: true },
+    });
+  });
+
   it("says the server is unreachable instead of the native fetch failure", async () => {
     vi.stubGlobal(
       "fetch",
