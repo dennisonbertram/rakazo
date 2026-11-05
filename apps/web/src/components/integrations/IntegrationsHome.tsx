@@ -329,12 +329,15 @@ function AppCard({
 
 function SourceCard({
   source,
+  bots,
   onRemove,
 }: {
   source: CapabilityInstall;
+  bots: IntegrationsData["bots"];
   onRemove: (source: CapabilityInstall) => void;
 }) {
   const { t } = useLingui();
+  const usedBy = new Set(source.usableBotIds ?? []);
   return (
     <Card>
       <TileMenu label={t`More ${source.name} actions`}>
@@ -345,7 +348,16 @@ function SourceCard({
       <CardHead
         name={source.name}
         sub={`${source.kind.toUpperCase()} · ${hostOf(source.source)}`}
+        to={`/app/integrations/source/${source.id}`}
       />
+      <UsedBy bots={bots.filter((bot) => usedBy.has(bot.id))} />
+      {source.agentBotId ? (
+        <div className="mt-auto flex min-h-7 items-center gap-2 max-sm:basis-full">
+          <OpenPageLink to={`/app/${source.agentBotId}`}>
+            <Trans>Open agent</Trans>
+          </OpenPageLink>
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -904,7 +916,12 @@ export function IntegrationsHome({
                     ) : null}
                     {wholeList && !searching ? <HexCard /> : null}
                     {(wholeList && !searching ? data.sources : []).map((source) => (
-                      <SourceCard key={source.id} source={source} onRemove={setRemoving} />
+                      <SourceCard
+                        key={source.id}
+                        source={source}
+                        bots={data.bots}
+                        onRemove={setRemoving}
+                      />
                     ))}
                   </div>
                 </>

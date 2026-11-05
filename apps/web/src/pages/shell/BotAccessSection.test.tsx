@@ -14,6 +14,7 @@ const rpc = vi.hoisted(() => ({
     accessAll: vi.fn(),
     setAgentAccess: vi.fn(),
   },
+  capabilities: { list: vi.fn(), setAgentAccess: vi.fn() },
   mcp: {
     servers: { list: vi.fn(), setAgentAssignment: vi.fn() },
     assignments: { list: vi.fn() },
@@ -52,6 +53,8 @@ const ada = bot("ada", "Ada");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rpc.capabilities.list.mockResolvedValue([]);
+  rpc.capabilities.setAgentAccess.mockResolvedValue({});
   rpc.mcp.servers.list.mockResolvedValue([]);
   rpc.mcp.assignments.list.mockResolvedValue([]);
   rpc.connections.accessAll.mockImplementation(async () =>
@@ -314,4 +317,52 @@ it("does not count 'all agents' as a grant for a firewalled agent", async () => 
   });
   const { sw } = await mount({ ...ada, firewall: true } as Bot);
   expect(sw("Ada can use Gmail ann@example.com").getAttribute("aria-checked")).toBe("false");
+});
+
+const source = (patch: Record<string, unknown> = {}) => ({
+  id: "src1",
+  kind: "api",
+  name: "Contacts API",
+  agentBotId: "owner",
+  writesEnabled: true,
+  usableBotIds: ["owner"],
+  writeBotIds: [],
+  ...patch,
+});
+
+it("lists a directly connected source and grants only this agent through the source endpoint", async () => {
+  rpc.connections.list.mockResolvedValue([]);
+  rpc.connections.effectiveAccess.mockResolvedValue({});
+  rpc.connections.accessAll.mockResolvedValue({});
+  rpc.capabilities.list.mockResolvedValue([
+    source(),
+    { id: "skill1", kind: "skill", name: "Notes" },
+  ]);
+  const { container, sw } = await mount(ada);
+  expect(container.textContent).toContain("Contacts API");
+  expect(container.textContent).not.toContain("Notes");
+  expect(sw("Ada can use Contacts API").getAttribute("aria-checked")).toBe("false");
+  await act(async () => sw("Ada can use Contacts API").click());
+  expect(rpc.capabilities.setAgentAccess).toHaveBeenCalledWith({
+    id: "src1",
+    botId: "ada",
+    on: true,
+  });
+});
+
+it("shows Allow changes for a granted source and keeps a firewalled agent off it", async () => {
+  rpc.connections.list.mockResolvedValue([]);
+  rpc.connections.effectiveAccess.mockResolvedValue({});
+  rpc.connections.accessAll.mockResolvedValue({});
+  rpc.capabilities.list.mockResolvedValue([source({ usableBotIds: ["owner", "ada"] })]);
+  const granted = await mount(ada);
+  await act(async () => granted.sw("Ada can make changes in Contacts API").click());
+  expect(rpc.capabilities.setAgentAccess).toHaveBeenCalledWith({
+    id: "src1",
+    botId: "ada",
+    on: true,
+    canWrite: true,
+  });
+  const walled = await mount({ ...ada, firewall: true } as Bot);
+  expect(walled.sw("Ada can use Contacts API").getAttribute("aria-disabled")).toBe("true");
 });

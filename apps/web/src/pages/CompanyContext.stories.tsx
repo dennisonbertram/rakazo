@@ -1,24 +1,15 @@
-// Mockup for docs/company-context/PLAN.md. Nothing in the app uses this yet: slice S1 moves the page
-// into CompanyContext.tsx and S3 adds the proposal to AskCard. Everything around it is the real shell
-// and the real Company page. Every name and fact is invented.
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-  Textarea,
-} from "@rakazo/ui-web";
+// Stories for the Context tab (CompanyContext.tsx) on the real Company page. The proposal and
+// "found in" stories below are still the mockup for docs/company-context/PLAN.md: slice S3 adds the
+// proposal to AskCard. Every name and fact is invented.
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { BookOpenText, ChevronDown, ChevronRight, Ellipsis } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { PageEmptyState } from "../components/PageEmptyState";
+import { userEvent, within } from "storybook/test";
 import { mockRpc } from "../lib/__mocks__/rpc";
 import { makeBot, mockBots, mockMe, mockSections } from "../stories/fixtures";
+import { CompanyPage } from "./Company";
+import { CompanyContext } from "./CompanyContext";
 import { companyFixture } from "./company-fixtures";
 import { ShellPage } from "./Shell";
 
@@ -108,209 +99,97 @@ function mocks(messages: ReturnType<typeof message>[]) {
   });
 }
 
-type Section = { id: string; title: string; summary: string; updated: string; body?: string[] };
-
-const SECTIONS: Section[] = [
-  {
-    id: "brand",
-    title: "Brand voice",
-    summary: "Plain and friendly. We write to clinic owners, not to software buyers.",
-    updated: "Oct 28",
-  },
-  {
-    id: "fernhollow",
-    title: "Fernhollow Labs",
-    summary: "The company: four people building tools for small clinics.",
-    updated: "Oct 12",
-  },
-  {
-    id: "loomstead",
-    title: "Loomstead",
-    summary: "Booking page for mobile pet groomers. In early testing, not for sale yet.",
-    updated: "Oct 30",
-  },
-  {
-    id: "quillfern",
-    title: "Quillfern",
-    summary: "Invoice reminders for small vet clinics.",
-    updated: "Nov 2",
-    body: [
-      "Clinics connect their billing system. Quillfern sends the reminder and stops when the invoice is paid.",
-      "Sold per clinic at a flat monthly price. Most customers have one to three vets.",
-      "Ada leads the product. Ben runs the pilot.",
-    ],
-  },
-];
-
-function Rows({ open }: { open: string }) {
-  return (
-    <ul className="divide-y divide-border border-y border-border">
-      {SECTIONS.map((section) => {
-        const expanded = section.id === open;
-        return (
-          <li key={section.id} className="py-3">
-            <div className="flex items-start gap-2">
-              <button type="button" className="flex min-w-0 flex-1 items-start gap-2 text-start">
-                {expanded ? (
-                  <ChevronDown aria-hidden className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                ) : (
-                  <ChevronRight
-                    aria-hidden
-                    className="mt-1 size-4 shrink-0 text-muted-foreground"
-                  />
-                )}
-                <span className="min-w-0">
-                  <span className="block text-[14.5px] font-medium text-foreground">
-                    {section.title}
-                  </span>
-                  <span className="mt-0.5 block text-[13.5px] text-muted-foreground">
-                    {section.summary}
-                  </span>
-                </span>
-              </button>
-              <span className="mt-0.5 hidden shrink-0 text-[12.5px] text-muted-foreground sm:block">
-                {section.updated}
-              </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={<Button variant="ghost" size="icon-sm" aria-label="More" />}
-                >
-                  <Ellipsis aria-hidden className="size-4" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>History</DropdownMenuItem>
-                  <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {expanded && section.body ? (
-              <div className="ms-6 mt-3 max-w-[68ch] space-y-2 text-[14px] leading-[1.55] text-foreground">
-                {section.body.map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
-                <Button variant="outline" size="sm" className="mt-1">
-                  Edit
-                </Button>
-              </div>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function ContextTab({ state }: { state: "full" | "empty" | "writing" }) {
-  if (state === "empty")
-    return (
-      <PageEmptyState
-        icon={<BookOpenText className="size-8" strokeWidth={1.6} aria-hidden="true" />}
-        title="What should every agent know?"
-        description="Start with one product or topic."
-      >
-        <Button>Add the first section</Button>
-      </PageEmptyState>
-    );
-  if (state === "writing")
-    return (
-      <form className="max-w-[68ch] space-y-3">
-        <Input aria-label="Name" placeholder="Name" defaultValue="Quillfern" />
-        <Textarea
-          aria-label="What is it?"
-          placeholder="What is it?"
-          rows={7}
-          defaultValue={
-            "Invoice reminders for small vet clinics.\n\nClinics connect their billing system. Quillfern sends the reminder and stops when the invoice is paid."
-          }
-        />
-        <div className="flex gap-2">
-          <Button type="button">Save</Button>
-          <Button type="button" variant="ghost">
-            Cancel
-          </Button>
-        </div>
-      </form>
-    );
-  return (
-    <div>
-      <div className="mb-3 flex justify-end">
-        <Button variant="outline" size="sm">
-          New section
-        </Button>
-      </div>
-      <Rows open="quillfern" />
-    </div>
-  );
-}
-
-/**
- * Shows the planned tab inside the real Company page without changing it: adds the tab to the real
- * tab strip, hides the real tab's content and renders the mockup in its place.
- */
-function ContextOverlay({ children }: { children: ReactNode }) {
-  const [host, setHost] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const list = document.querySelector<HTMLElement>('[role="tablist"]');
-      const [overview, people] = list
-        ? [...list.querySelectorAll<HTMLElement>('[role="tab"]')]
-        : [];
-      const root = list?.parentElement;
-      if (!list || !overview || !people || !root?.parentElement) return;
-      if (!list.querySelector("[data-mock-context]")) {
-        const context = overview.cloneNode(true) as HTMLElement;
-        context.dataset.mockContext = "true";
-        context.textContent = "Context";
-        overview.after(context);
-        const plain = people.cloneNode(true) as HTMLElement;
-        plain.textContent = "Overview";
-        overview.replaceWith(plain);
-      }
-      let target = root.parentElement.querySelector<HTMLElement>("[data-mock-host]");
-      if (!target) {
-        target = document.createElement("div");
-        target.dataset.mockHost = "true";
-        target.className = "mt-6";
-        root.after(target);
-        setHost(target);
-      }
-      for (const sibling of root.parentElement.children) {
-        if (sibling !== root && sibling !== target && root.compareDocumentPosition(sibling) & 4)
-          (sibling as HTMLElement).style.display = "none";
-      }
-    }, 60);
-    return () => clearInterval(timer);
-  }, []);
-  return host ? createPortal(children, host) : null;
-}
-
 const meta = {
-  title: "Company/Context (mockup)",
-  component: ShellPage,
-  parameters: { layout: "fullscreen" },
-} satisfies Meta<typeof ShellPage>;
+  title: "Company/Context",
+  component: CompanyContext,
+} satisfies Meta<typeof CompanyContext>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const page = (state: "full" | "empty" | "writing"): Story => ({
-  decorators: [at("/app/company")],
-  beforeEach: () => mocks([]),
-  render: () => (
-    <>
-      <div className="h-dvh">
-        <ShellPage />
-      </div>
-      <ContextOverlay>
-        <ContextTab state={state} />
-      </ContextOverlay>
-    </>
-  ),
+const section = (slug: string, title: string, text: string, updatedAt: string, revision = 1) => ({
+  id: `doc_${slug}`,
+  slug,
+  title,
+  summary: text.split(/(?<=\.)\s/)[0] ?? text,
+  text,
+  revision,
+  updatedAt,
 });
 
-export const Page = page("full");
+const SECTIONS = [
+  section(
+    "brand-voice",
+    "Brand voice",
+    "Plain and friendly. We write to clinic owners, not to software buyers.",
+    "2026-10-28T10:00:00.000Z",
+  ),
+  section(
+    "fernhollow-labs",
+    "Fernhollow Labs",
+    "The company: four people building tools for small clinics.",
+    "2026-10-12T10:00:00.000Z",
+  ),
+  section(
+    "quillfern",
+    "Quillfern",
+    "Invoice reminders for small vet clinics.\n\nClinics connect their billing system. Quillfern sends the reminder and stops when the invoice is paid.\n\nAda leads the product. Ben runs the pilot.",
+    "2026-11-02T10:00:00.000Z",
+    2,
+  ),
+];
+
+const history = [
+  {
+    revision: 2,
+    title: "Quillfern",
+    text: SECTIONS[2]!.text,
+    createdAt: "2026-11-02T10:00:00.000Z",
+  },
+  {
+    revision: 1,
+    title: "Quillfern",
+    text: "Invoice reminders for small vet clinics.",
+    createdAt: "2026-10-30T10:00:00.000Z",
+  },
+];
+
+const context = (sections: typeof SECTIONS, initialEntry: string): Story => ({
+  parameters: { initialEntries: [initialEntry] },
+  beforeEach: () =>
+    mockRpc({
+      "companyContext.list": sections,
+      "companyContext.history": history,
+      "companyContext.save": SECTIONS[2],
+    }),
+});
+
+/** The owner's sections, one open. Real tab on the real Company page. */
+export const Page: Story = {
+  ...context(SECTIONS, "/app/company?view=context&section=quillfern"),
+  render: () => <CompanyPage />,
+};
 /** The owner writes the first entry. */
-export const Empty = page("empty");
-export const Writing = page("writing");
+export const Empty: Story = {
+  ...context([], "/app/company?view=context"),
+  render: () => <CompanyPage />,
+};
+/** Editing an open section. */
+export const Writing: Story = {
+  ...context(SECTIONS, "/app/company?view=context&section=quillfern"),
+  render: () => <CompanyPage />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "Edit" }));
+  },
+};
+/** History of one section, with Restore on the older text. */
+export const History: Story = {
+  ...context(SECTIONS, "/app/company?view=context&section=quillfern"),
+  render: () => <CompanyPage />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(await within(canvasElement).findByRole("button", { name: "More" }));
+    await userEvent.click(await within(document.body).findByRole("menuitem", { name: "History" }));
+  },
+};
 
 const proposal = (flag?: string) => ({
   kind: "ask",

@@ -104,6 +104,8 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "calendar_query",
   "read_spreadsheet",
   "skill_read",
+  // The owner's own company sections; the executor refuses it once the run is tainted.
+  "company_context_lookup",
   // Reads of this bot's own thread, pages and pins only (scoped by space, user, bot and thread in
   // the handlers). The executor marks a run that reads meeting-marked history as tainted.
   "read_history",
@@ -499,6 +501,7 @@ export function buildApprovalTable(
  */
 const OWN_STATE_RESULT_TOOLS = new Set([
   "ask_user",
+  "company_context_lookup",
   "attach_file",
   "end_call",
   "list_fleet",

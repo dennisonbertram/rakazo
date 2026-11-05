@@ -8,6 +8,7 @@ export const isDataRoomAgentSpawnKey = (spawnKey: string | null | undefined) =>
 
 /** The only built-in tools the Data room agent is offered. None of them deletes. */
 export const DATA_ROOM_AGENT_BUILTIN_TOOLS = [
+  "company_context_lookup",
   "search_data_room",
   "read_data_room_item",
   "add_to_data_room",

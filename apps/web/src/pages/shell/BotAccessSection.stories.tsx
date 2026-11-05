@@ -39,6 +39,7 @@ const loaded = (rows: ReturnType<typeof connection>[]) => ({
     ]),
   ),
   "connections.setAgentAccess": null,
+  "capabilities.list": [],
   "mcp.servers.list": [],
   "mcp.assignments.list": [],
 });
@@ -62,3 +63,31 @@ export const Few: StoryObj<typeof meta> = { beforeEach: () => mockRpc(loaded(few
 
 /** Above 8 rows a search box appears. */
 export const WithSearch: StoryObj<typeof meta> = { beforeEach: () => mockRpc(loaded(many)) };
+
+/** A directly connected source: this agent can be added, and given Allow changes. */
+export const WithSource: StoryObj<typeof meta> = {
+  beforeEach: () =>
+    mockRpc({
+      ...loaded(few),
+      "capabilities.list": [
+        {
+          id: "src1",
+          kind: "api",
+          name: "Contacts API",
+          source: "https://api.example.test/v1",
+          version: "1.0.0",
+          digest: null,
+          secretConfigured: false,
+          config: {},
+          createdAt: "2026-01-01T00:00:00.000Z",
+          agentBotId: "bot_other",
+          allAgents: false,
+          agentShared: true,
+          writesEnabled: true,
+          usableBotIds: ["bot_other", bot.id],
+          writeBotIds: [],
+        },
+      ],
+      "capabilities.setAgentAccess": null,
+    }),
+};

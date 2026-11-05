@@ -287,7 +287,7 @@ async function lockAgentConnections(tx: Pick<PrismaClient, "$queryRaw">, botId: 
  * that was exclusive to it stays exclusive, so with no agent no bot can use it.
  */
 async function releaseAgentServers(
-  tx: Pick<PrismaClient, "mcpServer" | "connection" | "botConnectionAccess">,
+  tx: Pick<PrismaClient, "mcpServer" | "connection" | "botConnectionAccess" | "capabilityInstall">,
   bot: Pick<LifecycleBot, "id" | "spaceId" | "userId">,
 ) {
   const scope = {
@@ -295,6 +295,11 @@ async function releaseAgentServers(
     spaceId: bot.spaceId,
     ...(bot.userId ? { userId: bot.userId } : {}),
   };
+  // A directly connected source keeps its access policy; with no agent it is read-only.
+  await tx.capabilityInstall.updateMany({
+    where: scope,
+    data: { agentBotId: null, writesEnabled: false },
+  });
   const [servers, connections] = await Promise.all([
     // Servers made by provisioning stay exclusive; ones set exclusive by hand are shared again.
     (async () => {

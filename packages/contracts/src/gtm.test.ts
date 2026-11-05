@@ -100,6 +100,7 @@ describe("GTM contracts", () => {
       "request_takeover",
       "request_secret",
       "list_secrets",
+      "company_context_lookup",
       "scratchpad_list",
       "scratchpad_add",
       "scratchpad_update",

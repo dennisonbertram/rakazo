@@ -271,3 +271,27 @@ export function effectiveAccessByConnection(
     }),
   );
 }
+
+/**
+ * What a bot may do with a directly connected source (MCP, API or GraphQL install). The source's
+ * own agent reads it; every other internal agent needs "all agents" or its own grant. A change
+ * needs the source's "Allow changes" switch, and for a non-owner either "all agents" or its own
+ * write grant. External and firewalled bots get nothing, like the "all agents" rule on connections.
+ */
+export function sourceAccessFor(
+  source: {
+    agentBotId: string | null;
+    allAgents: boolean;
+    writesEnabled: boolean;
+    botAccess: { botId: string; canWrite: boolean }[];
+  },
+  bot: { id: string; audience?: string | null; firewall?: boolean },
+): { read: boolean; write: boolean } {
+  if (bot.audience === "external" || bot.firewall === true) return { read: false, write: false };
+  if (source.agentBotId === bot.id) return { read: true, write: source.writesEnabled };
+  const grant = source.botAccess.find((entry) => entry.botId === bot.id);
+  if (grant) return { read: true, write: source.writesEnabled && grant.canWrite };
+  return source.allAgents
+    ? { read: true, write: source.writesEnabled }
+    : { read: false, write: false };
+}

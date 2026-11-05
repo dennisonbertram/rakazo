@@ -719,6 +719,10 @@ describe("planActionGate with block and unattended runs", () => {
 });
 
 describe("unattendedToolRequiresApproval", () => {
+  it("lets a scheduled run read the owner's company context without a card", () => {
+    expect(unattendedToolRequiresApproval(true, "company_context_lookup", false)).toBe(false);
+  });
+
   it("never asks for an attended run", () => {
     expect(unattendedToolRequiresApproval(false, "shell", false)).toBe(false);
     expect(unattendedToolRequiresApproval(false, "github_create_issue", true)).toBe(false);
@@ -790,15 +794,12 @@ describe("unattendedToolRequiresApproval", () => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
   });
 
-  it.each([
-    "show_emails",
-    "finance_overview",
-    "finance_transactions",
-    "cap_table_read",
-    "page_source_list",
-  ])("still asks for %s in an unattended run", (name) => {
-    expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
-  });
+  it.each(["show_emails", "finance_overview", "finance_transactions", "cap_table_read", "page_source_list"])(
+    "still asks for %s in an unattended run",
+    (name) => {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+    },
+  );
 
   it("keeps an internal legal tool asking in a tainted run", () => {
     expect(externalTaintAllowsTool("legal_upsert_contract")).toBe(false);

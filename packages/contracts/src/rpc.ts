@@ -139,6 +139,8 @@ import {
   BotSchema,
   BotSectionSchema,
   CapabilityInstallSchema,
+  CompanyContextRevisionSchema,
+  CompanyContextSectionSchema,
   ComputerModeSchema,
   ComputerReleaseReasonSchema,
   ComputerStatusSchema,
@@ -1013,6 +1015,29 @@ export const appContract = {
       .output(SpaceMemoryConfigSchema),
     disconnectProvider: oc.output(z.object({ ok: z.literal(true) })),
   },
+  companyContext: {
+    list: oc.output(z.array(CompanyContextSectionSchema)),
+    /** Creates a section (no id) or replaces one's text. CONFLICT when the revision moved or the name is taken. */
+    save: oc
+      .input(
+        z.object({
+          id: Id.optional(),
+          title: z.string(),
+          text: z.string(),
+          expectedRevision: z.number().int().optional(),
+        }),
+      )
+      .output(CompanyContextSectionSchema),
+    history: oc.input(z.object({ id: Id })).output(z.array(CompanyContextRevisionSchema)),
+    /** Saves an old revision's text as a new revision. */
+    restore: oc
+      .input(z.object({ id: Id, revision: z.number().int(), expectedRevision: z.number().int() }))
+      .output(CompanyContextSectionSchema),
+    /** Deletes a section and its history, only if it is still at `revision`. */
+    remove: oc
+      .input(z.object({ id: Id, revision: z.number().int() }))
+      .output(z.object({ ok: z.literal(true) })),
+  },
   pages: {
     get: oc.input(BotPageGetInputSchema).output(BotPageSchema.nullable()),
     save: oc.input(BotPageSaveInputSchema).output(BotPageSaveOutputSchema),
@@ -1275,6 +1300,29 @@ export const appContract = {
       )
       .output(CapabilityInstallSchema),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Idempotent: returns the source's agent, creating it when the install could not. */
+    createAgent: oc.input(z.object({ id: Id })).output(z.object({ botId: Id })),
+    rename: oc
+      .input(z.object({ id: Id, name: z.string().trim().min(1).max(120) }))
+      .output(CapabilityInstallSchema),
+    setWrites: oc.input(z.object({ id: Id, enabled: z.boolean() })).output(CapabilityInstallSchema),
+    /** Only the source's agent may use it, or others may be added one by one. */
+    setExclusive: oc
+      .input(z.object({ id: Id, exclusive: z.boolean() }))
+      .output(CapabilityInstallSchema),
+    /** All (every internal agent, later ones too) or None (only the source's own agent). */
+    setAllAgents: oc.input(z.object({ id: Id, on: z.boolean() })).output(CapabilityInstallSchema),
+    /** One agent's switch and "Allow changes"; the server changes only that agent's grant. */
+    setAgentAccess: oc
+      .input(
+        z.object({
+          id: Id,
+          botId: Id,
+          on: z.boolean(),
+          canWrite: z.boolean().optional(),
+        }),
+      )
+      .output(CapabilityInstallSchema),
   },
   integrationAgents: {
     /** Idempotent: returns the server's agent bot, creating it on first call. */
