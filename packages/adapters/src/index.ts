@@ -8,6 +8,7 @@ export * from "./alchemy-crypto-source.js";
 export * from "./apns-push.js";
 export * from "./app-control/index.js";
 export {
+  buildApprovalAskBlock,
   mailRequestIsValid,
   type NormalizedMailEdits,
   normalizeMailEdits,
@@ -148,6 +149,7 @@ export * from "./mail-approval-recovery.js";
 export * from "./mail-attachment-filing.js";
 export * from "./mail-compose.js";
 export * from "./mail-protected-senders.js";
+export * from "./mail-reply-batch.js";
 export * from "./mail-sender-rules.js";
 export * from "./mail-skip-inbox.js";
 export * from "./mail-sync.js";

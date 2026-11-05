@@ -47,6 +47,7 @@ const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "mail_draft",
   "mail_modify",
   "mail_send",
+  "mail_reply_batch",
   "calendar_create_event",
   "calendar_update_event",
   "calendar_delete_event",
@@ -55,7 +56,12 @@ const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "contacts_save",
 ]);
 /** Built-in mail tools that write; the "email" approval category covers them. */
-const BUILTIN_MAIL_WRITE_TOOLS = new Set(["mail_draft", "mail_modify", "mail_send"]);
+const BUILTIN_MAIL_WRITE_TOOLS = new Set([
+  "mail_draft",
+  "mail_modify",
+  "mail_send",
+  "mail_reply_batch",
+]);
 /** Cannot be auto-reviewed or permanently allowed. imessage_send is a message to a person from the user's agent line. */
 const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "respond_agent_connection",
@@ -67,6 +73,8 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "company_import_start",
   // Hands a meeting to another agent; a card every time, also when the owner is chatting.
   "share_meeting",
+  // Several replies on one card, sent only by the owner's press. Its card has no Allow to save.
+  "mail_reply_batch",
   // Writes to the owner's fundraising records. A spreadsheet or email the agent read is untrusted,
   // so no saved Allow rule or Auto Review may pass them.
   "fundraising_round_save",
@@ -353,6 +361,7 @@ export function actionTypeFromCategory(category: string): ApprovalActionType | n
 
 const BUILTIN_ACTION_TYPES: Record<string, ApprovalActionType> = {
   mail_send: "send_email",
+  mail_reply_batch: "send_email",
   mail_draft: "send_email",
   mail_modify: "send_email",
   calendar_create_event: "calendar_changes",
@@ -791,11 +800,14 @@ export function isApprovalAskBlock(block: {
   approvalEffectId?: string;
   /** A page source approval has no effect row; its card is still an approval card. */
   pageSource?: unknown;
+  /** A reply batch card offers only Discard; Send selected is its own request. */
+  mailBatch?: unknown;
   actions?: Array<{ id: string; label: string }>;
 }): boolean {
   if (block.kind !== "ask" || !(block.approvalEffectId || block.pageSource)) return false;
   if (!block.actions?.length) return false;
   const actionIds = new Set(block.actions.map((action) => action.id));
+  if (block.mailBatch && block.actions.every((action) => action.id === "deny")) return true;
   return (
     actionIds.has("allow") &&
     actionIds.has("deny") &&

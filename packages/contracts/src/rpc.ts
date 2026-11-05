@@ -206,7 +206,16 @@ import {
   VoiceStatusSchema,
   WaitingOnYouItemSchema,
 } from "./domain.js";
-import { ComputerCommandSchema, MailEditsSchema, ProductEventSchema } from "./events.js";
+import {
+  ComputerCommandSchema,
+  MAX_MAIL_REPLY_BATCH,
+  MailBatchComposerDraftSchema,
+  MailBatchPressRowSchema,
+  MailBatchPreviewSchema,
+  MailBatchSchema,
+  MailEditsSchema,
+  ProductEventSchema,
+} from "./events.js";
 import {
   BalanceSeriesInputSchema,
   BalanceSeriesOutputSchema,
@@ -845,6 +854,53 @@ export const appContract = {
         }),
       )
       .output(z.object({ ok: z.literal(true) })),
+    /** The rows of a reply batch card, for the run's own user. Flags and hashes are the server's. */
+    mailBatch: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id }))
+      .output(MailBatchSchema),
+    /**
+     * Send selected on a reply batch card. Rows not posted are skipped. Any mismatch rejects the
+     * whole press and changes nothing.
+     */
+    sendMailBatch: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          rows: z.array(MailBatchPressRowSchema).min(1).max(MAX_MAIL_REPLY_BATCH),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
+    /** Retry failed on a settled reply batch card. Needs no waiting run and does not wake the agent. */
+    retryMailBatch: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          rows: z
+            .array(MailBatchPressRowSchema.pick({ itemId: true, seenMessageId: true }))
+            .min(1)
+            .max(MAX_MAIL_REPLY_BATCH),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true), count: z.number().int().nonnegative() })),
+    /** The flags these edits would give each row. Stores nothing. */
+    previewMailBatch: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          rows: z
+            .array(MailBatchPressRowSchema.pick({ itemId: true, edits: true }))
+            .min(1)
+            .max(MAX_MAIL_REPLY_BATCH),
+        }),
+      )
+      .output(MailBatchPreviewSchema),
+    /** Open in composer on a row that did not go out. Retry can no longer send that row. */
+    mailBatchToComposer: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id, itemId: Id }))
+      .output(MailBatchComposerDraftSchema),
     /**
      * Sends the draft a mail_draft card saved. The draft and account come from the server's record
      * of that tool call; the client only names the card.

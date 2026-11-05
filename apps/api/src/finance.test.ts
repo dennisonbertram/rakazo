@@ -74,6 +74,7 @@ import {
   financeSpend,
   financeTransaction,
   financeVendor,
+  onFinanceServerReconnected,
 } from "./finance.js";
 
 const NOW = new Date("2026-10-14T12:00:00Z");
@@ -120,6 +121,11 @@ function table(rows: Row[]) {
       const made = { id: `row-${rows.length + 1}`, ...create };
       rows.push(made);
       return made;
+    }),
+    updateMany: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
+      const hit = rows.filter((r) => matches(r, where));
+      for (const r of hit) Object.assign(r, data);
+      return { count: hit.length };
     }),
     update: vi.fn(async ({ where, data }: { where: Row; data: Row }) => {
       const row = rows.find((r) => matches(r, where));
@@ -186,6 +192,7 @@ function setup(
       | "financeBill"
       | "financeTreasuryYield"
       | "financeSyncState"
+      | "safeSyncState"
       | "bot"
       | "botMcpServer"
       | "financeWallet"
@@ -208,6 +215,7 @@ function setup(
     financeBill: t("financeBill"),
     financeTreasuryYield: t("financeTreasuryYield"),
     financeSyncState: t("financeSyncState"),
+    safeSyncState: t("safeSyncState"),
     bot: t("bot"),
     botMcpServer: t("botMcpServer"),
     financeWallet: t("financeWallet"),
@@ -452,6 +460,29 @@ describe("finance overview", () => {
     });
     expect((await financeOverview(failed.deps, a)).sources[0]?.status).toBe("error");
     expect(failed.enqueue).not.toHaveBeenCalled();
+  });
+
+  it("syncs a source whose sign-in works but whose reconnect flag is stale, throttled after a failure", async () => {
+    const expired = (ago: number) =>
+      setup({
+        mcpServer: [server(a)],
+        financeSyncState: [
+          {
+            mcpServerId: "srv-1",
+            ...scope(a),
+            lastSyncedAt: new Date(NOW.getTime() - 3_600_000),
+            lastErrorAt: new Date(NOW.getTime() - ago),
+            lastError: "Sign-in expired",
+            needsReconnect: true,
+          },
+        ],
+      });
+    const old = expired(20 * 60_000);
+    expect((await financeOverview(old.deps, a)).sources[0]?.status).toBe("needs_reconnect");
+    expect(old.enqueue).toHaveBeenCalledTimes(1);
+    const recent = expired(60_000);
+    await financeOverview(recent.deps, a);
+    expect(recent.enqueue).not.toHaveBeenCalled();
   });
 
   it("does not show another user's server or sync state", async () => {
@@ -1294,5 +1325,65 @@ describe("finance pages with the real calculations", () => {
     expect(overview.breakdownByPeriod?.month.vendor).toEqual([
       { key: "cloudnine-hosting", label: "Cloudnine Hosting", cents: 481_200 },
     ]);
+  });
+});
+
+describe("finance reconnect", () => {
+  const expiredState = (actor: Actor, mcpServerId = "srv-1"): Row => ({
+    mcpServerId,
+    ...scope(actor),
+    lastSyncedAt: new Date(NOW.getTime() - 3_600_000),
+    lastErrorAt: new Date(NOW.getTime() - 60_000),
+    lastError: "Sign-in expired",
+    needsReconnect: true,
+  });
+
+  it("clears the expired sign-in, enqueues a sync, and leaves another user's state alone", async () => {
+    const { deps, prisma, enqueue } = setup({
+      mcpServer: [server(a), server(b, { id: "srv-b" })],
+      financeSyncState: [expiredState(a), expiredState(b, "srv-b")],
+      safeSyncState: [
+        { ...scope(a), needsReconnect: true, lastError: "Sign-in expired" },
+        { ...scope(b), needsReconnect: true, lastError: "Sign-in expired" },
+      ],
+    });
+    await onFinanceServerReconnected(deps, a, "srv-1");
+    expect((await financeOverview(deps, a)).sources[0]?.status).toBe("ok");
+    expect(prisma.financeSyncState.rows[0]).toMatchObject({
+      needsReconnect: false,
+      lastError: null,
+      lastErrorAt: null,
+    });
+    expect(prisma.safeSyncState.rows[0]).toMatchObject({ needsReconnect: false, lastError: null });
+    expect(prisma.financeSyncState.rows[1]).toMatchObject({ needsReconnect: true });
+    expect(prisma.safeSyncState.rows[1]).toMatchObject({ needsReconnect: true });
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ name: "finance.sync" }));
+  });
+
+  it("shows needs_reconnect again when the fresh sync fails with an expired sign-in", async () => {
+    const { deps, prisma } = setup({
+      mcpServer: [server(a)],
+      financeSyncState: [expiredState(a)],
+    });
+    await onFinanceServerReconnected(deps, a, "srv-1");
+    // What a failed sync writes (finance-sync.ts fail()).
+    Object.assign(prisma.financeSyncState.rows[0]!, {
+      needsReconnect: true,
+      lastError: "Sign-in expired",
+      lastErrorAt: NOW,
+    });
+    expect((await financeOverview(deps, a)).sources[0]?.status).toBe("needs_reconnect");
+  });
+
+  it("does not fail when the enqueue fails or the server belongs to someone else", async () => {
+    const { deps, prisma, enqueue } = setup({
+      mcpServer: [server(a)],
+      financeSyncState: [expiredState(a)],
+    });
+    enqueue.mockRejectedValueOnce(new Error("queue down"));
+    await expect(onFinanceServerReconnected(deps, a, "srv-1")).resolves.toBeUndefined();
+    await onFinanceServerReconnected(deps, b, "srv-1");
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(prisma.financeSyncState.rows[0]).toMatchObject({ needsReconnect: false });
   });
 });

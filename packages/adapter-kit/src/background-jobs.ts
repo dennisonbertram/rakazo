@@ -35,6 +35,11 @@ const payloadSchemas = {
   "account.export.cleanup": z.object({}),
   "cloud_agent.poll": z.object({ agentId: z.string().min(1) }),
   "mail.search.expire": z.object({ searchId: z.string().min(1) }),
+  "mail.reply.batch": z.object({
+    effectId: z.string().min(1),
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+  }),
   "inbox.triage": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
   "mail.sync": z.object({
     spaceId: z.string().min(1),
@@ -368,6 +373,24 @@ export function mailSearchExpireJob(searchId: string, availableAt: Date): Backgr
     payload: { searchId },
     availableAt,
     replaceKey: mailSearchExpireJobKey(searchId),
+  };
+}
+
+export function mailReplyBatchJobKey(effectId: string): string {
+  return `mail.reply.batch:${effectId}`;
+}
+
+/**
+ * Sends one batch's approved rows in order. Claims are per row, so a second job for the same batch
+ * (a retry while one still runs, or recovery after a worker died) can never send a row twice.
+ */
+export function mailReplyBatchJob(
+  payload: BackgroundJobPayloads["mail.reply.batch"],
+): BackgroundJob {
+  return {
+    name: "mail.reply.batch",
+    payload,
+    replaceKey: mailReplyBatchJobKey(payload.effectId),
   };
 }
 

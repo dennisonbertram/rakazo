@@ -52,6 +52,7 @@ export const BUILTIN_TOOL_NAMES = [
   "mail_draft",
   "mail_modify",
   "mail_send",
+  "mail_reply_batch",
   "imessage_list_conversations",
   "imessage_read",
   "imessage_send",

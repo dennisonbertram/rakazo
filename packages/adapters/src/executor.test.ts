@@ -1868,15 +1868,19 @@ describe("run tool selection", () => {
       "mail_get",
       "mail_grep",
       "mail_modify",
+      "mail_reply_batch",
       "mail_search",
       "mail_send",
     ]);
     expect(mailNames(offered(true, ["mail_grep", "inbox_overview", "mail_draft"]))).toEqual([
       "mail_get",
       "mail_modify",
+      "mail_reply_batch",
       "mail_search",
       "mail_send",
     ]);
+    // Turning off sending for a bot covers the batch too.
+    expect(mailNames(offered(true, ["mail_send"]))).not.toContain("mail_reply_batch");
   });
 
   it("offers the Drive tools only when a Drive account is connected", () => {
