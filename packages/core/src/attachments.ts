@@ -129,6 +129,13 @@ export function mailThreadPlaceholder(block: MailThreadBlock): string {
   return `[email thread: "${block.subject}", ${block.messages.length === 1 ? "1 message" : `${block.messages.length} messages`}. Not shared with you yet: the user has not allowed AI data sharing for mail with the model running this chat. To read it, call mail_search for this subject: the user is then asked to allow it on a card. Do not send them to another page, and do not ask them to paste the message.]`;
 }
 
+const MAIL_OUTCOME_HISTORY = {
+  sent: "The email was sent. Do not send it again.",
+  saved: "The draft was saved.",
+  failed: "It failed. Nothing was sent.",
+  unknown: "The outcome is unknown, so it may have been sent. Do not send it again; check Sent.",
+} as const;
+
 export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
   return blocks
     .map((block) => {
@@ -150,6 +157,10 @@ export function blocksToAgentHistoryText(blocks: MessageBlock[]): string {
       // Without the answer a later turn sees the question as still open and asks it again.
       if (block.kind === "ask") {
         if (block.status !== "answered" || !block.answer) return block.text;
+        // How a mail card ended, whoever sent it. The stored answer is not the result: older cards
+        // the person sent themselves are stored as "deny".
+        const ended = block.mail?.outcome && MAIL_OUTCOME_HISTORY[block.mail.outcome];
+        if (ended) return `${block.text}\nResult: ${ended}`;
         const choice = block.actions?.find((action) => action.id === block.answer);
         return `${block.text}\nAnswer: ${choice?.label ?? block.answer}`;
       }

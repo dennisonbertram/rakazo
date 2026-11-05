@@ -64,8 +64,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   inbox: {
-    current: "db1c1ed3a35ee4ac50f3d14f7906e9a318dfba7064129da2d5cb2678d77c574a",
+    current: "43a7f661d2303292e61d9842a9dfa72d41281ee6fd41bab12ddd97ff2ec2672c",
     past: [
+      "db1c1ed3a35ee4ac50f3d14f7906e9a318dfba7064129da2d5cb2678d77c574a",
       "f6e825ecfc390c474393396e2975976771440a3758cee9b8cdf31c10a34e489e",
       "0f8d8113a669fdd8f41cd6cb9517baf0b80252433a49da5cb17541d07a188473",
       "3db3695c73b900c2909463eae9cec2b7be94c82ff3716c863ef33d9fa2acbaaf",

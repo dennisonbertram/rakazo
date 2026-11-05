@@ -365,6 +365,15 @@ describe("inferScript reply batch card", () => {
     expect(args.replies.some((reply) => reply.cc)).toBe(false);
   });
 
+  it("adds one new email per address, with no replyToId", () => {
+    const [step] = inferScript(
+      "reply batch card to m1 outreach card to ana@p.example.test,ben@p.example.test from s@example.test",
+    );
+    const args = step?.toolCalls?.[0]?.args as { replies: { replyToId?: string; to: string[] }[] };
+    expect(args.replies.map((reply) => reply.replyToId)).toEqual(["m1", undefined, undefined]);
+    expect(args.replies[2]?.to).toEqual(["ben@p.example.test"]);
+  });
+
   it("puts an off-thread Cc on the first row with stranger", () => {
     const [step] = inferScript("reply batch card to m1,m2 from support@example.test with stranger");
     const args = step?.toolCalls?.[0]?.args as { replies: { cc?: string[] }[] };

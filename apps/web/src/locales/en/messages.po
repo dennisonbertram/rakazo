@@ -583,6 +583,10 @@ msgstr "{first} answers by default. Type @ and a name to ask one bot, or ask eve
 msgid "{folders, plural, one {# folder} other {# folders}}"
 msgstr "{folders, plural, one {# folder} other {# folders}}"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "{fresh} new emails"
+msgstr "{fresh} new emails"
+
 #: src/pages/shell/transcript.tsx
 msgid "{from} handed off to {to}"
 msgstr "{from} handed off to {to}"
@@ -719,6 +723,10 @@ msgstr "{remaining, plural, one {Processing # file} other {Processing # files}}"
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "{remaining} left · bot is watching, not acting"
 msgstr "{remaining} left · bot is watching, not acting"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{replies} replies"
+msgstr "{replies} replies"
 
 #: src/pages/finance/FinanceBurn.tsx
 msgid "{runMonths} mo"
@@ -868,6 +876,10 @@ msgstr "1 channel"
 #: src/pages/CompanyImport.tsx
 msgid "1 folder"
 msgstr "1 folder"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "1 new email"
+msgstr "1 new email"
 
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceSpend.tsx
@@ -4933,6 +4945,10 @@ msgstr "Daily"
 msgid "Daily check-in"
 msgstr "Daily check-in"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Daily limit for new recipients reached. Retry later."
+msgstr "Daily limit for new recipients reached. Retry later."
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Dark"
@@ -6294,6 +6310,10 @@ msgstr "Finishing MCP connection…"
 msgid "Finishing sign-in…"
 msgstr "Finishing sign-in…"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Firewall is on, so this agent can only reply."
+msgstr "Firewall is on, so this agent can only reply."
+
 #: src/pages/finance/FinanceSpend.tsx
 msgid "First seen"
 msgstr "First seen"
@@ -7019,6 +7039,10 @@ msgstr "Inbox pile"
 #: src/pages/CompanyImportScope.tsx
 msgid "INBOX, SENT"
 msgstr "INBOX, SENT"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Include new email to {first}"
+msgstr "Include new email to {first}"
 
 #: src/components/MailReplyBatchCard.tsx
 msgid "Include reply to {first}"
@@ -8557,6 +8581,10 @@ msgstr "New bot"
 msgid "New Bot"
 msgstr "New Bot"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "New email"
+msgstr "New email"
+
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/FolderTree.tsx
 #: src/components/data-room/ItemDialogs.tsx
@@ -8617,6 +8645,10 @@ msgstr "New page {n}"
 #: src/pages/Auth.tsx
 msgid "New password"
 msgstr "New password"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "New recipient"
+msgstr "New recipient"
 
 #: src/pages/CompanyContext.tsx
 msgid "New section"
@@ -10137,6 +10169,10 @@ msgstr "Popular apps through Pipedream"
 msgid "Portal link"
 msgstr "Portal link"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Possible duplicate"
+msgstr "Possible duplicate"
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Post and schedule to social accounts"
 msgstr "Post and schedule to social accounts"
@@ -11611,6 +11647,10 @@ msgstr "Same as all bots"
 #: src/pages/CompanyReview.tsx
 msgid "Same person?"
 msgstr "Same person?"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Same text as others"
+msgstr "Same text as others"
 
 #: src/pages/CompanyImport.tsx
 msgid "Sample · up to 25 items per source"
