@@ -1018,4 +1018,6 @@ export const DE_MESSAGES: Record<string, string> = {
   Overdue: "Überfällig",
   Upcoming: "Anstehend",
   "No date": "Ohne Datum",
+  "Send selected": "Ausgewählte senden",
+  Skipped: "Übersprungen",
 };

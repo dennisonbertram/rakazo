@@ -4009,6 +4009,19 @@
                               }
                             ]
                           },
+                          "routineId": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcApprovalRulesListOutputSchema0"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "routineName": {
+                            "type": "string"
+                          },
                           "createdAt": {
                             "type": "string"
                           }
@@ -4386,6 +4399,19 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "routineId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcApprovalRulesSetOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "routineName": {
+                          "type": "string"
                         },
                         "createdAt": {
                           "type": "string"

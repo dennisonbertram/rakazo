@@ -1712,6 +1712,7 @@ describe("computer execution leases", () => {
       },
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
+      mailReplyItem: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: {
         updateMany: vi.fn().mockImplementation(async ({ data }) => {

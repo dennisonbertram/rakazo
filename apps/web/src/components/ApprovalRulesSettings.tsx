@@ -65,8 +65,11 @@ export function ApprovalRulesSettings() {
   }
 
   // The table owns category rules and bot overrides; the list holds the per-tool and per-connector rules.
-  const listedRules = rules.filter((rule) => rule.matchKind !== "category" && !rule.botId);
+  const listedRules = rules.filter(
+    (rule) => rule.matchKind !== "category" && !rule.botId && !rule.routineId,
+  );
   // An agent's "Allow all sites" rule: the owner can only remove it.
+  const routineRules = rules.filter((rule) => rule.routineId);
   const agentSiteRules = rules.filter(
     (rule) => rule.botId && rule.matchKind === "tool" && rule.matchValue === "web_fetch",
   );
@@ -82,10 +85,36 @@ export function ApprovalRulesSettings() {
       <p className="mt-3 text-[13px] text-muted-foreground">
         <Trans>
           Background runs always ask before they send, change or run anything, except mail changes
-          you always allowed.
+          you always allowed and tools you allowed for one routine.
         </Trans>
       </p>
       {error ? <p className="mt-3 text-[13px] text-destructive">{error}</p> : null}
+      {routineRules.length > 0 ? (
+        <ul className="mt-4 space-y-2">
+          {routineRules.map((rule) => (
+            <li
+              key={rule.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2"
+            >
+              <span className="min-w-0 break-words text-[13.5px] text-foreground/75">
+                {toolStepLabel(rule.matchValue)}
+                <span className="block text-[12px] text-muted-foreground">
+                  {rule.routineName ?? t`A routine`}
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0 text-muted-foreground"
+                disabled={saving === rule.id}
+                onClick={() => void removeRule(rule.id)}
+              >
+                <Trans>Remove</Trans>
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {agentSiteRules.length > 0 ? (
         <ul className="mt-4 space-y-2">
           {agentSiteRules.map((rule) => (

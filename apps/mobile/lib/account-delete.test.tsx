@@ -78,7 +78,7 @@ vi.mock("../components/avatar-style", () => ({
   useAvatarStyle: () => ({ avatarStyle: "organic", updateAvatarStyle: vi.fn() }),
 }));
 vi.mock("../components/bot-avatar", () => ({ BotAvatar: () => null }));
-vi.mock("../components/native-symbol", () => ({ NativeSymbol: () => null }));
+vi.mock("../components/data-export-row", () => ({ DataExportRow: () => null }));vi.mock("../components/native-symbol", () => ({ NativeSymbol: () => null }));
 vi.mock("../components/native-segmented-control", () => ({ NativeSegmentedControl: () => null }));
 vi.mock("../components/native-action-button", () => ({
   NativeActionButton: ({

@@ -282,6 +282,48 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "list_secrets",
 ]);
 
+/**
+ * Built-in reads that ask in a background run only because they are not on the safe list: they
+ * return the owner's private records, which a run holding outside text could send out. A routine
+ * run that has read nothing from outside (and was not started by a webhook) may let Auto Review
+ * judge them instead of asking. Nothing here writes, sends or reaches the network.
+ */
+export const ROUTINE_AUTO_REVIEW_READ_TOOLS: ReadonlySet<string> = new Set([
+  "show_emails",
+  "finance_overview",
+  "finance_breakdown",
+  "finance_transactions",
+  "finance_recurring",
+  "finance_crypto",
+  "cap_table_read",
+  "fundraising_read",
+  "ticket_get",
+]);
+
+const ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES: ReadonlySet<ApprovalActionType> = new Set([
+  "send_email",
+  "spend_money",
+  "message_outside",
+  "use_credentials",
+  "delete_data",
+]);
+
+/**
+ * True when a background card for the tool may offer "Always for this routine". Sends, payments,
+ * outside messages, credentials, deletes and tools that need an explicit approval never do.
+ */
+export function routineAlwaysAllowable(input: {
+  toolName: string;
+  viaConnector?: boolean;
+  connectorKind?: string;
+  readOnly?: boolean;
+}): boolean {
+  if (toolRequiresExplicitApproval(input.toolName)) return false;
+  if (input.toolName === "mail_send" || input.toolName === "mail_draft") return false;
+  const type = actionTypeForTool(input);
+  return type === null || !ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES.has(type);
+}
+
 /** True when a tainted run may call the tool without a card. Same scratchpad rule as unattended. */
 export function externalTaintAllowsTool(toolName: string, args?: Record<string, unknown>): boolean {
   if (!EXTERNAL_TAINT_SAFE_TOOLS.has(toolName)) return false;
@@ -800,6 +842,8 @@ export function planActionGate(input: {
   checkerConfigured: boolean;
   /** An unattended run never plans a judge: nobody is there to be spared the card. */
   unattended?: boolean;
+  /** Except a read of ROUTINE_AUTO_REVIEW_READ_TOOLS in a clean, non-webhook routine run. */
+  routineRead?: boolean;
   /** A fetch to a site the run was not given (see outboundSiteGate). */
   newDestination?: boolean;
 }): "ask" | "allow" | "judge" | "block" {
@@ -817,7 +861,7 @@ export function planActionGate(input: {
       : "ask";
   }
   const judgeable =
-    !input.unattended &&
+    (!input.unattended || input.routineRead === true) &&
     input.consequential &&
     input.autoReviewEnabled &&
     input.checkerConfigured &&
@@ -864,7 +908,12 @@ export function isApprovalAskBlock(block: {
     actionIds.has("allow") &&
     actionIds.has("deny") &&
     [...actionIds].every(
-      (id) => id === "allow" || id === "always" || id === ALL_SITES_ACTION_ID || id === "deny",
+      (id) =>
+        id === "allow" ||
+        id === "always" ||
+        id === "always_routine" ||
+        id === ALL_SITES_ACTION_ID ||
+        id === "deny",
     )
   );
 }

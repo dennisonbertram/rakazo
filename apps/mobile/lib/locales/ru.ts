@@ -1020,4 +1020,6 @@ export const RU_MESSAGES: Record<string, string> = {
   Overdue: "Просрочено",
   Upcoming: "Предстоящие",
   "No date": "Без даты",
+  "Send selected": "Отправить выбранное",
+  Skipped: "Пропущено",
 };

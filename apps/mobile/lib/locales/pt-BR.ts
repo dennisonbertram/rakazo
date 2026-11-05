@@ -973,4 +973,6 @@ export const PT_BR_MESSAGES: Record<string, string> = {
   Overdue: "Atrasadas",
   Upcoming: "Próximas",
   "No date": "Sem data",
+  "Send selected": "Enviar selecionados",
+  Skipped: "Ignorado",
 };

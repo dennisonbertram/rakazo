@@ -94,6 +94,7 @@ const message = (extra: Record<string, unknown> = {}) => ({
   subject: "Quarterly plan",
   html: null,
   text: "Plain body line",
+  attachments: [],
   ...extra,
 });
 

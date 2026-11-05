@@ -968,4 +968,6 @@ export const TR_MESSAGES: Record<string, string> = {
   Overdue: "Gecikmiş",
   Upcoming: "Yaklaşan",
   "No date": "Tarihsiz",
+  "Send selected": "Seçilenleri gönder",
+  Skipped: "Atlandı",
 };
