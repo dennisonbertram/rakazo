@@ -891,9 +891,12 @@ function approvalRuleDto(row: {
   matchKind: string;
   matchValue: string;
   botId: string | null;
+  routineId?: string | null;
+  routineName?: string;
   createdAt: Date;
 }) {
   return {
+    ...(row.routineId ? { routineId: row.routineId, routineName: row.routineName } : {}),
     id: row.id,
     effect: row.effect as "always_allow" | "require_approval" | "block",
     matchKind: row.matchKind as "tool" | "connector" | "category",
@@ -8522,7 +8525,21 @@ export function createRouter(deps: RouterDeps): AppRouter {
           },
           orderBy: { createdAt: "asc" },
         });
-        return [...rows, ...allSites].map(approvalRuleDto);
+        // A routine's "Always for this routine" rules, with the routine's name, so they can be removed.
+        const routineRules = await deps.prisma.actionApprovalRule.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            createdByUserId: context.actor.userId,
+            routineId: { not: null },
+          },
+          include: { routine: { select: { name: true } } },
+          orderBy: { createdAt: "asc" },
+        });
+        return [
+          ...rows,
+          ...allSites,
+          ...routineRules.map((rule) => ({ ...rule, routineName: rule.routine?.name })),
+        ].map(approvalRuleDto);
       }),
       set: authed.approvalRules.set.handler(async ({ context, input }) => {
         // A bot rule needs a bot the caller can see.

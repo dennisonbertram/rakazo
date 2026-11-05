@@ -51,6 +51,7 @@ function formatAnsweredState(
   if (answer === "allow") return waitsFor ? t`Approved here. Waiting for ${waitsFor}` : t`Approved`;
   if (answer === "always") return t`Always allowed`;
   if (answer === "always_bot_sites") return t`Allowed for all sites`;
+  if (answer === "always_routine") return t`Always allowed for this routine`;
   if (answer === "deny") return t`Denied`;
   return t`Answered: ${answer}`;
 }
@@ -66,13 +67,22 @@ function answeredTone(
   if (!approval || outcome === "cancelled" || isClosedApprovalAnswer(answer))
     return { className: "text-muted-foreground" };
   if (answer === "deny") return { className: "text-destructive", Icon: X };
-  if (answer === "allow" || answer === "always" || answer === "always_bot_sites")
+  if (
+    answer === "allow" ||
+    answer === "always" ||
+    answer === "always_bot_sites" ||
+    answer === "always_routine"
+  )
     return { className: "text-foreground", Icon: Check };
   return { className: "text-muted-foreground" };
 }
 
 /** Answers that save a standing permission; shown as quiet links under the one-off answers. */
-const STANDING_ACTIONS: ReadonlySet<string> = new Set(["always", "always_bot_sites"]);
+const STANDING_ACTIONS: ReadonlySet<string> = new Set([
+  "always",
+  "always_bot_sites",
+  "always_routine",
+]);
 
 function approvalActionLabel(
   id: string,
@@ -94,6 +104,7 @@ function approvalActionLabel(
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
   if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
   if (id === "deny") return t`Deny`;
+  if (id === "always_routine") return t`Always for this routine`;
   if (id === "always_bot_sites" && fallback === "Allow all sites for this agent")
     return t`Allow all sites for this agent`;
   return fallback;

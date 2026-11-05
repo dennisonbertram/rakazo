@@ -992,6 +992,9 @@ export const ActionApprovalRuleSchema = z.object({
   matchValue: z.string(),
   /** null for a space-wide rule; a bot id for that bot's override. */
   botId: Id.nullable().optional(),
+  /** Set on an "Always for this routine" rule, with the routine's name. */
+  routineId: Id.nullable().optional(),
+  routineName: z.string().optional(),
   createdAt: z.string(),
 });
 export type ActionApprovalRule = z.infer<typeof ActionApprovalRuleSchema>;

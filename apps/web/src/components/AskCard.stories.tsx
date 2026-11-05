@@ -239,6 +239,22 @@ export const NewSiteWithAllSites: Story = {
   },
 };
 
+/** A background routine card: allow once, or always for this routine only. */
+export const RoutineCardWithAlways: Story = {
+  args: {
+    block: ask({
+      text: "Review before Write file",
+      approvalEffectId: "effect_demo",
+      approvalReason: "Asked because this ran in the background.",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always_routine", label: "Always for this routine" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
 export const ApprovalAlwaysAllowed: Story = {
   args: {
     block: ask({

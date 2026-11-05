@@ -251,7 +251,10 @@ function formatApprovalAnswer(
   if (approval && outcome === "created") return t("Created");
   if (approval && outcome === "cancelled") return t("Cancelled");
   if (approval && answer === "allow") return t("Allowed once");
-  if (approval && (answer === "always" || answer === "always_bot_sites"))
+  if (
+    approval &&
+    (answer === "always" || answer === "always_bot_sites" || answer === "always_routine")
+  )
     return t("Always allowed");
   if (approval && answer === "deny") return t("Denied");
   // A reply batch pressed on another surface; its results are on that surface's card.

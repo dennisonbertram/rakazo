@@ -139,7 +139,7 @@ public struct AskBlock: Decodable, Equatable, Sendable {
     guard approvalEffectId != nil, !actions.isEmpty else { return false }
     let ids = Set(actions.map(\.id))
     return ids.contains("allow") && ids.contains("deny")
-      && ids.isSubset(of: ["allow", "always", "always_bot_sites", "deny"])
+      && ids.isSubset(of: ["allow", "always", "always_bot_sites", "always_routine", "deny"])
   }
   public var isSecret: Bool { input == "secret" && approvalEffectId == nil }
   public var isLogin: Bool { isSecret && credential?.authType == "login" }
@@ -166,7 +166,7 @@ public struct AskBlock: Decodable, Equatable, Sendable {
     }
     switch answer {
     case "allow": return waitsFor.map(AskOutcome.approvedWaiting) ?? .allowedOnce
-    case "always", "always_bot_sites": return .alwaysAllowed
+    case "always", "always_bot_sites", "always_routine": return .alwaysAllowed
     case "deny": return .denied
     default: return .answered(actions.first { $0.id == answer }?.label ?? answer)
     }
