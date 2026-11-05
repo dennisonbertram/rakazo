@@ -82,7 +82,7 @@ public enum AskOutcome: Equatable, Sendable {
   case approvedWaiting(String)
   case allowed, notNow, shared, notShared
   case created, cancelled
-  case superseded, expired, stopped
+  case superseded, expired, stopped, skipped
   case saved
   case answered(String?)
 }
@@ -155,6 +155,7 @@ public struct AskBlock: Decodable, Equatable, Sendable {
     case "superseded": return .superseded
     case "expired": return .expired
     case "stopped": return .stopped
+    case "skipped": return .skipped
     default: break
     }
     if share { return answer == "allow" ? .shared : .notShared }

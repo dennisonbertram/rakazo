@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { MailApproval, MailBatch, MailReplyFlag, MessageBlock } from "@rakazo/contracts";
-import { isClosedApprovalAnswer } from "@rakazo/core";
+import { isClosedApprovalAnswer, SKIPPED_APPROVAL_ANSWER } from "@rakazo/core";
 import { Badge, Button, Checkbox, cn } from "@rakazo/ui-web";
 import { Mail } from "lucide-react";
 import type { ReactNode } from "react";
@@ -387,6 +387,8 @@ export function MailReplyBatchCard({
       )
     ) : block.answer === "deny" ? (
       <Trans>Discarded</Trans>
+    ) : block.answer === SKIPPED_APPROVAL_ANSWER ? (
+      <Trans>Skipped</Trans>
     ) : isClosedApprovalAnswer(block.answer) ? (
       <Trans>Not sent</Trans>
     ) : sending ? (

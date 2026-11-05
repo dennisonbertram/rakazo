@@ -86,10 +86,20 @@ export function isClosedApprovalAnswer(answer: string | undefined): answer is Cl
   return CLOSED_APPROVAL_ANSWERS.includes(answer as ClosedApprovalAnswer);
 }
 
+/**
+ * The answer on an approval card the owner moved past by sending a message. It records a decline,
+ * never an approval: nothing ran and no rule was saved.
+ */
+export const SKIPPED_APPROVAL_ANSWER = "skipped";
+
+/** The tool result the agent gets for a skipped approval; the effect keeps it as its denial note. */
+export const SKIPPED_APPROVAL_NOTE =
+  "The owner moved on without approving this, so it was skipped and nothing was sent or changed. Do not retry it in this run. If it is still needed, ask the owner whether to try again.";
+
 /** Marks every unanswered approval card in `blocks` as closed; other blocks are returned as given. */
 export function closeApprovalAsks<
   T extends { kind: string; status?: string; answer?: string; approvalEffectId?: string },
->(blocks: readonly T[], answer: ClosedApprovalAnswer): T[] {
+>(blocks: readonly T[], answer: ClosedApprovalAnswer | typeof SKIPPED_APPROVAL_ANSWER): T[] {
   return blocks.map((block) =>
     block.kind === "ask" && block.approvalEffectId && block.status !== "answered"
       ? { ...block, status: "answered", answer }

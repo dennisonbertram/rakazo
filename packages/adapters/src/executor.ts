@@ -733,6 +733,13 @@ const NO_FRAGMENT_TOOLS = new Set([
 const CHECK_IN_READ_ONLY_MESSAGE =
   "Check-ins only read and report. Mention this in your message instead.";
 
+/** Returned to an unattended run whose archive needs the owner: it is skipped, not held. */
+const PROTECTED_ARCHIVE_SKIPPED_MESSAGE =
+  "This archive was skipped: the conversation is from someone the owner marked important or saved as a contact, and this run cannot ask. Leave it in the inbox and mention it in your summary.";
+const PROTECTED_ARCHIVE_REASON =
+  "Asked because this conversation is from someone you marked important or saved as a contact.";
+const AGENT_ACCOUNT_REASON = "Asked because this is another agent's account.";
+
 /** Final note of an unattended run that stopped because it needs the owner. */
 const UNATTENDED_NEEDS_OWNER_NOTE = "Stopped. I sent you a note about what I need.";
 
@@ -5687,15 +5694,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // The Inbox agent is the agent of the owner's own Gmail accounts, so every change it makes
           // there would ask. For mail_modify the owner's saved tool rule ("Always allow this tool")
           // clears that card; another agent's account still asks, and so does every other tool.
-          const inboxOwnModifyAllowed =
+          const inboxOwnModify =
             writeOnAgentConnection &&
             name === "mail_modify" &&
             isInboxAgentSpawnKey(bot.spawnKey) &&
+            !(await googleWriteOnAgentConnection(name, args, true));
+          const inboxOwnModifyAllowed =
+            inboxOwnModify &&
             approvalResolved.source === "always_allow" &&
             approvalResolved.matchingRules.some(
               (rule) => rule.matchKind === "tool" && rule.matchValue === name,
-            ) &&
-            !(await googleWriteOnAgentConnection(name, args, true));
+            );
+          // A write on an agent's account that no saved rule can clear (the Inbox agent's own
+          // mail_modify is the one case a tool rule clears).
+          const agentAccountWrite =
+            (writeOnAgentConnection && !inboxOwnModify) || connectorWriteOnAgentConnection;
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
             // A fetch the exfiltration check held is never cleared by a saved rule or another review.
@@ -5761,6 +5774,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   unattended: run.unattended,
                   newDestination: siteGate === "new",
                 });
+          // An unattended run has nobody to ask, and pausing would stop the whole routine: a protected
+          // archive is skipped and the agent is told, so it reports the skip in its summary.
+          if (protectedArchive && run.unattended === true) {
+            await recordDecision("block", "protected_archive");
+            return { error: PROTECTED_ARCHIVE_SKIPPED_MESSAGE };
+          }
           // A check-in only reads and reports: a call that would ask fails at once, with no card and no pause.
           // mail_modify changes mail, so a check-in never runs it, whatever the rules say.
           if (
@@ -5962,7 +5981,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
                     : standingHold
                       ? `Held before fetching: ${standingHold.reason}.`
-                      : undefined;
+                      : protectedArchive
+                        ? PROTECTED_ARCHIVE_REASON
+                        : agentAccountWrite
+                          ? AGENT_ACCOUNT_REASON
+                          : undefined;
           // Record each decision once; a replay of the same effect already has its event.
           if (
             !applied?.duplicate &&
@@ -6083,6 +6106,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               externalTaintedCall ||
               requiresUnattendedApproval ||
               runTainted ||
+              protectedArchive ||
+              agentAccountWrite ||
               COMPANY_TOOL_NAMES.has(name);
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
               // The card's reason line already says "Requested by an external bot".
