@@ -4,11 +4,21 @@ import type {
   FundraiseRound,
   FundraiseRoundSaveInput,
   FundraisingOverview,
+  PipelineCallLogInput,
+  PipelineCallLogResult,
+  PipelineCallOutcome,
+  PipelineStatus,
   ProspectImportResult,
   ProspectImportRow,
   ProspectSaveInput,
 } from "@rakazo/contracts";
+import {
+  PipelineCallOutcomeSchema,
+  PipelineDetailSchema,
+  PipelineStatusSchema,
+} from "@rakazo/contracts";
 import { isActiveSafe } from "@rakazo/core";
+import * as z from "zod";
 import type { Prisma, PrismaClient } from "./client.js";
 import { contactInclude, toContact } from "./contacts.js";
 import type { PipelineDb } from "./pipeline-records.js";
@@ -38,6 +48,8 @@ export class FundraiseRoundOpenError extends Error {
   }
 }
 
+const PipelineDetailsSchema = z.array(PipelineDetailSchema);
+
 const toRound = (row: Prisma.FundraiseRoundGetPayload<object>): FundraiseRound => ({
   id: row.id,
   name: row.name,
@@ -59,11 +71,16 @@ export async function getFundraisingOverview(
       orderBy: [{ closedAt: "desc" }, { id: "desc" }],
     }));
   const pipeline = FUNDRAISING_PIPELINE;
-  const [records, people, contacts, safeRows] = await Promise.all([
+  const [records, people, contacts, safeRows, callEvents] = await Promise.all([
     prisma.pipelineRecord.findMany({ where: { ...scope, pipeline }, orderBy: { id: "asc" } }),
     prisma.pipelineRecordPerson.findMany({
       where: { ...scope, pipeline },
-      select: { recordId: true, contactId: true, contact: { select: { kind: true } } },
+      select: {
+        recordId: true,
+        contactId: true,
+        contact: { select: { kind: true, name: true } },
+      },
+      orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }, { id: "asc" }],
     }),
     // One row per record, its primary person. A prospect not on a record yet still shows.
     prisma.contact.findMany({
@@ -78,7 +95,63 @@ export async function getFundraisingOverview(
       orderBy: [{ name: "asc" }, { id: "asc" }],
     }),
     prisma.safe.findMany({ where: scope, orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
+    // The newest call of each record: Last call is read, never stored.
+    prisma.pipelineEvent.findMany({
+      where: { ...scope, kind: "call" },
+      distinct: ["recordId"],
+      orderBy: [{ recordId: "asc" }, { at: "desc" }, { id: "desc" }],
+    }),
   ]);
+  const referrerIds = [
+    ...new Set(records.flatMap((r) => (r.referredByContactId ? [r.referredByContactId] : []))),
+  ];
+  const referrers = new Map<string, string>(
+    referrerIds.length === 0
+      ? []
+      : (
+          await prisma.contact.findMany({
+            where: { ...scope, id: { in: referrerIds } },
+            select: { id: true, name: true },
+          })
+        ).map((contact) => [contact.id, contact.name]),
+  );
+  const recordById = new Map(records.map((record) => [record.id, record]));
+  const lastCallOf = new Map(
+    callEvents.map((event) => {
+      const payload = event.payload as { outcome?: string; note?: string | null } | null;
+      return [
+        event.recordId,
+        { outcome: payload?.outcome, at: event.at.toISOString(), note: payload?.note ?? null },
+      ];
+    }),
+  );
+  /** What the table needs beyond the contact: referrer, people, fund details and the last call. */
+  const withExtras = (row: Contact): Contact => {
+    const info = row.pipelineRecord;
+    const record = info && recordById.get(info.id);
+    if (!info || !record) return row;
+    const call = lastCallOf.get(record.id);
+    return {
+      ...row,
+      pipelineRecord: {
+        ...info,
+        referredBy: record.referredByContactId
+          ? {
+              id: record.referredByContactId,
+              name: referrers.get(record.referredByContactId) ?? "",
+            }
+          : null,
+        people: people
+          .filter((person) => person.recordId === record.id)
+          .map((person) => ({ id: person.contactId, name: person.contact.name })),
+        details: PipelineDetailsSchema.catch([]).parse(record.details),
+        lastCall:
+          call && PipelineCallOutcomeSchema.safeParse(call.outcome).success
+            ? { ...call, outcome: call.outcome as PipelineCallOutcome }
+            : null,
+      },
+    };
+  };
   const safes = safeRows.map((safe) => toSafe(safe));
   const open = row && !row.closedAt ? row : null;
   const created = new Map(records.map((record) => [record.id, record.createdAt]));
@@ -112,7 +185,9 @@ export async function getFundraisingOverview(
     .map(toContact);
   const personless = records.filter((record) => !peopled.has(record.id)).map(personlessRow);
   // A prospect not yet on a record reads as Target.
-  const withStage = [...rows, ...personless].map((p) => ({ ...p, stage: p.stage ?? "target" }));
+  const withStage = [...rows, ...personless].map((p) =>
+    withExtras({ ...p, stage: p.stage ?? "target" }),
+  );
   const inRound = safes.filter((s) => row && s.roundId === row.id);
   const sumOf = (...statuses: string[]) =>
     inRound.filter((s) => statuses.includes(s.status)).reduce((sum, s) => sum + s.amountCents, 0);
@@ -254,6 +329,15 @@ export async function saveProspect(
   const scope = ownerOf(actor);
   const changes = {
     ...(fields.stage === undefined ? {} : { stage: fields.stage }),
+    ...(fields.status === undefined ? {} : { status: fields.status }),
+    ...(fields.interest === undefined ? {} : { interest: fields.interest }),
+    ...(fields.nextCallAt === undefined
+      ? {}
+      : { nextCallAt: fields.nextCallAt === null ? null : new Date(fields.nextCallAt) }),
+    ...(fields.nextCallHasTime === undefined ? {} : { nextCallHasTime: fields.nextCallHasTime }),
+    ...(fields.referredByContactId === undefined
+      ? {}
+      : { referredByContactId: fields.referredByContactId }),
     ...(fields.checkSizeCents === undefined ? {} : { amountCents: fields.checkSizeCents }),
     ...(fields.nextStep === undefined ? {} : { nextStep: fields.nextStep }),
   };
@@ -268,6 +352,73 @@ export async function saveProspect(
   const { record } = await prospectOf(prisma, scope, id);
   await savePipelineRecord(prisma, scope, record.id, changes);
   return contactRow(prisma, scope, id);
+}
+
+/** The record a contact or a person-less record id names; throws IsolationError for anything else. */
+async function recordFor(prisma: WriteDb, scope: Scope, id: string) {
+  const personless = await prisma.pipelineRecord.findFirst({
+    where: { id, ...scope, people: { none: {} } },
+  });
+  return personless ?? (await prospectOf(prisma, scope, id)).record;
+}
+
+type CallBefore = { status: string; nextCallAt: string | null; nextCallHasTime: boolean };
+
+/**
+ * Logs a call: one `call` event, and the status moves forward only. Spoke moves a record that has
+ * not reached Met to Met; Left message and No answer leave the status alone. `keep` leaves the next
+ * call as it is, so the row stays due. The event keeps the old status and next call for Undo.
+ */
+export async function logCall(
+  prisma: WriteDb,
+  actor: Scope,
+  { id, outcome, note, nextCall }: PipelineCallLogInput,
+): Promise<PipelineCallLogResult> {
+  const scope = ownerOf(actor);
+  const record = await recordFor(prisma, scope, id);
+  const before: CallBefore = {
+    status: record.status,
+    nextCallAt: record.nextCallAt?.toISOString() ?? null,
+    nextCallHasTime: record.nextCallHasTime,
+  };
+  const order = PipelineStatusSchema.options;
+  const movedToMet =
+    outcome === "spoke" && order.indexOf(record.status as PipelineStatus) < order.indexOf("met");
+  const event = await prisma.pipelineEvent.create({
+    data: {
+      ...scope,
+      recordId: record.id,
+      kind: "call",
+      payload: { outcome, note: note?.trim() || null, before },
+    },
+  });
+  await savePipelineRecord(prisma, scope, record.id, {
+    ...(movedToMet ? { status: "met" as const } : {}),
+    ...(nextCall === "keep"
+      ? {}
+      : {
+          nextCallAt: nextCall.at ? new Date(nextCall.at) : null,
+          nextCallHasTime: Boolean(nextCall.at) && nextCall.hasTime,
+        }),
+  });
+  return { eventId: event.id, movedToMet };
+}
+
+/** Undo of a logged call: removes it and restores the status and next call it changed. */
+export async function undoCall(prisma: WriteDb, actor: Scope, eventId: string): Promise<void> {
+  const scope = ownerOf(actor);
+  const event = await prisma.pipelineEvent.findFirst({
+    where: { id: eventId, ...scope, kind: "call" },
+  });
+  if (!event) throw new IsolationError("Call not found");
+  const before = (event.payload as { before?: CallBefore } | null)?.before;
+  if (before)
+    await savePipelineRecord(prisma, scope, event.recordId, {
+      status: before.status as PipelineStatus,
+      nextCallAt: before.nextCallAt ? new Date(before.nextCallAt) : null,
+      nextCallHasTime: before.nextCallHasTime,
+    });
+  await prisma.pipelineEvent.deleteMany({ where: { id: eventId, ...scope } });
 }
 
 type Known = { id: string; name: string; organization: string | null; email: string | null };

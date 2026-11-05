@@ -326,6 +326,7 @@ import {
   listTicketComments,
   listWaitingOnYouItems,
   lockOwnedGroup,
+  logCall,
   markInvestorUpdateDelivered,
   markSafe,
   markSeen,
@@ -391,6 +392,7 @@ import {
   UnshareableArtifactError,
   unassignSafe,
   unblockPortal,
+  undoCall,
   undoCapTableSource,
   unseenBotKinds,
   unseenCounts,
@@ -9335,6 +9337,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
         ),
         notSent: authed.fundraising.prospects.notSent.handler(({ context, input }) =>
           notSent(deps.prisma, actorScope(context.actor), input.id).catch(fundraisingError),
+        ),
+      },
+      calls: {
+        log: authed.fundraising.calls.log.handler(({ context, input }) =>
+          logCall(deps.prisma, actorScope(context.actor), input).catch(fundraisingError),
+        ),
+        undo: authed.fundraising.calls.undo.handler(({ context, input }) =>
+          undoCall(deps.prisma, actorScope(context.actor), input.eventId)
+            .then(() => ({ ok: true as const }))
+            .catch(fundraisingError),
         ),
       },
       safes: {

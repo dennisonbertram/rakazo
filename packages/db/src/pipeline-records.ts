@@ -1,4 +1,4 @@
-import type { Contact, ContactStage, PipelineStatus } from "@rakazo/contracts";
+import type { Contact, ContactStage, PipelineInterest, PipelineStatus } from "@rakazo/contracts";
 import type { Prisma, PrismaClient } from "./client.js";
 import { IsolationError } from "./scope.js";
 
@@ -160,6 +160,12 @@ export type PipelineChanges = {
   /** Replaces the round the status would pick; only a caller that has checked the round's owner. */
   roundId?: string | null;
   waitingSince?: Date | null;
+  /** Out moves a record to Passed and clears its next call; In or Maybe on a Passed record restores its earlier status. */
+  interest?: PipelineInterest | null;
+  nextCallAt?: Date | null;
+  nextCallHasTime?: boolean;
+  /** A contact of the user, or null; anything else throws IsolationError. */
+  referredByContactId?: string | null;
 };
 
 /**
@@ -178,7 +184,7 @@ export async function savePipelineRecord(
   const scope = { spaceId, userId };
   const current = await db.pipelineRecord.findFirst({ where: { id, ...scope } });
   if (!current) throw new IsolationError("Record not found");
-  const asked =
+  let asked =
     changes.status ??
     (changes.stage === undefined
       ? undefined
@@ -186,6 +192,18 @@ export async function savePipelineRecord(
         ? (current.status as PipelineStatus)
         : FIRST_STATUS[changes.stage ?? "target"]);
   const data: Prisma.PipelineRecordUncheckedUpdateManyInput = {};
+  if (changes.interest === "out" && !asked && current.status !== "passed") {
+    asked = "passed";
+    data.nextCallAt = null;
+    data.nextCallHasTime = false;
+  }
+  if (
+    changes.interest !== undefined &&
+    changes.interest !== "out" &&
+    !asked &&
+    current.status === "passed"
+  )
+    asked = (current.statusBeforePassed as PipelineStatus | null) ?? "not_reached";
   if (asked) {
     data.status = asked;
     data.roundId = await roundIdForStage(db, scope, stageOf(asked));
@@ -199,6 +217,18 @@ export async function savePipelineRecord(
       data.statusBeforePassed = null;
     }
   }
+  if (changes.interest !== undefined) data.interest = changes.interest;
+  if (changes.nextCallAt !== undefined) data.nextCallAt = changes.nextCallAt;
+  if (changes.nextCallHasTime !== undefined) data.nextCallHasTime = changes.nextCallHasTime;
+  if (changes.referredByContactId) {
+    const referrer = await db.contact.findFirst({
+      where: { id: changes.referredByContactId, ...scope },
+      select: { id: true },
+    });
+    if (!referrer) throw new IsolationError("Contact not found");
+  }
+  if (changes.referredByContactId !== undefined)
+    data.referredByContactId = changes.referredByContactId;
   if (changes.roundId !== undefined) data.roundId = changes.roundId;
   if (changes.amountCents !== undefined)
     data.amountCents = changes.amountCents === null ? null : BigInt(changes.amountCents);
@@ -243,7 +273,15 @@ export const pipelineFields = (record: RecordRow | null) => ({
   roundId: record?.roundId ?? null,
   mercurySentAt: record?.waitingSince?.toISOString() ?? null,
   pipelineRecord: record
-    ? { id: record.id, name: record.name, status: record.status as PipelineStatus }
+    ? {
+        id: record.id,
+        name: record.name,
+        status: record.status as PipelineStatus,
+        interest: record.interest as PipelineInterest | null,
+        nextCallAt: record.nextCallAt?.toISOString() ?? null,
+        nextCallHasTime: record.nextCallHasTime,
+        group: record.group,
+      }
     : null,
 });
 

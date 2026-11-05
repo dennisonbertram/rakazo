@@ -1,5 +1,12 @@
 import * as z from "zod";
-import { ContactEmailSchema, ContactSchema, ContactStageSchema } from "./contacts.js";
+import {
+  ContactEmailSchema,
+  ContactSchema,
+  ContactStageSchema,
+  PipelineCallOutcomeSchema,
+  PipelineInterestSchema,
+  PipelineStatusSchema,
+} from "./contacts.js";
 import { Id, IsoDate } from "./ids.js";
 
 /** Money is integer cents. */
@@ -125,6 +132,12 @@ export type ProspectImportResult = {
 export const ProspectSaveInputSchema = z.object({
   id: Id,
   stage: ContactStageSchema.optional(),
+  status: PipelineStatusSchema.optional(),
+  /** Out also moves the record to Passed and clears the next call; null clears the stance. */
+  interest: PipelineInterestSchema.nullish(),
+  nextCallAt: IsoDate.nullish(),
+  nextCallHasTime: z.boolean().optional(),
+  referredByContactId: Id.nullish(),
   checkSizeCents: Cents.nullish(),
   nextStep: z.string().trim().max(500).nullish(),
 });
@@ -161,3 +174,23 @@ export type SafeMarkInput = z.infer<typeof SafeMarkInputSchema>;
 /** Attaches an unattached Mercury SAFE to a prospect or investor contact. */
 export const SafeAssignInputSchema = z.object({ id: Id, contactId: Id });
 export type SafeAssignInput = z.infer<typeof SafeAssignInputSchema>;
+
+/** Logs one call on a record named by its contact or, for a record with no person, by the record. */
+export const PipelineCallLogInputSchema = z.object({
+  id: Id,
+  outcome: PipelineCallOutcomeSchema,
+  note: z.string().trim().max(2000).nullish(),
+  /** "keep" leaves the next call alone, so the row stays due until the founder picks a date. */
+  nextCall: z.union([
+    z.literal("keep"),
+    z.object({ at: IsoDate.nullable(), hasTime: z.boolean().default(false) }),
+  ]),
+});
+export type PipelineCallLogInput = z.infer<typeof PipelineCallLogInputSchema>;
+
+export const PipelineCallLogResultSchema = z.object({
+  eventId: Id,
+  /** Spoke moved the record from before Met to Met. */
+  movedToMet: z.boolean(),
+});
+export type PipelineCallLogResult = z.infer<typeof PipelineCallLogResultSchema>;

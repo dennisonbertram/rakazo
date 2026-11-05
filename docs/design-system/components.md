@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 340 of 340
-- Web and shared components: 862
+- Web and shared component files with stories: 344 of 344
+- Web and shared components: 872
 - Mobile components: 153 in 102 files, mobile — native story pending
 - SwiftUI views: 140 in 76 files, native story pending
 
@@ -225,10 +225,14 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
+| LogCallBody | [apps/web/src/components/fundraising/LogCall.tsx](../../apps/web/src/components/fundraising/LogCall.tsx) | [LogCall.stories.tsx](../../apps/web/src/components/fundraising/LogCall.stories.tsx) | web |
 | OneFieldDialog, InvestorEmailDialog, AssignSafeDialog | [apps/web/src/components/fundraising/MercuryDialogs.tsx](../../apps/web/src/components/fundraising/MercuryDialogs.tsx) | [MercuryDialogs.stories.tsx](../../apps/web/src/components/fundraising/MercuryDialogs.stories.tsx) | web |
 | MercuryLine | [apps/web/src/components/fundraising/MercuryLine.tsx](../../apps/web/src/components/fundraising/MercuryLine.tsx) | [MercuryLine.stories.tsx](../../apps/web/src/components/fundraising/MercuryLine.stories.tsx) | web |
-| ProspectRow, Pipeline, StageRows | [apps/web/src/components/fundraising/Pipeline.tsx](../../apps/web/src/components/fundraising/Pipeline.tsx) | [Pipeline.stories.tsx](../../apps/web/src/components/fundraising/Pipeline.stories.tsx) | web |
+| Dash, BlankAction, StatusPick, InterestChoice, InterestPick, ReferredByPicker, NextCallEditor, ValueEditor | [apps/web/src/components/fundraising/PipelineControls.tsx](../../apps/web/src/components/fundraising/PipelineControls.tsx) | [PipelineControls.stories.tsx](../../apps/web/src/components/fundraising/PipelineControls.stories.tsx) | web |
+| FilterFields, PipelineFilter | [apps/web/src/components/fundraising/PipelineFilter.tsx](../../apps/web/src/components/fundraising/PipelineFilter.tsx) | [PipelineFilter.stories.tsx](../../apps/web/src/components/fundraising/PipelineFilter.stories.tsx) | web |
+| PipelineTable | [apps/web/src/components/fundraising/PipelineTable.tsx](../../apps/web/src/components/fundraising/PipelineTable.tsx) | [PipelineTable.stories.tsx](../../apps/web/src/components/fundraising/PipelineTable.stories.tsx) | web |
 | RoundDialog, Segment, Figure, RoundCard | [apps/web/src/components/fundraising/RoundCard.tsx](../../apps/web/src/components/fundraising/RoundCard.tsx) | [RoundCard.stories.tsx](../../apps/web/src/components/fundraising/RoundCard.stories.tsx), [CrmPipeline.stories.tsx](../../apps/web/src/pages/CrmPipeline.stories.tsx) | web |
+| RowSheet | [apps/web/src/components/fundraising/RowSheet.tsx](../../apps/web/src/components/fundraising/RowSheet.tsx) | [RowSheet.stories.tsx](../../apps/web/src/components/fundraising/RowSheet.stories.tsx) | web |
 | SafeDialog, SafeCoverSummary | [apps/web/src/components/fundraising/SafeDialog.tsx](../../apps/web/src/components/fundraising/SafeDialog.tsx) | [SafeDialog.stories.tsx](../../apps/web/src/components/fundraising/SafeDialog.stories.tsx) | web |
 | MarkDateDialog, AttentionStrip, SafeRow, SafeList | [apps/web/src/components/fundraising/SafeList.tsx](../../apps/web/src/components/fundraising/SafeList.tsx) | [SafeList.stories.tsx](../../apps/web/src/components/fundraising/SafeList.stories.tsx), [CrmPipeline.stories.tsx](../../apps/web/src/pages/CrmPipeline.stories.tsx) | web |
 

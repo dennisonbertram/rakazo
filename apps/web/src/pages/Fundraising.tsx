@@ -3,8 +3,9 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type {
   Contact,
-  ContactStage,
   FundraisingOverview,
+  PipelineStatus,
+  ProspectSaveInput,
   Safe,
   SafeMarkInput,
 } from "@rakazo/contracts";
@@ -26,10 +27,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import type { ContactPrefill as Prefill } from "../components/ContactDialog";
-import { ContactDialog, contactStageNames } from "../components/ContactDialog";
+import { ContactDialog } from "../components/ContactDialog";
 import { AssignSafeDialog, InvestorEmailDialog } from "../components/fundraising/MercuryDialogs";
 import { MercuryLine } from "../components/fundraising/MercuryLine";
-import { Pipeline } from "../components/fundraising/Pipeline";
+import { statusNames } from "../components/fundraising/PipelineControls";
+import { PipelineTable } from "../components/fundraising/PipelineTable";
 import { RoundCard, RoundDialog } from "../components/fundraising/RoundCard";
 import { SafeCoverSummary, SafeDialog } from "../components/fundraising/SafeDialog";
 import type { SafeStep } from "../components/fundraising/SafeList";
@@ -38,8 +40,11 @@ import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { SectionCard } from "../components/SectionCard";
 import { StillLoading } from "../components/ShellSkeleton";
 import { isoFromDay, todayDay } from "../lib/day-input";
+import { centsFromText } from "../lib/dollars-input";
 import { connectFinanceProvider } from "../lib/finance-connect";
 import { usdFigure } from "../lib/finance-format";
+import type { PipelineRow, RowEdits } from "../lib/pipeline-rows";
+import { callIso } from "../lib/pipeline-rows";
 import { rpc } from "../lib/rpc";
 import { useContactNotices, useWithoutDeleted } from "../lib/use-contact-notices";
 import { errorText } from "../lib/user-error";
@@ -158,35 +163,111 @@ export function FundraisingPage({
     call()
       .then(load)
       .catch((cause) => notify(errorText(cause, failure)));
-  const move = (prospect: Contact, stage: ContactStage) =>
+  /** One row change, then a reload; `undo` (when given) puts the row back from the toast. */
+  const change = (
+    row: PipelineRow,
+    changes: Omit<ProspectSaveInput, "id">,
+    failure: string,
+    toast?: { title: string; undo?: Omit<ProspectSaveInput, "id"> },
+  ) =>
     rpc.fundraising.prospects
-      .save({ id: prospect.id, stage })
+      .save({ id: row.id, ...changes })
       .then(() => {
         load();
-        // Restoring a commitment from an earlier round would attach it to the open round instead.
-        const canUndo = !(
-          prospect.stage === "committed" && prospect.roundId !== (open?.id ?? null)
-        );
+        if (!toast) return;
         enqueueNotificationToast({
-          id: `prospect-${prospect.id}-${Date.now()}`,
-          title: t`Moved ${prospect.name} to ${contactStageNames()[stage]}`,
-          action: canUndo
+          id: `prospect-${row.id}-${Date.now()}`,
+          title: toast.title,
+          action: toast.undo
             ? {
                 label: t`Undo`,
                 onClick: () =>
                   void run(
-                    () =>
-                      rpc.fundraising.prospects.save({
-                        id: prospect.id,
-                        stage: prospect.stage ?? "target",
-                      }),
+                    () => rpc.fundraising.prospects.save({ id: row.id, ...toast.undo }),
                     t`Could not undo`,
                   ),
               }
             : undefined,
+          timeout: 8000,
         });
       })
-      .catch((cause) => notify(errorText(cause, t`Could not move ${prospect.name}`)));
+      .catch((cause) => notify(errorText(cause, failure)));
+  // Restoring a commitment from an earlier round would attach it to the open round instead.
+  const canRestore = (row: PipelineRow) =>
+    !(row.status === "committed" && row.contact.roundId !== (open?.id ?? null));
+  const restore = (row: PipelineRow): Omit<ProspectSaveInput, "id"> => ({
+    status: row.status,
+    interest: row.interest,
+    nextCallAt: row.nextCallAt,
+    nextCallHasTime: row.nextCallHasTime,
+  });
+  const edits: RowEdits = {
+    status: (row, status: PipelineStatus) =>
+      void change(row, { status }, t`Could not move ${row.name}`, {
+        title: t`Moved ${row.name} to ${statusNames()[status]}`,
+        undo: canRestore(row) ? restore(row) : undefined,
+      }),
+    interest: (row, interest) =>
+      void change(
+        row,
+        { interest },
+        t`Could not change interest`,
+        interest === "out" && row.status !== "passed"
+          ? {
+              title: t`${row.name}: Interest set to Out, status moved to Passed`,
+              undo: canRestore(row) ? restore(row) : undefined,
+            }
+          : undefined,
+      ),
+    nextStep: (row, text) =>
+      void change(row, { nextStep: text.trim() || null }, t`Could not save the next step`),
+    nextCall: (row, next) =>
+      void change(
+        row,
+        {
+          nextCallAt: next ? callIso(next.day, next.time) : null,
+          nextCallHasTime: Boolean(next?.time),
+        },
+        t`Could not save the next call`,
+      ),
+    amount: (row, text) => {
+      const checkSizeCents = centsFromText(text);
+      if (checkSizeCents === undefined) return notify(t`Enter an amount`);
+      void change(row, { checkSizeCents }, t`Could not save the amount`);
+    },
+    referrer: (row, contactId) =>
+      void change(row, { referredByContactId: contactId }, t`Could not save who referred`),
+    createReferrer: (row, name) =>
+      void rpc.contacts
+        .save({ name, kind: "other" })
+        .then(({ id }) => change(row, { referredByContactId: id }, t`Could not save who referred`))
+        .catch((cause) => notify(errorText(cause, t`Could not add ${name}`))),
+    log: (row, { outcome, note, next }) =>
+      void rpc.fundraising.calls
+        .log({
+          id: row.id,
+          outcome,
+          note: note.trim() || null,
+          nextCall:
+            next === "keep"
+              ? "keep"
+              : { at: next.day ? isoFromDay(next.day) : null, hasTime: false },
+        })
+        .then(({ eventId, movedToMet }) => {
+          load();
+          enqueueNotificationToast({
+            id: `call-${eventId}`,
+            title: movedToMet ? t`Call logged. ${row.name} moved to Met` : t`Call logged`,
+            action: {
+              label: t`Undo`,
+              onClick: () =>
+                void run(() => rpc.fundraising.calls.undo({ eventId }), t`Could not undo`),
+            },
+            timeout: 8000,
+          });
+        })
+        .catch((cause) => notify(errorText(cause, t`Could not log the call`))),
+  };
 
   const mercuryConnected = overview ? overview.mercury.status !== "not_connected" : false;
   // With Mercury the SAFE is made there: open it, then mark the prospect Waiting for Mercury.
@@ -328,25 +409,24 @@ export function FundraisingPage({
               }
             />
 
-            <SectionCard title={t`Pipeline`}>
-              <Pipeline
-                prospects={overview.prospects}
-                savedId={savedId}
-                filledSend={Boolean(open)}
-                onSendSafe={sendSafe}
-                onOpenMercury={openMercury}
-                onNotSent={(prospect) =>
-                  void run(
-                    () => rpc.fundraising.prospects.notSent({ id: prospect.id }),
-                    t`Could not undo Send SAFE`,
-                  )
-                }
-                onEdit={(prospect) =>
-                  setEditing(hasNoPerson(prospect) ? firstPerson(prospect) : prospect)
-                }
-                onMove={(prospect, stage) => void move(prospect, stage)}
-              />
-            </SectionCard>
+            <PipelineTable
+              prospects={overview.prospects}
+              contacts={contacts ?? []}
+              edits={edits}
+              savedId={savedId}
+              filledSend={Boolean(open)}
+              onSendSafe={sendSafe}
+              onOpenMercury={openMercury}
+              onNotSent={(prospect) =>
+                void run(
+                  () => rpc.fundraising.prospects.notSent({ id: prospect.id }),
+                  t`Could not undo Send SAFE`,
+                )
+              }
+              onEdit={(prospect) =>
+                setEditing(hasNoPerson(prospect) ? firstPerson(prospect) : prospect)
+              }
+            />
 
             <SectionCard title={t`SAFEs`}>
               {overview.safes.length === 0 ? (
@@ -504,8 +584,6 @@ export function FundraisingPage({
             contact={"id" in editing ? editing : null}
             prefill={"id" in editing ? undefined : editing}
             contacts={contacts ?? []}
-            // A first person joins a record that already has its stage and amount.
-            pipelineFields={"id" in editing || !editing.pipelineRecordId}
             onClose={() => setEditing(null)}
             onSaved={(saved) => {
               load();
