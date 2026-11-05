@@ -88,6 +88,7 @@ struct MailApprovalCardView: View {
     }
     switch answer {
     case "superseded", "expired", "stopped": return .result(Text("Not sent"), .negative)
+    case "skipped": return .result(Text("Skipped"), .neutral)
     case "deny": return .result(Text("Discarded"), .negative)
     default:
       return .result(mail.isDraftTool && ask.answer == "allow" ? Text("Saving…") : Text("Sending…"), .neutral)
