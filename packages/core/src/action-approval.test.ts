@@ -17,8 +17,10 @@ import {
   outboundSiteGate,
   planActionGate,
   privateDataAreas,
+  ROUTINE_AUTO_REVIEW_READ_TOOLS,
   resolveActionApproval,
   resolveActionApprovalDetail,
+  routineAlwaysAllowable,
   toolRequiresApproval,
   toolRequiresExplicitApproval,
   toolResultTaintsRun,
@@ -794,12 +796,15 @@ describe("unattendedToolRequiresApproval", () => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
   });
 
-  it.each(["show_emails", "finance_overview", "finance_transactions", "cap_table_read", "page_source_list"])(
-    "still asks for %s in an unattended run",
-    (name) => {
-      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
-    },
-  );
+  it.each([
+    "show_emails",
+    "finance_overview",
+    "finance_transactions",
+    "cap_table_read",
+    "page_source_list",
+  ])("still asks for %s in an unattended run", (name) => {
+    expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+  });
 
   it("keeps an internal legal tool asking in a tainted run", () => {
     expect(externalTaintAllowsTool("legal_upsert_contract")).toBe(false);
@@ -1068,5 +1073,68 @@ describe("isApprovalAskBlock with a reply batch card", () => {
 
   it("does not treat a deny-only card without the batch mark as an approval", () => {
     expect(isApprovalAskBlock(card([{ id: "deny", label: "Discard" }]))).toBe(false);
+  });
+});
+
+describe("routine rules and Auto Review of routine reads", () => {
+  const base = { consequential: true, autoReviewEnabled: true, checkerConfigured: true };
+  const resolved = (decision: "ask" | "allow", source: ActionApprovalSource) => ({
+    decision,
+    source,
+    matchingRules: [],
+  });
+
+  it("judges only a routine read in an unattended run", () => {
+    const r = resolved("allow", "default");
+    expect(planActionGate({ ...base, resolved: r, unattended: true })).toBe("allow");
+    expect(planActionGate({ ...base, resolved: r, unattended: true, routineRead: true })).toBe(
+      "judge",
+    );
+  });
+
+  it("lets a rule win over the routine judge", () => {
+    const flags = { ...base, unattended: true, routineRead: true };
+    expect(planActionGate({ ...flags, resolved: resolved("ask", "require_approval") })).toBe("ask");
+  });
+
+  it("lists only reads for the routine judge, all of which ask in the background today", () => {
+    for (const name of ROUTINE_AUTO_REVIEW_READ_TOOLS) {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+      expect(toolRequiresExplicitApproval(name)).toBe(false);
+      expect(name).not.toMatch(/send|write|save|update|upsert|create|delete|modify/);
+    }
+  });
+
+  it.each([
+    "mail_send",
+    "mail_draft",
+    "imessage_send",
+    "share_meeting",
+    "fundraising_round_save",
+    "company_fact_upsert",
+    "create_space",
+  ])("never offers Always for this routine on %s", (toolName) => {
+    expect(routineAlwaysAllowable({ toolName })).toBe(false);
+  });
+
+  it("never offers it for a payment, outside message or delete on a connector", () => {
+    for (const toolName of ["stripe_charge_card", "slack_post_message", "github_delete_branch"]) {
+      expect(routineAlwaysAllowable({ toolName, viaConnector: true })).toBe(false);
+    }
+  });
+
+  it("offers it for an ordinary background write, and accepts the answer on a card", () => {
+    expect(routineAlwaysAllowable({ toolName: "write_file" })).toBe(true);
+    expect(
+      isApprovalAskBlock({
+        kind: "ask",
+        approvalEffectId: "e",
+        actions: [
+          { id: "allow", label: "Allow once" },
+          { id: "always_routine", label: "Always for this routine" },
+          { id: "deny", label: "Deny" },
+        ],
+      }),
+    ).toBe(true);
   });
 });

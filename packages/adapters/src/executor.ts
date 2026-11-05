@@ -175,12 +175,14 @@ import {
   privateDataAreas,
   promptInvokesSkill,
   quietRoutineGuidance,
+  ROUTINE_AUTO_REVIEW_READ_TOOLS,
   redactSecrets,
   renderBotDirectory,
   repeatsPrivateText,
   resolveActionApproval,
   resolveActionApprovalDetail,
   resolveBotAddress,
+  routineAlwaysAllowable,
   sandboxCommandTimeoutMs,
   siteAlwaysAllowed,
   toolRequiresApproval,
@@ -217,6 +219,7 @@ import {
   isTooManyDatabaseConnections,
   isUniqueViolation,
   listApprovalRules,
+  listRoutineToolAllows,
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
   PinnedConnectionLostError,
@@ -5709,8 +5712,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // mail_modify is the one case a tool rule clears).
           const agentAccountWrite =
             (writeOnAgentConnection && !inboxOwnModify) || connectorWriteOnAgentConnection;
-          const requiresMandatoryApproval =
-            requiresUnattendedApproval ||
+          const otherMandatory =
             // A fetch the exfiltration check held is never cleared by a saved rule or another review.
             standingHold !== undefined ||
             mailModifyNeedsToolRule ||
@@ -5732,21 +5734,76 @@ export function createRunExecutor(deps: ExecutorDeps) {
             connectorWriteOnAgentConnection ||
             // An owner agent's writes on a peer's request never pass on a saved rule or Auto Review.
             (ownerAgentPeer && OWNER_PEER_WRITE_TOOLS.has(name));
-          const gateResolved = requiresMandatoryApproval
+          // A background routine run, with nothing from outside in it, started by the owner's own
+          // schedule or request (not a webhook), on an agent that is not firewalled or external.
+          const cleanRoutineRun =
+            requiresUnattendedApproval &&
+            !otherMandatory &&
+            Boolean(run.routineId) &&
+            run.trigger !== "webhook" &&
+            !runTainted &&
+            bot.audience !== "external" &&
+            !(await firewallNow());
+          // Once outside content is in the run (a page, a message, a restored transcript), injected
+          // text could pick the call, so no routine allowance applies any more.
+          const outsideSeen = cleanRoutineRun ? await isOutsideContentSeen() : true;
+          // "Always for this routine": the owner chose it on an earlier card of this routine.
+          const routineAllowable =
+            cleanRoutineRun &&
+            !outsideSeen &&
+            routineAlwaysAllowable({
+              toolName: name,
+              viaConnector,
+              connectorKind,
+              readOnly: declaredReadOnly,
+            });
+          const routineLifted =
+            routineAllowable &&
+            (
+              await listRoutineToolAllows(deps.prisma, {
+                spaceId: run.spaceId,
+                userId: run.userId,
+                routineId: run.routineId!,
+              })
+            ).has(name);
+          // Auto Review may judge a private read of the routine's owner while nothing outside has
+          // been read; any error, doubt or missing provider asks. A saved routine rule allows it
+          // outright, so the judge is not consulted then.
+          const routineReviewRead =
+            cleanRoutineRun &&
+            !viaConnector &&
+            ROUTINE_AUTO_REVIEW_READ_TOOLS.has(name) &&
+            !outsideSeen &&
+            !routineLifted;
+          const requiresMandatoryApproval =
+            (requiresUnattendedApproval && !routineLifted && !routineReviewRead) || otherMandatory;
+          const gateResolved = routineLifted
             ? {
-                decision: "ask" as const,
-                source: "default" as const,
+                decision: "allow" as const,
+                source: "always_allow" as const,
                 matchingRules: [],
               }
-            : firewallLifted && !approvalResolved.matchingRules.length
-              ? { decision: "allow" as const, source: "default" as const, matchingRules: [] }
-              : approvalResolved;
+            : requiresMandatoryApproval
+              ? {
+                  decision: "ask" as const,
+                  source: "default" as const,
+                  matchingRules: [],
+                }
+              : firewallLifted && !approvalResolved.matchingRules.length
+                ? { decision: "allow" as const, source: "default" as const, matchingRules: [] }
+                : approvalResolved;
           const autoReviewPref =
-            requiresMandatoryApproval || run.unattended ? false : await loadAutoReviewPreference();
+            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+              ? false
+              : await loadAutoReviewPreference();
           const injectedReview =
-            requiresMandatoryApproval || run.unattended ? undefined : deps.autoReview;
+            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+              ? undefined
+              : deps.autoReview;
           const checker =
-            requiresMandatoryApproval || run.unattended ? undefined : resolveAutoReviewChecker();
+            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+              ? undefined
+              : resolveAutoReviewChecker();
           const checkerConfigured =
             autoReviewPref &&
             (Boolean(injectedReview) ||
@@ -5760,7 +5817,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     ),
                   )
                 : false));
-          const plan =
+          const plannedGate =
             requiresMandatoryApproval ||
             // A repeating schedule asks unless the owner chose "Always allow" for this tool; Auto
             // Review never clears it, because the saved prompt would run on every fire.
@@ -5772,8 +5829,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   autoReviewEnabled: autoReviewPref,
                   checkerConfigured,
                   unattended: run.unattended,
+                  routineRead: routineReviewRead,
                   newDestination: siteGate === "new",
                 });
+          // A routine read runs only when the judge passes it: a saved Allow rule, no provider or
+          // an error never lets it through.
+          const plan =
+            routineReviewRead && plannedGate !== "judge" && plannedGate !== "block"
+              ? ("ask" as const)
+              : plannedGate;
           // An unattended run has nobody to ask, and pausing would stop the whole routine: a protected
           // archive is skipped and the agent is told, so it reports the skip in its summary.
           if (protectedArchive && run.unattended === true) {
@@ -5995,15 +6059,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ) {
             await recordDecision(
               gateDecision,
-              requiresUnattendedApproval
-                ? "unattended"
-                : firewallAskCall
-                  ? "firewall"
-                  : externalTaintedCall
-                    ? "external_taint"
-                    : requiresMandatoryApproval
-                      ? "mandatory"
-                      : approvalResolved.source,
+              routineLifted
+                ? "routine_allow"
+                : routineReviewRead
+                  ? "routine_review"
+                  : requiresUnattendedApproval
+                    ? "unattended"
+                    : firewallAskCall
+                      ? "firewall"
+                      : externalTaintedCall
+                        ? "external_taint"
+                        : requiresMandatoryApproval
+                          ? "mandatory"
+                          : approvalResolved.source,
             );
           }
           const bypassApproval = gateDecision === "allow" && requiresApprovalByDefault;
@@ -6132,6 +6200,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               approvalReason: approvalCardReason,
               mailBatch: preparedMailBatch,
               noAlwaysAllow,
+              routineAlways: routineAllowable,
               serviceName: callRoute?.serverName,
               mailAccount:
                 meetingTaintedCall || externalTaintedCall ? undefined : await approvalMailAccount(),
@@ -9306,16 +9375,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         // A quiet routine ("only message me if something needs me") gets the silent-reply
         // instruction from the server; users never type the NO_RESPONSE word.
-        const quietGuidance = run.routineId
-          ? (
-              await deps.prisma.routine.findUnique({
-                where: { id: run.routineId },
-                select: { quiet: true },
-              })
-            )?.quiet
-            ? quietRoutineGuidance()
-            : undefined
-          : undefined;
+        const runRoutine = run.routineId
+          ? await deps.prisma.routine.findUnique({
+              where: { id: run.routineId },
+              select: { quiet: true, managedKind: true },
+            })
+          : null;
+        const quietGuidance = runRoutine?.quiet ? quietRoutineGuidance() : undefined;
+        const runIsCheckIn = runRoutine?.managedKind === CHECK_IN_MANAGED_KIND;
 
         let fallbackModels: { provider: string; modelId: string }[] = [];
         // Backup models would receive the Legal agent's history under a consent given for another
@@ -9421,6 +9488,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         ? BOT_SETUP_GUIDANCE
                         : undefined,
                     quietGuidance,
+                    tenacity: tenacityLevelFor({
+                      proactivity: bot.proactivity,
+                      restricted:
+                        bot.firewall === true ||
+                        run.externalTaint === true ||
+                        externalTaint() ||
+                        restrictedContext ||
+                        messagingChannelRun ||
+                        runIsCheckIn,
+                    }),
                     disabledBuiltinTools: instructionDisabledTools,
                   })
                     .filter((instruction): instruction is string => Boolean(instruction))
@@ -11304,6 +11381,33 @@ export const PRESENTATION_GUIDANCE =
 export const TRUTHFULNESS_GUIDANCE =
   "Take ids, numbers, dates, durations and results from tool output or the user, never from guesswork, and do not predict how long something will take. If a tool returns nothing or fails, say so. In outbound mail, messages, searches and forms, include only what the recipient needs; do not pass along private details from memory, other mail or other people unless the user asked. Do not promise a follow-up unless something will deliver it: set up a schedule or send a notification, or say you will not follow up. Every routine prompt you write must say when to stop.";
 
+/** Retry limits and a final denial. Every agent that is not the voice agent gets this, at any level. */
+const TENACITY_BASE =
+  "When a tool fails or returns nothing, try a different query, tool or source before reporting back, but never repeat the same failing call more than once or twice; after two or three distinct attempts, stop and say what you tried and what would unblock you. A denied or skipped approval is final: do not retry, rephrase or work around it. Use paid connectors and research tools sparingly.";
+
+const PROACTIVITY_TEXT = {
+  low: "Do what was asked, then stop. Ask when you are unsure what the user wants.",
+  medium:
+    "Finish the job: do not stop at a partial result when the next step is clear and within what was asked. Look things up instead of asking when you can find the answer yourself; ask only for a decision or for something only the user knows. When you finish, name the obvious next step and offer to do it. Doing more never means acting beyond what was asked: approvals, sending, spending and deleting still need the user's say.",
+  high: "Finish the job: do not stop at a partial result when the next step is clear. Look things up instead of asking when you can find the answer yourself; ask only for a decision or for something only the user knows. Without being asked, also take the safe next steps within the request, such as reads, research and drafts, and bring up ideas. When you finish, name the obvious next step and offer to do it. Ask before anything that needs approval. Never send, spend or delete on your own initiative: approvals, sending, spending and deleting still need the user's say.",
+} as const;
+
+/** "limited" is the retry part only: firewalled, external, tainted, messaging-channel and check-in runs. */
+export type TenacityLevel = "limited" | keyof typeof PROACTIVITY_TEXT;
+
+export function tenacityGuidance(level: TenacityLevel): string {
+  return level === "limited" ? TENACITY_BASE : `${TENACITY_BASE} ${PROACTIVITY_TEXT[level]}`;
+}
+
+/** The owner's stored level, or "limited" when the run must ignore it. Unknown values read as medium. */
+export function tenacityLevelFor(input: {
+  proactivity: string | undefined;
+  restricted: boolean;
+}): TenacityLevel {
+  if (input.restricted) return "limited";
+  return input.proactivity === "low" || input.proactivity === "high" ? input.proactivity : "medium";
+}
+
 function toolUsageLine(parts: {
   computerInstruction: string;
   pageBrowserAllowed: boolean;
@@ -11657,6 +11761,8 @@ export function userTurnInstructions(parts: {
   replyGuidance: string;
   /** Set while the bot is unconfigured and the user is typing in its own chat; see BOT_SETUP_GUIDANCE. */
   botSetupGuidance?: string | undefined;
+  /** The agent's proactivity level, or "limited" for restricted runs; see tenacityLevelFor. */
+  tenacity?: TenacityLevel;
   /** Added for quiet routines; follows replyGuidance. */
   quietGuidance?: string | undefined;
   disabledBuiltinTools?: ReadonlySet<string>;
@@ -11744,6 +11850,7 @@ export function userTurnInstructions(parts: {
     ),
     "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
     TRUTHFULNESS_GUIDANCE,
+    parts.tenacity ? tenacityGuidance(parts.tenacity) : undefined,
     PRESENTATION_GUIDANCE,
     "Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Do not open a reply with today's date unless the user asked for it.",
     "Treat pagination cursors as opaque: copy the returned continuation value exactly, never calculate or guess it. When the tool reports no next page, stop; if a cursor is rejected, recheck the last successful result before retrying.",

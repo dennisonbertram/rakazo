@@ -15,9 +15,11 @@ public struct BotDetail: Sendable, Identifiable, Hashable, Decodable {
   public let spawnKey: String?
   /// A firewalled or external agent is not reached through "all agents".
   public let restricted: Bool
+  /// `low`, `medium` or `high`: how far the agent goes beyond the request.
+  public let proactivity: String
 
   private enum CodingKeys: String, CodingKey {
-    case id, name, title, color, pinned, sectionId, autoSpeak, archivedAt, threadId, spawnKey, audience, firewall
+    case id, name, title, color, pinned, sectionId, autoSpeak, archivedAt, threadId, spawnKey, audience, firewall, proactivity
   }
 
   public init(from decoder: Decoder) throws {
@@ -35,6 +37,7 @@ public struct BotDetail: Sendable, Identifiable, Hashable, Decodable {
     let audience = try container.decodeIfPresent(String.self, forKey: .audience)
     let firewall = try container.decodeIfPresent(Bool.self, forKey: .firewall) ?? false
     restricted = audience == "external" || firewall
+    proactivity = try container.decodeIfPresent(String.self, forKey: .proactivity) ?? "medium"
   }
 }
 

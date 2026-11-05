@@ -13476,6 +13476,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -13530,6 +13539,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -13966,6 +13976,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -14020,6 +14039,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -14456,6 +14476,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -14510,6 +14539,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -14935,6 +14965,15 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "proactivity": {
+                            "default": "medium",
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          },
                           "externalMessageTargets": {
                             "default": [],
                             "type": "array",
@@ -14989,6 +15028,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
                           "webhookConfigured",
@@ -15415,6 +15455,15 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "proactivity": {
+                            "default": "medium",
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          },
                           "externalMessageTargets": {
                             "default": [],
                             "type": "array",
@@ -15469,6 +15518,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
                           "webhookConfigured",
@@ -16567,6 +16617,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -16621,6 +16680,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -16817,14 +16877,17 @@
                       "firewall": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema25"
                       },
-                      "externalMessageTargets": {
+                      "proactivity": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema26"
                       },
-                      "externalComputerTools": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
                       },
-                      "runsOn": {
+                      "externalComputerTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema28"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema29"
                       }
                     },
                     "required": [
@@ -17136,6 +17199,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -17190,6 +17262,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -21146,6 +21219,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -21200,6 +21282,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -21958,6 +22041,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -22012,6 +22104,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -27522,6 +27615,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -27576,6 +27678,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -39592,6 +39695,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -39646,6 +39758,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -46627,6 +46740,15 @@
                                   "default": false,
                                   "type": "boolean"
                                 },
+                                "proactivity": {
+                                  "default": "medium",
+                                  "type": "string",
+                                  "enum": [
+                                    "low",
+                                    "medium",
+                                    "high"
+                                  ]
+                                },
                                 "externalMessageTargets": {
                                   "default": [],
                                   "type": "array",
@@ -46681,6 +46803,7 @@
                                 "disabledBuiltinTools",
                                 "audience",
                                 "firewall",
+                                "proactivity",
                                 "externalMessageTargets",
                                 "externalComputerTools",
                                 "webhookConfigured",
@@ -50967,6 +51090,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -51021,6 +51153,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -68163,6 +68296,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -68217,6 +68359,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -69832,6 +69975,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -69886,6 +70038,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -70675,6 +70828,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -70729,6 +70891,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -77662,6 +77825,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -77716,6 +77888,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -84640,6 +84813,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -84694,6 +84876,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -121230,6 +121413,15 @@
                                     "default": false,
                                     "type": "boolean"
                                   },
+                                  "proactivity": {
+                                    "default": "medium",
+                                    "type": "string",
+                                    "enum": [
+                                      "low",
+                                      "medium",
+                                      "high"
+                                    ]
+                                  },
                                   "externalMessageTargets": {
                                     "default": [],
                                     "type": "array",
@@ -121281,6 +121473,7 @@
                                   "disabledBuiltinTools",
                                   "audience",
                                   "firewall",
+                                  "proactivity",
                                   "externalMessageTargets",
                                   "externalComputerTools",
                                   "webhookConfigured",
@@ -134355,6 +134548,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -134409,6 +134611,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -136762,6 +136965,15 @@
             "default": false,
             "type": "boolean"
           },
+          "proactivity": {
+            "default": "medium",
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
           "externalMessageTargets": {
             "default": [],
             "type": "array",
@@ -136813,6 +137025,7 @@
           "disabledBuiltinTools",
           "audience",
           "firewall",
+          "proactivity",
           "externalMessageTargets",
           "externalComputerTools",
           "webhookConfigured",
@@ -138234,16 +138447,24 @@
         "type": "boolean"
       },
       "RpcBotsUpdateInputSchema26": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "RpcBotsUpdateInputSchema27": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema27": {
+      "RpcBotsUpdateInputSchema28": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema28": {
+      "RpcBotsUpdateInputSchema29": {
         "anyOf": [
           {
             "type": "string",

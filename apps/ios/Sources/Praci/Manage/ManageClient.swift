@@ -27,9 +27,10 @@ struct BotUpdateInput: Encodable, Sendable {
   var autoSpeak: Bool?
   var sectionId: String?
   var clearSection = false
+  var proactivity: String?
 
   private enum Keys: String, CodingKey {
-    case botId, name, title, color, pinned, autoSpeak, sectionId
+    case botId, name, title, color, pinned, autoSpeak, sectionId, proactivity
   }
 
   func encode(to encoder: Encoder) throws {
@@ -40,6 +41,7 @@ struct BotUpdateInput: Encodable, Sendable {
     try box.encodeIfPresent(color, forKey: .color)
     try box.encodeIfPresent(pinned, forKey: .pinned)
     try box.encodeIfPresent(autoSpeak, forKey: .autoSpeak)
+    try box.encodeIfPresent(proactivity, forKey: .proactivity)
     if clearSection {
       try box.encodeNil(forKey: .sectionId)
     } else {
