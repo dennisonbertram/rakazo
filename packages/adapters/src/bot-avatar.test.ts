@@ -38,6 +38,25 @@ describe("bot avatar encoding", () => {
     ).resolves.toEqual({ color: "#8B5CF6::shape_2" });
   });
 
+  it("keeps the current shape when only a plain hex color is written", async () => {
+    await expect(
+      resolveUpdateBotAvatar({
+        color: "#0EA5E9",
+        currentColor: "#10B981::shape_3",
+        sourceImageArtifactIds: [],
+        loadArtifact: async () => null,
+      }),
+    ).resolves.toEqual({ color: "#0EA5E9::shape_3" });
+    await expect(
+      resolveUpdateBotAvatar({
+        color: "#0EA5E9::shape_1",
+        currentColor: "#10B981::shape_3",
+        sourceImageArtifactIds: [],
+        loadArtifact: async () => null,
+      }),
+    ).resolves.toEqual({ color: "#0EA5E9::shape_1" });
+  });
+
   it("rejects remote URLs and missing attached images", async () => {
     await expect(
       resolveUpdateBotAvatar({
