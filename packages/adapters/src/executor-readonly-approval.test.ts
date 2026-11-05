@@ -8316,7 +8316,7 @@ describe("a run that a goal adopts while it is running", () => {
     expect(f.execute).toHaveBeenCalledTimes(2);
   });
 
-  it("records the calls made after the goal was set, and queues the goal check when it ends", async () => {
+  it("records every call of the run, also those before the goal was set, and queues the goal check when it ends", async () => {
     const f = fixture({
       beforeToolCall: (index) => {
         if (index === 1) f.attachGoal("goal-1");
@@ -8332,7 +8332,7 @@ describe("a run that a goal adopts while it is running", () => {
       evidenceWrites(f)
         .at(-1)
         ?.map((entry) => entry.id),
-    ).toEqual(["t1", "t2"]);
+    ).toEqual(["t1", "t2", "t3"]);
     expect(f.jobsEnqueue).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "goal.check",
@@ -8341,10 +8341,10 @@ describe("a run that a goal adopts while it is running", () => {
     );
   });
 
-  it("queues nothing for a run that never had a goal", async () => {
+  it("keeps the log for a run that never had a goal, but queues no goal check", async () => {
     const f = fixture();
     await f.run();
-    expect(evidenceWrites(f)).toEqual([]);
+    expect(evidenceWrites(f).at(-1)?.map((entry) => entry.id)).toEqual(["t1"]);
     expect(f.jobsEnqueue).not.toHaveBeenCalledWith(expect.objectContaining({ name: "goal.check" }));
   });
 
