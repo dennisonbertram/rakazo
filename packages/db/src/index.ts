@@ -21,6 +21,7 @@ export * from "./data-room-autosort.js";
 export * from "./data-room-imports.js";
 export * from "./database-access.js";
 export * from "./events.js";
+export * from "./stopped-work.js";
 export * from "./expire-stuck-run.js";
 export * from "./external-conversations.js";
 export * from "./fundraising.js";

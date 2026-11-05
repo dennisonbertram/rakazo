@@ -194,6 +194,7 @@ import {
   routineAlwaysAllowable,
   sandboxCommandTimeoutMs,
   siteAlwaysAllowed,
+  stoppedWorkNote,
   toolRequiresApproval,
   toolRequiresExplicitApproval,
   toolResultTaintsRun,
@@ -231,6 +232,7 @@ import {
   listRoutineToolAllows,
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
+  loadStoppedRunWork,
   PinnedConnectionLostError,
   parseComputerMode,
   RUN_TURN_CHECKPOINT_KIND,
@@ -4560,8 +4562,49 @@ export function createRunExecutor(deps: ExecutorDeps) {
         if ((turnCheckpoint || checkpointLoadError) && !runReadMeetingText) {
           runReadMeetingText = await threadRowMarked();
         }
+        // After Stop: the results of calls a stopped run finished, for the owner's "continue". A
+        // run-level restriction (outside content in its prompt, Firewall, external bot) on either
+        // side leaves the note out. Otherwise the run starts as restricted as the stopped one was
+        // when it ended, as if it had made those calls itself.
+        const stoppedWork =
+          run.externalTaint === true ||
+          externalTaint() ||
+          bot.firewall === true ||
+          bot.audience === "external"
+            ? undefined
+            : await loadStoppedRunWork(deps.prisma, {
+                spaceId: run.spaceId,
+                threadId: thread.id,
+                botId: bot.id,
+                userId: run.userId,
+                runId,
+                before: run.createdAt,
+              }).catch((error: unknown) => {
+                // Best effort: a failed lookup must not fail the run.
+                getLogger().warn("stopped run work lookup failed", { error });
+                return undefined;
+              });
+        const stoppedNote =
+          stoppedWork && !stoppedWork.restricted ? stoppedWorkNote(stoppedWork.runs) : "";
+        // The markers are written to the run the moment they are set, so a goal continuation or a
+        // later stopped-run note reads them from the row and not from the capped tool log.
+        const persistedMarkers = { readOutsideContent: false, readDesktop: false };
+        const persistMarker = async (marker: "readOutsideContent" | "readDesktop") => {
+          if (persistedMarkers[marker]) return;
+          persistedMarkers[marker] = true;
+          await deps.prisma.run
+            .updateMany({ where: { id: runId }, data: { [marker]: true } })
+            .catch((error: unknown) =>
+              getLogger().warn("restriction marker write failed", { error }),
+            );
+        };
         // A restored transcript holds earlier tool results this worker did not see.
-        let outsideContentSeen = Boolean(turnCheckpoint) || Boolean(checkpointLoadError);
+        let outsideContentSeen =
+          Boolean(turnCheckpoint) ||
+          Boolean(checkpointLoadError) ||
+          Boolean(stoppedNote && stoppedWork?.readOutsideContent);
+        if (stoppedNote && stoppedWork?.readOutsideContent)
+          await persistMarker("readOutsideContent");
         let earlierAttemptPromise: Promise<boolean> | undefined;
         const isOutsideContentSeen = async () => {
           if (outsideContentSeen) return true;
@@ -4611,7 +4654,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Desktop app tools (docs/local-desktop-control). They are not effects: only the owner's
         // allowance for one app in this run is, so retries and repeated actions never collide
         // with the effect lifecycle. The grant is a desktop_app_use effect a person approved.
-        let desktopReadMemo = false;
+        let desktopReadMemo = Boolean(stoppedNote && stoppedWork?.readDesktop);
+        if (desktopReadMemo) await persistMarker("readDesktop");
         const desktopReadKey = approvalEffectKey(runId, DESKTOP_APP_READ_EFFECT_KIND, {});
         /**
          * Whether this run has listed or read an app. Kept as a completed effect of the run, so a
@@ -4627,6 +4671,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         };
         const markDesktopRead = async () => {
           desktopReadMemo = true;
+          await persistMarker("readDesktop");
           await deps.prisma.externalEffect
             .create({
               data: {
@@ -4762,7 +4807,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         };
         // A goal run keeps what its tool calls returned, for the goal check that judges it. The log
         // survives a pause for approval because each call is written to the run as it completes.
-        let goalEvidence = run.goalId ? parseGoalEvidence(run.goalEvidence) : [];
+        let goalEvidence = parseGoalEvidence(run.goalEvidence);
         let goalEvidenceWrite: Promise<unknown> = Promise.resolve();
         const recordGoalEvidence = (
           name: string,
@@ -4824,7 +4869,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           await refreshGoalId();
           try {
             const result = await applyToolCall(name, args, executionId, route, observer);
-            if (run.goalId && !isToolPauseResult(result)) recordGoalEvidence(name, args, result);
+            if (!isToolPauseResult(result)) recordGoalEvidence(name, args, result);
             if (!isToolPauseResult(result) && !NO_FRAGMENT_TOOLS.has(name)) {
               const text = JSON.stringify(result);
               if (PUBLIC_RESULT_TOOLS.has(name)) privateFragments.addPublic(text);
@@ -4838,11 +4883,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
             return result;
           } catch (error) {
-            if (run.goalId && !context.signal.aborted)
-              recordGoalEvidence(name, args, undefined, error);
+            if (!context.signal.aborted) recordGoalEvidence(name, args, undefined, error);
             throw error;
           } finally {
-            if (toolResultTaintsRun(name)) outsideContentSeen = true;
+            if (toolResultTaintsRun(name)) {
+              outsideContentSeen = true;
+              await persistMarker("readOutsideContent");
+            }
             settleReadEffect.delete(executionId);
           }
         };
@@ -9650,6 +9697,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ),
           });
         }
+        if (stoppedNote) historicalContext.push({ role: "user", content: stoppedNote });
         if (recalledMemory) {
           historicalContext.push({
             role: "user",
