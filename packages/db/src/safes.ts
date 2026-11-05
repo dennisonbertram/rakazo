@@ -145,25 +145,58 @@ async function lockContact(tx: Prisma.TransactionClient, scope: Scope, id: strin
   return rows[0] ?? null;
 }
 
+type SafeDates = {
+  [K in "investmentDate" | "signedByOwnerAt" | "signedByInvestorAt" | "paidAt"]:
+    | Date
+    | string
+    | null;
+};
+
+/** The earliest date a SAFE itself names: when it really began, whenever a sync first saw it. */
+const earliestDate = (safe: SafeDates): number | null => {
+  const dates = [safe.investmentDate, safe.signedByOwnerAt, safe.signedByInvestorAt, safe.paidAt];
+  const known = dates.flatMap((date) => (date ? [new Date(date).getTime()] : []));
+  return known.length > 0 ? Math.min(...known) : null;
+};
+const DAY_MS = 86_400_000;
+/** Mercury's dates can be plain days, so a window opens at the start of its first day. */
+const dayOf = (date: Date) => Math.floor(date.getTime() / DAY_MS) * DAY_MS;
+
 /**
- * Whether a SAFE belongs to a record's round: `roundId`, or any round when there is none (null). A
- * SAFE with no round belongs only when it was created after the record.
+ * Whether a Mercury SAFE's own dates fall within a round. One naming no date yet is taken as new.
+ * ponytail: a round entered here after its first SAFE was signed leaves that SAFE outside; Assign
+ * cannot override it, so add an owner's choice if that turns up.
+ */
+const fitsRound = (safe: SafeDates, round: { createdAt: Date; closedAt: Date | null }) => {
+  const start = earliestDate(safe);
+  if (start === null) return true;
+  return (
+    start >= dayOf(round.createdAt) && (!round.closedAt || start < dayOf(round.closedAt) + DAY_MS)
+  );
+};
+
+/**
+ * Whether a SAFE belongs to a record's round: `round`, or any round when there is none (null). A SAFE
+ * with no round belongs only when it began after the record, and a dated Mercury one only when it did
+ * not begin before the round either, so an old SAFE never stands in for a current commitment.
  */
 export const safeInRecordRound = (
-  safe: Pick<Safe, "roundId" | "createdAt">,
+  safe: Pick<Safe, "source" | "roundId" | "createdAt"> & SafeDates,
   recordCreatedAt: Date,
-  roundId: string | null,
-) =>
-  safe.roundId
-    ? !roundId || safe.roundId === roundId
-    : new Date(safe.createdAt).getTime() >= recordCreatedAt.getTime();
+  round: { id: string; createdAt: Date } | null,
+) => {
+  if (safe.roundId) return !round || safe.roundId === round.id;
+  const start = safe.source === "mercury" ? earliestDate(safe) : null;
+  if (start === null) return new Date(safe.createdAt).getTime() >= recordCreatedAt.getTime();
+  return start >= dayOf(recordCreatedAt) && (!round || start >= dayOf(round.createdAt));
+};
 
 /**
  * Whether the contact's record has an active SAFE in this round, through any of its people. A contact
  * on no record has one when any of its own SAFEs is active, in any round.
  */
 export async function hasActiveSafe(
-  db: Pick<Prisma.TransactionClient, "safe" | "pipelineRecordPerson">,
+  db: Pick<Prisma.TransactionClient, "safe" | "pipelineRecordPerson" | "fundraiseRound">,
   scope: Scope,
   contactId: string,
   roundId: string | null,
@@ -182,13 +215,20 @@ export async function hasActiveSafe(
   const rows = await db.safe.findMany({
     where: { ...scope, contactId: { in: people.map((person) => person.contactId) } },
   });
+  const round =
+    own && roundId
+      ? await db.fundraiseRound.findFirst({
+          where: { id: roundId, ...scope },
+          select: { id: true, createdAt: true },
+        })
+      : null;
   return rows
     .filter((row) => row.id !== exceptSafeId)
     .map((row) => toSafe(row))
     .some(
       (safe) =>
         isActiveSafe(safe.status) &&
-        safeInRecordRound(safe, own?.record.createdAt ?? new Date(0), own ? roundId : null),
+        safeInRecordRound(safe, own?.record.createdAt ?? new Date(0), round),
     );
 }
 
@@ -286,7 +326,7 @@ export type MercurySafeInput = {
  * Writes Mercury's SAFEs as read-only cache rows, owned by the user. A known row (by source and
  * externalId) has its Mercury fields overwritten and keeps its contact and round. A new row attaches
  * to the person on a fundraising record whose email equals the investor's (case and surrounding spaces
- * ignored), takes that record's round and ends its Waiting for Mercury. Then each paid, unlinked SAFE gets its Finance
+ * ignored), takes that record's round when its dates fall within it, and ends its Waiting for Mercury. Then each paid, unlinked SAFE gets its Finance
  * deposit when exactly one transaction fits.
  */
 export const syncMercurySafes = (db: SyncDb, actor: Scope, rows: readonly MercurySafeInput[]) =>
@@ -316,11 +356,22 @@ export async function writeMercurySafes(
       }
       const match = fields.investorEmail
         ? (
-            await tx.$queryRaw<{ id: string; recordId: string | null; roundId: string | null }[]>`
-              SELECT c.id, r.id AS "recordId", r."roundId" FROM contacts c
+            await tx.$queryRaw<
+              {
+                id: string;
+                recordId: string | null;
+                roundId: string | null;
+                roundCreatedAt: Date | null;
+                roundClosedAt: Date | null;
+              }[]
+            >`
+              SELECT c.id, r.id AS "recordId", r."roundId",
+                f."createdAt" AS "roundCreatedAt", f."closedAt" AS "roundClosedAt"
+              FROM contacts c
               LEFT JOIN pipeline_record_people p
                 ON p."contactId" = c.id AND p.pipeline = ${FUNDRAISING_PIPELINE}
               LEFT JOIN pipeline_records r ON r.id = p."recordId"
+              LEFT JOIN fundraise_rounds f ON f.id = r."roundId"
               WHERE c."spaceId" = ${scope.spaceId} AND c."userId" = ${scope.userId}
                 AND (r.id IS NOT NULL OR c.kind = 'prospect')
                 AND lower(btrim(c.email)) = ${fields.investorEmail}
@@ -334,7 +385,12 @@ export async function writeMercurySafes(
           source: "mercury",
           externalId,
           contactId: match?.id ?? null,
-          roundId: match?.roundId ?? null,
+          roundId:
+            match?.roundId &&
+            match.roundCreatedAt &&
+            fitsRound(fields, { createdAt: match.roundCreatedAt, closedAt: match.roundClosedAt })
+              ? match.roundId
+              : null,
         },
       });
       if (match?.recordId)
@@ -388,7 +444,7 @@ export async function writeMercurySafes(
 
 /**
  * Attaches a Mercury SAFE that has no contact to a prospect, an investor or anyone else on a
- * fundraising record of the user, taking that record's round and ending its Waiting for Mercury. Throws
+ * fundraising record of the user, taking that record's round when its dates fall within it, and ending its Waiting for Mercury. Throws
  * IsolationError for a SAFE or contact that is not the user's, SafeStateError for a native SAFE, one
  * that already has a contact, or a contact of another kind on no record.
  */
@@ -411,9 +467,13 @@ export async function assignSafe(
     if (!record && full.kind !== "prospect" && full.kind !== "investor")
       throw new SafeStateError("Choose a prospect or an investor.");
     // An investor who signed before records existed has no record; the round stays on the contact.
+    const roundId = record ? record.roundId : full.roundId;
+    const round = roundId
+      ? await tx.fundraiseRound.findFirst({ where: { id: roundId, ...scope } })
+      : null;
     const { count } = await tx.safe.updateMany({
       where: { id, ...scope, contactId: null },
-      data: { contactId, roundId: record ? record.roundId : full.roundId },
+      data: { contactId, roundId: round && fitsRound(safe, round) ? round.id : null },
     });
     if (count === 0) throw new SafeStateError("This SAFE already has a contact.");
     if (record) await savePipelineRecord(tx, scope, record.id, { waitingSince: null });

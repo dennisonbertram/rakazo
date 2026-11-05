@@ -84,17 +84,20 @@ export async function getFundraisingOverview(
   const created = new Map(records.map((record) => [record.id, record.createdAt]));
   const personOf = new Map(people.map((person) => [person.contactId, person]));
   // A record leaves the pipeline while it has an active SAFE in the open round (any round when none
-  // is open). It returns once every SAFE is canceled, expired or deleted, unless the SAFE was signed:
-  // signing makes a prospect an investor, which ends its place in that round, as it always has.
+  // is open). It returns once every SAFE is canceled, expired or deleted. The one exception is as it
+  // always was: a lone prospect who signed became an investor, which ends its place in that round.
+  // A firm with other people still has someone to raise from.
   const leftRecords = new Set(
     safes.flatMap((safe) => {
       const person = safe.contactId ? personOf.get(safe.contactId) : undefined;
       const since = person && created.get(person.recordId);
-      if (!person || !since || !safeInRecordRound(safe, since, open?.id ?? null)) return [];
-      const signed = safe.signedByOwnerAt && safe.signedByInvestorAt;
-      return isActiveSafe(safe.status) || (signed && person.contact.kind === "investor")
-        ? [person.recordId]
-        : [];
+      if (!person || !since || !safeInRecordRound(safe, since, open)) return [];
+      const signedAlone =
+        safe.signedByOwnerAt &&
+        safe.signedByInvestorAt &&
+        person.contact.kind === "investor" &&
+        people.filter((other) => other.recordId === person.recordId).length === 1;
+      return isActiveSafe(safe.status) || signedAlone ? [person.recordId] : [];
     }),
   );
   const withSafe = new Set(

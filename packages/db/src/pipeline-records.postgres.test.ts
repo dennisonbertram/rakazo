@@ -13,6 +13,7 @@ import {
   saveProspect,
   saveRound,
 } from "./fundraising.js";
+import { savePipelineRecord } from "./pipeline-records.js";
 import type { MercurySafeInput } from "./safes.js";
 import { assignSafe, markSafe, SafeActiveError, saveSafe, syncMercurySafes } from "./safes.js";
 import { IsolationError } from "./scope.js";
@@ -179,6 +180,8 @@ describePostgres("pipeline records (PostgreSQL)", () => {
         },
       });
 
+      // The transition trigger already made records for the rows above; the backfill must alone.
+      await prisma.pipelineRecord.deleteMany({ where: owner });
       await pool.query(backfill);
       const first = await counts();
       expect(first).toEqual({ records: 15, people: 15, events: 1 });
@@ -493,6 +496,42 @@ describePostgres("pipeline records (PostgreSQL)", () => {
       expect(rows.prospects.map((r) => r.id)).toEqual([back.id]);
     });
 
+    it("joins the named record even when the first person has another name", async () => {
+      const owner = scopeOf(4, spaceB);
+      const p = await saveContact(prisma, owner, {
+        name: "Sample Named Firm",
+        kind: "prospect",
+        stage: "committed",
+        checkSizeCents: 400_000,
+      });
+      const record = await recordOf(owner, p.id);
+      await deleteContact(prisma, owner, p.id);
+      const before = await prisma.pipelineRecord.count({ where: owner });
+      const person = await saveContact(prisma, owner, {
+        name: "Riley Placeholder",
+        organization: "Another Name",
+        kind: "prospect",
+        pipelineRecordId: record.id,
+      });
+      expect(person.pipelineRecord?.id).toBe(record.id);
+      expect(person).toMatchObject({ stage: "committed", checkSizeCents: 400_000 });
+      expect(await prisma.pipelineRecord.count({ where: owner })).toBe(before);
+      expect(
+        await prisma.pipelineRecordPerson.findFirstOrThrow({ where: { contactId: person.id } }),
+      ).toMatchObject({
+        isPrimary: true,
+      });
+      // Another user's record is refused, and nothing is saved.
+      await expect(
+        saveContact(prisma, scopeOf(6, spaceB), {
+          name: "Sample Intruder",
+          kind: "prospect",
+          pipelineRecordId: record.id,
+        }),
+      ).rejects.toBeInstanceOf(IsolationError);
+      expect(await listContacts(prisma, scopeOf(6, spaceB))).toEqual([]);
+    });
+
     it("stops waiting for Mercury when the last person is deleted", async () => {
       const owner = scopeOf(5, spaceA);
       const p = await saveContact(prisma, owner, {
@@ -540,6 +579,74 @@ describePostgres("pipeline records (PostgreSQL)", () => {
       expect((await getFundraisingOverview(prisma, owner)).pendingCents).toBe(900_000);
       await deleteContact(prisma, owner, p.id);
       expect((await getFundraisingOverview(prisma, owner)).pendingCents).toBe(900_000);
+    });
+  });
+
+  // During a rolling deploy an API process still on the old code writes the old contact columns.
+  describe("an old process during a deploy", () => {
+    const owner = scopeOf(7, spaceB);
+    const pendingOf = async () => (await getFundraisingOverview(prisma, owner)).pendingCents;
+
+    it("keeps money and rows right through the transition trigger", async () => {
+      const open = await saveRound(prisma, owner, round);
+      // A prospect saved by the old code after the backfill ran.
+      const added = await prisma.contact.create({
+        data: {
+          ...owner,
+          name: "Sample Old Process",
+          kind: "prospect",
+          stage: "committed",
+          checkSizeCents: 1_000_000n,
+          nextStep: "Call",
+          roundId: open.id,
+        },
+      });
+      expect(await recordOf(owner, added.id)).toMatchObject({
+        status: "committed",
+        amountCents: 1_000_000n,
+        nextStep: "Call",
+        roundId: open.id,
+        interest: "in",
+      });
+      expect(await pendingOf()).toBe(1_000_000);
+      // A prospect the new code saved, whose amount the old code then edits.
+      const p = await saveContact(prisma, owner, {
+        name: "Sample New Process",
+        kind: "prospect",
+        stage: "committed",
+        checkSizeCents: 2_000_000,
+      });
+      expect(await pendingOf()).toBe(3_000_000);
+      await prisma.contact.update({ where: { id: p.id }, data: { checkSizeCents: 2_500_000n } });
+      expect(await pendingOf()).toBe(3_500_000);
+      await prisma.contact.update({
+        where: { id: p.id },
+        data: { stage: "passed", roundId: null },
+      });
+      expect(await recordOf(owner, p.id)).toMatchObject({
+        status: "passed",
+        roundId: null,
+        interest: "out",
+        statusBeforePassed: "committed",
+      });
+      expect(await pendingOf()).toBe(1_000_000);
+      await prisma.contact.update({
+        where: { id: added.id },
+        data: { mercurySentAt: new Date("2026-02-01T00:00:00Z") },
+      });
+      expect((await recordOf(owner, added.id)).waitingSince).not.toBeNull();
+    });
+
+    it("does not let an old save of stale values replace what the new code wrote", async () => {
+      const p = await saveContact(prisma, owner, { name: "Sample Stale", kind: "prospect" });
+      const { id } = await recordOf(owner, p.id);
+      await savePipelineRecord(prisma, owner, id, { status: "met", amountCents: 700_000 });
+      // The old dialog sends the columns as it read them: all still empty.
+      await prisma.contact.update({
+        where: { id: p.id },
+        data: { email: "stale@example.test", stage: null, checkSizeCents: null, nextStep: null },
+      });
+      expect(await recordOf(owner, p.id)).toMatchObject({ status: "met", amountCents: 700_000n });
     });
   });
 
@@ -759,14 +866,23 @@ describePostgres("pipeline records (PostgreSQL)", () => {
       await expect(safeFor(scope, away.id)).rejects.toBeInstanceOf(SafeActiveError);
     });
 
-    it("keeps a person who signed off the pipeline in that round, and off Pending", async () => {
-      const { scope, open, primary } = await firm(spaceB, "signed");
+    it("returns a two-person firm when a signed SAFE is canceled", async () => {
+      const { scope, primary } = await firm(spaceB, "signed");
+      const safe = await safeFor(scope, primary.id);
+      await markSafe(prisma, scope, { id: safe.id, action: "signed", at });
+      expect((await overviewOf(scope)).prospects).toEqual([]);
+      await markSafe(prisma, scope, { id: safe.id, action: "cancel", at });
+      const view = await overviewOf(scope);
+      expect(view.prospects.map((p) => p.id)).toEqual([primary.id]);
+      expect(view.pendingCents).toBe(5_000_000);
+    });
+
+    it("keeps a lone prospect who signed and canceled off the pipeline in that round only", async () => {
+      const { scope, open, primary, second } = await firm(spaceB, "signedalone");
+      await prisma.pipelineRecordPerson.deleteMany({ where: { ...scope, contactId: second.id } });
       const safe = await safeFor(scope, primary.id);
       await markSafe(prisma, scope, { id: safe.id, action: "signed", at });
       await markSafe(prisma, scope, { id: safe.id, action: "cancel", at });
-      expect((await prisma.contact.findUniqueOrThrow({ where: { id: primary.id } })).kind).toBe(
-        "investor",
-      );
       let view = await overviewOf(scope);
       expect(view.prospects).toEqual([]);
       expect(view.pendingCents).toBe(0);
@@ -776,6 +892,120 @@ describePostgres("pipeline records (PostgreSQL)", () => {
       view = await overviewOf(scope);
       expect(view.prospects.map((p) => p.id)).toEqual([primary.id]);
       expect(view.pendingCents).toBe(0);
+    });
+
+    it("leaves an old funded Mercury SAFE outside the round, and the commitment standing", async () => {
+      const { scope, primary, second, record } = await firm(spaceA, "oldmercury");
+      // The firm has been on the list for years; the round only started now.
+      await prisma.pipelineRecord.update({
+        where: { id: record.id },
+        data: { createdAt: new Date("2020-01-01T00:00:00Z") },
+      });
+      const old = new Date("2024-03-01T00:00:00Z");
+      await syncMercurySafes(prisma, scope, [
+        mercury("m-old", {
+          investorEmail: "associate@example.test",
+          amountCents: 1_000_000,
+          investmentDate: old,
+          signedByOwnerAt: old,
+          signedByInvestorAt: old,
+          paidAt: old,
+        }),
+      ]);
+      const row = await prisma.safe.findFirstOrThrow({ where: { ...scope, source: "mercury" } });
+      expect(row).toMatchObject({ contactId: second.id, roundId: null });
+      const view = await overviewOf(scope);
+      expect(view.fundedCents).toBe(0);
+      expect(view.pendingCents).toBe(5_000_000);
+      expect(view.prospects.map((p) => p.id)).toEqual([primary.id]);
+      await expect(markWaiting(prisma, scope, primary.id)).resolves.toBeTruthy();
+    });
+
+    it("takes a Mercury SAFE dated within the round into that round", async () => {
+      const { scope, open, second } = await firm(spaceA, "newmercury");
+      const today = new Date();
+      await syncMercurySafes(prisma, scope, [
+        mercury("m-new", {
+          investorEmail: "associate@example.test",
+          amountCents: 2_000_000,
+          investmentDate: today,
+          signedByOwnerAt: today,
+          signedByInvestorAt: today,
+          paidAt: today,
+        }),
+      ]);
+      const row = await prisma.safe.findFirstOrThrow({ where: { ...scope, source: "mercury" } });
+      expect(row).toMatchObject({ contactId: second.id, roundId: open.id });
+      const view = await overviewOf(scope);
+      expect(view.fundedCents).toBe(2_000_000);
+      expect(view.pendingCents).toBe(0);
+    });
+
+    it("leaves a Mercury SAFE dated after a closed round outside it", async () => {
+      const { scope, open, second } = await firm(spaceA, "aftermercury");
+      await prisma.fundraiseRound.update({
+        where: { id: open.id },
+        data: { closedAt: new Date("2026-01-01T00:00:00Z") },
+      });
+      const later = new Date("2026-03-01T00:00:00Z");
+      await syncMercurySafes(prisma, scope, [
+        mercury("m-after", { investorEmail: "associate@example.test", investmentDate: later }),
+      ]);
+      const row = await prisma.safe.findFirstOrThrow({ where: { ...scope, source: "mercury" } });
+      expect(row).toMatchObject({ contactId: second.id, roundId: null });
+    });
+
+    it("applies the same date rule when Assign attaches an old Mercury SAFE", async () => {
+      const { scope, primary, record } = await firm(spaceA, "oldassign");
+      await prisma.pipelineRecord.update({
+        where: { id: record.id },
+        data: { createdAt: new Date("2020-01-01T00:00:00Z") },
+      });
+      await syncMercurySafes(prisma, scope, [
+        mercury("m-oldassign", { investmentDate: new Date("2024-03-01T00:00:00Z") }),
+      ]);
+      const loose = await prisma.safe.findFirstOrThrow({ where: { ...scope, source: "mercury" } });
+      const assigned = await assignSafe(prisma, scope, loose.id, primary.id);
+      expect(assigned).toMatchObject({ contactId: primary.id, roundId: null });
+      const view = await overviewOf(scope);
+      expect(view.pendingCents).toBe(5_000_000);
+      expect(view.prospects.map((p) => p.id)).toEqual([primary.id]);
+    });
+
+    it("keeps the other person's commitment when a contact with an earlier round's SAFE is deleted", async () => {
+      const { scope, open, primary, second } = await firm(spaceB, "deleteold");
+      const earlier = await prisma.fundraiseRound.create({
+        data: { ...scope, name: "Earlier", targetCents: 1n, capCents: 1n, closedAt: new Date() },
+      });
+      await prisma.safe.create({
+        data: {
+          ...scope,
+          contactId: second.id,
+          roundId: earlier.id,
+          investorName: "Sample Associate",
+          amountCents: 1_000_000n,
+          capCents: 1_000_000_000n,
+        },
+      });
+      await deleteContact(prisma, scope, second.id);
+      expect((await recordOf(scope, primary.id)).roundId).toBe(open.id);
+      expect((await overviewOf(scope)).pendingCents).toBe(5_000_000);
+    });
+
+    it("counts a firm once after a SAFE holder's kind changes", async () => {
+      const { scope, primary, second } = await firm(spaceB, "kindchange");
+      await safeFor(scope, primary.id, 3_000_000);
+      expect((await overviewOf(scope)).pendingCents).toBe(3_000_000);
+      await saveContact(prisma, scope, { id: primary.id, name: primary.name, kind: "vendor" });
+      const view = await overviewOf(scope);
+      expect(view.pendingCents).toBe(3_000_000);
+      expect(view.prospects).toEqual([]);
+      // With no SAFE to hold it there, a person who stops being a prospect does leave the firm.
+      await saveContact(prisma, scope, { id: second.id, name: second.name, kind: "prospect" });
+      await saveContact(prisma, scope, { id: second.id, name: second.name, kind: "vendor" });
+      expect(
+        await prisma.pipelineRecordPerson.count({ where: { ...scope, contactId: second.id } }),
+      ).toBe(0);
     });
 
     afterAll(async () => {

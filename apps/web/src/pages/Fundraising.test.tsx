@@ -395,10 +395,16 @@ it("a row with no person keeps its stage and asks for a first person, not a SAFE
   );
   // The first person joins the record as it is: no stage or amount to overwrite it.
   expect(document.getElementById("contact-stage")).toBeNull();
-  rpcMock.contactSave.mockResolvedValue(prospect("c9", "Sample Street Capital"));
+  // A different name still joins this record: the record's id travels with the dialog.
+  await typeInto("contact-name", "Riley Placeholder");
+  rpcMock.contactSave.mockResolvedValue(prospect("c9", "Riley Placeholder"));
   await click(button("Save"));
   const sent = rpcMock.contactSave.mock.calls[0]?.[0];
-  expect(sent).toMatchObject({ name: "Sample Street Capital", kind: "prospect" });
+  expect(sent).toMatchObject({
+    name: "Riley Placeholder",
+    kind: "prospect",
+    pipelineRecordId: "rec1",
+  });
   for (const key of ["id", "stage", "checkSizeCents", "nextStep"])
     expect(sent).not.toHaveProperty(key);
   expect(rpcMock.safeSave).not.toHaveBeenCalled();

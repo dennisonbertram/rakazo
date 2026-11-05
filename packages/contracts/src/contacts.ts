@@ -88,6 +88,8 @@ export const ContactSaveInputSchema = z.object({
   nextStep: z.string().trim().max(500).nullish(),
   /** Keeps a Committed prospect in this round (Undo of a delete) instead of the open one. */
   roundId: Id.optional(),
+  /** A new contact's Fundraising record, for the first person of a record with none. */
+  pipelineRecordId: Id.optional(),
 });
 export type ContactSaveInput = z.infer<typeof ContactSaveInputSchema>;
 

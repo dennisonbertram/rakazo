@@ -14,13 +14,14 @@ import type { PipelineDb } from "./pipeline-records.js";
 import {
   ensureRecord,
   FUNDRAISING_PIPELINE,
+  joinRecord,
   pipelineFields,
   promoteNextPerson,
   recordOfContact,
   savePipelineRecord,
 } from "./pipeline-records.js";
 import { isUniqueViolation } from "./prisma-errors.js";
-import { toSafe } from "./safes.js";
+import { safeInRecordRound, toSafe } from "./safes.js";
 import { IsolationError } from "./scope.js";
 
 export class ContactEmailTakenError extends Error {
@@ -120,7 +121,15 @@ async function writeContact(
   input: ContactSaveInput,
 ): Promise<Contact> {
   const scope = ownerOf(actor);
-  const { id, roundId: keepRound, stage, checkSizeCents, nextStep, ...fields } = input;
+  const {
+    id,
+    roundId: keepRound,
+    pipelineRecordId,
+    stage,
+    checkSizeCents,
+    nextStep,
+    ...fields
+  } = input;
   const changes = {
     ...(stage === undefined ? {} : { stage }),
     ...(checkSizeCents === undefined ? {} : { amountCents: checkSizeCents }),
@@ -142,6 +151,7 @@ async function writeContact(
     if (!id) {
       contactId = (await tx.contact.create({ data: { ...scope, ...fields }, select: { id: true } }))
         .id;
+      if (pipelineRecordId) await joinRecord(tx, scope, pipelineRecordId, contactId);
     } else {
       contactId = id;
       const [before] = await tx.$queryRaw<{ email: string | null; kind: string }[]>`
@@ -177,10 +187,32 @@ async function writeContact(
   });
 }
 
-/** Takes a contact off its record; a record left with nobody is removed with it. */
-async function leavePipeline(db: PipelineDb, scope: Scope, contactId: string) {
+/**
+ * Takes a contact off its record; a record left with nobody is removed with it. In a firm with other
+ * people, one holding the round's active SAFE stays linked, since that SAFE is the firm's commitment
+ * and unlinking it would count the firm twice.
+ */
+async function leavePipeline(
+  db: PipelineDb & Pick<PrismaClient, "safe">,
+  scope: Scope,
+  contactId: string,
+) {
   const record = await recordOfContact(db, scope, contactId);
   if (!record) return;
+  const others = await db.pipelineRecordPerson.count({
+    where: { recordId: record.id, contactId: { not: contactId } },
+  });
+  if (others > 0) {
+    const open = await db.fundraiseRound.findFirst({
+      where: { ...scope, closedAt: null },
+      select: { id: true, createdAt: true },
+    });
+    const safes = await db.safe.findMany({ where: { ...scope, contactId } });
+    const holds = safes
+      .map((safe) => toSafe(safe))
+      .some((safe) => isActiveSafe(safe.status) && safeInRecordRound(safe, record.createdAt, open));
+    if (holds) return;
+  }
   await db.pipelineRecordPerson.deleteMany({ where: { ...scope, contactId } });
   await promoteNextPerson(db, record.id);
   if ((await db.pipelineRecordPerson.count({ where: { recordId: record.id } })) === 0)
@@ -296,10 +328,15 @@ export async function deleteContact(prisma: WriteDb, actor: Scope, id: string): 
   // A detached Mercury SAFE counts in no round (the foreign key clears contactId only).
   const count = await prisma.$transaction(async (tx) => {
     const record = await recordOfContact(tx, scope, id);
-    // The record stays. Its commitment leaves the round if this contact held a SAFE, which goes on
-    // counting by itself or, from Mercury, in no round.
-    const safes = await tx.safe.findMany({ where: { ...scope, contactId: id } });
-    if (record && safes.some((safe) => isActiveSafe(toSafe(safe).status)))
+    // The record stays. A native SAFE of its round goes on counting by itself, so the commitment
+    // leaves the round rather than count twice; a Mercury SAFE counts nowhere once detached.
+    const safes = await tx.safe.findMany({ where: { ...scope, contactId: id, source: "native" } });
+    if (
+      record?.roundId &&
+      safes
+        .map((safe) => toSafe(safe))
+        .some((safe) => isActiveSafe(safe.status) && safe.roundId === record.roundId)
+    )
       await savePipelineRecord(tx, scope, record.id, { roundId: null });
     await tx.safe.updateMany({
       where: { ...scope, contactId: id, source: "mercury" },
@@ -353,7 +390,14 @@ export async function addContactIfNew(
   // ponytail: only email is unique, so concurrent no-email adds can both insert a duplicate row;
   // upgrade to a unique index on lower(name) plus organization, or an advisory lock.
   // Saved as is, so this route never carries pipeline fields.
-  const { stage: _s, checkSizeCents: _c, nextStep: _n, roundId: _r, ...fields } = input;
+  const {
+    stage: _s,
+    checkSizeCents: _c,
+    nextStep: _n,
+    roundId: _r,
+    pipelineRecordId: _p,
+    ...fields
+  } = input;
   const data = { ...scope, ...fields, name, organization, botId };
   try {
     if (input.kind !== "prospect") {

@@ -123,6 +123,34 @@ export async function ensureRecord(
   return record;
 }
 
+/**
+ * Adds a contact to one named record of the user: primary if the record has no one primary yet.
+ * Throws IsolationError for a record that is not the user's. Call inside a transaction.
+ */
+export async function joinRecord(
+  db: PipelineDb,
+  { spaceId, userId }: Scope,
+  recordId: string,
+  contactId: string,
+): Promise<void> {
+  const scope = { spaceId, userId };
+  const record = await db.pipelineRecord.findFirst({
+    where: { id: recordId, ...scope, pipeline: FUNDRAISING_PIPELINE },
+    select: { id: true },
+  });
+  if (!record) throw new IsolationError("Record not found");
+  const primary = await db.pipelineRecordPerson.count({ where: { recordId, isPrimary: true } });
+  await db.pipelineRecordPerson.create({
+    data: {
+      ...scope,
+      pipeline: FUNDRAISING_PIPELINE,
+      recordId,
+      contactId,
+      isPrimary: primary === 0,
+    },
+  });
+}
+
 export type PipelineChanges = {
   /** A status, or a stage, which keeps the current status when it is already in that stage. */
   status?: PipelineStatus;

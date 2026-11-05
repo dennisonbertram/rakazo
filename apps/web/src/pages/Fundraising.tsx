@@ -59,7 +59,11 @@ const NEW_PROSPECT: Prefill = { name: "", email: null, organization: null, kind:
 
 /** A row with no person yet carries its record's id, so its actions add the first person. */
 const hasNoPerson = (prospect: Contact) => prospect.pipelineRecord?.id === prospect.id;
-const firstPerson = ({ name }: Contact): Prefill => ({ ...NEW_PROSPECT, name });
+const firstPerson = ({ name, id }: Contact): Prefill => ({
+  ...NEW_PROSPECT,
+  name,
+  pipelineRecordId: id,
+});
 
 /** The Fundraising page: the round and the prospect pipeline. */
 export function FundraisingPage({
@@ -501,7 +505,7 @@ export function FundraisingPage({
             prefill={"id" in editing ? undefined : editing}
             contacts={contacts ?? []}
             // A first person joins a record that already has its stage and amount.
-            pipelineFields={"id" in editing || !editing.name}
+            pipelineFields={"id" in editing || !editing.pipelineRecordId}
             onClose={() => setEditing(null)}
             onSaved={(saved) => {
               load();

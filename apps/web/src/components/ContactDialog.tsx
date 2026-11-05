@@ -28,6 +28,8 @@ export type ContactPrefill = {
   email: string | null;
   organization: string | null;
   kind?: ContactKind;
+  /** The Fundraising record this contact becomes the first person of. */
+  pipelineRecordId?: string;
 };
 
 export const contactKindNames = (): Record<ContactKind, string> => ({
@@ -199,6 +201,9 @@ export function ContactDialog({
         kind,
         notes: notes.trim() || null,
         ...(isProspect && !contact ? pipeline : {}),
+        ...(!contact && prefill?.pipelineRecordId
+          ? { pipelineRecordId: prefill.pipelineRecordId }
+          : {}),
       });
       return isProspect && Object.keys(changed).length > 0
         ? rpc.fundraising.prospects.save({ id: saved.id, ...changed })

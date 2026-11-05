@@ -392,7 +392,8 @@ describePostgres("safes (PostgreSQL)", () => {
 
     it("turns a prospect into an investor once its Mercury SAFE is signed, and keeps it so after a cancel", async () => {
       const p = await person("signs@example.test");
-      const signedAt = new Date("2026-10-05T00:00:00Z");
+      // Signed during this round; a SAFE dated before the round is not this round's.
+      const signedAt = new Date();
       await sync(
         mercury("m-signs", {
           investorEmail: "signs@example.test",

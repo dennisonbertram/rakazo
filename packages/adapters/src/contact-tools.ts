@@ -84,7 +84,14 @@ export async function contactToolFromTool(
     }
     if (name === "contacts_add") {
       // The pipeline stage is the founder's to change from the Fundraising page, never an agent's.
-      const { id: _id, stage: _stage, checkSizeCents: _check, nextStep: _next, ...rest } = args;
+      const {
+        id: _id,
+        stage: _stage,
+        checkSizeCents: _check,
+        nextStep: _next,
+        pipelineRecordId: _record,
+        ...rest
+      } = args;
       const input = ContactSaveInputSchema.safeParse(rest);
       if (!input.success) return { error: input.error.issues.map((i) => i.message).join("; ") };
       const { contact, created } = await addContactIfNew(
@@ -171,7 +178,14 @@ export async function contactToolFromTool(
     if (name === "contacts_save") {
       // The tool never updates by id and never creates: it changes the contact with this email.
       // The pipeline stage is the founder's to change from the Fundraising page, never an agent's.
-      const { id: _id, stage: _stage, checkSizeCents: _check, nextStep: _next, ...rest } = args;
+      const {
+        id: _id,
+        stage: _stage,
+        checkSizeCents: _check,
+        nextStep: _next,
+        pipelineRecordId: _record,
+        ...rest
+      } = args;
       const input = ContactSaveInputSchema.safeParse(rest);
       if (!input.success) return { error: input.error.issues.map((i) => i.message).join("; ") };
       const existing = input.data.email

@@ -38189,6 +38189,43 @@
                                 }
                               ]
                             },
+                            "pipelineRecord": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "$ref": "#/components/schemas/RpcContactsDetailOutputSchema0"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "not_reached",
+                                        "intro_requested",
+                                        "intro_made",
+                                        "meeting_booked",
+                                        "met",
+                                        "diligence",
+                                        "committed",
+                                        "passed"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "status"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "portalLinkSentAt": {
                               "anyOf": [
                                 {
@@ -38801,6 +38838,43 @@
                               }
                             ]
                           },
+                          "pipelineRecord": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "$ref": "#/components/schemas/RpcContactsListOutputSchema0"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "not_reached",
+                                      "intro_requested",
+                                      "intro_made",
+                                      "meeting_booked",
+                                      "met",
+                                      "diligence",
+                                      "committed",
+                                      "passed"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "status"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "portalLinkSentAt": {
                             "anyOf": [
                               {
@@ -39102,6 +39176,9 @@
                       },
                       "roundId": {
                         "$ref": "#/components/schemas/RpcContactsSaveInputSchema0"
+                      },
+                      "pipelineRecordId": {
+                        "$ref": "#/components/schemas/RpcContactsSaveInputSchema0"
                       }
                     },
                     "required": [
@@ -39210,6 +39287,43 @@
                           "anyOf": [
                             {
                               "$ref": "#/components/schemas/RpcContactsSaveOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pipelineRecord": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcContactsSaveOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_reached",
+                                    "intro_requested",
+                                    "intro_made",
+                                    "meeting_booked",
+                                    "met",
+                                    "diligence",
+                                    "committed",
+                                    "passed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -60304,6 +60418,43 @@
                                   }
                                 ]
                               },
+                              "pipelineRecord": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "$ref": "#/components/schemas/RpcFundraisingOverviewOutputSchema1"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "not_reached",
+                                          "intro_requested",
+                                          "intro_made",
+                                          "meeting_booked",
+                                          "met",
+                                          "diligence",
+                                          "committed",
+                                          "passed"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "status"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "portalLinkSentAt": {
                                 "anyOf": [
                                   {
@@ -60851,6 +61002,43 @@
                             }
                           ]
                         },
+                        "pipelineRecord": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcFundraisingProspectsMarkWaitingOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_reached",
+                                    "intro_requested",
+                                    "intro_made",
+                                    "meeting_booked",
+                                    "met",
+                                    "diligence",
+                                    "committed",
+                                    "passed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "portalLinkSentAt": {
                           "anyOf": [
                             {
@@ -61168,6 +61356,43 @@
                           "anyOf": [
                             {
                               "$ref": "#/components/schemas/RpcFundraisingProspectsNotSentOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pipelineRecord": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcFundraisingProspectsNotSentOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_reached",
+                                    "intro_requested",
+                                    "intro_made",
+                                    "meeting_booked",
+                                    "met",
+                                    "diligence",
+                                    "committed",
+                                    "passed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -61525,6 +61750,43 @@
                           "anyOf": [
                             {
                               "$ref": "#/components/schemas/RpcFundraisingProspectsSaveOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pipelineRecord": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcFundraisingProspectsSaveOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_reached",
+                                    "intro_requested",
+                                    "intro_made",
+                                    "meeting_booked",
+                                    "met",
+                                    "diligence",
+                                    "committed",
+                                    "passed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -80160,6 +80422,43 @@
                             }
                           ]
                         },
+                        "pipelineRecord": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcInvestorsPortalRevokeOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_reached",
+                                    "intro_requested",
+                                    "intro_made",
+                                    "meeting_booked",
+                                    "met",
+                                    "diligence",
+                                    "committed",
+                                    "passed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "portalLinkSentAt": {
                           "anyOf": [
                             {
@@ -80477,6 +80776,43 @@
                           "anyOf": [
                             {
                               "$ref": "#/components/schemas/RpcInvestorsPortalUnblockOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "pipelineRecord": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "$ref": "#/components/schemas/RpcInvestorsPortalUnblockOutputSchema0"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "not_reached",
+                                    "intro_requested",
+                                    "intro_made",
+                                    "meeting_booked",
+                                    "met",
+                                    "diligence",
+                                    "committed",
+                                    "passed"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "status"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
