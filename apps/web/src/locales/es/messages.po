@@ -429,6 +429,11 @@ msgstr ""
 msgid "{0}: delivery unknown"
 msgstr ""
 
+#. placeholder {0}: row.name
+#: src/pages/Fundraising.tsx
+msgid "{0}: Interest set to Out, status moved to Passed"
+msgstr ""
+
 #. placeholder {0}: active.name
 #: src/pages/Shell.tsx
 msgid "{0}' computer"
@@ -529,10 +534,6 @@ msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "{count} read tools"
-msgstr ""
-
-#: src/components/MailReplyBatchCard.tsx
-msgid "{count} replies"
 msgstr ""
 
 #: src/pages/Fundraising.tsx
@@ -865,6 +866,10 @@ msgstr ""
 msgid "+{unnamed} more"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "$100K–$500K"
+msgstr ""
+
 #: src/components/finance/WalletDialog.tsx
 msgid "0x… or name.eth"
 msgstr ""
@@ -1030,6 +1035,7 @@ msgid "Action items"
 msgstr ""
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/shell/composer.tsx
 msgid "Actions"
@@ -1040,7 +1046,7 @@ msgstr ""
 #. placeholder {0}: contact.name
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/components/cap-table/HoldingsTable.tsx
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Investors.tsx
@@ -1084,6 +1090,8 @@ msgid "Activity {0}"
 msgstr ""
 
 #: src/components/finance/WalletDialog.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/ModelBackupsSettings.tsx
@@ -1309,6 +1317,11 @@ msgstr ""
 #: src/components/integrations/FinanceSection.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Add wallet"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Add who referred {0}"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -1691,6 +1704,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Answers questions about what Devin is working on."
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Any"
 msgstr ""
 
 #: src/pages/Paywall.tsx
@@ -2494,6 +2511,15 @@ msgstr ""
 msgid "Call Elio"
 msgstr ""
 
+#: src/pages/Fundraising.tsx
+msgid "Call logged"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/pages/Fundraising.tsx
+msgid "Call logged. {0} moved to Met"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Callback URL"
 msgstr ""
@@ -2521,6 +2547,7 @@ msgstr "No se puede alcanzar el servidor."
 #: src/components/finance/RenameAccountDialog.tsx
 #: src/components/finance/StatementImport.tsx
 #: src/components/finance/WalletDialog.tsx
+#: src/components/fundraising/LogCall.tsx
 #: src/components/fundraising/MercuryDialogs.tsx
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/fundraising/SafeDialog.tsx
@@ -2848,8 +2875,6 @@ msgstr ""
 msgid "Check queue"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
 #: src/pages/Investors.tsx
 msgid "Check size"
 msgstr ""
@@ -2995,6 +3020,7 @@ msgstr ""
 msgid "Cleanup"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Clear"
@@ -3032,6 +3058,8 @@ msgstr ""
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/finance/ui.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
@@ -3258,6 +3286,10 @@ msgstr "Color"
 msgid "Color {color}"
 msgstr "Color {color}"
 
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Columns"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Comfortable"
 msgstr ""
@@ -3275,7 +3307,8 @@ msgstr "Variable de comando"
 msgid "Comment"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Committed"
 msgstr ""
 
@@ -3797,6 +3830,10 @@ msgstr ""
 msgid "Could not add"
 msgstr "No se pudo agregar"
 
+#: src/pages/Fundraising.tsx
+msgid "Could not add {name}"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Could not add the connection"
 msgstr ""
@@ -3824,6 +3861,10 @@ msgstr ""
 #. placeholder {0}: contact.name
 #: src/pages/Investors.tsx
 msgid "Could not change access for {0}"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not change interest"
 msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
@@ -4255,6 +4296,10 @@ msgstr ""
 msgid "Could not load voice settings"
 msgstr "No se pudo cargar la configuración de voz"
 
+#: src/pages/Fundraising.tsx
+msgid "Could not log the call"
+msgstr ""
+
 #. placeholder {0}: prospect.name
 #: src/pages/Fundraising.tsx
 msgid "Could not mark {0} waiting"
@@ -4269,7 +4314,7 @@ msgid "Could not mark sent"
 msgstr ""
 
 #. placeholder {0}: names.join(", ")
-#. placeholder {0}: prospect.name
+#. placeholder {0}: row.name
 #: src/pages/DataRoom.tsx
 #: src/pages/Fundraising.tsx
 msgid "Could not move {0}"
@@ -4473,6 +4518,10 @@ msgstr "No se pudo guardar ese modelo de habla"
 msgid "Could not save that voice"
 msgstr "No se pudo guardar esa voz"
 
+#: src/pages/Fundraising.tsx
+msgid "Could not save the amount"
+msgstr ""
+
 #: src/pages/McpConnectionsPanel.tsx
 msgid "Could not save the change"
 msgstr ""
@@ -4483,6 +4532,14 @@ msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not save the embedding model"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not save the next call"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not save the next step"
 msgstr ""
 
 #: src/pages/shell/bot-page-panel.tsx
@@ -4511,6 +4568,10 @@ msgstr "No se pudo guardar esta opción"
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Could not save time zone"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not save who referred"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -4761,6 +4822,11 @@ msgstr ""
 #: src/pages/shell/space-sidebar.tsx
 msgid "Create"
 msgstr "Crear"
+
+#. placeholder {0}: query.trim()
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Create “{0}”"
+msgstr ""
 
 #. placeholder {0}: bot.name
 #: src/pages/shell/dialogs.tsx
@@ -5288,7 +5354,8 @@ msgstr ""
 msgid "Digest"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Diligence"
 msgstr ""
 
@@ -5678,6 +5745,10 @@ msgstr ""
 msgid "Due date"
 msgstr ""
 
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Due now · {due}"
+msgstr ""
+
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Due soon"
 msgstr ""
@@ -5746,7 +5817,7 @@ msgstr "Editar primero"
 msgid "Edit limit"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/RowSheet.tsx
 msgid "Edit prospect"
 msgstr ""
 
@@ -5836,6 +5907,7 @@ msgid "Embedding model"
 msgstr ""
 
 #: src/components/data-room/folders.ts
+#: src/components/fundraising/PipelineFilter.tsx
 msgid "Empty"
 msgstr ""
 
@@ -5907,9 +5979,9 @@ msgstr "Introduce un número entero del 1 al {MAX_MODEL_MAX_TOKENS} para el máx
 msgid "Enter a whole number from 1 to 1000 for the image limit."
 msgstr "Introduce un número entero del 1 al 1000 para el límite de imágenes."
 
-#: src/components/ContactDialog.tsx
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/fundraising/SafeDialog.tsx
+#: src/pages/Fundraising.tsx
 msgid "Enter an amount"
 msgstr ""
 
@@ -6202,9 +6274,14 @@ msgstr ""
 msgid "Filing"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/Inbox.tsx
 msgid "Filter"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Filter · {active}"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -6420,6 +6497,10 @@ msgstr ""
 msgid "From URL"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "From your list"
+msgstr ""
+
 #: src/components/data-room/PreviewActions.tsx
 msgid "Full screen"
 msgstr ""
@@ -6432,6 +6513,11 @@ msgstr "Pantalla completa"
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/pages/Investors.tsx
 msgid "Fully diluted"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Fund details"
 msgstr ""
 
 #: src/components/fundraising/RoundCard.tsx
@@ -6449,6 +6535,12 @@ msgstr ""
 #: src/pages/Shell.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Fundraising"
+msgstr ""
+
+#. placeholder {0}: record.name
+#. placeholder {1}: pipelineStatusNames()[record.status]
+#: src/pages/ContactDetail.tsx
+msgid "Fundraising: {0} · {1}"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -6652,6 +6744,10 @@ msgstr "Cuelga y luego ingresa el código en pantalla."
 
 #: src/components/MailReplyBatchCard.tsx
 msgid "Has a link"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Has a next step"
 msgstr ""
 
 #: src/components/inbox/InboxRow.tsx
@@ -6983,6 +7079,7 @@ msgstr ""
 msgid "Importing {done} of {total}"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "In"
 msgstr ""
@@ -7123,6 +7220,22 @@ msgstr ""
 msgid "Integrations"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Interest"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Interest of {0}: {name}"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Interest: {0}"
+msgstr ""
+
 #: src/pages/shell/bot-panel.tsx
 msgid "Internal"
 msgstr ""
@@ -7140,8 +7253,14 @@ msgstr "Cantidad del intervalo"
 msgid "Interval unit"
 msgstr "Unidad del intervalo"
 
-#: src/components/ContactDialog.tsx
-msgid "Intro"
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Intro made"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Intro requested"
 msgstr ""
 
 #: src/components/cap-table/CapTableEditor.tsx
@@ -7242,6 +7361,11 @@ msgstr "ahora mismo"
 msgid "Keep"
 msgstr ""
 
+#. placeholder {0}: dayLabel(kept)
+#: src/components/fundraising/LogCall.tsx
+msgid "Keep {0}"
+msgstr ""
+
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Keep {name}"
 msgstr ""
@@ -7327,6 +7451,11 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Last 90 days"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Last call"
 msgstr ""
 
 #: src/components/finance/UpcomingSubscriptions.tsx
@@ -7418,6 +7547,7 @@ msgid "Last used"
 msgstr ""
 
 #: src/components/DesktopUpdates.tsx
+#: src/components/fundraising/PipelineFilter.tsx
 msgid "Later"
 msgstr ""
 
@@ -7454,6 +7584,10 @@ msgstr ""
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Leave"
 msgstr "Salir"
+
+#: src/components/fundraising/LogCall.tsx
+msgid "Left message"
+msgstr ""
 
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/FilterBar.tsx
@@ -7695,6 +7829,24 @@ msgstr ""
 
 #: src/pages/CompanyFactDetail.tsx
 msgid "Locked fields"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Log"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Log a call with {0}"
+msgstr ""
+
+#: src/components/fundraising/RowSheet.tsx
+msgid "Log call"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/RowSheet.tsx
+msgid "Log call: {0}"
 msgstr ""
 
 #: src/pages/Paywall.tsx
@@ -7959,6 +8111,10 @@ msgstr "Máximo de tokens de salida"
 msgid "May already be delivered. Send again?"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Maybe"
+msgstr ""
+
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "MCP endpoint"
 msgstr ""
@@ -7973,13 +8129,17 @@ msgstr "Medio"
 msgid "Medium"
 msgstr "Medio"
 
-#: src/components/ContactDialog.tsx
 #: src/components/integrations/OmiSegments.tsx
 msgid "Meeting"
 msgstr ""
 
 #: src/lib/meeting-capture/title.ts
 msgid "Meeting {time}"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Meeting booked"
 msgstr ""
 
 #: src/lib/slash-skills.ts
@@ -8126,6 +8286,11 @@ msgstr "Mensajería"
 
 #: src/pages/shell/working-label.ts
 msgid "Messaging you"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Met"
 msgstr ""
 
 #: src/components/fundraising/SafeDialog.tsx
@@ -8371,7 +8536,6 @@ msgstr ""
 msgid "Move them to your shared memory."
 msgstr "Muévelas a tu memoria compartida."
 
-#: src/components/fundraising/Pipeline.tsx
 #: src/pages/BotContextMenu.tsx
 msgid "Move to"
 msgstr "Mover a"
@@ -8401,8 +8565,8 @@ msgstr ""
 msgid "Moved \"{0}\" to Inbox"
 msgstr ""
 
-#. placeholder {0}: prospect.name
-#. placeholder {1}: contactStageNames()[stage]
+#. placeholder {0}: row.name
+#. placeholder {1}: statusNames()[status]
 #: src/pages/Fundraising.tsx
 msgid "Moved {0} to {1}"
 msgstr ""
@@ -8549,6 +8713,7 @@ msgstr ""
 msgid "Net {0}"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
 #: src/pages/McpConnectionsPanel.tsx
 msgid "Never"
 msgstr ""
@@ -8691,8 +8856,33 @@ msgstr ""
 msgid "Next 30 days"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Next 7 days"
+msgstr ""
+
 #: src/components/inbox/MailAttachments.tsx
 msgid "Next attachment"
+msgstr ""
+
+#: src/components/fundraising/LogCall.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Next call"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Next call {label}"
+msgstr ""
+
+#: src/components/fundraising/LogCall.tsx
+msgid "Next call date"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Next call with {0}"
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -8720,15 +8910,22 @@ msgstr ""
 msgid "Next run {nextRun}"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 msgid "Next step"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Next step of {0}"
 msgstr ""
 
 #: src/pages/Gtm.tsx
 msgid "Next wakeup in {minutes} min"
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
 #: src/components/gtm/GtmCalendar.tsx
 msgid "Next week"
 msgstr ""
@@ -8748,6 +8945,10 @@ msgstr ""
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "No agent connections yet."
 msgstr "Aún no hay conexiones de agentes."
+
+#: src/components/fundraising/LogCall.tsx
+msgid "No answer"
+msgstr ""
 
 #: src/pages/Artifacts.tsx
 msgid "No artifacts match these filters."
@@ -8937,6 +9138,7 @@ msgstr ""
 
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/components/finance/ui.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
@@ -9030,7 +9232,7 @@ msgstr ""
 msgid "No people yet"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
 msgid "No prospects yet"
 msgstr ""
 
@@ -9145,7 +9347,13 @@ msgstr ""
 msgid "No-reply address"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Nobody"
+msgstr ""
+
 #: src/components/data-room/Preview.tsx
+#: src/components/fundraising/LogCall.tsx
+#: src/components/fundraising/PipelineFilter.tsx
 #: src/components/integrations/parts.tsx
 msgid "None"
 msgstr ""
@@ -9249,6 +9457,11 @@ msgstr "Ahora no"
 msgid "Not on this thread"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Not reached"
+msgstr ""
+
 #: src/components/data-room/ItemRows.tsx
 msgid "Not read"
 msgstr ""
@@ -9278,7 +9491,8 @@ msgstr ""
 msgid "Not searchable"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailReplyBatchCard.tsx
 msgid "Not sent"
@@ -9286,6 +9500,11 @@ msgstr ""
 
 #: src/components/ComposeEmail.tsx
 msgid "Not sent. {text}"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Not set"
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -9331,6 +9550,7 @@ msgid "Not waiting for approval"
 msgstr ""
 
 #: src/components/finance/charts.tsx
+#: src/components/fundraising/LogCall.tsx
 #: src/components/integrations/OmiSegments.tsx
 msgid "Note"
 msgstr ""
@@ -9461,6 +9681,10 @@ msgstr ""
 
 #: src/pages/McpConnectionActivity.tsx
 msgid "OK"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Older"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -9650,7 +9874,8 @@ msgstr ""
 msgid "Open link"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 msgid "Open Mercury"
 msgstr ""
 
@@ -9811,12 +10036,27 @@ msgstr ""
 
 #: src/components/finance/charts.tsx
 #: src/components/finance/ui.tsx
+#: src/components/fundraising/PipelineControls.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Out"
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
+msgid "Outcome"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Over $500K"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Overdue"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Overdue: {label}"
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -9909,8 +10149,13 @@ msgstr ""
 msgid "Party"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Passed"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Passed · {passed}"
 msgstr ""
 
 #: src/components/PasskeySettings.tsx
@@ -9940,6 +10185,10 @@ msgstr "Contraseña actualizada"
 #: src/pages/Auth.tsx
 msgid "Passwords do not match"
 msgstr "Las contraseñas no coinciden"
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Past 7 days"
+msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Past charges"
@@ -10115,6 +10364,10 @@ msgstr "Elige un modelo de la lista o introduce un id de modelo que sirva este e
 msgid "Pick a provider below and connect it."
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
+msgid "Pick date"
+msgstr ""
+
 #: src/components/sidebar-folders/SidebarDnd.tsx
 msgid "Picked up {item}."
 msgstr ""
@@ -10123,7 +10376,7 @@ msgstr ""
 msgid "Pin"
 msgstr "Fijar"
 
-#: src/pages/Fundraising.tsx
+#: src/components/fundraising/PipelineTable.tsx
 msgid "Pipeline"
 msgstr ""
 
@@ -10167,6 +10420,17 @@ msgstr ""
 
 #: src/components/CopyLinkDialog.tsx
 msgid "Portal link"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Possible amount"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Possible amount of {0}"
 msgstr ""
 
 #: src/components/MailReplyBatchCard.tsx
@@ -10452,6 +10716,7 @@ msgid "Promotions"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineTable.tsx
 msgid "Prospect"
 msgstr ""
 
@@ -10899,6 +11164,12 @@ msgstr ""
 msgid "Redirect URI"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Referred by"
+msgstr ""
+
 #: src/App.tsx
 #: src/components/ErrorBoundary.tsx
 #: src/components/fundraising/MercuryLine.tsx
@@ -11282,6 +11553,10 @@ msgstr ""
 
 #: src/pages/shell/message-cards.tsx
 msgid "Research & writing"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Researched"
 msgstr ""
 
 #: src/pages/Investors.tsx
@@ -11673,6 +11948,8 @@ msgstr ""
 #: src/components/finance/charts.tsx
 #: src/components/finance/RenameAccountDialog.tsx
 #: src/components/finance/WalletDialog.tsx
+#: src/components/fundraising/LogCall.tsx
+#: src/components/fundraising/PipelineControls.tsx
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/gtm/EmailItemCard.tsx
 #: src/components/integrations/AlchemyConnectDialog.tsx
@@ -11931,6 +12208,10 @@ msgstr ""
 msgid "Search by domain"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Search contacts"
+msgstr ""
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "Search contracts"
 msgstr ""
@@ -11992,6 +12273,10 @@ msgstr ""
 
 #: src/pages/shell/command-palette.tsx
 msgid "Search pages, bots, groups, documents and artifacts"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Search prospects"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -12179,7 +12464,8 @@ msgid "Send reset link"
 msgstr "Enviar enlace de restablecimiento"
 
 #: src/components/fundraising/MercuryDialogs.tsx
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/fundraising/SafeDialog.tsx
 msgid "Send SAFE"
 msgstr ""
@@ -12296,6 +12582,14 @@ msgstr ""
 
 #: src/components/integrations/IMessageSection.tsx
 msgid "Set by server"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Set date"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Set interest"
 msgstr ""
 
 #: src/components/integrations/ConnectAppsStep.tsx
@@ -12714,6 +13008,8 @@ msgstr ""
 msgid "Skip tour"
 msgstr ""
 
+#: src/components/AskCard.tsx
+#: src/components/MailApprovalCard.tsx
 #: src/components/MailReplyBatchCard.tsx
 msgid "Skipped"
 msgstr ""
@@ -12785,6 +13081,10 @@ msgstr "Algo salió mal. Inténtalo de nuevo."
 
 #: src/components/ListControls.tsx
 msgid "Sort ascending"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Sort by"
 msgstr ""
 
 #: src/components/ListControls.tsx
@@ -12919,6 +13219,10 @@ msgstr ""
 msgid "Spent this month"
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
+msgid "Spoke"
+msgstr ""
+
 #: src/lib/slash-skills.ts
 msgid "Spot scam tokens and look-alike addresses in your wallets."
 msgstr ""
@@ -12938,12 +13242,6 @@ msgstr ""
 
 #: src/components/finance/CountCryptoButton.tsx
 msgid "Stablecoins only"
-msgstr ""
-
-#: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
-#: src/pages/Investors.tsx
-msgid "Stage"
 msgstr ""
 
 #: src/pages/Inbox.tsx
@@ -13007,6 +13305,9 @@ msgstr ""
 #: src/components/data-room/ItemRows.tsx
 #: src/components/finance/ui.tsx
 #: src/components/finance/UpcomingSubscriptions.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/ActivityList.tsx
@@ -13017,6 +13318,11 @@ msgstr ""
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 msgid "Status"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Status of {0}: {name}"
 msgstr ""
 
 #. placeholder {0}: stepIndex + 1
@@ -13292,7 +13598,6 @@ msgstr ""
 msgid "Talks to people outside your company. Anything private it would share waits for your approval. Private tools are turned off."
 msgstr ""
 
-#: src/components/ContactDialog.tsx
 #: src/components/fundraising/RoundCard.tsx
 msgid "Target"
 msgstr ""
@@ -13800,6 +14105,11 @@ msgstr ""
 msgid "Tickets track work for your bots. Bots add them when you ask them to track a task, or press New ticket."
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Time"
+msgstr ""
+
 #: src/pages/RoutineSchedule.tsx
 msgid "Time of day"
 msgstr "Hora del día"
@@ -13849,6 +14159,8 @@ msgid "To-dos"
 msgstr ""
 
 #: src/components/EmailCards.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/PipelineFilter.tsx
 #: src/components/gtm/GtmCalendar.tsx
 #: src/components/inbox/TodoCard.tsx
 #: src/components/integrations/OmiSegments.tsx
@@ -14148,6 +14460,10 @@ msgstr ""
 
 #: src/components/finance/ui.tsx
 msgid "Uncategorized"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Under $100K"
 msgstr ""
 
 #: src/components/compose/RichTextEditor.tsx
@@ -14695,8 +15011,9 @@ msgstr ""
 msgid "Waiting for approval"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
-msgid "Waiting for Mercury · {waiting}"
+#. placeholder {0}: dayLabel(row.waitingSince.slice(0, 10))
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Waiting for Mercury · {0}"
 msgstr ""
 
 #: src/components/data-room/ProcessingStrip.tsx
@@ -14775,6 +15092,10 @@ msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Watches {host}"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Wave"
 msgstr ""
 
 #: src/lib/devin-format.ts

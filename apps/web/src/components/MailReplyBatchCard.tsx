@@ -328,6 +328,16 @@ export function MailReplyBatchCard({
   const hiddenTicked =
     reviewing && rows.slice(list.rows.length).some((row) => ticks.has(row.itemId));
   const ticked = rows.filter((row) => ticks.has(row.itemId));
+  // Repeat-send flags stay unticked until ticked by hand, so Select all skips them.
+  const eligible = rows.filter(
+    (row) =>
+      row.state === "reviewing" &&
+      !(previews[row.itemId]?.flags ?? row.flags).some(
+        (flag) => flag === "already_sent" || flag === "duplicate_email",
+      ),
+  );
+  const eligibleTicked = eligible.filter((row) => ticks.has(row.itemId)).length;
+  const allTicked = eligible.length > 0 && eligibleTicked === eligible.length;
   const checkPending = editsKey !== checkedEdits;
   const retryable = rows.filter((row) => row.retryable);
 
@@ -457,6 +467,25 @@ export function MailReplyBatchCard({
           ) : null}
         </span>
       </div>
+      {reviewing && rows.length >= 2 && eligible.length > 0 ? (
+        <div className="flex items-center gap-3 border-t border-border px-5 py-2.5">
+          <Checkbox
+            id={`${ids.messageId}-select-all`}
+            checked={allTicked}
+            indeterminate={eligibleTicked > 0 && !allTicked}
+            disabled={busy}
+            onCheckedChange={() => {
+              if (allTicked) return setTicks(new Set());
+              setTicks(new Set([...ticks, ...eligible.map((r) => r.itemId)]));
+              // Every ticked row must be visible before Send, so ticking opens the list.
+              if (list.capped && !list.expanded) list.toggle();
+            }}
+          />
+          <label htmlFor={`${ids.messageId}-select-all`} className="text-sm text-foreground">
+            <Trans>Select all</Trans>
+          </label>
+        </div>
+      ) : null}
       <ul>
         {list.rows.map((row) => {
           const inReview = row.state === "reviewing";
