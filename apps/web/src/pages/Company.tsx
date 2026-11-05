@@ -37,6 +37,7 @@ import { useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 import { CompanyCalendar } from "./CompanyCalendar";
+import { CompanyContext } from "./CompanyContext";
 import { CompanyFactDetail } from "./CompanyFactDetail";
 import { CompanyHistory } from "./CompanyHistory";
 import { CompanyPrivacy } from "./CompanyPrivacy";
@@ -280,6 +281,9 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           <TabsTrigger value="overview">
             <Trans>Overview</Trans>
           </TabsTrigger>
+          <TabsTrigger value="context">
+            <Trans>Context</Trans>
+          </TabsTrigger>
           <TabsTrigger value="people">
             <Trans>People</Trans>
           </TabsTrigger>
@@ -298,7 +302,12 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      {page.error && (
+      {view === "context" && (
+        <div className="mt-6">
+          <CompanyContext />
+        </div>
+      )}
+      {view !== "context" && page.error && (
         <p role="alert" className="mt-6 text-destructive">
           {page.error}
           <Button variant="link" onClick={reload}>
@@ -306,8 +315,8 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           </Button>
         </p>
       )}
-      {!data && !page.error && <Skeleton className="mt-6 h-64 w-full" />}
-      {data && (
+      {view !== "context" && !data && !page.error && <Skeleton className="mt-6 h-64 w-full" />}
+      {view !== "context" && data && (
         <div className="mt-6 space-y-8">
           {view === "history" && <CompanyHistory data={data} onOpen={setFact} />}
           {view === "review" && (

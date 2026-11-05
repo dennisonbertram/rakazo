@@ -432,6 +432,13 @@ import {
 } from "./carta-agent.js";
 import { ensureCompanyAgent, ensureCompanyImporter } from "./company-agent.js";
 import { companyCalendar } from "./company-calendar.js";
+import {
+  companyContextHistory,
+  listCompanyContext,
+  removeCompanyContext,
+  restoreCompanyContext,
+  saveCompanyContext,
+} from "./company-context.js";
 import type { CompanyImportPage } from "./company-import-page.js";
 import { companyFact, companyPage } from "./company-page.js";
 import {
@@ -4700,6 +4707,23 @@ export function createRouter(deps: RouterDeps): AppRouter {
         return { ok: true as const };
       }),
     },
+    companyContext: {
+      list: authed.companyContext.list.handler(({ context }) =>
+        listCompanyContext(deps, context.actor),
+      ),
+      save: authed.companyContext.save.handler(({ context, input }) =>
+        saveCompanyContext(deps, context.actor, input),
+      ),
+      history: authed.companyContext.history.handler(({ context, input }) =>
+        companyContextHistory(deps, context.actor, input.id),
+      ),
+      restore: authed.companyContext.restore.handler(({ context, input }) =>
+        restoreCompanyContext(deps, context.actor, input),
+      ),
+      remove: authed.companyContext.remove.handler(({ context, input }) =>
+        removeCompanyContext(deps, context.actor, input),
+      ),
+    },
     memory: {
       list: authed.memory.list.handler(async ({ context, input }) => {
         const docs = await deps.prisma.memoryDocument.findMany({
@@ -4707,7 +4731,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
             ...(input.botId ? { botId: input.botId } : {}),
-            ...(input.scope ? { scope: input.scope } : {}),
+            scope: input.scope ?? { in: ["bot", "user"] },
           },
         });
         return docs.map((doc) => ({
@@ -4721,11 +4745,13 @@ export function createRouter(deps: RouterDeps): AppRouter {
         }));
       }),
       update: authed.memory.update.handler(async ({ context, input }) => {
+        // Company context sections change only through companyContext.*.
         const doc = await deps.prisma.memoryDocument.findFirst({
           where: {
             id: input.documentId,
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
+            scope: { in: ["bot", "user"] },
           },
         });
         if (!doc) throw new IsolationError();
@@ -4767,6 +4793,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           id: input.documentId,
           spaceId: context.actor.spaceId,
           userId: context.actor.userId,
+          scope: { in: ["bot", "user"] },
         };
         // Revisions go with the document (ON DELETE CASCADE).
         const { count } = await deps.prisma.memoryDocument.deleteMany({
@@ -4783,6 +4810,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           where: {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
+            scope: { in: ["bot", "user"] },
             ...(input.botId ? { botId: input.botId } : {}),
           },
         });

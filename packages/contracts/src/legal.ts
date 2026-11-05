@@ -29,6 +29,7 @@ export const LEGAL_SCAN_ROUTINE_NAME = "Daily legal scan";
 
 /** The only built-in tools the Legal agent is offered (mail, drive and calendar are read-only). */
 export const LEGAL_AGENT_BUILTIN_TOOLS = [
+  "company_context_lookup",
   "search_data_room",
   "read_data_room_item",
   "read_spreadsheet",

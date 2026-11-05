@@ -182,8 +182,20 @@ async function runIdentityExecutor({
   taskPrompt = ambientContext ? "Follow up on SYN-42" : "Synthetic request",
   connections = [],
   dataRoomItem,
+  firewall = false,
+  audience = null,
+  runExternalTaint = false,
+  taintDuringRun = false,
+  companySections = [],
 }: {
   spawnKey: string | null;
+  firewall?: boolean;
+  audience?: string | null;
+  runExternalTaint?: boolean;
+  /** The stored run is marked after the attempt loaded it (steering from MCP). */
+  taintDuringRun?: boolean;
+  /** Company context sections the owner wrote (memory scope "company"). */
+  companySections?: Array<{ path: string; content: string; revision?: number }>;
   trigger?: string;
   groupId?: string | null;
   botUserId?: string;
@@ -233,6 +245,7 @@ async function runIdentityExecutor({
     trigger,
     sourceMessageId: channelRun ? "channel-message-1" : null,
     leaseFence: 0,
+    externalTaint: runExternalTaint,
   };
   let request: AgentRunRequest | undefined;
   const toolResults: Array<{ name: string; result: unknown }> = [];
@@ -269,6 +282,7 @@ async function runIdentityExecutor({
       persistedReplayArgs.push(replayArgs);
       currentCalls = [{ name: "company_import_start", args: replayArgs }];
     }
+    if (taintDuringRun) run.externalTaint = true;
     for (const [index, call] of currentCalls.entries()) {
       if (!next.executeTool) throw new Error("Runtime tool executor was not provided.");
       toolResults.push({
@@ -315,17 +329,20 @@ async function runIdentityExecutor({
   const connectorCall = vi.fn(async function* () {
     yield { type: "result" as const, data: {} };
   });
-  const memoryRead = vi.fn(async () => ({
-    documents: ambientContext
-      ? [
-          {
-            path: "synthetic-private-memory",
-            content: "DURABLE_MEMORY_PRIVATE_MARKER",
-            revision: 1,
-            updatedAt: "2026-01-01T00:00:00.000Z",
-          },
-        ]
-      : [],
+  const memoryRead = vi.fn(async (request?: { scope?: string }) => ({
+    documents:
+      request?.scope === "company"
+        ? companySections.map((section) => ({ revision: 1, ...section, id: section.path }))
+        : ambientContext
+          ? [
+              {
+                path: "synthetic-private-memory",
+                content: "DURABLE_MEMORY_PRIVATE_MARKER",
+                revision: 1,
+                updatedAt: "2026-01-01T00:00:00.000Z",
+              },
+            ]
+          : [],
   }));
   const semanticRecall = vi.fn(async () => ({
     ok: true as const,
@@ -352,8 +369,8 @@ async function runIdentityExecutor({
   const prisma = {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     run: {
-      findUnique: vi.fn(async () => run),
-      findUniqueOrThrow: vi.fn(async () => run),
+      findUnique: vi.fn(async () => (taintDuringRun ? { ...run } : run)),
+      findUniqueOrThrow: vi.fn(async () => (taintDuringRun ? { ...run } : run)),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
         return { count: 1 };
@@ -377,6 +394,8 @@ async function runIdentityExecutor({
         memoryScope: null,
         computer: { id: "computer-1", scope: "dedicated" },
         disabledBuiltinTools: [],
+        firewall,
+        audience,
       })),
       findMany: vi.fn(async () => []),
     },
@@ -931,7 +950,9 @@ describe("Company identity executor boundaries", () => {
         request?.tools
           .map(({ name }) => name)
           .filter(
-            (name) => name.startsWith("company_") || COMPANY_READ_TOOLS.includes(name as never),
+            (name) =>
+              name !== "company_context_lookup" &&
+              (name.startsWith("company_") || COMPANY_READ_TOOLS.includes(name as never)),
           )
           .sort() ?? [];
       expect(exposedCompanyTools).toEqual([...COMPANY_READ_TOOLS].sort());
@@ -1064,7 +1085,8 @@ describe("Company identity executor boundaries", () => {
     }
     expect(memoryProviderResolve).toHaveBeenCalledOnce();
     expect(semanticRecall).toHaveBeenCalledOnce();
-    expect(memoryRead).toHaveBeenCalledTimes(2);
+    // Bot memory, user memory, and the company context index.
+    expect(memoryRead).toHaveBeenCalledTimes(3);
     expect(scratchpadFindMany).toHaveBeenCalledOnce();
     expect(prisma.board.findUnique).toHaveBeenCalledOnce();
     expect(prisma.ticket.findMany).toHaveBeenCalledOnce();
@@ -1233,7 +1255,9 @@ describe("Company identity executor boundaries", () => {
         request?.tools
           .map(({ name }) => name)
           .filter(
-            (name) => name.startsWith("company_") || COMPANY_READ_TOOLS.includes(name as never),
+            (name) =>
+              name !== "company_context_lookup" &&
+              (name.startsWith("company_") || COMPANY_READ_TOOLS.includes(name as never)),
           )
           .sort() ?? [];
       expect(exposedCompanyTools).toEqual([...COMPANY_READ_TOOLS].sort());
@@ -5397,5 +5421,92 @@ describe("Omi recordings: agent access and meeting taint", () => {
     expect(isApprovalPausedResult(toolResults[1]?.result)).toBe(true);
     const card = pauseRunForInput.mock.calls[0]?.[0].blocks.find((block) => block.kind === "ask");
     expect(card?.actions?.map((action) => action.id)).toEqual(["allow", "deny"]);
+  });
+});
+
+describe("company context in a run", () => {
+  const companySections = [
+    {
+      path: "acme-widget",
+      content: "# Acme Widget\n\nInvoice reminders for small clinics. More detail.\n",
+    },
+  ];
+  const toolNames = (request: AgentRunRequest | undefined) =>
+    (request?.tools ?? []).map((tool) => tool.name);
+
+  it("gives an ordinary agent the index and the lookup tool, read from the database", async () => {
+    const { request, memoryRead, prisma } = await runIdentityExecutor({
+      spawnKey: null,
+      companySections,
+    });
+    const instructions = request?.instructions ?? "";
+    expect(instructions).toContain("<company_context>");
+    expect(instructions).toContain(
+      "- Acme Widget: Invoice reminders for small clinics. (/app/company?view=context&section=acme-widget)",
+    );
+    expect(instructions).toContain("look it up before asking");
+    expect(toolNames(request)).toContain("company_context_lookup");
+    expect(memoryRead).toHaveBeenCalledWith({ scope: "company" }, expect.anything());
+    // The agent row is only read, never written: the index is not stored in its instructions.
+    expect(prisma.bot).not.toHaveProperty("update");
+  });
+
+  it("gives a page agent the index too", async () => {
+    const { request } = await runIdentityExecutor({
+      spawnKey: financeAgentSpawnKey("user-1"),
+      companySections,
+    });
+    expect(request?.instructions).toContain("Acme Widget");
+  });
+
+  it("adds nothing when the owner wrote nothing", async () => {
+    const { request } = await runIdentityExecutor({ spawnKey: null, companySections: [] });
+    expect(request?.instructions).not.toContain("company_context");
+    expect(request?.instructions).not.toContain("look it up before asking");
+  });
+
+  it.each([
+    ["firewalled agent", { spawnKey: null, firewall: true }],
+    ["external agent", { spawnKey: null, audience: "external" }],
+    ["run that read outside content", { spawnKey: null, runExternalTaint: true }],
+    ["voice agent", { spawnKey: voiceAgentSpawnKey("user-1") }],
+    ["Company agent", { spawnKey: companyAgentSpawnKey("user-1") }],
+    ["messaging channel run", { spawnKey: null, trigger: "messaging", channelRun: true }],
+  ])("gives a %s no company context and no lookup tool", async (_label, options) => {
+    const { request, memoryRead } = await runIdentityExecutor({ ...options, companySections });
+    expect(JSON.stringify(request)).not.toContain("Acme Widget");
+    expect(toolNames(request)).not.toContain("company_context_lookup");
+    expect(memoryRead).not.toHaveBeenCalledWith({ scope: "company" }, expect.anything());
+  });
+
+  it("refuses the lookup in a run that read outside content", async () => {
+    const { toolResults } = await runIdentityExecutor({
+      spawnKey: null,
+      companySections,
+      calls: [{ name: "company_context_lookup", args: { name: "Acme" } }],
+      runExternalTaint: true,
+    });
+    expect(JSON.stringify(toolResults)).not.toContain("Invoice reminders");
+  });
+
+  it("refuses the lookup once the stored run is marked mid-attempt", async () => {
+    const { toolResults } = await runIdentityExecutor({
+      spawnKey: null,
+      companySections,
+      calls: [{ name: "company_context_lookup", args: { name: "Acme" } }],
+      taintDuringRun: true,
+    });
+    expect(JSON.stringify(toolResults)).not.toContain("Invoice reminders");
+  });
+
+  it("answers the lookup with the section and its link", async () => {
+    const { toolResults } = await runIdentityExecutor({
+      spawnKey: null,
+      companySections,
+      calls: [{ name: "company_context_lookup", args: { name: "acme" } }],
+    });
+    const result = JSON.stringify(toolResults.find((r) => r.name === "company_context_lookup"));
+    expect(result).toContain("Invoice reminders for small clinics. More detail.");
+    expect(result).toContain("/app/company?view=context&section=acme-widget");
   });
 });

@@ -1212,6 +1212,10 @@ msgstr ""
 msgid "Add speech to text"
 msgstr ""
 
+#: src/pages/CompanyContext.tsx
+msgid "Add the first section"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add the header name."
 msgstr ""
@@ -8457,6 +8461,10 @@ msgstr ""
 msgid "New password"
 msgstr "नया पासवर्ड"
 
+#: src/pages/CompanyContext.tsx
+msgid "New section"
+msgstr ""
+
 #: src/pages/shell/bot-picker.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "New space"
@@ -12664,6 +12672,10 @@ msgstr ""
 msgid "Start recording"
 msgstr "रिकॉर्डिंग शुरू करें"
 
+#: src/pages/CompanyContext.tsx
+msgid "Start with one product or topic."
+msgstr ""
+
 #: src/pages/ActivityList.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Starting"
@@ -14514,6 +14526,10 @@ msgstr ""
 msgid "What did we spend last month?"
 msgstr ""
 
+#: src/pages/CompanyContext.tsx
+msgid "What is it?"
+msgstr ""
+
 #: src/lib/finance-agent.ts
 msgid "What is our runway?"
 msgstr ""
@@ -14529,6 +14545,10 @@ msgstr ""
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "What result will you demonstrate?"
 msgstr "आप कौन-सा परिणाम दिखाकर बताएंगे?"
+
+#: src/pages/CompanyContext.tsx
+msgid "What should every agent know?"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "What should I do first this week?"
