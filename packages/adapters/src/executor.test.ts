@@ -24,6 +24,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isApprovalPausedResult } from "./approval-effect.js";
 import { resolveDataRoomAi } from "./data-room-models.js";
 import {
+  ACT_ON_REVIEWED_PLAN_GUIDANCE,
   appendToolCompletionAudit,
   BOT_SETUP_GUIDANCE,
   createRunExecutor,
@@ -32,8 +33,10 @@ import {
   dockerComputerToolInstruction,
   financeConnectionLineFor,
   isTerminalModelSetupError,
+  LONG_WORK_PROGRESS_GUIDANCE,
   loadCurrentTurnImages,
   loadFinanceConnectionLine,
+  MAIL_BATCH_GUIDANCE,
   MAIL_SORTING_LINE,
   MEMORY_GUIDANCE,
   missingTurnImagesInstruction,
@@ -43,25 +46,28 @@ import {
   parseUpdateBotPatch,
   persistentComputerInstruction,
   READ_ONLY_AGENT_TOOLS,
+  ROUTINE_WORK_GUIDANCE,
   runIdentityInstruction,
   runNotificationsEnabled,
   STALE_HISTORY_GUIDANCE,
   selectBuiltinToolsForRun,
   settleSteeringAttachmentLoads,
   splitInboxSearchSkill,
+  TRUTHFULNESS_GUIDANCE,
   tenacityGuidance,
   tenacityLevelFor,
-  TRUTHFULNESS_GUIDANCE,
   threadContextForRun,
   toolCompletionAuditPayload,
   toolCompletionFromResult,
   userTurnInstructions,
   VOICE_CALL_INSTRUCTION,
   voiceCallInstruction,
+  WORK_LIST_GUIDANCE,
   withRecentTurnImages,
 } from "./executor.js";
 import { UnavailableModelForAuthError } from "./model-selection.js";
 import { RetiredModelCredentialError, serializeModelSecret } from "./pi-oauth.js";
+import { TASK_CATALOG_GUIDANCE } from "./task-catalog.js";
 import { UI_BLOCKS_GUIDANCE } from "./ui-blocks-tool.js";
 
 const gtmAgentBuiltinToolSet = new Set<string>(GTM_AGENT_BUILTIN_TOOLS);
@@ -495,7 +501,8 @@ async function runIdentityExecutor({
       ),
     },
     mcpServer: { findMany: vi.fn(async () => []) },
-    capabilityInstall: { count: vi.fn(async () => 0) },    dataRoomItem: { findFirst: dataRoomItemFindFirst },
+    capabilityInstall: { count: vi.fn(async () => 0) },
+    dataRoomItem: { findFirst: dataRoomItemFindFirst },
     dataRoomFolder: { findMany: vi.fn(async () => []) },
     dataRoomItemText: {
       findFirst: vi.fn(async () => (dataRoomItem ? { text: dataRoomItem.text } : null)),
@@ -2785,8 +2792,7 @@ describe("userTurnInstructions", () => {
   ];
   const archiveBot =
     "archive_bot safely archives a bot this bot created, and only that bot. Use it when the user asks to remove that bot or when it is finished and unused. The user can restore it or permanently delete it later. confirm_name must exactly match its name.";
-  const replyGuidance =
-    "During long work, send a few short progress updates with message_user so the user can see what you are doing. Keep them brief and high-signal (a sentence or two, not a dump). Do not narrate every tool call. Thinking stays private. message_user is capped at 500 characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.";
+  const replyGuidance = LONG_WORK_PROGRESS_GUIDANCE;
   const stableTail = [
     "Use read_spreadsheet for Excel (.xlsx, .xlsm) and CSV files, and cite the sheet name and cells (for example Revenue!B4:B9) for every figure you quote.",
     "For a dashboard, summary, report or table, call create_ui_artifact (read-only cards, metrics, tables, lists and charts that follow the app's look). Use an HTML page with attach_file only when you need a free-form page it cannot express.",
@@ -2796,7 +2802,7 @@ describe("userTurnInstructions", () => {
     'You have named pages, up to 20. Put durable output the user will revisit on a page (a summary, tracker, or dashboard); keep ordinary replies in chat. Each page result has a link; whenever you name a page in a reply, write it as a Markdown link to that exact link value, never as bold text and without saying where it sits. Do the same for a Data room file with a link. Call page_list to see them and page_create to add one;  page_read, page_write and page_edit take an optional page (a title from page_list) and use the first page without it. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order. Live data: numbers come from sources, never from you. Call page_source_set first ({name, tool, args, schedule}; tools: finance_overview, finance_breakdown, finance_transactions, finance_recurring, cap_table_read, fundraising_read, contacts_list, board_tickets) and read the preview it returns to choose paths (JSON Pointers like /cash/balance). Then use fences, each with one line of JSON on the line after the opener and nothing after the fence name, for example ```metric then {"label":"Cash","source":"Overview","path":"/cash","format":"usd"} then ```. metric: {"label", "source", "path", "format": "number"|"usd"|"percent"|"text"}; table: {"name", "source", "path" (a JSON Pointer string to an array of objects), "columns"?: [{"key", "label", "format"?}], "limit"?}; a chart gets "source", "path" and "over": "latest" (rows are the array at path) or "history" (one {at, value} row per stored result; the path points at a number), and still needs a few sample rows in data. A source with kind "mcp" ({name, kind, server, tool, args, schedule}) reads one read-only tool of an MCP server you have; the owner must approve it, and its blocks show "Waiting for approval" until they do. A source with kind "http" ({name, kind, url, secret?, accept?, schedule}) does one GET of a JSON or CSV API (CSV becomes an array of row objects); a secret is the name of a saved key for that site. It needs the owner\'s approval too. Keep going without waiting. A block shows what the source last stored; page_source_list shows errors. At most 20 live blocks and 20 sources per page. Pages are Markdown by default. Call page_create with kind "html" only when blocks cannot express the design; the page is then one HTML document that page_write and page_edit save whole. Its sources must exist (page_source_set) and be named in the head: <meta name="praci-sources" content="Overview, Revenue"> and, for sources whose past results it needs, <meta name="praci-history" content="Revenue">. The page receives data through window message events: addEventListener("message", (e) => { if (e.data?.type === "praci-data") render(e.data.sources) }); sources[name] has status, fetchedAt, error?, value (the newest result) and history ([{at, value}], newest first). Expect the event again after each refresh. The page has no network and cannot load remote scripts, fonts, images or frames: inline all script, CSS and images (data: URIs).',
     "Use pins for numbers the user checks often (stats) and for an ongoing list. Call pins_read first, then pins_write. When asked to update your pinned numbers, recheck the data each one came from with your tools and rewrite them with pins_write; if a number has no data you can recheck, keep it and say so in one line. Give a stat a source when a single read-only MCP tool call returns it, so it refreshes without you. List items are short imperatives of at most 60 characters; keep details in chat.",
     "When the user asks you to add or connect an MCP server (and gives you its details), use add_mcp_server. If it uses browser sign-in, an approval card appears in the chat — tell the user to click Authorize on it.",
-    "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
+    "Never print API keys, access tokens, or secret values.",
     TRUTHFULNESS_GUIDANCE,
     PRESENTATION_GUIDANCE,
     "Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Do not open a reply with today's date unless the user asked for it.",
@@ -2811,6 +2817,79 @@ describe("userTurnInstructions", () => {
     workspaceInstruction: "This entire computer workspace is your private home.",
     replyGuidance,
   };
+
+  describe("work tracking guidance", () => {
+    const parts = {
+      ...base,
+      groupContext: undefined,
+      messagingContext: undefined,
+      redactedMemoryContext: undefined,
+      redactedScratchpadContext: undefined,
+      hasHistoricalContext: false,
+      agentEnvironmentInstruction: undefined,
+      botDirectory: undefined,
+      pluginLine: undefined,
+      agentSkillsLine: undefined,
+      taughtSkillsLine: undefined,
+    };
+    const text = (extra: Partial<Parameters<typeof userTurnInstructions>[0]>) =>
+      userTurnInstructions({ ...parts, ...extra }).join("\n");
+
+    it.each(["low", "medium", "high"] as const)("reaches a %s agent", (tenacity) => {
+      const prompt = text({ tenacity });
+      expect(prompt).toContain(WORK_LIST_GUIDANCE);
+      expect(prompt).toContain(ACT_ON_REVIEWED_PLAN_GUIDANCE);
+    });
+
+    it("leaves it out of a restricted run, which keeps the truthfulness rule", () => {
+      const prompt = text({ tenacity: "limited" });
+      expect(prompt).not.toContain(WORK_LIST_GUIDANCE);
+      expect(prompt).not.toContain(ACT_ON_REVIEWED_PLAN_GUIDANCE);
+      expect(prompt).toContain(TRUTHFULNESS_GUIDANCE);
+    });
+
+    it("drops the work list when the scratchpad tools are off, and keeps the rest", () => {
+      const prompt = text({
+        tenacity: "medium",
+        disabledBuiltinTools: new Set(["scratchpad_add"]),
+      });
+      expect(prompt).not.toContain(WORK_LIST_GUIDANCE);
+      expect(prompt).toContain(ACT_ON_REVIEWED_PLAN_GUIDANCE);
+    });
+
+    it("leaves the work list out of an email's own agent, which keeps one to-do", () => {
+      expect(text({ tenacity: "medium", mailThreadAgent: true })).not.toContain(WORK_LIST_GUIDANCE);
+    });
+
+    it("tells a routine run how to report work that has not started", () => {
+      expect(text({ tenacity: "medium", routineRun: true })).toContain(ROUTINE_WORK_GUIDANCE);
+      expect(text({ tenacity: "medium" })).not.toContain(ROUTINE_WORK_GUIDANCE);
+      expect(text({ tenacity: "limited", routineRun: true })).not.toContain(ROUTINE_WORK_GUIDANCE);
+    });
+
+    it("says nothing of it to the voice agent", () => {
+      const prompt = text({ tenacity: "medium", voiceAgent: true });
+      expect(prompt).not.toContain(WORK_LIST_GUIDANCE);
+      expect(prompt).not.toContain(TRUTHFULNESS_GUIDANCE);
+    });
+
+    it("forbids claiming mail went out without a result, at every level", () => {
+      expect(TRUTHFULNESS_GUIDANCE).toContain("Never say mail went out or is going out");
+      expect(LONG_WORK_PROGRESS_GUIDANCE).toContain("at most one short line");
+      expect(MAIL_BATCH_GUIDANCE).toContain("connected account");
+    });
+
+    it("has no rule left that tells an agent to look again after a result", () => {
+      const prompt = text({
+        tenacity: "medium",
+        mailBatchOffered: true,
+        taskCatalogInstruction: TASK_CATALOG_GUIDANCE,
+      });
+      expect(prompt).not.toContain("verify the result");
+      expect(prompt).not.toContain("conversation or memory text is not proof");
+      expect(prompt).not.toContain("then call schedule_list");
+    });
+  });
 
   it("adds the tenacity clause for the agent's level and the retry part only for restricted runs", () => {
     const parts = {
@@ -2849,16 +2928,18 @@ describe("userTurnInstructions", () => {
       expect(text(level)).not.toContain("Without being asked");
       expect(text(level)).not.toContain("Do what was asked, then stop");
     }
-    expect(userTurnInstructions({ ...parts, voiceAgent: true, tenacity: "high" }).join("")).not.toContain(
-      "Without being asked",
-    );
+    expect(
+      userTurnInstructions({ ...parts, voiceAgent: true, tenacity: "high" }).join(""),
+    ).not.toContain("Without being asked");
   });
 
   it("never lets the level lift an approval gate or send, spend or delete", () => {
     expect(tenacityGuidance("high")).toContain("Ask before anything that needs approval");
     expect(tenacityGuidance("high")).toContain("Never send, spend or delete");
     expect(tenacityGuidance("high")).toContain("approval");
-    expect(tenacityGuidance("medium")).toContain("approvals, sending, spending and deleting still need the user's say");
+    expect(tenacityGuidance("medium")).toContain(
+      "approvals, sending, spending and deleting still need the user's say",
+    );
   });
 
   it("ignores the stored level for restricted runs and falls back to medium for unknown values", () => {

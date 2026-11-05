@@ -70,6 +70,9 @@ export const ProductEventType = z.enum([
 export type ProductEventType = z.infer<typeof ProductEventType>;
 
 /** The card reason when a call asks only because the chat read a meeting; the web card adds Clear conversation. */
+/** Why a mail card warns: the same email went to the same people moments ago. Clients match it. */
+export const MAIL_ALREADY_SENT_REASON = "Already sent to this person a few minutes ago";
+
 export const MEETING_MARK_REASON = "This chat read a meeting, so it asks first.";
 
 export const MessageRole = z.enum(["user", "bot", "system"]);
@@ -166,6 +169,12 @@ export const MailApprovalSchema = z.object({
   tool: z.enum(["mail_draft", "mail_send"]),
   /** Connected account address, when the call named one. */
   account: z.string().optional(),
+  /** With no account named and several the agent may use: the accounts to choose the sender from. */
+  choices: z
+    .array(
+      z.object({ connectionId: z.string(), label: z.string(), address: z.string().optional() }),
+    )
+    .optional(),
   to: z.array(z.string()),
   cc: z.array(z.string()),
   bcc: z.array(z.string()),
@@ -235,6 +244,7 @@ export const MAIL_REPLY_FLAGS = [
   "important_sender",
   "no_reply_address",
   "no_reply_needed",
+  "already_sent",
   "duplicate_email",
   "new_recipient",
   "has_link",
