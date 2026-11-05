@@ -435,6 +435,47 @@ describePostgres("list import (PostgreSQL)", () => {
       ]);
     });
 
+    it("the Pipeline reads Wave, Fund details and Referred by from an imported row", async () => {
+      await importList([
+        {
+          firm: "Peak Fund",
+          people: [{ name: "Blake Example" }],
+          group: "Wave 2",
+          details: [{ label: "Stage and check", value: "Seed lead, $250K-$500K" }],
+          introPath: "Via Sam Example",
+          referrer: { name: "Sam Example" },
+        },
+        {
+          firm: "Riverside Example Fund",
+          group: "Wave 3",
+          details: [{ label: "Fit", value: "Strong" }],
+          referrer: { name: "Sam Example" },
+        },
+      ]);
+      const sam = await prisma.contact.findFirstOrThrow({
+        where: { ...scope, name: "Sam Example" },
+      });
+      const { prospects } = await asOwner(() => getFundraisingOverview(raw, scope));
+      const rowOf = (firm: string) =>
+        prospects.find((row) => row.pipelineRecord?.name === firm)?.pipelineRecord;
+      // Both shapes: a row with a person, and a firm with no person yet.
+      expect(rowOf("Peak Fund")).toMatchObject({
+        group: "Wave 2",
+        referredBy: { id: sam.id, name: "Sam Example" },
+        people: [{ name: "Blake Example" }],
+        details: [
+          { label: "Stage and check", value: "Seed lead, $250K-$500K", source: "list" },
+          { label: "Intro path", value: "Via Sam Example", source: "list" },
+        ],
+      });
+      expect(rowOf("Riverside Example Fund")).toMatchObject({
+        group: "Wave 3",
+        referredBy: { id: sam.id, name: "Sam Example" },
+        people: [],
+        details: [{ label: "Fit", value: "Strong", source: "list" }],
+      });
+    });
+
     it("a Wave next step moves to the Wave and leaves the next step empty", async () => {
       await importList([{ firm: "Peak Fund", nextStep: "Wave 3" }]);
       expect(await record("Peak Fund")).toMatchObject({ group: "Wave 3", nextStep: null });

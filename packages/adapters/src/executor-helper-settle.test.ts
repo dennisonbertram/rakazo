@@ -247,3 +247,34 @@ describe("routine progress", () => {
     expect(progressEvents(append).length).toBeGreaterThan(0);
   });
 });
+
+describe("narration in chat", () => {
+  const posted = (prisma: Record<string, unknown>) =>
+    (
+      prisma.message as { create: { mock: { calls: { data: Record<string, unknown> }[][] } } }
+    ).create.mock.calls
+      .map(([call]) => call!.data)
+      .filter((data) => String(data.clientNonce ?? "").startsWith("user-progress:"))
+      .map((data) => (data.blocks as { text: string }[])[0]?.text);
+
+  it("posts one line for a group of lookups and the line for the action", async () => {
+    savedEvents.length = 0;
+    const tool = (name: string, executionId: string) => ({
+      type: "tool" as const,
+      name,
+      args: {},
+      executionId,
+    });
+    const { prisma } = await continueRun([
+      { type: "text" as const, text: "Pulling your list." },
+      tool("mail_search", "c1"),
+      { type: "text" as const, text: "I'll pull the list now." },
+      tool("search_history", "c2"),
+      { type: "text" as const, text: "Getting the list together." },
+      tool("mail_grep", "c3"),
+      { type: "text" as const, text: "Sending the batch." },
+      tool("mail_reply_batch", "c4"),
+    ]);
+    expect(posted(prisma)).toEqual(["Pulling your list.", "Sending the batch."]);
+  });
+});

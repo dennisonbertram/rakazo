@@ -28,6 +28,9 @@ export async function loadAgentScratchpadContext(
   const lines: string[] = [];
   let remainingBytes = maxBytes - fixedBytes;
   const visible = items.slice(0, MAX_OPEN_ITEMS);
+  let shown = 0;
+  // Room for the "more" line, so a list cut by the byte cap never reads as complete.
+  const moreBytes = 80;
   for (const item of visible) {
     const notes = item.notes.trim() ? ` — ${escapePromptData(item.notes.trim())}` : "";
     const classification =
@@ -40,18 +43,26 @@ export async function loadAgentScratchpadContext(
     const mail = item.mailMessageId ? ` mail: id ${escapePromptData(item.mailMessageId)};` : "";
     const line = `${lines.length === 0 ? "" : "\n"}- [${item.status}]${classification} ${escapePromptData(item.title)}${meta}${notes}${mail} (id: ${escapePromptData(item.id)})`;
     const lineBytes = byteLength(line);
-    if (lineBytes > remainingBytes) {
-      const truncated = truncateUtf8(line, remainingBytes);
-      if (truncated) lines.push(truncated);
-      remainingBytes = 0;
+    const isLast = shown === items.length - 1;
+    if (lineBytes > remainingBytes - (isLast ? 0 : moreBytes)) {
+      // A very small cap still shows a cut line rather than nothing.
+      if (shown === 0) {
+        const truncated = truncateUtf8(
+          line,
+          Math.max(0, remainingBytes - (isLast ? 0 : moreBytes)),
+        );
+        if (truncated) lines.push(truncated);
+        remainingBytes -= byteLength(truncated);
+      }
       break;
     }
     lines.push(line);
     remainingBytes -= lineBytes;
+    shown += 1;
   }
 
-  if (items.length > MAX_OPEN_ITEMS && remainingBytes > 0) {
-    const more = `\n…and ${items.length - MAX_OPEN_ITEMS} more. Call scratchpad_list to see the rest.`;
+  if (shown < items.length && remainingBytes > 0) {
+    const more = `\n…and ${items.length - shown} more. Call scratchpad_list to see the rest.`;
     lines.push(truncateUtf8(more, remainingBytes));
   }
 

@@ -37,6 +37,7 @@ import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import type * as ComputerWorkspaceModule from "./computer-workspace.js";
 import { DestinationEmulator } from "./destination-emulator.js";
 import {
+  ACT_ON_REVIEWED_PLAN_GUIDANCE,
   createRunExecutor,
   EXTERNAL_BOT_PROMPT,
   EXTERNAL_REQUEST_REASON,
@@ -44,6 +45,8 @@ import {
   MAIL_CONSENT_DECLINED,
   MAIL_CONSENT_OFF,
   MEETING_TAINT_FREE_TOOLS,
+  ROUTINE_WORK_GUIDANCE,
+  WORK_LIST_GUIDANCE,
   withExternalBotPrompt,
 } from "./executor.js";
 import { FakeBrowserProvider } from "./fake-browser.js";
@@ -753,19 +756,23 @@ function fixture({
     agentSkill: { findMany: vi.fn(async () => skillRows) },
     botSkillSetting: { findMany: vi.fn(async () => []) },
     scratchpadItem: {
-      findMany: vi.fn(async () =>
-        scratchpadUpdatedAt
-          ? [
-              {
-                id: "todo-1",
-                title: "Follow up",
-                notes: "",
-                status: "open",
-                createdAt: scratchpadUpdatedAt,
-                updatedAt: scratchpadUpdatedAt,
-              },
-            ]
-          : [],
+      findMany: vi.fn(async (args?: { where?: { id?: { in?: string[] } } }) =>
+        args?.where?.id?.in
+          ? scratchpadItem
+            ? args.where.id.in.map((id) => ({ id, ...scratchpadItem }))
+            : []
+          : scratchpadUpdatedAt
+            ? [
+                {
+                  id: "todo-1",
+                  title: "Follow up",
+                  notes: "",
+                  status: "open",
+                  createdAt: scratchpadUpdatedAt,
+                  updatedAt: scratchpadUpdatedAt,
+                },
+              ]
+            : [],
       ),
       findFirst: vi.fn(async () => scratchpadItem ?? null),
     },
@@ -1867,6 +1874,59 @@ describe("unattended mail_modify and mail_send", () => {
       await f.run();
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     }
+  });
+});
+
+describe("the From of a mail approval card", () => {
+  const second = { id: "acct-2", address: "other@example.test" };
+  const first = { id: "acct-1", address: "hello@example.test" };
+  /** Gmail rows as the access rules read them: limited to bot-1 (granted), or to nobody (not granted). */
+  const row = (id: string, granted: boolean) => ({
+    ...mailConnectionRow(),
+    id,
+    allAgents: false,
+    privateByDefault: true,
+    botAccess: granted ? [{ botId: "bot-1", canWrite: false }] : [],
+  });
+  const cardFor = async (granted: string[]) => {
+    const f = fixture({
+      name: "mail_send",
+      builtin: true,
+      mail: { listAccounts: vi.fn(async () => [first, second]) },
+      connectionRows: [
+        row("acct-1", granted.includes("acct-1")),
+        row("acct-2", granted.includes("acct-2")),
+      ],
+    });
+    f.setCalls([
+      { args: { to: ["a@example.test"], subject: "Hi", body: "Hello" }, executionId: "call-1" },
+    ]);
+    await f.run();
+    return f;
+  };
+  const mailOf = (f: Awaited<ReturnType<typeof cardFor>>) =>
+    (
+      f.pauseRunForInput.mock.calls[0] as unknown as [
+        { blocks: { mail?: { account?: string; choices?: { connectionId: string }[] } }[] },
+      ]
+    )[0].blocks[0]?.mail;
+
+  it("is the one account the agent may use, with nothing to choose", async () => {
+    const f = await cardFor(["acct-1"]);
+    expect(mailOf(f)).toMatchObject({ account: "hello@example.test" });
+    expect(mailOf(f)?.choices).toBeUndefined();
+  });
+
+  it("offers a choice of exactly the accounts the agent may use when there are several", async () => {
+    const f = await cardFor(["acct-1", "acct-2"]);
+    expect(mailOf(f)?.account).toBeUndefined();
+    expect(mailOf(f)?.choices?.map((choice) => choice.connectionId)).toEqual(["acct-1", "acct-2"]);
+  });
+
+  it("refuses the call with no card when the agent may use none", async () => {
+    const f = await cardFor([]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.any(String) });
   });
 });
 
@@ -5077,6 +5137,85 @@ describe("unattended runs and block rules", () => {
     f.setCalls([{ args: { itemId: "i1", notes: "n" }, executionId: "c1" }]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [{ category: "goal" }, false],
+    [{ category: null }, false],
+    [{ category: "public_post" }, true],
+    [null, true],
+  ])("a bulk scratchpad_update with %j asks: %s", async (item, asks) => {
+    const f = fixture({
+      name: "scratchpad_update",
+      builtin: true,
+      unattended: true,
+      scratchpadItem: item,
+    });
+    f.setCalls([{ args: { itemIds: ["i1", "i2"], status: "done" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledTimes(asks ? 1 : 0);
+  });
+
+  it("a tainted run asks for a bulk update of a gated row", async () => {
+    const f = fixture({
+      name: "scratchpad_update",
+      builtin: true,
+      externalTaint: true,
+      scratchpadItem: { category: "outbound_email" },
+    });
+    f.setCalls([{ args: { itemIds: ["i1"], status: "done" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks when rows come with a gated category, and refuses a hand-off", async () => {
+    const gated = fixture({ name: "scratchpad_add", builtin: true, unattended: true });
+    gated.setCalls([
+      { args: { items: [{ title: "A" }], category: "public_post" }, executionId: "c1" },
+    ]);
+    await gated.run({ expectFailure: true });
+    expect(gated.pauseRunForInput).toHaveBeenCalledOnce();
+    const handoff = fixture({ name: "scratchpad_add", builtin: true, unattended: true });
+    handoff.setCalls([
+      { args: { items: [{ title: "A" }], forAgent: "finance" }, executionId: "c1" },
+    ]);
+    await handoff.run({ expectFailure: true });
+    expect(handoff.results[0]).toHaveProperty("error");
+    expect(handoff.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  describe("work tracking guidance by run", () => {
+    const instructions = async (options: Parameters<typeof fixture>[0]) => {
+      const f = fixture({ name: "scratchpad_list", builtin: true, ...options });
+      f.setCalls([]);
+      await f.run({ expectFailure: true });
+      return f.request()?.instructions ?? "";
+    };
+
+    it("reaches an ordinary chat run", async () => {
+      const prompt = await instructions({});
+      expect(prompt).toContain(WORK_LIST_GUIDANCE);
+      expect(prompt).toContain(ACT_ON_REVIEWED_PLAN_GUIDANCE);
+      expect(prompt).not.toContain(ROUTINE_WORK_GUIDANCE);
+    });
+
+    it("reaches an ordinary routine run, with the routine rule", async () => {
+      const prompt = await instructions({ trigger: "routine", unattended: true });
+      expect(prompt).toContain(WORK_LIST_GUIDANCE);
+      expect(prompt).toContain(ROUTINE_WORK_GUIDANCE);
+    });
+
+    it.each([
+      ["a firewalled agent", { firewall: true }],
+      ["an external bot", { audience: "external" as const }],
+      ["a tainted run", { externalTaint: true }],
+      ["a check-in", { trigger: "routine", unattended: true, routineManagedKind: "check_in" }],
+    ])("stays out of %s", async (_label, options) => {
+      const prompt = await instructions(options);
+      expect(prompt).not.toContain(WORK_LIST_GUIDANCE);
+      expect(prompt).not.toContain(ACT_ON_REVIEWED_PLAN_GUIDANCE);
+      expect(prompt).not.toContain(ROUTINE_WORK_GUIDANCE);
+    });
   });
 
   describe("tool_run", () => {

@@ -392,6 +392,31 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
         expect(flagsOf(c.rows)).toEqual([["no_reply_address"]]);
       });
 
+      it("Already sent: the same text to the same people in this thread moments ago", async () => {
+        const reply = argsFor(["t1"]).replies[0]!;
+        await prisma.cachedMailMessage.create({
+          data: {
+            ...scope(),
+            connectionId: f.connA,
+            providerMessageId: "t1-sent",
+            threadId: "t1",
+            fromAddress: "me@example.test",
+            toAddresses: reply.to,
+            ccAddresses: [],
+            subject: reply.subject,
+            snippet: reply.body.slice(0, 20),
+            receivedAt: new Date(Date.now() - 60_000),
+            unread: false,
+            fromSelf: true,
+            seenAt: new Date(),
+          },
+        });
+        const c = await card(["t1"]);
+        expect(flagsOf(c.rows)).toEqual([["already_sent"]]);
+        expect(startsUnticked(c.rows[0]!.flags)).toBe(true);
+        await prisma.cachedMailMessage.deleteMany({ where: { providerMessageId: "t1-sent" } });
+      });
+
       it("You said no reply needed", async () => {
         await prisma.mailSenderStat.create({
           data: {
@@ -1966,6 +1991,33 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
         ["duplicate_email", "new_recipient"],
       ]);
       expect((await read(c)).rows.every((row) => row.startsUnticked)).toBe(true);
+    });
+
+    it("flags a new email to someone just emailed about it, reworded or from another account", async () => {
+      await f.cache(f.a, f.connA2, "just-1", {
+        threadId: "just",
+        from: "box-b@example.test",
+        to: [address("ana")],
+        subject: "Re: Hello ana",
+        snippet: "A different wording entirely",
+        fromSelf: true,
+        receivedAt: new Date(Date.now() - 3 * 60_000),
+        signals: null,
+      });
+      const c = await card([], outreach("ana"));
+      expect(flagsOf(c.rows)[0]).toContain("already_sent");
+      expect(startsUnticked(c.rows[0]!.flags)).toBe(true);
+      // Someone else, another subject, or an older send is not this.
+      const other = await card([], {
+        replies: [newRow("ben"), newRow("ana", { subject: "Other" })],
+      });
+      expect(flagsOf(other.rows).flat()).not.toContain("already_sent");
+      await prisma.cachedMailMessage.updateMany({
+        where: { providerMessageId: "just-1" },
+        data: { receivedAt: new Date(Date.now() - 16 * 60_000) },
+      });
+      const later = await card([], outreach("ana"));
+      expect(flagsOf(later.rows)[0]).not.toContain("already_sent");
     });
 
     it("flags the same subject sent recently to the same address, in mail or on another card", async () => {
