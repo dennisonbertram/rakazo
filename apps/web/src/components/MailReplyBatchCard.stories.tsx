@@ -110,6 +110,15 @@ export const LargeBatch: Story = {
   args: { block: card(18) },
   beforeEach: withRows(many),
 };
+/** A run that read outside content leaves every row unticked; Select all ticks the rows that are safe to send, not the repeat-send ones. */
+export const SelectAll: Story = {
+  args: { block: card(18) },
+  beforeEach: withRows([
+    ...many.slice(0, 16).map((r) => ({ ...r, startsUnticked: true })),
+    row("repeat1", { flags: ["already_sent"], startsUnticked: true }),
+    row("repeat2", { flags: ["duplicate_email"], startsUnticked: true }),
+  ]),
+};
 export const Sending: Story = {
   args: { block: card(3, { status: "answered", answer: "send" }) },
   beforeEach: withRows(
