@@ -381,6 +381,11 @@ it("describes a connected-app watch by its app, not a page", () => {
   expect(routineStatusLine(appWatch)).toBe("Paused: the app could not be checked");
 });
 
+it("says a timer routine is held because its model connection ran out of credit", () => {
+  const held = { ...baseRoutine, status: { ...baseRoutine.status, pausedReason: "credit" } };
+  expect(routineStatusLine(held as Routine)).toBe("Paused: model connection out of credit");
+});
+
 it("picks the connection's first model when a connection is chosen with no model yet", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   models.credentials = [

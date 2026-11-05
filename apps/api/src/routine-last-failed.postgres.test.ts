@@ -31,7 +31,9 @@ describePostgres("routine status lastRunFailed (PostgreSQL)", () => {
     routines: {
       list(input: {
         botId: string;
-      }): Promise<{ id: string; status: { lastRunFailed?: boolean } }[]>;
+      }): Promise<
+        { id: string; status: { lastRunFailed?: boolean; pausedReason: string | null } }[]
+      >;
     };
   };
 
@@ -122,5 +124,34 @@ describePostgres("routine status lastRunFailed (PostgreSQL)", () => {
     expect(await failedFlag()).toBe(true);
     await run("cancelled", 5);
     expect(await failedFlag()).toBe(false);
+  });
+
+  it("says a routine is paused while its model connection is out of credit", async () => {
+    const credential = await prisma.userModelCredential.create({
+      data: { userId, provider: "openrouter", label: "Fixture", secretId: "fake-secret" },
+    });
+    const routine = await prisma.routine.create({
+      data: { spaceId, botId, userId, name: "Hourly", prompt: "p", crons: ["0 * * * *"] },
+    });
+    const pausedReason = async () =>
+      (await client.routines.list({ botId })).find((r) => r.id === routine.id)?.status.pausedReason;
+    const pause = (pausedUntil: Date) =>
+      prisma.modelConnectionPause.upsert({
+        where: {
+          spaceId_userId_credentialId: { spaceId, userId, credentialId: credential.id },
+        },
+        create: { spaceId, userId, credentialId: credential.id, pausedUntil },
+        update: { pausedUntil },
+      });
+
+    await pause(new Date(Date.now() + 60 * 60_000));
+    await prisma.routine.update({
+      where: { id: routine.id },
+      data: { pausedConnectionId: credential.id },
+    });
+    expect(await pausedReason()).toBe("credit");
+
+    await pause(new Date(Date.now() - 1_000));
+    expect(await pausedReason()).toBeNull();
   });
 });

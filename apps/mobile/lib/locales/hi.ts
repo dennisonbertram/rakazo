@@ -930,6 +930,7 @@ export const HI_MESSAGES: Record<string, string> = {
   "Last ran": "पिछली बार चला",
   Next: "अगला",
   "Paused: no access": "रुका हुआ: पहुँच नहीं है",
+  "Paused: model connection out of credit": "रुका हुआ: मॉडल कनेक्शन का क्रेडिट खत्म",
   "Paused: the page changes too often": "रुका हुआ: पेज बहुत बार बदलता है",
   "Paused: the page could not be checked": "रुका हुआ: पेज की जाँच नहीं हो सकी",
   "Paused: too many checks today": "रुका हुआ: आज बहुत ज़्यादा जाँचें हुईं",
