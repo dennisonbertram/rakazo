@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@rakazo/db";
 import { createDb, createThreadEvents } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { resolveDuplicateEffectGate } from "./approval-effect.js";
 import {
   MAIL_APPROVAL_STALE_MS,
   mailApprovalAgentNote,
@@ -210,6 +211,13 @@ describePostgres("mail approval recovery (PostgreSQL)", () => {
     await reconcile(later());
     expect((await card(a.message.id))?.outcome).toBe("sent");
     expect(await note(a.effect.id)).toContain("Do not send it again");
+    // What the agent reads on resume: sent, not a denial.
+    const settled = await prisma.externalEffect.findUniqueOrThrow({ where: { id: a.effect.id } });
+    expect(settled.status).toBe("completed");
+    expect(resolveDuplicateEffectGate(settled, "mail_send")).toMatchObject({
+      action: "return",
+      result: { ok: true, outcome: "sent" },
+    });
   });
 
   it("settles a draft the person sent now as a send, not as a saved draft", async () => {

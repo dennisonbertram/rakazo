@@ -589,7 +589,10 @@ async function commitAnswerRunInput(
     ? ""
     : staleConsent
       ? "deny"
-      : (selectedChoice?.id ?? input.answer);
+      : input.mailDenial
+        ? // The person pressed Send on the card: their answer was yes, never a denial.
+          "allow"
+        : (selectedChoice?.id ?? input.answer);
   const callId = callIdFromClientNonce(input.clientNonce);
   const recordsCallUtterance = Boolean(callId && !secretAsk);
 

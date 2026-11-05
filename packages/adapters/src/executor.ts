@@ -511,6 +511,7 @@ import {
 import {
   approvedMailOutcome,
   failedMailToAgent,
+  isCardMailSend,
   mailSendRefusal,
 } from "./mail-approval-recovery.js";
 import { threadHasProtectedSender } from "./mail-protected-senders.js";
@@ -6430,6 +6431,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               denied.find(
                 (prior) =>
                   prior.id !== applied!.effect.id &&
+                  // A card the person sent themselves is not a refusal: it says nothing about a
+                  // different email, and must not answer for one. mailSendRefusal covers a repeat.
+                  !isCardMailSend(prior.result) &&
                   (!wrapperKind ||
                     repeatsDeniedRequest(replayEffectToolName, prior.request, effectRequest)),
               ) ??
@@ -11585,7 +11589,12 @@ export async function priorDenialAwaitingOwner(
       where: {
         spaceId: run.spaceId,
         kind,
-        status: "denied",
+        // An email the person already sent from its card stands like a denial: the agent gets the
+        // sent result back instead of a new card for the same email.
+        OR: [
+          { status: "denied" },
+          { status: "completed", result: { path: ["outcome"], equals: "sent" } },
+        ],
         id: { not: currentEffectId },
         run: { userId: run.userId, botId: run.botId, trigger: "bot_message" },
       },

@@ -4797,7 +4797,7 @@ describe("answerRunInput with a mail denial", () => {
     const blocks = tx.message.update.mock.calls[0]?.[0].data.blocks;
     expect(blocks[0]).toMatchObject({
       status: "answered",
-      answer: "deny",
+      answer: "allow",
       mail: { subject: "New subject", body: "New", connectionId: "conn-1", to: ["a@example.test"] },
     });
   });
@@ -4886,9 +4886,30 @@ describe("setMailApprovalOutcome", () => {
     );
     expect(tx.externalEffect.updateMany).toHaveBeenCalledWith({
       where: { id: "effect-1", spaceId: "workspace-1", status: "denied" },
-      data: { result: { note: "nothing was sent", outcome: "failed" } },
+      data: {
+        status: "completed",
+        result: { error: "nothing was sent", note: "nothing was sent", outcome: "failed" },
+      },
     });
     expect(tx.message.update.mock.calls[0]?.[0].data.blocks[0].mail.outcome).toBe("failed");
+    for (const [outcome, status, result] of [
+      ["sent", "completed", { ok: true, note: "n", outcome: "sent" }],
+      ["saved", "completed", { ok: true, note: "n", outcome: "saved" }],
+      ["unknown", "uncertain", { error: "n", note: "n", outcome: "unknown", uncertain: true }],
+    ] as const) {
+      await setMailApprovalOutcome(prisma, {
+        spaceId: "workspace-1",
+        threadId: "thread-1",
+        messageId: "message-1",
+        effectId: "effect-1",
+        outcome,
+        note: "n",
+      });
+      expect(tx.externalEffect.updateMany).toHaveBeenLastCalledWith({
+        where: { id: "effect-1", spaceId: "workspace-1", status: "denied" },
+        data: { status, result },
+      });
+    }
   });
 });
 
