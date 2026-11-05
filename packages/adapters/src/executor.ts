@@ -642,14 +642,17 @@ import {
 import { loadAgentScratchpadContext } from "./scratchpad-context.js";
 import {
   addScratchpadItemFromTool,
+  addScratchpadItemsFromTool,
   completeScratchpadItemFromTool,
   findWorkableOpenItem,
   hasApprovedOpenPost,
   hasApprovedOpenSignup,
+  isGatedScratchpadCategory,
   listScratchpadItems,
   listScratchpadItemsFromTool,
   removeScratchpadItemFromTool,
   updateScratchpadItemFromTool,
+  updateScratchpadItemsFromTool,
 } from "./scratchpad-tools.js";
 import { inferScript } from "./scripted-runtime.js";
 import {
@@ -708,10 +711,12 @@ import { parseUiBlocks, UI_BLOCKS_GUIDANCE } from "./ui-blocks-tool.js";
 import {
   botMessageOutcomeFromMidTurn,
   clampUserProgressMessage,
+  createNarrationGate,
   extractNarrationText,
   finalBlocksAfterMidTurnProgress,
   isProgressMessageTruncated,
   isUserProgressClientNonce,
+  toolIsQuietForNarration,
   userProgressClientNonce,
 } from "./user-progress.js";
 import { VOICE_WORKSPACE_TOOL_NAMES, voiceAgentToolFromTool } from "./voice-agent-tools.js";
@@ -4228,7 +4233,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           pendingProgress = "";
           lastProgressAt = Date.now();
         };
-        const publishMidTurnNarration = async () => {
+        const narrationGate = createNarrationGate(midTurnUserTexts);
+        const publishMidTurnNarration = async (nextToolIsQuiet?: boolean) => {
           const extracted = extractNarrationText(messageSegments, currentTextSegment);
           const narration = clampUserProgressMessage(redactSecrets(extracted.text, runSecrets));
           messageSegments = extracted.remaining;
@@ -4241,6 +4247,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             discardedMidTurnNarration = true;
             return;
           }
+          if (nextToolIsQuiet === undefined) narrationGate.notePosted(narration);
+          else if (!narrationGate.admit(narration, nextToolIsQuiet)) return;
           await publishMessage(
             deps,
             run,
@@ -5252,6 +5260,32 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // non-gated items run unattended and gated ones ask. A missing item has no category: it asks.
           let policyArgs = args;
           if (
+            (run.unattended || run.externalTaint || externalTaint()) &&
+            name === "scratchpad_update" &&
+            Array.isArray(args.itemIds)
+          ) {
+            // Every row must be this bot's and ungated, or the whole call asks.
+            const ids = [...new Set((args.itemIds as unknown[]).map(String))];
+            const rows = await deps.prisma.scratchpadItem
+              .findMany({
+                where: {
+                  id: { in: ids },
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  botId: bot.id,
+                },
+                select: { category: true },
+              })
+              .catch(() => []);
+            const gated = rows.find((row) => isGatedScratchpadCategory(row.category));
+            policyArgs = {
+              ...args,
+              category:
+                ids.length === 0 || rows.length !== ids.length
+                  ? undefined
+                  : (gated?.category ?? "none"),
+            };
+          } else if (
             (run.unattended || run.externalTaint || externalTaint()) &&
             (name === "scratchpad_update" || name === "scratchpad_complete")
           ) {
@@ -7780,6 +7814,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
               includeDone: Boolean(args.includeDone),
             });
           }
+          if (name === "scratchpad_add" && args.items !== undefined) {
+            if (Object.keys(args).length > 1) {
+              return finish({ error: "Pass items alone; each row takes its own fields." });
+            }
+            return finish(
+              await addScratchpadItemsFromTool(deps, {
+                spaceId: run.spaceId,
+                botId: bot.id,
+                userId: run.userId,
+                items: args.items,
+                callerSpawnKey: bot.spawnKey,
+              }),
+            );
+          }
           if (name === "scratchpad_add") {
             const created = await addScratchpadItemFromTool(deps, {
               spaceId: run.spaceId,
@@ -7804,6 +7852,26 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return finish({
                 error: "category and channel can only be set when an item is created.",
               });
+            }
+            if (args.itemIds !== undefined) {
+              const { itemIds, status, notes, dueAt, waitingOn, ...other } = args;
+              if (Object.keys(other).length > 0) {
+                return finish({
+                  error: "With itemIds, pass only status, notes, dueAt or waitingOn.",
+                });
+              }
+              return finish(
+                await updateScratchpadItemsFromTool(deps, {
+                  spaceId: run.spaceId,
+                  botId: bot.id,
+                  userId: run.userId,
+                  itemIds,
+                  ...(status !== undefined ? { status: String(status) } : {}),
+                  ...(notes !== undefined ? { notes: String(notes) } : {}),
+                  ...(dueAt !== undefined ? { dueAt: dueAt === null ? null : String(dueAt) } : {}),
+                  ...(waitingOn !== undefined ? { waitingOn: String(waitingOn) } : {}),
+                }),
+              );
             }
             const updated = await updateScratchpadItemFromTool(deps, {
               spaceId: run.spaceId,
@@ -8814,6 +8882,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
             midTurnUserTexts.push(text);
             publishedMidTurnUserMessage = true;
+            narrationGate.notePosted(text);
             return finish(
               truncated
                 ? {
@@ -9515,6 +9584,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         ? BOT_SETUP_GUIDANCE
                         : undefined,
                     quietGuidance,
+                    routineRun: run.trigger === "routine",
                     tenacity: tenacityLevelFor({
                       proactivity: bot.proactivity,
                       restricted:
@@ -9986,7 +10056,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
               // Promote streamed narration into a durable, replyable chat message before
               // tools continue, so long turns do not look stalled and stay replyable.
               if (event.name !== "message_user") {
-                await publishMidTurnNarration();
+                const quiet = toolIsQuietForNarration(
+                  event.name,
+                  tools.find((tool) => tool.name === event.name)?.readOnly,
+                );
+                await publishMidTurnNarration(quiet);
+                narrationGate.noteTool(quiet);
               }
               await deps.events.append({
                 spaceId: run.spaceId,
@@ -11396,7 +11471,7 @@ function offeredBuiltinClause(
 
 /** For every agent offered mail_reply_batch, custom bots included; its instructions may not say this. */
 export const MAIL_BATCH_GUIDANCE =
-  "For two or more emails, new or replies, call mail_reply_batch once with one row per email, so the user reviews them on one card. Never call mail_send one at a time for these, including when the user says to send them all at once. Do not search again or re-verify what the user already approved in this conversation: write the rows from what was agreed and call the tool.";
+  "For two or more emails, new or replies, call mail_reply_batch once with one row per email, so the user reviews them on one card. Never call mail_send one at a time for these, including when the user says to send them all at once. Do not search again or re-verify what the user already approved in this conversation: write the rows from what was agreed and call the tool. Send from the connected account the mail tools name; if your instructions name another address, say so once and use the connected account.";
 
 export const MAIL_NOTE_GUIDANCE =
   "When the user asks you to make a note or to-do, call scratchpad_add; it is linked to this email automatically. If the work belongs to another agent's area (Carta, finance, legal, data room, investors, company, GTM), set forAgent to that area so the to-do goes to that agent instead of staying here, and tell the user plainly where it went, for example \"Added to the Carta agent's to-dos.\" If the result has no addedTo, say it was added to this chat's to-dos.";
@@ -11410,11 +11485,23 @@ export const PRESENTATION_GUIDANCE =
 
 /** Grounding, minimal disclosure and honest follow-ups, for every agent turn. */
 export const TRUTHFULNESS_GUIDANCE =
-  "Take ids, numbers, dates, durations and results from tool output or the user, never from guesswork, and do not predict how long something will take. If a tool returns nothing or fails, say so. In outbound mail, messages, searches and forms, include only what the recipient needs; do not pass along private details from memory, other mail or other people unless the user asked. Do not promise a follow-up unless something will deliver it: set up a schedule or send a notification, or say you will not follow up. Every routine prompt you write must say when to stop.";
+  "Take ids, numbers, dates, durations and results from tool output or the user, never from guesswork, and do not predict how long something will take. If a tool returns nothing or fails, say so. Say you are doing something only in the step that makes the call. Never say mail went out or is going out without a tool result that shows it, and take sent counts from results. In outbound mail, messages, searches and forms, include only what the recipient needs; do not pass along private details from memory, other mail or other people unless the user asked. Do not promise a follow-up unless something will deliver it: set up a schedule or send a notification, or say you will not follow up. Every routine prompt you write must say when to stop.";
+
+/** A job with several steps keeps its place in rows it can read back. Unrestricted runs only. */
+export const WORK_LIST_GUIDANCE =
+  "For a job with several steps or many people, such as a list of recipients or batches, write a work list first: one scratchpad_add call with items, one row per recipient or batch. After each result update the rows with scratchpad_update; itemIds changes many at once. Mark a row done only when a tool result shows it happened. Your open rows appear in these instructions: read them to see who or what is left, and do not search history, mail or files or run shell commands to work it out again.";
+
+/** Unrestricted runs only: a restricted run must not be told to act on an outside "go". */
+export const ACT_ON_REVIEWED_PLAN_GUIDANCE =
+  "When the user says go on a plan they have reviewed, call the action now, with no lookups first; any approval it needs still applies. Treat the last tool result as current and do not re-read or re-check what is already in this conversation. When you resume a job from an earlier turn, check its state once, then carry on. Set up a routine that checks on a job only after the job has started, and have its prompt say to stay silent when nothing changed.";
+
+/** A routine run has no thread history, so its rows are all it knows of the job. */
+export const ROUTINE_WORK_GUIDANCE =
+  'This run cannot see the chat, so your work list is its record of the job. If the work this routine checks on has not started, such as replies to mail not yet sent, do not search: say "Nothing sent yet." in one line, or stay silent if this routine is quiet.';
 
 /** Retry limits and a final denial. Every agent that is not the voice agent gets this, at any level. */
 const TENACITY_BASE =
-  "When a tool fails or returns nothing, try a different query, tool or source before reporting back, but never repeat the same failing call more than once or twice; after two or three distinct attempts, stop and say what you tried and what would unblock you. A denied or skipped approval is final: do not retry, rephrase or work around it. Use paid connectors and research tools sparingly.";
+  "When a tool fails, or a lookup you expected to find something returns nothing, try a different query, tool or source before reporting back, but never repeat the same failing call more than once or twice; after two or three distinct attempts, stop and say what you tried and what would unblock you. A denied or skipped approval is final: do not retry, rephrase or work around it. Use paid connectors and research tools sparingly.";
 
 const PROACTIVITY_TEXT = {
   low: "Do what was asked, then stop. Ask when you are unsure what the user wants.",
@@ -11803,6 +11890,8 @@ export function userTurnInstructions(parts: {
   tenacity?: TenacityLevel;
   /** Added for quiet routines; follows replyGuidance. */
   quietGuidance?: string | undefined;
+  /** This run is a routine's. */
+  routineRun?: boolean;
   disabledBuiltinTools?: ReadonlySet<string>;
 }): (string | undefined)[] {
   if (parts.voiceAgent) return [parts.botInstructions];
@@ -11887,9 +11976,20 @@ export function userTurnInstructions(parts: {
       "add_mcp_server",
       "When the user asks you to add or connect an MCP server (and gives you its details), use add_mcp_server. If it uses browser sign-in, an approval card appears in the chat — tell the user to click Authorize on it.",
     ),
-    "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
+    "Never print API keys, access tokens, or secret values.",
     TRUTHFULNESS_GUIDANCE,
     parts.tenacity ? tenacityGuidance(parts.tenacity) : undefined,
+    ...(parts.tenacity && parts.tenacity !== "limited"
+      ? [
+          !parts.mailThreadAgent &&
+          builtinOffered(parts.disabledBuiltinTools, "scratchpad_add") &&
+          builtinOffered(parts.disabledBuiltinTools, "scratchpad_update")
+            ? WORK_LIST_GUIDANCE
+            : undefined,
+          ACT_ON_REVIEWED_PLAN_GUIDANCE,
+          parts.routineRun ? ROUTINE_WORK_GUIDANCE : undefined,
+        ]
+      : []),
     PRESENTATION_GUIDANCE,
     "Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Do not open a reply with today's date unless the user asked for it.",
     "Treat pagination cursors as opaque: copy the returned continuation value exactly, never calculate or guess it. When the tool reports no next page, stop; if a cursor is rejected, recheck the last successful result before retrying.",
@@ -12067,7 +12167,7 @@ export function mayOpenModelStream(
 export { isExactNoResponse, NO_RESPONSE, stripNoResponseReply };
 
 export const LONG_WORK_PROGRESS_GUIDANCE =
-  "During long work, send a few short progress updates with message_user so the user can see what you are doing. Keep them brief and high-signal (a sentence or two, not a dump). Do not narrate every tool call. Thinking stays private. message_user is capped at 500 characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.";
+  "Write at most one short line before a group of lookups, none per lookup, and never repeat what you already said you would do. During long work, use message_user for a sentence or two only when something changed. Thinking stays private. message_user is capped at 500 characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.";
 
 export const ROUTINE_SILENT_REPLY_GUIDANCE = `If this routine's prompt says to stay silent when there is nothing to report, the entire final assistant reply must be exactly ${NO_RESPONSE} — no surrounding prose, no variants, no progress updates, no all-clear, and no meta note that you are staying silent. Do not call message_user unless you have something to report.`;
 
