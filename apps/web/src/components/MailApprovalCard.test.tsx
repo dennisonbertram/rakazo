@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type { MailApproval } from "@rakazo/contracts";
+import { MAIL_ALREADY_SENT_REASON } from "@rakazo/contracts";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { act, cloneElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -19,11 +20,11 @@ vi.mock("@rakazo/ui-web", () => {
   const Plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return {
     Button: ({
-      variant: _variant,
+      variant,
       size: _size,
       ...props
     }: ComponentProps<"button"> & { variant?: string; size?: string }) => (
-      <button type="button" {...props} />
+      <button type="button" data-variant={variant} {...props} />
     ),
     cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
     DropdownMenu: Plain,
@@ -722,4 +723,14 @@ it("embedded in a batch row it shows the fields without its header or buttons", 
   expect(host.textContent).toContain(mail.body);
   await render({ embedded: { editing: true } });
   expect(host.querySelector("textarea")?.value).toBe(mail.body);
+});
+
+it("warns on a repeat of an email that just went out, and Send is still there to press", async () => {
+  const { onAnswer } = await render({ reason: MAIL_ALREADY_SENT_REASON });
+  expect(host.textContent).toContain("Already sent to this person a few minutes ago");
+  const send = [...host.querySelectorAll("button")].find((b) => b.textContent === "Send")!;
+  expect(send.getAttribute("data-variant")).toBe("secondary");
+  await act(async () => send.click());
+  await sent();
+  expect(onAnswer).toHaveBeenCalledWith("allow", undefined, undefined);
 });

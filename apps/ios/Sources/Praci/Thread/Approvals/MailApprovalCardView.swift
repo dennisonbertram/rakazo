@@ -106,7 +106,10 @@ struct MailApprovalCardView: View {
       }
       if mail.canSend {
         CardActionButton(
-          title: Text("Send"), style: .prominent, busy: approval.pending == "send",
+          // The server's warning that this email just went out: Send stops being the obvious press.
+          title: Text("Send"),
+          style: ask.approvalReason == "Already sent to this person a few minutes ago" ? .secondary : .prominent,
+          busy: approval.pending == "send",
           disabled: approval.pending != nil, identifier: "mailSend"
         ) {
           Task { await answer("send", edits: mail.isDraftTool ? MailAnswerEdits(send: true) : nil) }

@@ -70,6 +70,9 @@ export const ProductEventType = z.enum([
 export type ProductEventType = z.infer<typeof ProductEventType>;
 
 /** The card reason when a call asks only because the chat read a meeting; the web card adds Clear conversation. */
+/** Why a mail card warns: the same email went to the same people moments ago. Clients match it. */
+export const MAIL_ALREADY_SENT_REASON = "Already sent to this person a few minutes ago";
+
 export const MEETING_MARK_REASON = "This chat read a meeting, so it asks first.";
 
 export const MessageRole = z.enum(["user", "bot", "system"]);
@@ -228,6 +231,7 @@ export const MAIL_REPLY_FLAGS = [
   "important_sender",
   "no_reply_address",
   "no_reply_needed",
+  "already_sent",
   "has_link",
 ] as const;
 export const MailReplyFlagSchema = z.enum(MAIL_REPLY_FLAGS);

@@ -382,6 +382,31 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
         expect(flagsOf(c.rows)).toEqual([["no_reply_address"]]);
       });
 
+      it("Already sent: the same text to the same people in this thread moments ago", async () => {
+        const reply = argsFor(["t1"]).replies[0]!;
+        await prisma.cachedMailMessage.create({
+          data: {
+            ...scope(),
+            connectionId: f.connA,
+            providerMessageId: "t1-sent",
+            threadId: "t1",
+            fromAddress: "me@example.test",
+            toAddresses: reply.to,
+            ccAddresses: [],
+            subject: reply.subject,
+            snippet: reply.body.slice(0, 20),
+            receivedAt: new Date(Date.now() - 60_000),
+            unread: false,
+            fromSelf: true,
+            seenAt: new Date(),
+          },
+        });
+        const c = await card(["t1"]);
+        expect(flagsOf(c.rows)).toEqual([["already_sent"]]);
+        expect(startsUnticked(c.rows[0]!.flags)).toBe(true);
+        await prisma.cachedMailMessage.deleteMany({ where: { providerMessageId: "t1-sent" } });
+      });
+
       it("You said no reply needed", async () => {
         await prisma.mailSenderStat.create({
           data: {

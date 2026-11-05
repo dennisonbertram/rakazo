@@ -8,7 +8,11 @@ import type {
   MessageReaction,
   Routine,
 } from "@rakazo/contracts";
-import { canReactToThreadMessage, MESSAGE_REACTIONS } from "@rakazo/contracts";
+import {
+  canReactToThreadMessage,
+  MAIL_ALREADY_SENT_REASON,
+  MESSAGE_REACTIONS,
+} from "@rakazo/contracts";
 import type { SlashActionId, ThreadItem } from "@rakazo/core";
 import {
   abortableDelay,
@@ -171,6 +175,7 @@ import {
   resumeLiveNotifications,
   setOpenNotificationThread,
 } from "../lib/live-notifications";
+import { mailOutcomeLabel } from "../lib/mail-outcome";
 import { presentMessageActionSheet } from "../lib/message-action-sheet";
 import { buildMessageContextMenu, messageMenuReaction } from "../lib/message-context-menu";
 import {
@@ -3852,22 +3857,31 @@ const MessageBubble = memo(function MessageBubble({
               {askBlock.detail}
             </Text>
           ) : null}
+          {askBlock.status !== "answered" &&
+          askBlock.approvalReason === MAIL_ALREADY_SENT_REASON ? (
+            <Text
+              style={{ color: tokens.warning, marginTop: 8, fontSize: 13.5, fontWeight: "600" }}
+            >
+              {askBlock.approvalReason}
+            </Text>
+          ) : null}
           {askBlock.status === "answered" ? (
             <Text
               {...actionProps}
               style={{
-                color: tokens.success,
+                color: askBlock.mail?.outcome === "failed" ? tokens.destructive : tokens.success,
                 marginTop: 12,
                 fontSize: 13.5,
                 fontWeight: "600",
               }}
             >
-              {formatApprovalAnswer(
-                askBlock.answer,
-                askBlock.actions,
-                isApprovalAskBlock(askBlock),
-                Boolean(askBlock.consent || askBlock.pageSource),
-              )}
+              {mailOutcomeLabel(askBlock.mail) ??
+                formatApprovalAnswer(
+                  askBlock.answer,
+                  askBlock.actions,
+                  isApprovalAskBlock(askBlock),
+                  Boolean(askBlock.consent || askBlock.pageSource),
+                )}
             </Text>
           ) : (canAnswer || askBlock.pageSource) && onAnswer ? (
             <AskActions

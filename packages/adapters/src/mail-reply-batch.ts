@@ -33,7 +33,12 @@ import { mailRequestIsValid } from "./approval-ask.js";
 import type { FirewallMailDeps } from "./firewall-mail.js";
 import { firewallMailReadDecision, threadParticipants } from "./firewall-mail.js";
 import type { PriorMailEffect } from "./mail-approval-recovery.js";
-import { MAIL_APPROVAL_STALE_MS, mailSendRefusal } from "./mail-approval-recovery.js";
+import {
+  MAIL_APPROVAL_STALE_MS,
+  MAIL_DUPLICATE_WINDOW_MS,
+  mailSendRefusal,
+  sentCopyMatches,
+} from "./mail-approval-recovery.js";
 import { displayAddress, parseRecipients } from "./mail-compose.js";
 import { protectedSenders } from "./mail-protected-senders.js";
 import type { MailToolDeps } from "./mail-tools.js";
@@ -100,6 +105,8 @@ export async function mailReplyFlags(
       ccAddresses: true,
       fromSelf: true,
       signals: true,
+      receivedAt: true,
+      snippet: true,
     },
   });
   const threadOf = (row: MailReplyFlagInput) =>
@@ -176,6 +183,17 @@ export async function mailReplyFlags(
       // rarely_answered gets no flag: a customer who writes often and has no answer yet matches it.
       if (guard === "no_reply_sender") flags.add("no_reply_address");
       if (guard === "corrected") flags.add("no_reply_needed");
+    }
+    const since = Date.now() - MAIL_DUPLICATE_WINDOW_MS;
+    if (
+      threadOf(row).some(
+        (message) =>
+          message.fromSelf &&
+          message.receivedAt.getTime() >= since &&
+          sentCopyMatches(message, row),
+      )
+    ) {
+      flags.add("already_sent");
     }
     if (bodyHasLink(row.body)) flags.add("has_link");
     return { flags: flagOrder(flags), newestInboundId: newest?.providerMessageId ?? null };

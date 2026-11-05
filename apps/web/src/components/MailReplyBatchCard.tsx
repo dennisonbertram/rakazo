@@ -66,6 +66,8 @@ function flagText(flag: MailReplyFlag): string {
       return t`No-reply address`;
     case "no_reply_needed":
       return t`You said no reply needed`;
+    case "already_sent":
+      return t`Already sent a few minutes ago`;
     case "has_link":
       return t`Has a link`;
   }

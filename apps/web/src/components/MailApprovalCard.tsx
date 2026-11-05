@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { MailAccountSummary, MailApproval, MailEdits } from "@rakazo/contracts";
+import { MAIL_ALREADY_SENT_REASON } from "@rakazo/contracts";
 import { isClosedApprovalAnswer, SKIPPED_APPROVAL_ANSWER } from "@rakazo/core";
 import {
   Button,
@@ -135,6 +136,8 @@ export function MailApprovalCard({
   const confirmId = useId();
   const ownAnswer = useRef(false);
   const answered = status === "answered";
+  // Send stops being the obvious press; sending again stays possible.
+  const alreadySent = reason === MAIL_ALREADY_SENT_REASON;
   const interactive = !answered && canAnswer;
   const busy = pendingAction !== null;
   const draft = mail.tool === "mail_draft";
@@ -545,7 +548,16 @@ export function MailApprovalCard({
             </fieldset>
           ) : interactive && !embedded ? (
             <>
-              {reason ? <p className="pt-3 text-[13px] text-muted-foreground">{reason}</p> : null}
+              {reason ? (
+                <p
+                  className={cn(
+                    "pt-3 text-[13px]",
+                    alreadySent ? "font-medium text-warning" : "text-muted-foreground",
+                  )}
+                >
+                  {reason}
+                </p>
+              ) : null}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-4">
                 <div className="flex items-center gap-2">
                   {canSendNow ? (
@@ -558,7 +570,7 @@ export function MailApprovalCard({
                     </Button>
                   ) : null}
                   <Button
-                    variant={canSendNow ? "secondary" : "default"}
+                    variant={canSendNow || alreadySent ? "secondary" : "default"}
                     className="rounded-full"
                     disabled={busy || allowDisabled || needsAccount}
                     aria-describedby={chooseAccount && !account ? `${confirmId}-hint` : undefined}
