@@ -483,6 +483,7 @@ import {
   financeSpend,
   financeTransaction,
   financeVendor,
+  onFinanceServerReconnected,
 } from "./finance.js";
 import {
   financeCrypto,
@@ -6817,7 +6818,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
               spaceId: context.actor.spaceId,
               userId: context.actor.userId,
             });
-            if (session) await onMcpServerConnected(cartaSyncDeps, context.actor, session.serverId);
+            if (session) {
+              await onMcpServerConnected(cartaSyncDeps, context.actor, session.serverId);
+              await onFinanceServerReconnected(financeDeps, context.actor, session.serverId);
+            }
             return { ok: true as const };
           } catch (error) {
             throw new ORPCError("BAD_REQUEST", {
