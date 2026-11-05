@@ -340,6 +340,7 @@ import {
   newestVoiceCredentialOrder,
   notSent,
   PinnedConnectionLostError,
+  PipelineInputError,
   PortalBlockedError,
   Prisma,
   ProspectEmailRequiredError,
@@ -1450,7 +1451,11 @@ function fundraisingError(error: unknown): never {
   if (error instanceof SafeActiveError || error instanceof SafeStateError) {
     throw new ORPCError("CONFLICT", { message: error.message });
   }
-  if (error instanceof SafeCapRequiredError || error instanceof ProspectEmailRequiredError) {
+  if (
+    error instanceof SafeCapRequiredError ||
+    error instanceof ProspectEmailRequiredError ||
+    error instanceof PipelineInputError
+  ) {
     throw new ORPCError("BAD_REQUEST", { message: error.message });
   }
   if (error instanceof FundraiseRoundOpenError) {
@@ -2944,7 +2949,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
             disabledBuiltinTools: source.disabledBuiltinTools,
             audience: source.audience === "external" ? "external" : "internal",
             firewall: source.firewall,
-            proactivity: source.proactivity === "low" || source.proactivity === "high" ? source.proactivity : "medium",
+            proactivity:
+              source.proactivity === "low" || source.proactivity === "high"
+                ? source.proactivity
+                : "medium",
             externalMessageTargets: source.externalMessageTargets,
             externalComputerTools: source.externalComputerTools,
           })

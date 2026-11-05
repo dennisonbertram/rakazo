@@ -138,6 +138,14 @@ export const ProspectSaveInputSchema = z.object({
   nextCallAt: IsoDate.nullish(),
   nextCallHasTime: z.boolean().optional(),
   referredByContactId: Id.nullish(),
+  /** An Undo's guard: the save applies only while the record still has these values. */
+  expect: z
+    .object({
+      status: PipelineStatusSchema.optional(),
+      interest: PipelineInterestSchema.nullable().optional(),
+      nextCallAt: IsoDate.nullable().optional(),
+    })
+    .optional(),
   checkSizeCents: Cents.nullish(),
   nextStep: z.string().trim().max(500).nullish(),
 });

@@ -378,12 +378,12 @@ it("offers Undo after a status move and restores the old status", async () => {
   await flush();
   expect(document.body.textContent).toContain("Moved Ada Fund to Committed");
   await click(button("Undo"));
+  // Only what the move changed, and only while the row is still at Committed.
   expect(rpcMock.prospectSave).toHaveBeenLastCalledWith({
     id: "p1",
     status: "not_reached",
     interest: null,
-    nextCallAt: null,
-    nextCallHasTime: false,
+    expect: { status: "committed" },
   });
 });
 
@@ -430,6 +430,7 @@ it("Out moves to Passed in one write with one toast naming both, and Undo restor
     interest: "maybe",
     nextCallAt: "2026-11-10T12:00:00.000Z",
     nextCallHasTime: false,
+    expect: { status: "passed", interest: "out", nextCallAt: null },
   });
 });
 

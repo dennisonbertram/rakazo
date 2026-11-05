@@ -31,6 +31,9 @@ import {
   savePipelineRecord,
   stageOf,
 } from "./pipeline-records.js";
+
+export { PipelineInputError } from "./pipeline-records.js";
+
 import { isUniqueViolation } from "./prisma-errors.js";
 import { hasActiveSafe, SafeActiveError, safeInRecordRound, toSafe } from "./safes.js";
 import { IsolationError } from "./scope.js";
@@ -345,12 +348,21 @@ export async function saveProspect(
     where: { id, ...scope, people: { none: {} } },
     select: { id: true },
   });
+  const guard: Prisma.PipelineRecordWhereInput = {
+    ...(fields.expect?.status === undefined ? {} : { status: fields.expect.status }),
+    ...(fields.expect?.interest === undefined ? {} : { interest: fields.expect.interest }),
+    ...(fields.expect?.nextCallAt === undefined
+      ? {}
+      : {
+          nextCallAt: fields.expect.nextCallAt === null ? null : new Date(fields.expect.nextCallAt),
+        }),
+  };
   if (personless) {
-    await savePipelineRecord(prisma, scope, id, changes);
+    await savePipelineRecord(prisma, scope, id, changes, guard);
     return personlessRow(await prisma.pipelineRecord.findFirstOrThrow({ where: { id, ...scope } }));
   }
   const { record } = await prospectOf(prisma, scope, id);
-  await savePipelineRecord(prisma, scope, record.id, changes);
+  await savePipelineRecord(prisma, scope, record.id, changes, guard);
   return contactRow(prisma, scope, id);
 }
 
@@ -363,11 +375,14 @@ async function recordFor(prisma: WriteDb, scope: Scope, id: string) {
 }
 
 type CallBefore = { status: string; nextCallAt: string | null; nextCallHasTime: boolean };
+/** What a logged call wrote, so Undo reverses only that, and only while it still holds. */
+type CallSet = { status: "met" | null; next: { at: string | null; hasTime: boolean } | null };
 
 /**
  * Logs a call: one `call` event, and the status moves forward only. Spoke moves a record that has
- * not reached Met to Met; Left message and No answer leave the status alone. `keep` leaves the next
- * call as it is, so the row stays due. The event keeps the old status and next call for Undo.
+ * not reached Met to Met, decided at the write itself so a record that has advanced meanwhile is
+ * left alone. Left message and No answer leave the status alone. `keep` leaves the next call as it
+ * is, so the row stays due. The event keeps what it set and what was there before, for Undo.
  */
 export async function logCall(
   prisma: WriteDb,
@@ -382,41 +397,77 @@ export async function logCall(
     nextCallHasTime: record.nextCallHasTime,
   };
   const order = PipelineStatusSchema.options;
-  const movedToMet =
-    outcome === "spoke" && order.indexOf(record.status as PipelineStatus) < order.indexOf("met");
+  const earlier = order.slice(0, order.indexOf("met"));
+  const moved =
+    outcome === "spoke"
+      ? (
+          await prisma.pipelineRecord.updateMany({
+            where: { id: record.id, ...scope, status: { in: earlier } },
+            data: { status: "met", roundId: null },
+          })
+        ).count > 0
+      : false;
+  const next =
+    nextCall === "keep"
+      ? null
+      : {
+          at: nextCall.at ? new Date(nextCall.at).toISOString() : null,
+          hasTime: Boolean(nextCall.at) && nextCall.hasTime,
+        };
+  if (next)
+    await prisma.pipelineRecord.updateMany({
+      where: { id: record.id, ...scope },
+      data: { nextCallAt: next.at ? new Date(next.at) : null, nextCallHasTime: next.hasTime },
+    });
+  const set: CallSet = { status: moved ? "met" : null, next };
   const event = await prisma.pipelineEvent.create({
     data: {
       ...scope,
       recordId: record.id,
       kind: "call",
-      payload: { outcome, note: note?.trim() || null, before },
+      payload: { outcome, note: note?.trim() || null, before, set },
     },
   });
-  await savePipelineRecord(prisma, scope, record.id, {
-    ...(movedToMet ? { status: "met" as const } : {}),
-    ...(nextCall === "keep"
-      ? {}
-      : {
-          nextCallAt: nextCall.at ? new Date(nextCall.at) : null,
-          nextCallHasTime: Boolean(nextCall.at) && nextCall.hasTime,
-        }),
-  });
-  return { eventId: event.id, movedToMet };
+  if (moved)
+    await prisma.pipelineEvent.create({
+      data: {
+        ...scope,
+        recordId: record.id,
+        kind: "status",
+        payload: { from: before.status, to: "met" },
+      },
+    });
+  return { eventId: event.id, movedToMet: moved };
 }
 
-/** Undo of a logged call: removes it and restores the status and next call it changed. */
+/**
+ * Undo of a logged call: removes it and puts back the status and next call it set, each only while
+ * the record still has the value the call set. The round is never touched.
+ */
 export async function undoCall(prisma: WriteDb, actor: Scope, eventId: string): Promise<void> {
   const scope = ownerOf(actor);
   const event = await prisma.pipelineEvent.findFirst({
     where: { id: eventId, ...scope, kind: "call" },
   });
   if (!event) throw new IsolationError("Call not found");
-  const before = (event.payload as { before?: CallBefore } | null)?.before;
-  if (before)
-    await savePipelineRecord(prisma, scope, event.recordId, {
-      status: before.status as PipelineStatus,
-      nextCallAt: before.nextCallAt ? new Date(before.nextCallAt) : null,
-      nextCallHasTime: before.nextCallHasTime,
+  const { before, set } = event.payload as { before?: CallBefore; set?: CallSet };
+  const where = { id: event.recordId, ...scope };
+  if (before && set?.status)
+    await prisma.pipelineRecord.updateMany({
+      where: { ...where, status: set.status },
+      data: { status: before.status },
+    });
+  if (before && set?.next)
+    await prisma.pipelineRecord.updateMany({
+      where: {
+        ...where,
+        nextCallAt: set.next.at ? new Date(set.next.at) : null,
+        nextCallHasTime: set.next.hasTime,
+      },
+      data: {
+        nextCallAt: before.nextCallAt ? new Date(before.nextCallAt) : null,
+        nextCallHasTime: before.nextCallHasTime,
+      },
     });
   await prisma.pipelineEvent.deleteMany({ where: { id: eventId, ...scope } });
 }

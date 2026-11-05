@@ -151,6 +151,14 @@ export async function joinRecord(
   });
 }
 
+/** A save whose parts contradict each other, such as Out on a status other than Passed. */
+export class PipelineInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PipelineInputError";
+  }
+}
+
 export type PipelineChanges = {
   /** A status, or a stage, which keeps the current status when it is already in that stage. */
   status?: PipelineStatus;
@@ -192,6 +200,15 @@ export async function savePipelineRecord(
         ? (current.status as PipelineStatus)
         : FIRST_STATUS[changes.stage ?? "target"]);
   const data: Prisma.PipelineRecordUncheckedUpdateManyInput = {};
+  // Out and Passed go together: the rule that Out moves to Passed cannot be bypassed.
+  if (
+    asked &&
+    changes.interest !== undefined &&
+    (changes.interest === "out") !== (asked === "passed")
+  )
+    throw new PipelineInputError(
+      asked === "passed" ? "Passed goes with Out." : "Out goes with Passed.",
+    );
   if (changes.interest === "out" && !asked && current.status !== "passed") {
     asked = "passed";
     data.nextCallAt = null;

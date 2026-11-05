@@ -195,17 +195,24 @@ export function FundraisingPage({
   // Restoring a commitment from an earlier round would attach it to the open round instead.
   const canRestore = (row: PipelineRow) =>
     !(row.status === "committed" && row.contact.roundId !== (open?.id ?? null));
-  const restore = (row: PipelineRow): Omit<ProspectSaveInput, "id"> => ({
+  // Each Undo puts back only what its change set, and only while the row still has it.
+  const restoreStatus = (row: PipelineRow, to: PipelineStatus): Omit<ProspectSaveInput, "id"> => ({
+    status: row.status,
+    interest: row.interest,
+    expect: { status: to },
+  });
+  const restoreOut = (row: PipelineRow): Omit<ProspectSaveInput, "id"> => ({
     status: row.status,
     interest: row.interest,
     nextCallAt: row.nextCallAt,
     nextCallHasTime: row.nextCallHasTime,
+    expect: { status: "passed", interest: "out", nextCallAt: null },
   });
   const edits: RowEdits = {
     status: (row, status: PipelineStatus) =>
       void change(row, { status }, t`Could not move ${row.name}`, {
         title: t`Moved ${row.name} to ${statusNames()[status]}`,
-        undo: canRestore(row) ? restore(row) : undefined,
+        undo: canRestore(row) ? restoreStatus(row, status) : undefined,
       }),
     interest: (row, interest) =>
       void change(
@@ -215,7 +222,7 @@ export function FundraisingPage({
         interest === "out" && row.status !== "passed"
           ? {
               title: t`${row.name}: Interest set to Out, status moved to Passed`,
-              undo: canRestore(row) ? restore(row) : undefined,
+              undo: canRestore(row) ? restoreOut(row) : undefined,
             }
           : undefined,
       ),

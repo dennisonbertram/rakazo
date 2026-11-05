@@ -9,6 +9,7 @@ import {
   saveRound,
   undoCall,
 } from "./fundraising.js";
+import { PipelineInputError } from "./pipeline-records.js";
 import { IsolationError } from "./scope.js";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -195,6 +196,124 @@ describePostgres("pipeline table writes (PostgreSQL)", () => {
       expect(
         (await prisma.pipelineRecord.findUniqueOrThrow({ where: { id: record.id } })).status,
       ).toBe("met");
+    });
+  });
+
+  describe("undo and races", () => {
+    it("Undo of a call restores only what the call set, and only while it still holds", async () => {
+      const p = await add(owner, "Sample Later Edits");
+      await saveProspect(prisma, owner, { id: p.id, nextCallAt: "2026-11-03T12:00:00.000Z" });
+      const { eventId } = await logCall(prisma, owner, {
+        id: p.id,
+        outcome: "no_answer",
+        nextCall: "keep",
+      });
+      await saveProspect(prisma, owner, {
+        id: p.id,
+        status: "diligence",
+        nextCallAt: "2026-11-20T12:00:00.000Z",
+      });
+      await undoCall(prisma, owner, eventId);
+      expect(await infoOf(owner, p.id)).toMatchObject({
+        status: "diligence",
+        nextCallAt: "2026-11-20T12:00:00.000Z",
+        lastCall: null,
+      });
+      // A call that moved the date: a later date survives, an untouched one is put back.
+      const q = await add(owner, "Sample Later Date");
+      await saveProspect(prisma, owner, { id: q.id, nextCallAt: "2026-11-03T12:00:00.000Z" });
+      const moved = await logCall(prisma, owner, {
+        id: q.id,
+        outcome: "spoke",
+        nextCall: { at: "2026-11-09T12:00:00.000Z", hasTime: false },
+      });
+      await saveProspect(prisma, owner, { id: q.id, nextCallAt: "2026-11-30T12:00:00.000Z" });
+      await undoCall(prisma, owner, moved.eventId);
+      expect(await infoOf(owner, q.id)).toMatchObject({
+        status: "not_reached",
+        nextCallAt: "2026-11-30T12:00:00.000Z",
+      });
+    });
+
+    it("Undo of a call never touches the round of a Committed record", async () => {
+      const closed = await prisma.fundraiseRound.create({
+        data: { ...owner, name: "Earlier", targetCents: 1n, capCents: 1n, closedAt: new Date() },
+      });
+      const p = await add(owner, "Sample Old Round");
+      const record = await recordOf(owner, p.id);
+      await prisma.pipelineRecord.update({
+        where: { id: record.id },
+        data: { status: "committed", roundId: closed.id, amountCents: 5_000_000n },
+      });
+      const { eventId } = await logCall(prisma, owner, {
+        id: p.id,
+        outcome: "left_message",
+        nextCall: { at: "2026-11-12T12:00:00.000Z", hasTime: false },
+      });
+      await undoCall(prisma, owner, eventId);
+      expect((await recordOf(owner, p.id)).roundId).toBe(closed.id);
+    });
+
+    it("Log call does not overwrite a status that advanced after the record was read", async () => {
+      const record = await prisma.pipelineRecord.create({
+        data: { ...owner, name: "Sample Racing", normalizedName: "sampleracing" },
+      });
+      const open = await getFundraisingOverview(prisma, owner).then((o) => o.round);
+      const racing = new Proxy(prisma, {
+        get(target, prop) {
+          if (prop !== "pipelineRecord") return Reflect.get(target, prop);
+          return new Proxy(target.pipelineRecord, {
+            get(delegate, method) {
+              if (method !== "findFirst") return Reflect.get(delegate, method);
+              return async (args: never) => {
+                const read = await delegate.findFirst(args);
+                await delegate.update({
+                  where: { id: record.id },
+                  data: { status: "committed", roundId: open?.id ?? null },
+                });
+                return read;
+              };
+            },
+          });
+        },
+      }) as PrismaClient;
+      const result = await logCall(racing, owner, {
+        id: record.id,
+        outcome: "spoke",
+        nextCall: "keep",
+      });
+      expect(result.movedToMet).toBe(false);
+      const after = await prisma.pipelineRecord.findUniqueOrThrow({ where: { id: record.id } });
+      expect(after).toMatchObject({ status: "committed", roundId: open?.id ?? null });
+    });
+
+    it("rejects an interest that contradicts the status", async () => {
+      const p = await add(owner, "Sample Contradiction");
+      await expect(
+        saveProspect(prisma, owner, { id: p.id, status: "diligence", interest: "out" }),
+      ).rejects.toBeInstanceOf(PipelineInputError);
+      await expect(
+        saveProspect(prisma, owner, { id: p.id, status: "passed", interest: "in" }),
+      ).rejects.toBeInstanceOf(PipelineInputError);
+      expect((await infoOf(owner, p.id))?.status).toBe("not_reached");
+    });
+
+    it("an Undo that expects a value only applies while the record still has it", async () => {
+      const p = await add(owner, "Sample Expect");
+      await saveProspect(prisma, owner, { id: p.id, status: "met" });
+      await saveProspect(prisma, owner, { id: p.id, status: "diligence" });
+      await saveProspect(prisma, owner, {
+        id: p.id,
+        status: "not_reached",
+        expect: { status: "met" },
+      });
+      expect((await infoOf(owner, p.id))?.status).toBe("diligence");
+      await saveProspect(prisma, owner, {
+        id: p.id,
+        status: "met",
+        expect: { status: "diligence" },
+      });
+      expect((await infoOf(owner, p.id))?.status).toBe("met");
     });
   });
 

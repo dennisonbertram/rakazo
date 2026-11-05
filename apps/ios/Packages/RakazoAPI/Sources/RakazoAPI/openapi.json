@@ -62909,27 +62909,12 @@
                         ]
                       },
                       "status": {
-                        "type": "string",
-                        "enum": [
-                          "not_reached",
-                          "intro_requested",
-                          "intro_made",
-                          "meeting_booked",
-                          "met",
-                          "diligence",
-                          "committed",
-                          "passed"
-                        ]
+                        "$ref": "#/components/schemas/RpcFundraisingProspectsSaveInputSchema1"
                       },
                       "interest": {
                         "anyOf": [
                           {
-                            "type": "string",
-                            "enum": [
-                              "in",
-                              "maybe",
-                              "out"
-                            ]
+                            "$ref": "#/components/schemas/RpcFundraisingProspectsSaveInputSchema2"
                           },
                           {
                             "type": "null"
@@ -62939,9 +62924,7 @@
                       "nextCallAt": {
                         "anyOf": [
                           {
-                            "type": "string",
-                            "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            "$ref": "#/components/schemas/RpcFundraisingProspectsSaveInputSchema3"
                           },
                           {
                             "type": "null"
@@ -62960,6 +62943,34 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "expect": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "$ref": "#/components/schemas/RpcFundraisingProspectsSaveInputSchema1"
+                          },
+                          "interest": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcFundraisingProspectsSaveInputSchema2"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "nextCallAt": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcFundraisingProspectsSaveInputSchema3"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
                       },
                       "checkSizeCents": {
                         "anyOf": [
@@ -145385,6 +145396,32 @@
       "RpcFundraisingProspectsSaveInputSchema0": {
         "type": "string",
         "minLength": 1
+      },
+      "RpcFundraisingProspectsSaveInputSchema1": {
+        "type": "string",
+        "enum": [
+          "not_reached",
+          "intro_requested",
+          "intro_made",
+          "meeting_booked",
+          "met",
+          "diligence",
+          "committed",
+          "passed"
+        ]
+      },
+      "RpcFundraisingProspectsSaveInputSchema2": {
+        "type": "string",
+        "enum": [
+          "in",
+          "maybe",
+          "out"
+        ]
+      },
+      "RpcFundraisingProspectsSaveInputSchema3": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
       },
       "RpcFundraisingRoundSaveInputSchema0": {
         "type": "integer",
