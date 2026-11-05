@@ -148,7 +148,6 @@ export function renderBotDirectory(bots: readonly BotAddress[]): string | undefi
     "<teammate_directory>",
     ...formatBotRosterLines(bots),
     "</teammate_directory>",
-    "Use message_bot for useful updates, questions, and results. Delivery is async. If the user is waiting on the answer, say in one sentence who you are checking with and end your turn; the reply wakes you. Otherwise continue independent work. Do not poll or send ack-only messages.",
     ...(bots.some(
       (bot) => isIntegrationAgentSpawnKey(bot.spawnKey) || isCartaAgentSpawnKey(bot.spawnKey),
     )

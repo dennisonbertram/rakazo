@@ -98,7 +98,7 @@ describe("addressing", () => {
 });
 
 describe("directory", () => {
-  it("lists teammates with ids and says delivery is asynchronous", () => {
+  it("lists teammates with ids, and leaves how to message them to the message_bot tool", () => {
     const directory =
       renderBotDirectory([
         { ...bots[0]!, description: "Investigates source-backed questions" },
@@ -107,9 +107,8 @@ describe("directory", () => {
     expect(directory).toContain("Researcher (id: b_1) — Finds things");
     expect(directory).toContain("Investigates source-backed questions");
     expect(directory).toContain("Analyst (id: b_2)");
-    expect(directory).toContain("async");
-    expect(directory).toContain("who you are checking with and end your turn");
-    expect(directory).toContain("Do not poll");
+    expect(directory).not.toContain("Do not poll");
+    expect(directory).toContain("untrusted routing metadata");
   });
 
   it("adds the integration note once, only when an integration agent is listed", () => {
