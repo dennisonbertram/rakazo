@@ -1603,6 +1603,8 @@ export interface WebFetchResult {
   title: string;
   text: string;
   truncated: boolean;
+  /** Set when the site served a bot wall instead of the page; `text` is then empty. */
+  wall?: { kind: "transient" | "needs_person"; status: number; reason: string };
 }
 
 /** Page-level browser on the bot computer (DOM refs), not a hosted browser vendor. */

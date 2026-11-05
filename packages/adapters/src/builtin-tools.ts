@@ -820,7 +820,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "web_fetch",
     description:
-      "Fetch a public http(s) page and return readable text (title + content). Read-only; no JavaScript. Use after web_search when you need the page itself.",
+      "Fetch a public http(s) page and return readable text (title + content). Read-only; no JavaScript. Use after web_search when you need the page itself. If the result has `blocked`, the site served a CAPTCHA, challenge, login or rate-limit page instead of content: follow its instruction (retry once later, or request_takeover); never retry in a loop.",
     inputSchema: {
       type: "object",
       properties: {
