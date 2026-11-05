@@ -7265,11 +7265,19 @@ describe("mail_reply_batch", () => {
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     });
 
-    it("marks every row of a tainted run, so its new email starts unticked", async () => {
-      const f = batchRun({ externalTaint: true, ...access }, { replies: [newEmail] });
+    it("refuses a chained run with stored taint on a bot that is not firewalled", async () => {
+      const f = batchRun({ externalTaint: true, ...access }, { replies: [replies[0], newEmail] });
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.mailReplyRows).toEqual([]);
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("New email 2") });
+    });
+
+    it("still gives a tainted run its replies", async () => {
+      const f = batchRun({ externalTaint: true, ...access });
       await f.run();
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
-      expect(f.mailReplyRows[0]).toMatchObject({ outsideContent: true });
+      expect(f.mailReplyRows).toHaveLength(2);
     });
 
     it("marks a run that has read outside content the same way", async () => {

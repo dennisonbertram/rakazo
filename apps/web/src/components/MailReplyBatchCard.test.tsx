@@ -565,7 +565,7 @@ describe("new emails", () => {
     expect(host.textContent).not.toContain("replies");
   });
 
-  it("leaves a clean run's new email ticked and a tainted run's unticked", async () => {
+  it("leaves a clean run's new email ticked and an outside-content run's unticked", async () => {
     await render(batch([fresh("a"), fresh("b", { startsUnticked: true })]));
     const box = (id: string) =>
       host.querySelector(

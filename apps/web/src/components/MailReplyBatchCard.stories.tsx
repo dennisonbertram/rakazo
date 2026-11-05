@@ -136,7 +136,7 @@ export const Discarded: Story = {
   args: { block: card(3, { status: "answered", answer: "deny" }) },
   beforeEach: withRows([row("pat"), row("robin"), row("alex")], "denied"),
 };
-/** New emails sit beside replies. A tainted run's new email starts unticked. */
+/** New emails sit beside replies. One from a run that read outside content starts unticked. */
 export const NewEmails: Story = {
   args: { block: card(4, { text: "3 new emails · 1 reply" }) },
   beforeEach: withRows([

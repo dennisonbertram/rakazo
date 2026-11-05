@@ -344,8 +344,8 @@ the call, at the press and in the worker. Migration `20261231000054_mail_reply_n
 
 | Agent or run | New email rows |
 | --- | --- |
-| Firewalled or external agent | The whole call is refused, naming the row. The agent calls again with its replies, which work as before. Firewall turned on after the card: the worker holds the row (`firewall`). |
-| Run that is tainted or has read outside content (`runTainted`, meeting text, `isOutsideContentSeen`) | The row stays on the card and starts unticked, whoever it goes to, so it takes a deliberate tick. |
+| Firewalled or external agent, or a tainted run (`runTainted`: stored `externalTaint`, including a chained run on a bot that is not firewalled, or an external bot in the history) | The whole call is refused, naming the row. The agent calls again with its replies, which work as before. Firewall turned on after the card: the worker holds the row (`firewall`). |
+| Run that has read outside content (meeting text, `isOutsideContentSeen`) | The row stays on the card and starts unticked, whoever it goes to, so it takes a deliberate tick. |
 | Anything else | The row starts ticked, and still waits for Send selected. |
 
 Outside content is any tool result that is not the run's own state (`toolResultTaintsRun`), so an agent

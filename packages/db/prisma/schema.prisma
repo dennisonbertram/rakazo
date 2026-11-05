@@ -2872,7 +2872,7 @@ model MailReplyItem {
   dispatch         String         @default("reviewing")
   /// With "held": why, as a stable code.
   error            String?
-  /// The run was tainted or had read outside content when it proposed this row.
+  /// The run had read outside content when it proposed this row.
   outsideContent   Boolean        @default(false)
   /// The place this row holds in the account's daily new-recipient limit: how many, and since when.
   newRecipientCount Int           @default(0)

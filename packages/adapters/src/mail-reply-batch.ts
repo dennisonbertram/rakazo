@@ -83,8 +83,8 @@ export const startsUnticked = (flags: readonly MailReplyFlag[]) =>
   flags.some((flag) => !INFORMING_FLAGS.includes(flag));
 
 /**
- * The same, for a stored row. A run that was tainted or read outside content may have been told whom
- * to write to, so a new email or a new address waits for a deliberate tick.
+ * The same, for a stored row. A run that read outside content may have been told whom to write to,
+ * so a new email or a new address waits for a deliberate tick.
  */
 export const rowStartsUnticked = (
   row: { providerThreadId: string | null; outsideContent: boolean },
@@ -452,9 +452,9 @@ export async function prepareMailReplyBatch(
     secrets: string[];
     /** Set for a firewalled agent: each thread must stay inside its support label. */
     firewall?: FirewallMailDeps;
-    /** A firewalled or external agent: an injected email must not choose whom it writes to. */
+    /** A firewalled or external agent, or a tainted run: injected text must not choose whom it writes to. */
     refuseNewEmail?: boolean;
-    /** The run is tainted or has read outside content: see rowStartsUnticked. */
+    /** The run has read outside content: see rowStartsUnticked. */
     outsideContent?: boolean;
     prior: PriorMailEffect[];
   },
@@ -523,7 +523,7 @@ export async function prepareMailReplyBatch(
     } else {
       if (deps.refuseNewEmail) {
         return {
-          error: `${name(index)}: this agent can only reply. Remove the row and call again.`,
+          error: `${name(index)}: new emails are not available here, only replies. Remove the row and call again.`,
         };
       }
       if (!newEmailIsComplete(reply)) {

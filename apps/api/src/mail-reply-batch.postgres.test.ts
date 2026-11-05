@@ -1643,11 +1643,24 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect(followUp).toEqual(expect.any(String));
     });
 
-    it("a message while the card still waits for the owner is refused as before", async () => {
-      const c = await card();
-      await expect(say("One more thing")).rejects.toMatchObject({ code: "CONFLICT" });
-      expect(await runStatus(c)).toBe("waiting_input");
-      expect(await prisma.steeringMessage.count({ where: { botId } })).toBe(0);
+    it("a message while the card still waits moves past it, and nothing on it can be sent", async () => {
+      const c = await card([], {
+        replies: [
+          argsFor(["t1"]).replies[0],
+          { to: ["ana@prospect.example.test"], subject: "Hi", body: "Hi Ana" },
+        ],
+      });
+      const posted = await pressRows(c, [0, 1]);
+      await say("One more thing");
+      expect(await runStatus(c)).toBe("queued");
+      expect((await effectOf(c)).status).toBe("denied");
+      await expect(
+        sendMailBatch(rpcDeps(), f.a, target(), { ...c.ids, rows: posted }),
+      ).rejects.toMatchObject({
+        code: "CONFLICT",
+      });
+      await work(c);
+      expect(sent()).toEqual([]);
     });
 
     it("Stop during sending: approved rows still send, settlement wakes nothing, the results stay", async () => {
@@ -1894,7 +1907,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect(replies.rows).toHaveLength(1);
     });
 
-    it("a tainted run's new email starts unticked, even to someone known", async () => {
+    it("a new email from a run that read outside content starts unticked, even to someone known", async () => {
       await f.cache(f.a, f.connA, "known-1", {
         threadId: "known",
         from: address("known"),

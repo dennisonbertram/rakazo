@@ -227,7 +227,7 @@ export type MailBatchCounts = z.infer<typeof MailBatchCountsSchema>;
 
 /**
  * Reasons to look at one row, most serious first. All but the last three start the row unticked.
- * `new_recipient` does too when the run was tainted or had read outside content.
+ * `new_recipient` does too when the run had read outside content.
  */
 export const MAIL_REPLY_FLAGS = [
   "not_on_thread",
