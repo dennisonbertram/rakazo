@@ -75,6 +75,7 @@ import { SendToAgentMenu } from "../../components/data-room/SendToAgent";
 import { EmailCards } from "../../components/EmailCards";
 import { FinanceCardGroup } from "../../components/FinanceCards";
 import { MailApprovalCard } from "../../components/MailApprovalCard";
+import { MailReplyBatchCard } from "../../components/MailReplyBatchCard";
 import { MailThreadCard } from "../../components/MailThreadCard";
 import { MessageHoverMetadata } from "../../components/MessageHoverMetadata";
 import {
@@ -2006,6 +2007,29 @@ const MessageView = memo(function MessageView({
         if (block.kind === "ask") {
           // A card after text in the same message sits one message-gap (20 px) below it.
           const gap = i > 0 ? "mt-5" : undefined;
+          if (block.mailBatch && block.approvalEffectId && message.botId) {
+            return (
+              <div key={i} className={gap}>
+                <MailReplyBatchCard
+                  block={block}
+                  botId={message.botId}
+                  message={message}
+                  canAnswer={canAnswer}
+                  onAnswer={(text) => onAnswer(message, text)}
+                  onOpenComposer={botToolControls?.openComposer}
+                  fallback={
+                    <AskCard
+                      block={block}
+                      requestedAt={message.createdAt}
+                      canAnswer={canAnswer}
+                      ownerOnly={ownerOnly}
+                      onAnswer={(text, username) => onAnswer(message, text, username)}
+                    />
+                  }
+                />
+              </div>
+            );
+          }
           if (block.mail && isApprovalAskBlock(block)) {
             return (
               <div key={i} className={gap}>

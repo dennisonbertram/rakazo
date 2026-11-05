@@ -1,5 +1,5 @@
 import { MailProviderError } from "@rakazo/adapter-kit";
-import type { MailApproval, MailEdits, MessageBlock } from "@rakazo/contracts";
+import type { MailApproval, MailEdits, MailReplyFlag, MessageBlock } from "@rakazo/contracts";
 import {
   AI_DATA_DISCLOSURES,
   AI_DISCLOSURE_VERSION,
@@ -14,6 +14,7 @@ import {
   isMailAgentSpawnKey,
   isReadTool,
   isZernioEndpoint,
+  MAIL_REPLY_BATCH_TOOL,
   MAX_COMPOSE_BODY,
 } from "@rakazo/contracts";
 import {
@@ -63,8 +64,13 @@ export function buildApprovalAskBlock(
     moneyNames?: MoneyNames;
     /** share_meeting: the agent that would receive the meeting. */
     shareTarget?: string;
+    /** mail_reply_batch: the stored rows. */
+    mailBatch?: readonly MailBatchCardRow[];
   },
 ): MessageBlock {
+  if (toolName === MAIL_REPLY_BATCH_TOOL) {
+    return buildMailBatchAskBlock(effectId, options?.mailBatch ?? [], options?.approvalReason);
+  }
   if (toolName === "respond_agent_connection") {
     // Shows who asked, from what was captured before the effect was recorded, not from the model.
     const name = sanitizeMessagingLabel(String(args.requester_name ?? "agent")).replace(
@@ -220,6 +226,54 @@ export function buildApprovalAskBlock(
               : []),
             { id: "deny", label: "Deny" },
           ],
+  };
+}
+
+/** One row of a reply batch as an older client's card lists it. */
+export type MailBatchCardRow = {
+  to: readonly string[];
+  cc: readonly string[];
+  bcc: readonly string[];
+  subject: string;
+  flags: readonly MailReplyFlag[];
+};
+
+const MAIL_REPLY_FLAG_TEXT: Record<MailReplyFlag, string> = {
+  not_on_thread: "Not on this thread",
+  new_message: "New message",
+  important_sender: "Important sender",
+  no_reply_address: "No-reply address",
+  no_reply_needed: "You said no reply needed",
+  has_link: "Has a link",
+};
+
+/**
+ * The card for a reply batch: its one action is Discard, so no answer to it can send or save a rule.
+ * Send selected is a separate request. The rows are listed for clients without the batch card. Each
+ * recipient is shown whole and bare: the model writes the display name, and a name can say anything.
+ */
+function buildMailBatchAskBlock(
+  effectId: string,
+  rows: readonly MailBatchCardRow[],
+  approvalReason?: string,
+): MessageBlock {
+  const bare = (entries: readonly string[]) =>
+    entries.map((entry) => entry.match(/<([^>]+)>\s*$/)?.[1] ?? entry);
+  return {
+    kind: "ask",
+    approvalEffectId: effectId,
+    text: rows.length === 1 ? "1 reply" : `${rows.length} replies`,
+    detail: rows
+      .map((row) => {
+        const to = [...bare(row.to), ...bare(row.cc), ...bare(row.bcc)].join(", ");
+        const flag = row.flags[0] ? ` (${MAIL_REPLY_FLAG_TEXT[row.flags[0]]})` : "";
+        return `${to}: ${truncate(row.subject, 120)}${flag}`;
+      })
+      .join("\n"),
+    approvalReason,
+    mailBatch: { count: rows.length, sent: 0, failed: 0, unknown: 0 },
+    status: "pending",
+    actions: [{ id: "deny", label: "Discard" }],
   };
 }
 
@@ -580,6 +634,7 @@ export function describeApprovalAction(
 const HAND_WRITTEN_TOOLS = new Set([
   "mail_send",
   "mail_draft",
+  "mail_reply_batch",
   "imessage_send",
   "destination.write",
   "delete_bot",

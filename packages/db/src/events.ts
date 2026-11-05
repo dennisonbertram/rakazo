@@ -23,6 +23,12 @@ import {
   CrossSpaceCommunicationBlockedError,
   crossSpaceCommunicationAllowed,
 } from "./cross-space-communication.js";
+import type { AcceptMailReplyBatchInput, AcceptMailReplyBatchResult } from "./mail-reply-batch.js";
+import {
+  acceptMailReplyBatch,
+  setMailBatchCounts,
+  settleMailReplyBatch,
+} from "./mail-reply-batch.js";
 import {
   assertRunCanWriteHistory,
   assertRunIsCancelled,
@@ -68,6 +74,13 @@ export interface ThreadEvents {
   answerRunInput(input: AnswerRunInput): Promise<boolean>;
   findMailApprovalForEdit(input: FindMailApprovalInput): Promise<PendingMailApproval | null>;
   setMailApprovalOutcome(input: SetMailApprovalOutcomeInput): Promise<void>;
+  acceptMailReplyBatch(input: AcceptMailReplyBatchInput): Promise<AcceptMailReplyBatchResult>;
+  setMailBatchCounts(input: { spaceId: string; userId: string; effectId: string }): Promise<void>;
+  settleMailReplyBatch(input: {
+    spaceId: string;
+    userId: string;
+    effectId: string;
+  }): Promise<{ settled: boolean; resumeRunId?: string }>;
   setApprovalWaitsFor(input: SetApprovalWaitsForInput): Promise<void>;
   append(input: AppendEventInput): Promise<ProductEvent>;
   claimSteering(input: ClaimSteeringInput): Promise<ClaimedSteeringMessage[]>;
@@ -202,10 +215,16 @@ export interface AnswerRunInput {
   mailDenial?: { note: string; mail: Partial<MailApproval> };
 }
 
-export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send"]);
+export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send", "mail_reply_batch"]);
 
 /** The compose record key of an edited mail approval: one record per approval effect. */
 export const mailApprovalComposeClientId = (effectId: string) => `approval_${effectId}`;
+
+/** The compose record of one batch reply: one per row, so only one worker can move it to pending. */
+/** A row held because its thread was cleared before a worker took it. */
+export const MAIL_REPLY_CLEARED_HOLD = "thread_cleared";
+export const MAIL_REPLY_CLIENT_PREFIX = "agent:batch_";
+export const mailReplyClientId = (itemId: string) => `${MAIL_REPLY_CLIENT_PREFIX}${itemId}`;
 
 export interface SendUserMessageInput {
   spaceId: string;
@@ -272,6 +291,9 @@ export function createThreadEvents(
     answerRunInput: (input) => answerRunInput(prisma, input, realtime, options.runSecretWriter),
     findMailApprovalForEdit: (input) => findMailApprovalForEdit(prisma, input),
     setMailApprovalOutcome: (input) => setMailApprovalOutcome(prisma, input, realtime),
+    acceptMailReplyBatch: (input) => acceptMailReplyBatch(prisma, input, realtime),
+    setMailBatchCounts: (input) => setMailBatchCounts(prisma, input, realtime),
+    settleMailReplyBatch: (input) => settleMailReplyBatch(prisma, input, realtime),
     setApprovalWaitsFor: (input) => setApprovalWaitsFor(prisma, input, realtime),
     append: (input) => appendEvent(prisma, input, realtime),
     claimSteering: (input) => claimSteering(prisma, input),
@@ -315,6 +337,15 @@ export async function clearThread(
     const now = new Date();
     const runIds = activeRuns.map((run) => run.id);
     await cancelRunsInTransaction(tx, activeRuns, now);
+    // Clearing is a strong signal, and the card with its Retry is gone: replies not yet claimed stop.
+    await tx.mailReplyItem.updateMany({
+      where: {
+        spaceId: input.spaceId,
+        dispatch: "queued",
+        effect: { run: { threadId: input.threadId } },
+      },
+      data: { dispatch: "held", error: MAIL_REPLY_CLEARED_HOLD },
+    });
     // Expire as tombstones so a still-open provider screen claim cannot reset fencing to 1.
     await expireComputerExecutionLeases(tx, { runId: { in: runIds } });
     await tx.computer.updateMany({

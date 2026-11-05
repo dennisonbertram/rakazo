@@ -656,6 +656,7 @@ describe("tool names for people", () => {
   it("never says a mail send or draft finished before its outcome is known", () => {
     expect(toolPhrase("mail_send", "done")).toBe("Email to send");
     expect(toolPhrase("mail_draft", "done")).toBe("Draft to save");
+    expect(toolPhrase("mail_reply_batch", "done")).toBe("Replies to send");
     expect(mailOutcomeSummary("mail_send", "sent")).toBe("Sent email");
     expect(mailOutcomeSummary("mail_send", "failed")).toBe("Couldn't send");
     expect(mailOutcomeSummary("mail_draft", "saved")).toBe("Draft saved");

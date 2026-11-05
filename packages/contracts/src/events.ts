@@ -205,6 +205,103 @@ export const MailEditsSchema = z
   .strict();
 export type MailEdits = z.infer<typeof MailEditsSchema>;
 
+/** The tool that proposes several replies on one card. */
+export const MAIL_REPLY_BATCH_TOOL = "mail_reply_batch";
+/** Rows per call. Over this the call is refused with a message to split it. */
+export const MAX_MAIL_REPLY_BATCH = 20;
+
+/** What a reply batch card shows at a glance; the rows come from `threads.mailBatch`. */
+export const MailBatchCountsSchema = z.object({
+  count: z.number().int().positive(),
+  sent: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  unknown: z.number().int().nonnegative(),
+  /** Nothing is left to send, so Retry failed is open. */
+  settled: z.boolean().optional(),
+});
+export type MailBatchCounts = z.infer<typeof MailBatchCountsSchema>;
+
+/** Reasons to look at one reply, most serious first. All but `has_link` start the row unticked. */
+export const MAIL_REPLY_FLAGS = [
+  "not_on_thread",
+  "new_message",
+  "important_sender",
+  "no_reply_address",
+  "no_reply_needed",
+  "has_link",
+] as const;
+export const MailReplyFlagSchema = z.enum(MAIL_REPLY_FLAGS);
+export type MailReplyFlag = z.infer<typeof MailReplyFlagSchema>;
+
+/** One row of a reply batch card. Recipients are bare addresses: a display name can say anything. */
+export const MailBatchRowSchema = z.object({
+  itemId: Id,
+  replyToId: z.string(),
+  to: z.array(z.string()),
+  cc: z.array(z.string()),
+  bcc: z.array(z.string()),
+  subject: z.string(),
+  body: z.string(),
+  /** Of the stored row; posted back with the press. */
+  hash: z.string().length(64),
+  /** The newest inbound message now; posting it back acknowledges it. */
+  seenMessageId: z.string().nullable(),
+  flags: z.array(MailReplyFlagSchema),
+  /** A row with a flag other than a link starts unticked. */
+  startsUnticked: z.boolean(),
+  state: z.enum(["reviewing", "sending", "sent", "not_sent", "unknown", "skipped", "composer"]),
+  /** Why a row is not sent, when it was held before any send attempt. */
+  error: z.string().nullable(),
+  /** Retry failed can pick this row up. */
+  retryable: z.boolean(),
+});
+export type MailBatchRow = z.infer<typeof MailBatchRowSchema>;
+
+export const MailBatchSchema = z.object({
+  /** The address every row goes out from. */
+  account: z.string().nullable(),
+  effectStatus: z.string(),
+  rows: z.array(MailBatchRowSchema),
+});
+export type MailBatch = z.infer<typeof MailBatchSchema>;
+
+/** One ticked row of Send selected. Edits replace the row's fields before its hash is approved. */
+export const MailBatchPressRowSchema = z.object({
+  itemId: Id,
+  hash: z.string().length(64),
+  seenMessageId: z.string().max(500).nullable(),
+  /** The flags the card showed for this row, edits included. The server recomputes them. */
+  flags: z.array(MailReplyFlagSchema),
+  edits: MailEditsSchema.omit({ account: true, send: true }).optional(),
+});
+export type MailBatchPressRow = z.infer<typeof MailBatchPressRowSchema>;
+
+/** The flags rows would have with their unsaved edits. */
+export const MailBatchPreviewSchema = z.object({
+  rows: z.array(
+    z.object({
+      itemId: Id,
+      flags: z.array(MailReplyFlagSchema),
+      startsUnticked: z.boolean(),
+    }),
+  ),
+});
+export type MailBatchPreview = z.infer<typeof MailBatchPreviewSchema>;
+
+/** What the composer opens with when the owner takes a row that did not go out. */
+export const MailBatchComposerDraftSchema = z.object({
+  connectionId: z.string(),
+  account: z.string(),
+  to: z.array(z.string()),
+  cc: z.array(z.string()),
+  bcc: z.array(z.string()),
+  subject: z.string(),
+  body: z.string(),
+  /** The synced message answered, so the reply stays in its thread. */
+  replyToId: z.string().optional(),
+});
+export type MailBatchComposerDraft = z.infer<typeof MailBatchComposerDraftSchema>;
+
 /** The effect kind of a bot-to-bot message held for the owner before it reaches an external bot. */
 export const BOT_SHARE_EFFECT_KIND = "bot_message_share";
 /** Server-written replies to the external bot; never model text. */
@@ -231,6 +328,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     /** The service that must still approve a money request on its own side after the person allows it. */
     waitsFor: z.string().optional(),
     mail: MailApprovalSchema.optional(),
+    /** A reply batch: Discard is the card's only action; Send selected is its own request. */
+    mailBatch: MailBatchCountsSchema.optional(),
     /**
      * A held message from one bot to an external bot: Allow delivers exactly the text on the card,
      * once. It is answered without a waiting run.

@@ -47,6 +47,7 @@ export const FIREWALL_ASK_TOOLS: ReadonlySet<string> = new Set([
   "page_create",
   "page_edit",
   "mail_send",
+  "mail_reply_batch",
   "mail_draft",
   "mail_modify",
   "web_fetch",
@@ -101,11 +102,20 @@ export function firewallDraftIsFree(input: {
   body?: string;
   participants: readonly string[];
 }): boolean {
-  const recipients = [...(input.to ?? []), ...(input.cc ?? []), ...(input.bcc ?? [])].map(
-    bareAddress,
-  );
+  const recipients = [...(input.to ?? []), ...(input.cc ?? []), ...(input.bcc ?? [])];
   if (recipients.length === 0) return false;
-  const known = new Set(input.participants.map(bareAddress));
-  if (!recipients.every((address) => known.has(address))) return false;
-  return !/https?:\/\/|www\./i.test(input.body ?? "");
+  if (recipientsOffThread(recipients, input.participants).length > 0) return false;
+  return !bodyHasLink(input.body ?? "");
 }
+
+/** The bare addresses that are not participants of the thread. The caller splits each field first. */
+export function recipientsOffThread(
+  recipients: readonly string[],
+  participants: readonly string[],
+): string[] {
+  const known = new Set(participants.map(bareAddress));
+  return recipients.map(bareAddress).filter((address) => !known.has(address));
+}
+
+/** Any link in a mail body, until the firewall site list exists. */
+export const bodyHasLink = (body: string) => /https?:\/\/|www\./i.test(body);
