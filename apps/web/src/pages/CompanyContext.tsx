@@ -226,9 +226,11 @@ export function CompanyContext() {
                     <span className="block text-[14.5px] font-medium text-foreground">
                       {section.title}
                     </span>
-                    <span className="mt-0.5 block text-[13.5px] text-muted-foreground">
-                      {section.summary}
-                    </span>
+                    {!expanded && (
+                      <span className="mt-0.5 block text-[13.5px] text-muted-foreground">
+                        {section.summary}
+                      </span>
+                    )}
                   </span>
                 </button>
                 <span className="mt-0.5 hidden shrink-0 text-[12.5px] text-muted-foreground sm:block">
