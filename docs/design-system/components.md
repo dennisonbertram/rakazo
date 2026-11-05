@@ -6,7 +6,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 - Web and shared component files with stories: 337 of 337
 - Web and shared components: 856
 - Mobile components: 153 in 102 files, mobile — native story pending
-- SwiftUI views: 139 in 76 files, native story pending
+- SwiftUI views: 140 in 76 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -112,7 +112,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | NotificationSettingsSection | [apps/web/src/components/NotificationSettings.tsx](../../apps/web/src/components/NotificationSettings.tsx) | [NotificationSettings.stories.tsx](../../apps/web/src/components/NotificationSettings.stories.tsx) | web |
 | PageAgentIntro | [apps/web/src/components/PageAgentIntro.tsx](../../apps/web/src/components/PageAgentIntro.tsx) | [PageAgentIntro.stories.tsx](../../apps/web/src/components/PageAgentIntro.stories.tsx) | web |
 | PageAgentsRow | [apps/web/src/components/PageAgentsRow.tsx](../../apps/web/src/components/PageAgentsRow.tsx) | [PageAgentsRow.stories.tsx](../../apps/web/src/components/PageAgentsRow.stories.tsx) | web |
-| PageEmptyState | [apps/web/src/components/PageEmptyState.tsx](../../apps/web/src/components/PageEmptyState.tsx) | [PageEmptyState.stories.tsx](../../apps/web/src/components/PageEmptyState.stories.tsx) | web |
+| PageEmptyState | [apps/web/src/components/PageEmptyState.tsx](../../apps/web/src/components/PageEmptyState.tsx) | [PageEmptyState.stories.tsx](../../apps/web/src/components/PageEmptyState.stories.tsx), [CompanyContext.stories.tsx](../../apps/web/src/pages/CompanyContext.stories.tsx) | web |
 | PageNavButton, PageHeader | [apps/web/src/components/PageHeader.tsx](../../apps/web/src/components/PageHeader.tsx) | [PageHeader.stories.tsx](../../apps/web/src/components/PageHeader.stories.tsx), [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx) | web |
 | PasskeySettings, PasskeyList | [apps/web/src/components/PasskeySettings.tsx](../../apps/web/src/components/PasskeySettings.tsx) | [PasskeySettings.stories.tsx](../../apps/web/src/components/PasskeySettings.stories.tsx) | web |
 | PdfViewer | [apps/web/src/components/PdfViewer.tsx](../../apps/web/src/components/PdfViewer.tsx) | [PdfViewer.stories.tsx](../../apps/web/src/components/PdfViewer.stories.tsx) | web |
@@ -432,7 +432,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | ScratchpadItemMeta, ScratchpadSection | [apps/web/src/pages/ScratchpadSection.tsx](../../apps/web/src/pages/ScratchpadSection.tsx) | [ScratchpadSection.stories.tsx](../../apps/web/src/pages/ScratchpadSection.stories.tsx) | web |
 | SettingsOverlay | [apps/web/src/pages/SettingsOverlay.tsx](../../apps/web/src/pages/SettingsOverlay.tsx) | [SettingsOverlay.stories.tsx](../../apps/web/src/pages/SettingsOverlay.stories.tsx) | web |
 | SharedArtifactPage | [apps/web/src/pages/SharedArtifact.tsx](../../apps/web/src/pages/SharedArtifact.tsx) | [SharedArtifact.stories.tsx](../../apps/web/src/pages/SharedArtifact.stories.tsx) | web |
-| ShellPage, ComputerReleaseActions, DesktopKindEmptyState | [apps/web/src/pages/Shell.tsx](../../apps/web/src/pages/Shell.tsx) | [Shell.stories.tsx](../../apps/web/src/pages/Shell.stories.tsx) | web |
+| ShellPage, ComputerReleaseActions, DesktopKindEmptyState | [apps/web/src/pages/Shell.tsx](../../apps/web/src/pages/Shell.tsx) | [CompanyContext.stories.tsx](../../apps/web/src/pages/CompanyContext.stories.tsx), [Shell.stories.tsx](../../apps/web/src/pages/Shell.stories.tsx) | web |
 | AvatarStudioPopover | [apps/web/src/pages/shell/avatar-studio-popover.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.tsx) | [avatar-studio-popover.stories.tsx](../../apps/web/src/pages/shell/avatar-studio-popover.stories.tsx) | web |
 | BotCredentialsSection | [apps/web/src/pages/shell/bot-credentials.tsx](../../apps/web/src/pages/shell/bot-credentials.tsx) | [bot-credentials.stories.tsx](../../apps/web/src/pages/shell/bot-credentials.stories.tsx) | web |
 | LiveDelete, ChartView, MetricView, TableView, GtmView, PageEditor, BotPagePanel | [apps/web/src/pages/shell/bot-page-panel.tsx](../../apps/web/src/pages/shell/bot-page-panel.tsx) | [bot-page-panel.stories.tsx](../../apps/web/src/pages/shell/bot-page-panel.stories.tsx) | web |
@@ -590,7 +590,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | CapTableScreen, HolderRow, HolderDetailView | [apps/ios/Sources/Praci/CapTable/CapTableScreen.swift](../../apps/ios/Sources/Praci/CapTable/CapTableScreen.swift) | native story pending | iOS |
 | ComputerKeyBar | [apps/ios/Sources/Praci/Computer/ComputerKeyBar.swift](../../apps/ios/Sources/Praci/Computer/ComputerKeyBar.swift) | native story pending | iOS |
 | ComputerScreen | [apps/ios/Sources/Praci/Computer/ComputerScreen.swift](../../apps/ios/Sources/Praci/Computer/ComputerScreen.swift) | native story pending | iOS |
-| DataRoomItemScreen | [apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift) | native story pending | iOS |
+| DataRoomItemScreen, DataRoomItemLoader | [apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomItemScreen.swift) | native story pending | iOS |
 | DataRoomFolderRow, DataRoomItemRow, DataRoomUploadRow, DataRoomConsentSheet | [apps/ios/Sources/Praci/DataRoom/DataRoomRows.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomRows.swift) | native story pending | iOS |
 | DataRoomScreen, DataRoomListView | [apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift](../../apps/ios/Sources/Praci/DataRoom/DataRoomScreen.swift) | native story pending | iOS |
 | FinanceScreen, TransactionRow, BurnChart | [apps/ios/Sources/Praci/Finance/FinanceScreen.swift](../../apps/ios/Sources/Praci/Finance/FinanceScreen.swift) | native story pending | iOS |
