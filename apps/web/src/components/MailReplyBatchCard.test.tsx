@@ -4,7 +4,7 @@ import type { MailBatch, MessageBlock } from "@rakazo/contracts";
 import type { ComponentProps, ReactNode } from "react";
 import { act, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UNDO_SEND_MS, undoSend } from "../lib/outbox";
 import { MailReplyBatchCard } from "./MailReplyBatchCard";
 
@@ -534,6 +534,90 @@ it("a row newly flagged on a reload is unticked; one the owner re-ticked stays",
     await vi.advanceTimersByTimeAsync(0);
   });
   expect(tick("one")?.checked).toBe(false);
+});
+
+describe("new emails", () => {
+  const fresh = (id: string, extra: Partial<Row> = {}) =>
+    row(id, {
+      replyToId: null,
+      seenMessageId: null,
+      subject: `Hello ${id}`,
+      flags: ["new_recipient"],
+      ...extra,
+    });
+
+  it("marks a new email apart from a reply, and titles the card with both", async () => {
+    await render(batch([row("old"), fresh("new")]));
+    expect(host.textContent).toContain("1 new email · 1 reply");
+    const [reply, email] = items();
+    expect(reply).not.toContain("New email");
+    expect(email).toContain("New email");
+    expect(email).toContain("New recipient");
+    expect(
+      host.querySelector('input[aria-label="Include new email to new@customer.example.test"]'),
+    ).not.toBeNull();
+    expect(tick("old")).not.toBeNull();
+  });
+
+  it("titles a card of new emails only", async () => {
+    await render(batch([fresh("a"), fresh("b")]));
+    expect(host.textContent).toContain("2 new emails");
+    expect(host.textContent).not.toContain("replies");
+  });
+
+  it("leaves a clean run's new email ticked and a tainted run's unticked", async () => {
+    await render(batch([fresh("a"), fresh("b", { startsUnticked: true })]));
+    const box = (id: string) =>
+      host.querySelector(
+        `input[aria-label="Include new email to ${id}@customer.example.test"]`,
+      ) as HTMLInputElement;
+    expect(box("a").checked).toBe(true);
+    expect(box("b").checked).toBe(false);
+    expect(buttonMatching(/Send selected \(1\)/)).toBeDefined();
+  });
+
+  it("says why a row was held by the daily limit, and offers Retry failed", async () => {
+    await render(
+      batch(
+        [fresh("a", { state: "not_sent", error: "daily_limit", retryable: true })],
+        "completed",
+      ),
+      block({ status: "answered", answer: "send" }),
+    );
+    expect(host.textContent).toContain("Daily limit for new recipients reached");
+    expect(button("Retry failed")).toBeDefined();
+  });
+
+  it("shows flags an edit gave a row that was not edited, and posts them", async () => {
+    rpc.threads.previewMailBatch.mockResolvedValue({
+      rows: [
+        { itemId: "a", flags: ["duplicate_email", "new_recipient"], startsUnticked: true },
+        { itemId: "b", flags: ["duplicate_email", "new_recipient"], startsUnticked: true },
+      ],
+    });
+    await render(batch([fresh("a"), fresh("b")]));
+    await click(buttonMatching(/a@customer/));
+    await click(button("Edit"));
+    const subject = [...host.querySelectorAll("input")].find(
+      (el) => el.value === "Hello a",
+    ) as HTMLInputElement;
+    await type(subject, "Changed");
+    await settle();
+    expect(items()[1]).toContain("Possible duplicate");
+    const box = (id: string) =>
+      host.querySelector(
+        `input[aria-label="Include new email to ${id}@customer.example.test"]`,
+      ) as HTMLInputElement;
+    expect(box("a").checked).toBe(false);
+    expect(box("b").checked).toBe(false);
+    await click(box("b"));
+    expect(box("b").checked).toBe(true);
+    await pressSend(/Send selected \(1\)/);
+    expect(rpc.threads.sendMailBatch.mock.calls[0]?.[0].rows[0]).toMatchObject({
+      itemId: "b",
+      flags: ["duplicate_email", "new_recipient"],
+    });
+  });
 });
 
 it("falls back to the plain card when the rows cannot be read", async () => {

@@ -24,6 +24,17 @@ const row = (name: string, extra: Partial<Row> = {}): Row => ({
   ...extra,
 });
 
+const newEmail = (name: string, extra: Partial<Row> = {}) =>
+  row(name, {
+    replyToId: null,
+    seenMessageId: null,
+    to: [`${name}@prospect.example.test`],
+    subject: `Hello ${name}`,
+    body: `Hi ${name},\n\nI read your note about export times and wrote this one for you.`,
+    flags: ["new_recipient"],
+    ...extra,
+  });
+
 const review = [
   row("sam", {
     cc: ["billing@other.example.test"],
@@ -124,6 +135,39 @@ export const PartlySent: Story = {
 export const Discarded: Story = {
   args: { block: card(3, { status: "answered", answer: "deny" }) },
   beforeEach: withRows([row("pat"), row("robin"), row("alex")], "denied"),
+};
+/** New emails sit beside replies. A tainted run's new email starts unticked. */
+export const NewEmails: Story = {
+  args: { block: card(4, { text: "3 new emails · 1 reply" }) },
+  beforeEach: withRows([
+    row("pat"),
+    newEmail("sasha", { startsUnticked: true }),
+    newEmail("noor"),
+    newEmail("kai", {
+      subject: "Hello noor",
+      flags: ["duplicate_email", "new_recipient"],
+      startsUnticked: true,
+    }),
+  ]),
+};
+/** Over the daily limit: the row says why, and Retry failed can try it again later. */
+export const NewEmailsOverLimit: Story = {
+  args: {
+    block: card(3, {
+      text: "3 new emails",
+      status: "answered",
+      answer: "send",
+      mailBatch: { count: 3, sent: 1, failed: 2, unknown: 0, settled: true },
+    }),
+  },
+  beforeEach: withRows(
+    [
+      newEmail("sasha", { state: "sent" }),
+      newEmail("noor", { state: "not_sent", error: "daily_limit", retryable: true }),
+      newEmail("kai", { state: "not_sent", error: "daily_limit", retryable: true }),
+    ],
+    "completed",
+  ),
 };
 /** Phone width, the same card. */
 export const Phone: Story = {

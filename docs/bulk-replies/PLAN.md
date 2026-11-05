@@ -1,8 +1,8 @@
 # Bulk replies: plan
 
-Status: plan only. Nothing here is built. Addresses and names in the mockup are invented. Code
-references are to `origin/main` at 6b355a8f6. "Proposal" marks a choice this plan makes; everything
-else was read from the code.
+Status: sections 1 to 6 are the original plan, and S1 to S3 and S6 are built. Section 7 adds new
+outreach emails. Addresses and names in the mockup are invented. Code references are to `origin/main`
+at 6b355a8f6. "Proposal" marks a choice this plan makes; everything else was read from the code.
 
 ## Why
 
@@ -50,7 +50,7 @@ mail_reply_batch({ account?, replies: [{ replyToId, to, cc?, bcc?, subject, body
 | `mail_draft`, then a card over the drafts | A send of a saved draft shows a locked card with no body, and the Carta and Inbox agents refuse `draftId` for that reason. A draft can also change in Gmail after review, which `sendSavedMailDraft` cannot detect. Discarding leaves clean-up work in Gmail, and one row with a new recipient makes `mail_draft` ask for a firewalled agent, which brings back a card per row. |
 
 - **Replies only.** `replyToId` is required on every row, so the tool cannot start a conversation and
-  cannot serve as a mailing list. No attachments, as with `mail_send` today.
+  cannot serve as a mailing list. No attachments, as with `mail_send` today. (Changed by section 7.)
 - **Limit: 20 rows per call (proposal).** It matches `MAX_EMAIL_CARDS` and
   `MAX_PENDING_PER_CONNECTION`, both 20. `MAX_BULK_ARCHIVE` is 50, but an archive can be undone. Over
   the limit the call is refused with a message to split it. Each row keeps `MAX_COMPOSE_BODY`.
@@ -322,3 +322,76 @@ model key, ask a firewalled test agent to answer three invented emails on the em
 - **TBD: a new owner message during sending.** The message path treats `waiting_input` as active. The
   exact behaviour with an answered card must be checked in S2. Default: same as Stop above.
 - **TBD: Expo editing.** Default: none. Alternative: the composer screen.
+
+## 7. New outreach emails
+
+The owner chose to add new emails to the same card: a row can be a new email to someone the owner has
+not written to. Each one is written for its person, with at most 20 rows per card. **This is one-to-one
+outreach, not bulk marketing.** There is no unsubscribe handling, so it must not be used as a mailing
+list. Bulk marketing would also need an unsubscribe link and `List-Unsubscribe` header, a suppression
+list honoured on every send, a sender's postal address, consent records and bounce handling.
+
+**Tool: `mail_reply_batch` is extended, not renamed.** A row with no `replyToId` is a new email. The
+name is on every gate list, and `accountAllowedIn` returns true for a name missing from
+`GOOGLE_BUILTIN_WRITES`, so a rename risks a write hole. It is also the effect kind of cards in flight,
+of the job and of the reconciler. The name reads a little narrowly; the description covers it. An empty
+`replyToId` is refused, and one that is not synced is still refused, so a bad id never turns a reply into
+a new email. The guarantees of sections 2 and 3 apply to these rows unchanged, through the same row,
+hash, `ComposeSend`, claim and Retry.
+
+**Rows.** `replyToId` and `providerThreadId` are null. A new email needs a To, a subject and a body, at
+the call, at the press and in the worker. Migration `20261231000054_mail_reply_new_emails`.
+
+| Agent or run | New email rows |
+| --- | --- |
+| Firewalled or external agent | The whole call is refused, naming the row. The agent calls again with its replies, which work as before. Firewall turned on after the card: the worker holds the row (`firewall`). |
+| Run that is tainted or has read outside content (`runTainted`, meeting text, `isOutsideContentSeen`) | The row stays on the card and starts unticked, whoever it goes to, so it takes a deliberate tick. |
+| Anything else | The row starts ticked, and still waits for Send selected. |
+
+Outside content is any tool result that is not the run's own state (`toolResultTaintsRun`), so an agent
+that reads mail before it writes gets unticked rows. That is the intended cost.
+
+**New flags.** Computed on the server like the others, on every row, and acknowledged at the press.
+
+| Flag | Condition | Starts |
+| --- | --- | --- |
+| "New recipient" | An address with no message in that account's synced mail. Only as complete as the sync, so it can read someone known long ago as new. | Ticked, or unticked per the table above |
+| "Possible duplicate" | The same address on two new rows of this card (both flagged), or the same subject (ignoring case) sent to it in the last 30 days, in synced mail or on another card. | Unticked |
+| "Same text as others" | Three or more new rows share one text, ignoring case and spacing. Exact matches only: it is cheap and catches a mailing, but not a template with a name changed. | Ticked |
+
+New emails reuse `protectedSenders` ("Important sender") and the no-reply test of `replyGuard`
+("No-reply address") on their recipients. A Contacts entry therefore starts unticked, like section 6's
+open question.
+
+**Daily limit: `MAX_NEW_RECIPIENT_SENDS_PER_DAY` = 40 per account, over a rolling 24 hours (proposal).**
+That is two full cards. Mail to many people who never wrote back is what harms a Gmail account's sender
+reputation, and this keeps a card far from that and from the provider's own caps. It is a chosen default,
+not a measured threshold. A rolling window needs no time zone and allows no burst at midnight.
+
+- **What it counts.** Each new address of a row, including a stranger Cc'd on a reply. Replies to people
+  already in the mail do not count.
+- **Why a new column.** `ComposeSend` has an account and a state but no recipients, and an address stops
+  looking new once the send syncs, so sends cannot be counted back later. `newRecipientCount` and
+  `newRecipientAt` on the row are the count.
+- **Concurrency.** Just before its send, the worker takes a place in one transaction under
+  `pg_advisory_xact_lock` on the account, so workers cannot overrun it. A row that holds a place keeps it,
+  so a retry is not counted twice. A definite provider refusal gives the place back; an `unknown` keeps it.
+- **Over the limit.** The row is held as `daily_limit`. It shows its reason, the agent is told, and Retry
+  failed can try it later. Not counted: `mail_send` cards and the composer.
+
+### New copy
+
+| Copy | Where | Why it is needed | Why not remove it or reveal it later |
+| --- | --- | --- | --- |
+| "New email" | Row badge | Tells a new email from a reply at a glance; the two look alike otherwise. | Shown only on those rows. |
+| "{n} new email(s)", "{n} new emails · {m} replies" | Card title and older clients | "{n} replies" would be false. | Replaces it, only with such rows. |
+| "New recipient" | Row flag | This person has not been in this mailbox. | Shown only when true. |
+| "Possible duplicate" | Row flag | Prevents writing to someone twice. | Shown only when true. |
+| "Same text as others" | Row flag | These rows read as a mailing, which this card is not for. | Shown only when true. |
+| "Daily limit for new recipients reached. Retry later." | Row, after sending | A held row must say why, and "Not sent" alone reads as a failure to retry now. | Shown only for that hold. |
+| "Firewall is on, so this agent can only reply." | Row, after sending | Same, for the worker's hold. | Shown only for that hold. |
+| "Include new email to {address}" | Accessible name of a tick | Screen readers need the difference. | Not visible. |
+| "Emails to send" | Activity line, replacing "Replies to send" | The call can now be new emails. | Same length, no new line. |
+| "New: " | Start of a row's line, older clients only | iPhone and Expo show the plain list with Discard. | Those clients have no badge. |
+
+iPhone and Expo stay as the plain card with Discard, so new emails can only be sent from web and Electron.

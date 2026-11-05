@@ -1,6 +1,11 @@
 import type { RealtimeFanout } from "@rakazo/adapter-kit";
 import type { MailBatchCounts } from "@rakazo/contracts";
-import { MAIL_REPLY_BATCH_TOOL, MessageBlock as MessageBlockSchema } from "@rakazo/contracts";
+import {
+  MAIL_REPLY_BATCH_TOOL,
+  MAIL_REPLY_FIREWALL_HOLD,
+  MAIL_REPLY_LIMIT_HOLD,
+  MessageBlock as MessageBlockSchema,
+} from "@rakazo/contracts";
 import { mailReplyHash } from "@rakazo/core/node/approval-effect-key";
 import type { Prisma, PrismaClient } from "./client.js";
 import { appendEventInTransaction, mailReplyClientId, notifyRealtime } from "./events.js";
@@ -8,6 +13,60 @@ import { announceDelegatePending } from "./run-pauses.js";
 
 /** A row held because its stored text no longer matches what the owner approved. Never retried. */
 export const MAIL_REPLY_HASH_HOLD = "hash";
+
+/**
+ * New recipients one mail account may reach through batch cards in any 24 hours: two full cards.
+ * Sending to many people who never wrote back is what harms a Gmail account's sender reputation, and
+ * a limit far below the provider's own hard caps stops a card from getting near that. A proposal, not
+ * a measured threshold: change it here if real accounts show otherwise. Replies to people already in
+ * the account's mail do not count.
+ */
+export const MAX_NEW_RECIPIENT_SENDS_PER_DAY = 40;
+const NEW_RECIPIENT_WINDOW_MS = 24 * 60 * 60_000;
+
+/**
+ * Takes this row's place in its account's limit, right before its send. The lock makes the count and
+ * the claim one step across workers. A row that already holds a place keeps it, so a retry or a
+ * recovered worker is never counted twice. False means no room: nothing changed.
+ */
+export async function reserveNewRecipientSends(
+  prisma: PrismaClient,
+  input: Scope & { itemId: string; connectionId: string; count: number; now?: Date },
+): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const scope = { spaceId: input.spaceId, userId: input.userId };
+  return prisma.$transaction(async (tx: Tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`mail-new-recipients:${input.connectionId}`}))`;
+    const row = await tx.mailReplyItem.findFirstOrThrow({
+      where: { ...scope, id: input.itemId },
+      select: { newRecipientAt: true },
+    });
+    if (row.newRecipientAt) return true;
+    const used = await tx.mailReplyItem.aggregate({
+      where: {
+        ...scope,
+        connectionId: input.connectionId,
+        newRecipientAt: { gte: new Date(now.getTime() - NEW_RECIPIENT_WINDOW_MS) },
+      },
+      _sum: { newRecipientCount: true },
+    });
+    if ((used._sum.newRecipientCount ?? 0) + input.count > MAX_NEW_RECIPIENT_SENDS_PER_DAY) {
+      return false;
+    }
+    await tx.mailReplyItem.update({
+      where: { id: input.itemId },
+      data: { newRecipientCount: input.count, newRecipientAt: now },
+    });
+    return true;
+  });
+}
+
+/** Gives the place back when the provider refused the row, so an outage does not use up the day. */
+export const releaseNewRecipientSends = (prisma: PrismaClient, scope: Scope, itemId: string) =>
+  prisma.mailReplyItem.updateMany({
+    where: { ...scope, id: itemId },
+    data: { newRecipientCount: 0, newRecipientAt: null },
+  });
 
 type Scope = { spaceId: string; userId: string };
 type Tx = Prisma.TransactionClient;
@@ -47,7 +106,7 @@ async function rowStates(
   const rows = await db.mailReplyItem.findMany({
     where: { ...scope, effectId },
     orderBy: { position: "asc" },
-    select: { id: true, replyToId: true, dispatch: true },
+    select: { id: true, replyToId: true, to: true, dispatch: true, error: true },
   });
   const records = await db.composeSend.findMany({
     where: { ...scope, clientId: { in: rows.map((row) => mailReplyClientId(row.id)) } },
@@ -256,6 +315,9 @@ export async function setMailBatchCounts(
 
 const AGENT_NOTE =
   "The user sees each reply's result on the card. Do not list them; answer in a sentence.";
+const LIMIT_NOTE =
+  " Some new emails were not sent because this account reached its daily limit for new recipients. Say so, and do not propose them again today.";
+const HOLD_REASONS: readonly (string | null)[] = [MAIL_REPLY_LIMIT_HOLD, MAIL_REPLY_FIREWALL_HOLD];
 
 /**
  * Ends the waiting call once nothing is left to send: the effect moves from executing to completed
@@ -291,8 +353,17 @@ export async function settleMailReplyBatch(
         status: "completed",
         result: {
           ...counts,
-          replies: rows.map((row) => ({ replyToId: row.replyToId, outcome: outcome(row.state) })),
-          note: AGENT_NOTE,
+          replies: rows.map((row) => ({
+            replyToId: row.replyToId,
+            ...(row.replyToId ? {} : { to: row.to }),
+            outcome: outcome(row.state),
+            ...(row.dispatch === "held" && HOLD_REASONS.includes(row.error)
+              ? { reason: row.error }
+              : {}),
+          })),
+          note: rows.some((row) => row.dispatch === "held" && row.error === MAIL_REPLY_LIMIT_HOLD)
+            ? AGENT_NOTE + LIMIT_NOTE
+            : AGENT_NOTE,
         },
       },
     });

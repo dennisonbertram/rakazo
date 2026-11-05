@@ -6288,6 +6288,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 effectId: applied.effect.id,
                 secrets: runSecrets,
                 ...(firewallMail ? { firewall: firewallMail } : {}),
+                refuseNewEmail: firewalled || bot.audience === "external",
+                outsideContent: runTainted || runReadMeetingText || (await isOutsideContentSeen()),
                 prior: await priorMailEffects(applied.effect.id),
               },
               args,
@@ -12345,7 +12347,7 @@ export const MAIL_CONSENT_OFF =
 
 const firstBatchReplyTo = (args: Record<string, unknown>) =>
   Array.isArray(args.replies)
-    ? (args.replies[0] as { replyToId?: unknown } | undefined)?.replyToId
+    ? (args.replies as { replyToId?: unknown }[]).find((reply) => reply?.replyToId)?.replyToId
     : undefined;
 
 /**

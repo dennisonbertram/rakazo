@@ -753,6 +753,25 @@ describe("mail_reply_batch card", () => {
     expect(block).not.toHaveProperty("toolId");
   });
 
+  it("titles a card with new emails and marks them for clients without the batch card", () => {
+    const fresh = {
+      to: ["ana@prospect.example"],
+      cc: [],
+      bcc: [],
+      subject: "Hello",
+      flags: ["new_recipient"] as const,
+      newEmail: true,
+    };
+    const titled = (mailBatch: readonly (typeof fresh | (typeof rows)[number])[]) =>
+      buildApprovalAskBlock("e1", "mail_reply_batch", {}, [], { mailBatch });
+    expect(titled([fresh])).toMatchObject({ text: "1 new email" });
+    expect(titled([fresh, fresh])).toMatchObject({ text: "2 new emails" });
+    expect(titled([fresh, ...rows])).toMatchObject({
+      text: "1 new email · 2 replies",
+      detail: expect.stringContaining("New: ana@prospect.example: Hello (New recipient)"),
+    });
+  });
+
   it("lists every recipient as a bare address with the most serious flag", () => {
     const block = buildApprovalAskBlock("e1", "mail_reply_batch", {}, [], { mailBatch: rows });
     if (block.kind !== "ask") throw new Error("not an ask");

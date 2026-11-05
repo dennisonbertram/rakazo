@@ -2840,7 +2840,7 @@ model ComposeSend {
   @@map("compose_sends")
 }
 
-/// One reply of a mail_reply_batch call. The ExternalEffect is the batch header; each outgoing
+/// One row of a mail_reply_batch call: a reply, or a new email with no replyToId or thread. The ExternalEffect is the batch header; each outgoing
 /// message is built from this row, and its send state is the row's ComposeSend
 /// (clientId `agent:batch_<id>`), never a copy here.
 model MailReplyItem {
@@ -2854,9 +2854,9 @@ model MailReplyItem {
   user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   connectionId     String
   connection       Connection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  /// The provider's id of the message answered.
-  replyToId        String
-  providerThreadId String
+  /// The provider's id of the message answered. Null, with providerThreadId, for a new email.
+  replyToId        String?
+  providerThreadId String?
   to               String[]
   cc               String[]
   bcc              String[]
@@ -2870,12 +2870,18 @@ model MailReplyItem {
   dispatch         String         @default("reviewing")
   /// With "held": why, as a stable code.
   error            String?
+  /// The run was tainted or had read outside content when it proposed this row.
+  outsideContent   Boolean        @default(false)
+  /// The place this row holds in the account's daily new-recipient limit: how many, and since when.
+  newRecipientCount Int           @default(0)
+  newRecipientAt   DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   @@unique([effectId, position])
   @@index([spaceId, userId])
   @@index([connectionId])
+  @@index([connectionId, newRecipientAt])
   @@index([dispatch, updatedAt])
   @@map("mail_reply_items")
 }

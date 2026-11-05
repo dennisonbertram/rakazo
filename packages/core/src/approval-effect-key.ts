@@ -59,7 +59,7 @@ export function approvalEffectKey(
  */
 export function mailReplyHash(row: {
   connectionId: string;
-  replyToId: string;
+  replyToId: string | null;
   to: readonly string[];
   cc: readonly string[];
   bcc: readonly string[];

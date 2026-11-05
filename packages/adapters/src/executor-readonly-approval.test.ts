@@ -697,6 +697,7 @@ function fixture({
           connectionRows.find((row) => matchesWhere(row, where)) ?? null,
       ),
     },
+    $queryRaw: vi.fn(async () => []),
     cachedMailMessage: {
       findFirst: vi.fn(async () => ({ id: "cached-1", threadId: "thread-x" })),
       findMany: vi.fn(async () => [{ id: "cached-1" }]),
@@ -7038,6 +7039,7 @@ describe("mail_reply_batch", () => {
     {
       providerMessageId: "m1",
       threadId: "t1",
+      subject: "One",
       connectionId: "acct-1",
       fromAddress: "sam@customer.example",
       toAddresses: ["support@us.example"],
@@ -7048,6 +7050,7 @@ describe("mail_reply_batch", () => {
     {
       providerMessageId: "m2",
       threadId: "t2",
+      subject: "Two",
       connectionId: "acct-1",
       fromAddress: "lee@customer.example",
       toAddresses: ["support@us.example"],
@@ -7149,6 +7152,66 @@ describe("mail_reply_batch", () => {
     expect(f.mailReplyRows).toEqual([]);
   });
 
+  describe("new emails", () => {
+    const newEmail = { to: ["ana@prospect.example"], subject: "Hello Ana", body: "Hi Ana" };
+    const access = {
+      connectionRows: [
+        { ...mailConnectionRow(), allAgents: false, botAccess: [{ botId: "bot-1" }] },
+      ],
+    };
+
+    it("shows a new email on the card, marked, and a clean run does not untick it", async () => {
+      const f = batchRun({}, { replies: [replies[0], newEmail] });
+      await f.run();
+      expect(card(f).text).toBe("1 new email · 1 reply");
+      expect(card(f).actions.map((action) => action.id)).toEqual(["deny"]);
+      expect(card(f).detail).toContain("New: ana@prospect.example: Hello Ana (New recipient)");
+      expect(f.mailReplyRows[1]).toMatchObject({
+        replyToId: null,
+        providerThreadId: null,
+        outsideContent: false,
+      });
+    });
+
+    it("takes the account from the first row that has a replyToId", async () => {
+      const f = batchRun({}, { replies: [newEmail, replies[0]] });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.mailReplyRows.map((row) => row.replyToId)).toEqual([null, "m1"]);
+    });
+
+    it.each([
+      ["a firewalled agent", { firewall: true, ...access }],
+      ["an external agent", { audience: "external" as const, ...access }],
+    ])("refuses %s with no card and no rows, even beside a reply", async (_label, options) => {
+      const f = batchRun(options, { replies: [replies[0], newEmail] });
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.mailReplyRows).toEqual([]);
+      expect(f.results[0]).toEqual({ error: expect.any(String) });
+    });
+
+    it("still gives a firewalled agent its replies", async () => {
+      const f = batchRun({ firewall: true, ...access });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("marks every row of a tainted run, so its new email starts unticked", async () => {
+      const f = batchRun({ externalTaint: true, ...access }, { replies: [newEmail] });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.mailReplyRows[0]).toMatchObject({ outsideContent: true });
+    });
+
+    it("marks a run that has read outside content the same way", async () => {
+      const f = batchRun({}, { replies: [newEmail] });
+      f.prisma.attempt.count.mockResolvedValue(2 as never);
+      await f.run();
+      expect(f.mailReplyRows[0]).toMatchObject({ outsideContent: true });
+    });
+  });
+
   describe("non-owner grants", () => {
     const linked = (botAccess: object[], writesEnabled = true) => [
       {
@@ -7225,9 +7288,8 @@ describe("mail_reply_batch", () => {
       await refused(batchRun({}, { replies: many }), "At most 20");
     });
 
-    it("a row without replyToId: the tool cannot start a conversation", async () => {
-      const { replyToId: _omitted, ...rest } = replies[0]!;
-      await refused(batchRun({}, { replies: [rest] }), "replyToId");
+    it("an empty replyToId is refused, never read as a new email", async () => {
+      await refused(batchRun({}, { replies: [{ ...replies[0]!, replyToId: " " }] }), "replyToId");
     });
 
     it("a replyToId that is not synced", async () => {
