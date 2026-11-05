@@ -39,6 +39,7 @@ export function makeBot(overrides: Partial<Bot> = {}): Bot {
     externalMessageTargets: [],
     externalComputerTools: false,
     firewall: false,
+    proactivity: "medium",
     webhookConfigured: false,
     spawnKey: null,
     runPhase: null,

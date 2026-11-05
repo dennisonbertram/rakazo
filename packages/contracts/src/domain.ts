@@ -103,6 +103,10 @@ export type RunPhase = z.infer<typeof RunPhaseSchema>;
 export const BotAudienceSchema = z.enum(["internal", "external"]);
 export type BotAudience = z.infer<typeof BotAudienceSchema>;
 
+/** How far an agent goes beyond the request. Only the owner's settings set it; it never changes approvals. */
+export const BotProactivitySchema = z.enum(["low", "medium", "high"]);
+export type BotProactivity = z.infer<typeof BotProactivitySchema>;
+
 /** Only a bot the owner made can be external; page and integration agents hold private data by design. */
 /** A page the person asked for by hand: the server picks this key, so a client cannot claim it. */
 export const customPageSpawnKey = (id: string) => `custom-page:${id}`;
@@ -158,6 +162,7 @@ export const BotSchema = z.object({
   audience: BotAudienceSchema.default("internal"),
   /** Agent firewall: everything the agent reads is untrusted. Only the owner's settings set it. */
   firewall: z.boolean().default(false),
+  proactivity: BotProactivitySchema.default("medium"),
   /** An external bot may message only these internal bots. */
   externalMessageTargets: z.array(Id).default([]),
   /** An external bot has the browser and computer tools only when this is on. */
@@ -453,6 +458,7 @@ export const UpdateBotInput = z
     disabledBuiltinTools: DisabledBuiltinToolsSchema.optional(),
     audience: BotAudienceSchema.optional(),
     firewall: z.boolean().optional(),
+    proactivity: BotProactivitySchema.optional(),
     externalMessageTargets: z.array(Id).max(200).optional(),
     externalComputerTools: z.boolean().optional(),
     runsOn: ComputerHostSchema.nullable().optional(),
