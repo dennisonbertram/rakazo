@@ -818,8 +818,13 @@ export async function rpc<T>(
     if (!res.ok) {
       // oRPC sends a failure as `{ json: { code, status, message } }`; the message is the
       // server's user-facing copy.
-      const error = parsed.json as { message?: unknown } | undefined;
-      const message = errorText(typeof error?.message === "string" ? error.message : "");
+      const error = parsed.json as { message?: unknown; data?: unknown } | undefined;
+      // The answer to a bare /goal is sent as an error; show its text as written.
+      const goalReply = (error?.data as { goalReply?: unknown } | undefined)?.goalReply === true;
+      const message =
+        goalReply && typeof error?.message === "string"
+          ? error.message
+          : errorText(typeof error?.message === "string" ? error.message : "");
       const unauthorized = res.status === 401;
       // Without a Space header a 401 means the server no longer accepts the
       // session itself; Space recovery below probes the same way. Clearing it
@@ -906,7 +911,10 @@ export async function rpc<T>(
         if (!selectedSpaceId()) await clearStaleSpaceSelection();
         throw new Error(message);
       }
-      throw Object.defineProperty(new Error(message), "status", { value: res.status });
+      throw Object.defineProperties(new Error(message), {
+        status: { value: res.status },
+        ...(goalReply ? { data: { value: { goalReply: true } } } : {}),
+      });
     }
     const verifiedUser = parsed.json as { userId?: unknown; spaceId?: unknown } | null;
     if (
