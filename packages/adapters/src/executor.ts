@@ -3568,6 +3568,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const googleWriteOnAgentConnection = async (
           toolName: string,
           callArgs: Record<string, unknown>,
+          ignoreOwn = false,
         ): Promise<boolean> => {
           const pending = GOOGLE_BUILTIN_WRITES.has(toolName)
             ? googleBuiltinAccounts(toolName)
@@ -3599,7 +3600,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           const ids = new Set(targets.map((account) => account.id));
           const rows = await connectionRowsNow();
-          return rows.some((row) => ids.has(row.id) && row.agentBotId !== null);
+          return rows.some(
+            (row) =>
+              ids.has(row.id) &&
+              row.agentBotId !== null &&
+              !(ignoreOwn && row.agentBotId === bot.id),
+          );
         };
         const driveEnabled =
           driveToolsAllowed({
@@ -5678,6 +5684,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? threadHasProtectedSender(deps.prisma, owner, String(args.id).trim(), account.id)
                 : true;
             })());
+          // The Inbox agent is the agent of the owner's own Gmail accounts, so every change it makes
+          // there would ask. For mail_modify the owner's saved tool rule ("Always allow this tool")
+          // clears that card; another agent's account still asks, and so does every other tool.
+          const inboxOwnModifyAllowed =
+            writeOnAgentConnection &&
+            name === "mail_modify" &&
+            isInboxAgentSpawnKey(bot.spawnKey) &&
+            approvalResolved.source === "always_allow" &&
+            approvalResolved.matchingRules.some(
+              (rule) => rule.matchKind === "tool" && rule.matchValue === name,
+            ) &&
+            !(await googleWriteOnAgentConnection(name, args, true));
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
             // A fetch the exfiltration check held is never cleared by a saved rule or another review.
@@ -5697,7 +5715,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             isCartaMailSend(bot.spawnKey, name) ||
             // Integration-agent writes require approval for every call.
             integrationWriteTool !== undefined ||
-            writeOnAgentConnection ||
+            (writeOnAgentConnection && !inboxOwnModifyAllowed) ||
             connectorWriteOnAgentConnection ||
             // An owner agent's writes on a peer's request never pass on a saved rule or Auto Review.
             (ownerAgentPeer && OWNER_PEER_WRITE_TOOLS.has(name));

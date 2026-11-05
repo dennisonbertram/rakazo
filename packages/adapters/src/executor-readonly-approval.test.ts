@@ -1648,6 +1648,40 @@ describe("unattended mail_modify and mail_send", () => {
     expect(isApprovalPausedResult(f.results[0])).toBe(false);
   });
 
+  it("runs an Inbox agent's own-account mail_modify under a tool Allow, but not on another agent's account", async () => {
+    for (const [agentBotId, asks] of [
+      ["bot-1", false],
+      ["agent-x", true],
+    ] as const) {
+      const mail = {
+        listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+      };
+      const f = fixture({
+        name: "mail_modify",
+        builtin: true,
+        rules: allow("mail_modify"),
+        mail,
+        unattended: true,
+        spawnKey: inboxAgentSpawnKey("user-1"),
+        connectionRows: [{ ...mailConnectionRow(), agentBotId, writesEnabled: true }],
+      });
+      f.setCalls([
+        { args: { id: "m1", account: "me@example.test", archive: true }, executionId: "call-1" },
+      ]);
+      f.prisma.cachedMailMessage.findFirst.mockResolvedValue({
+        threadId: "t1",
+        connectionId: "acct-1",
+      } as never);
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        { fromAddress: "list@example.test" },
+      ] as never);
+      await f.run();
+      // Another agent's account is refused for a bot that is not its agent.
+      if (asks) expect(f.results[0]).toEqual({ error: expect.stringContaining("agent") });
+      else expect(isApprovalPausedResult(f.results[0])).toBe(false);
+    }
+  });
+
   it("asks for a mail_modify archive under a tool Allow when an earlier sender in the thread is a Contact", async () => {
     const f = mailFixture("mail_modify", allow("mail_modify"));
     f.prisma.cachedMailMessage.findMany.mockResolvedValue([
