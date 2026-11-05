@@ -49,8 +49,8 @@ import {
   selectBuiltinToolsForRun,
   settleSteeringAttachmentLoads,
   splitInboxSearchSkill,
-  TENACITY_GUIDANCE,
-  TENACITY_LIMITED_GUIDANCE,
+  tenacityGuidance,
+  tenacityLevelFor,
   TRUTHFULNESS_GUIDANCE,
   threadContextForRun,
   toolCompletionAuditPayload,
@@ -2812,7 +2812,7 @@ describe("userTurnInstructions", () => {
     replyGuidance,
   };
 
-  it("gives an ordinary agent the full tenacity clause and untrusted-input runs only the retry part", () => {
+  it("adds the tenacity clause for the agent's level and the retry part only for restricted runs", () => {
     const parts = {
       ...base,
       groupContext: undefined,
@@ -2826,17 +2826,48 @@ describe("userTurnInstructions", () => {
       agentSkillsLine: undefined,
       taughtSkillsLine: undefined,
     };
-    const full = userTurnInstructions({ ...parts, tenacity: "full" });
-    expect(full).toContain(TENACITY_GUIDANCE);
-    expect(full.indexOf(TENACITY_GUIDANCE)).toBeGreaterThan(full.indexOf(TRUTHFULNESS_GUIDANCE));
-    const limited = userTurnInstructions({ ...parts, tenacity: "limited" });
-    expect(limited).toContain(TENACITY_LIMITED_GUIDANCE);
-    expect(limited).not.toContain("Finish the job");
-    expect(limited).not.toContain("offer to do it");
-    expect(TENACITY_GUIDANCE).toContain(TENACITY_LIMITED_GUIDANCE.split(". ")[1] ?? "");
-    expect(userTurnInstructions({ ...parts, voiceAgent: true, tenacity: "full" }).join("")).not.toContain(
-      "Finish the job",
+    const text = (tenacity: "limited" | "low" | "medium" | "high") =>
+      userTurnInstructions({ ...parts, tenacity }).join("\n");
+    for (const level of ["limited", "low", "medium", "high"] as const) {
+      const prompt = text(level);
+      expect(prompt).toContain(tenacityGuidance(level));
+      expect(prompt.indexOf(tenacityGuidance(level))).toBeGreaterThan(
+        prompt.indexOf(TRUTHFULNESS_GUIDANCE),
+      );
+      // Every level keeps the retry limits and a final denial.
+      expect(prompt).toContain("A denied or skipped approval is final");
+      expect(prompt).toContain("never repeat the same failing call more than once or twice");
+    }
+    expect(text("low")).toContain("Do what was asked, then stop");
+    expect(text("low")).not.toContain("offer to do it");
+    expect(text("medium")).toContain("offer to do it");
+    expect(text("medium")).not.toContain("Without being asked");
+    expect(text("high")).toContain("offer to do it");
+    expect(text("high")).toContain("Without being asked");
+    for (const level of ["limited"] as const) {
+      expect(text(level)).not.toContain("Finish the job");
+      expect(text(level)).not.toContain("Without being asked");
+      expect(text(level)).not.toContain("Do what was asked, then stop");
+    }
+    expect(userTurnInstructions({ ...parts, voiceAgent: true, tenacity: "high" }).join("")).not.toContain(
+      "Without being asked",
     );
+  });
+
+  it("never lets the level lift an approval gate or send, spend or delete", () => {
+    expect(tenacityGuidance("high")).toContain("Ask before anything that needs approval");
+    expect(tenacityGuidance("high")).toContain("Never send, spend or delete");
+    expect(tenacityGuidance("high")).toContain("approval");
+    expect(tenacityGuidance("medium")).toContain("approvals, sending, spending and deleting still need the user's say");
+  });
+
+  it("ignores the stored level for restricted runs and falls back to medium for unknown values", () => {
+    for (const proactivity of ["low", "medium", "high"]) {
+      expect(tenacityLevelFor({ proactivity, restricted: true })).toBe("limited");
+      expect(tenacityLevelFor({ proactivity, restricted: false })).toBe(proactivity);
+    }
+    expect(tenacityLevelFor({ proactivity: "extreme", restricted: false })).toBe("medium");
+    expect(tenacityLevelFor({ proactivity: undefined, restricted: false })).toBe("medium");
   });
 
   it("adds the setup guidance after update_bot only when it is given and the tool is offered", () => {
