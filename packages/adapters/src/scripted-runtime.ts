@@ -351,6 +351,15 @@ export function inferScript(
       },
     ];
   }
+  const fetchUrl = /fetch the url (\S+)/i.exec(prompt)?.[1];
+  if (fetchUrl) {
+    return [
+      {
+        assistant: "i will read that page.",
+        toolCalls: [{ name: "web_fetch", args: { url: fetchUrl } }],
+      },
+    ];
+  }
   if (lower.includes("history search card")) {
     return [
       {
