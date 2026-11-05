@@ -7,9 +7,14 @@ const MAX_LOOKUP_RESULTS = 2;
 export async function loadCompanyContextIndex(
   memory: MemoryStore,
   context: AdapterContext,
+  redact: (text: string) => string = (text) => text,
 ): Promise<string | undefined> {
   const { documents } = await memory.read({ scope: "company" }, context);
-  return buildCompanyContextIndex(documents);
+  // Redact the source text: escaping first would turn a secret containing & < > into text the
+  // exact-match redaction no longer finds.
+  return buildCompanyContextIndex(
+    documents.map((doc) => ({ path: doc.path, content: redact(doc.content) })),
+  );
 }
 
 /** Up to two sections whose name or text mentions `name`, names first. */

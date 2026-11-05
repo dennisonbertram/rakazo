@@ -28,6 +28,15 @@ describe("company context for agents", () => {
     expect(await loadCompanyContextIndex(memory, context)).toBeUndefined();
   });
 
+  it("redacts known secrets before the index text is escaped", async () => {
+    const memory = store([{ path: "a", content: "# Acme\n\nKey a<b&c>d is secret.\n" }]);
+    const index = await loadCompanyContextIndex(memory, context, (text) =>
+      text.replaceAll("a<b&c>d", "[redacted]"),
+    );
+    expect(index).toContain("[redacted]");
+    expect(index).not.toMatch(/a(<|&lt;)b/);
+  });
+
   it("looks a name up, titles first, at most two, and finds nothing for an unknown name", async () => {
     const memory = store([
       { path: "a", content: "# Brand voice\n\nWe write plainly about Acme Widget.\n" },

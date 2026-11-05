@@ -185,12 +185,15 @@ async function runIdentityExecutor({
   firewall = false,
   audience = null,
   runExternalTaint = false,
+  taintDuringRun = false,
   companySections = [],
 }: {
   spawnKey: string | null;
   firewall?: boolean;
   audience?: string | null;
   runExternalTaint?: boolean;
+  /** The stored run is marked after the attempt loaded it (steering from MCP). */
+  taintDuringRun?: boolean;
   /** Company context sections the owner wrote (memory scope "company"). */
   companySections?: Array<{ path: string; content: string; revision?: number }>;
   trigger?: string;
@@ -279,6 +282,7 @@ async function runIdentityExecutor({
       persistedReplayArgs.push(replayArgs);
       currentCalls = [{ name: "company_import_start", args: replayArgs }];
     }
+    if (taintDuringRun) run.externalTaint = true;
     for (const [index, call] of currentCalls.entries()) {
       if (!next.executeTool) throw new Error("Runtime tool executor was not provided.");
       toolResults.push({
@@ -365,8 +369,8 @@ async function runIdentityExecutor({
   const prisma = {
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     run: {
-      findUnique: vi.fn(async () => run),
-      findUniqueOrThrow: vi.fn(async () => run),
+      findUnique: vi.fn(async () => (taintDuringRun ? { ...run } : run)),
+      findUniqueOrThrow: vi.fn(async () => (taintDuringRun ? { ...run } : run)),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
         return { count: 1 };
@@ -5481,6 +5485,16 @@ describe("company context in a run", () => {
       companySections,
       calls: [{ name: "company_context_lookup", args: { name: "Acme" } }],
       runExternalTaint: true,
+    });
+    expect(JSON.stringify(toolResults)).not.toContain("Invoice reminders");
+  });
+
+  it("refuses the lookup once the stored run is marked mid-attempt", async () => {
+    const { toolResults } = await runIdentityExecutor({
+      spawnKey: null,
+      companySections,
+      calls: [{ name: "company_context_lookup", args: { name: "Acme" } }],
+      taintDuringRun: true,
     });
     expect(JSON.stringify(toolResults)).not.toContain("Invoice reminders");
   });

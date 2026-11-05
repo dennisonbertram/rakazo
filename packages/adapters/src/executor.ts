@@ -2639,7 +2639,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           // Read from the database on every attempt; never stored in the bot's instructions.
           companyContextAllowed
-            ? loadCompanyContextIndex(deps.memory, context)
+            ? loadCompanyContextIndex(deps.memory, context, (text) => redactSecrets(text, runSecrets))
             : Promise.resolve(undefined),
           messagingChannelRun || voiceAgent || restrictedContext || companyAgent || companyImporter
             ? Promise.resolve("")
@@ -6888,7 +6888,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "company_context_lookup") {
             // A run that read outside content, or a firewalled bot, gets nothing.
-            if (run.externalTaint === true || externalTaint() || (await firewallNow())) {
+            // Steering can mark the stored run after this attempt loaded it, so read the row again.
+            const stored = await deps.prisma.run.findUnique({
+              where: { id: runId },
+              select: { externalTaint: true },
+            });
+            if (
+              run.externalTaint === true ||
+              stored?.externalTaint !== false ||
+              externalTaint() ||
+              (await firewallNow())
+            ) {
               return finish({ error: `Tool ${name} is not available to this bot.` });
             }
             return finish(
