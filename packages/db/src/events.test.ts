@@ -4303,6 +4303,7 @@ describe("clearThread", () => {
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
+      mailReplyItem: { updateMany: vi.fn() },
       computer: { updateMany: vi.fn() },
       message: { deleteMany: vi.fn() },
       event: {
@@ -4370,6 +4371,7 @@ describe("clearThread", () => {
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
+      mailReplyItem: { updateMany: vi.fn() },
       computer: { updateMany: vi.fn() },
       message: { deleteMany: vi.fn() },
       event: {

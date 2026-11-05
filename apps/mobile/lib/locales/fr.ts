@@ -975,4 +975,6 @@ export const FR_MESSAGES: Record<string, string> = {
   Overdue: "En retard",
   Upcoming: "À venir",
   "No date": "Sans date",
+  "Send selected": "Envoyer la sélection",
+  Skipped: "Ignoré",
 };
