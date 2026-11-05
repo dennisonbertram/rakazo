@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { PrivateFragments } from "./outbound-check.js";
 
 /** Every string in a value, however deeply nested in arrays and objects (bounded). */
@@ -100,7 +99,15 @@ function entropy(value: string): number {
   return bits;
 }
 
-const short = (token: string) => createHash("sha256").update(token).digest("hex").slice(0, 8);
+/** A short, one-way-enough label for a flagged token (FNV-1a), so the token itself is never sent. */
+function short(token: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < token.length; i += 1) {
+    hash ^= token.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
 
 /** Tokens of a URL: host labels, path segments, query keys and values, and the fragment. */
 function urlTokens(url: URL, original: string) {
