@@ -240,8 +240,10 @@ export function inferScript(
     ];
   }
   if (lower.includes("send email card")) {
-    // "send email card from sales@example.test" names the account; otherwise the fixed test one.
+    // "send email card from sales@example.test" names the account; "send email card with no sender"
+    // names none; otherwise the fixed test one.
     const from = /\bfrom\s+([^\s,]+@[^\s,]+)/i.exec(prompt)?.[1];
+    const noSender = lower.includes("no sender");
     return [
       {
         assistant: "this email needs your approval.",
@@ -249,7 +251,7 @@ export function inferScript(
           {
             name: "mail_send",
             args: {
-              account: from ?? "first@example.test",
+              ...(noSender ? {} : { account: from ?? "first@example.test" }),
               to: ["Sam Rivera <sam@example.test>"],
               subject: "Offsite dates",
               body: "The 14th works for us.\nSee you then.",
