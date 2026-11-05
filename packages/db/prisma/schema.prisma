@@ -479,14 +479,19 @@ model ActionApprovalRule {
   // Null for a space-wide rule; a bot id for that bot's override.
   botId           String?
   bot             Bot?     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  // Set only on an "Always for this routine" rule: it applies to that routine's runs and nothing else.
+  routineId       String?
+  routine         Routine? @relation(fields: [routineId], references: [id], onDelete: Cascade)
   matchKind       String
   matchValue      String
   createdAt       DateTime @default(now())
 
-  // One rule per target: unique index action_approval_rules_target_key (raw SQL in migration
-  // 20261227000000) on (spaceId, createdByUserId, COALESCE(botId, ''), matchKind, lower(matchValue)).
+  // One rule per target: unique index action_approval_rules_target_key (raw SQL in migrations
+  // 20261227000000 and 20261231000053) on (spaceId, createdByUserId, COALESCE(botId, ''),
+  // COALESCE(routineId, ''), matchKind, lower(matchValue)).
   @@index([spaceId, createdByUserId])
   @@index([botId])
+  @@index([routineId])
   @@map("action_approval_rules")
 }
 
@@ -1300,6 +1305,7 @@ model Routine {
   /// When `prompt` last changed (updatedAt also moves with every schedule update); null reads as createdAt.
   promptUpdatedAt DateTime?
   runs            Run[]
+  approvalRules   ActionApprovalRule[]
 
   @@index([active, nextRunAt])
   @@index([spaceId, botId])

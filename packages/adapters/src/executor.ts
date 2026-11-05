@@ -175,12 +175,14 @@ import {
   privateDataAreas,
   promptInvokesSkill,
   quietRoutineGuidance,
+  ROUTINE_AUTO_REVIEW_READ_TOOLS,
   redactSecrets,
   renderBotDirectory,
   repeatsPrivateText,
   resolveActionApproval,
   resolveActionApprovalDetail,
   resolveBotAddress,
+  routineAlwaysAllowable,
   sandboxCommandTimeoutMs,
   siteAlwaysAllowed,
   toolRequiresApproval,
@@ -217,6 +219,7 @@ import {
   isTooManyDatabaseConnections,
   isUniqueViolation,
   listApprovalRules,
+  listRoutineToolAllows,
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
   PinnedConnectionLostError,
@@ -5678,8 +5681,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? threadHasProtectedSender(deps.prisma, owner, String(args.id).trim(), account.id)
                 : true;
             })());
-          const requiresMandatoryApproval =
-            requiresUnattendedApproval ||
+          const otherMandatory =
             // A fetch the exfiltration check held is never cleared by a saved rule or another review.
             standingHold !== undefined ||
             mailModifyNeedsToolRule ||
@@ -5701,21 +5703,70 @@ export function createRunExecutor(deps: ExecutorDeps) {
             connectorWriteOnAgentConnection ||
             // An owner agent's writes on a peer's request never pass on a saved rule or Auto Review.
             (ownerAgentPeer && OWNER_PEER_WRITE_TOOLS.has(name));
-          const gateResolved = requiresMandatoryApproval
+          // A background routine run, with nothing from outside in it, started by the owner's own
+          // schedule or request (not a webhook), on an agent that is not firewalled or external.
+          const cleanRoutineRun =
+            requiresUnattendedApproval &&
+            !otherMandatory &&
+            Boolean(run.routineId) &&
+            run.trigger !== "webhook" &&
+            !runTainted &&
+            bot.audience !== "external" &&
+            !(await firewallNow());
+          // "Always for this routine": the owner chose it on an earlier card of this routine.
+          const routineAllowable =
+            cleanRoutineRun &&
+            routineAlwaysAllowable({
+              toolName: name,
+              viaConnector,
+              connectorKind,
+              readOnly: declaredReadOnly,
+            });
+          const routineLifted =
+            routineAllowable &&
+            (
+              await listRoutineToolAllows(deps.prisma, {
+                spaceId: run.spaceId,
+                userId: run.userId,
+                routineId: run.routineId!,
+              })
+            ).has(name);
+          // Auto Review may judge a private read of the routine's owner while nothing outside has
+          // been read; any error, doubt or missing provider asks.
+          const routineReviewRead =
+            cleanRoutineRun &&
+            !viaConnector &&
+            ROUTINE_AUTO_REVIEW_READ_TOOLS.has(name) &&
+            !(await isOutsideContentSeen());
+          const requiresMandatoryApproval =
+            (requiresUnattendedApproval && !routineLifted && !routineReviewRead) || otherMandatory;
+          const gateResolved = routineLifted
             ? {
-                decision: "ask" as const,
-                source: "default" as const,
+                decision: "allow" as const,
+                source: "always_allow" as const,
                 matchingRules: [],
               }
-            : firewallLifted && !approvalResolved.matchingRules.length
-              ? { decision: "allow" as const, source: "default" as const, matchingRules: [] }
-              : approvalResolved;
+            : requiresMandatoryApproval
+              ? {
+                  decision: "ask" as const,
+                  source: "default" as const,
+                  matchingRules: [],
+                }
+              : firewallLifted && !approvalResolved.matchingRules.length
+                ? { decision: "allow" as const, source: "default" as const, matchingRules: [] }
+                : approvalResolved;
           const autoReviewPref =
-            requiresMandatoryApproval || run.unattended ? false : await loadAutoReviewPreference();
+            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+              ? false
+              : await loadAutoReviewPreference();
           const injectedReview =
-            requiresMandatoryApproval || run.unattended ? undefined : deps.autoReview;
+            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+              ? undefined
+              : deps.autoReview;
           const checker =
-            requiresMandatoryApproval || run.unattended ? undefined : resolveAutoReviewChecker();
+            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+              ? undefined
+              : resolveAutoReviewChecker();
           const checkerConfigured =
             autoReviewPref &&
             (Boolean(injectedReview) ||
@@ -5729,7 +5780,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     ),
                   )
                 : false));
-          const plan =
+          const plannedGate =
             requiresMandatoryApproval ||
             // A repeating schedule asks unless the owner chose "Always allow" for this tool; Auto
             // Review never clears it, because the saved prompt would run on every fire.
@@ -5741,8 +5792,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   autoReviewEnabled: autoReviewPref,
                   checkerConfigured,
                   unattended: run.unattended,
+                  routineRead: routineReviewRead,
                   newDestination: siteGate === "new",
                 });
+          // A routine read runs only when the judge passes it: a saved Allow rule, no provider or
+          // an error never lets it through.
+          const plan =
+            routineReviewRead && plannedGate !== "judge" && plannedGate !== "block"
+              ? ("ask" as const)
+              : plannedGate;
           // A check-in only reads and reports: a call that would ask fails at once, with no card and no pause.
           // mail_modify changes mail, so a check-in never runs it, whatever the rules say.
           if (
@@ -5954,15 +6012,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ) {
             await recordDecision(
               gateDecision,
-              requiresUnattendedApproval
-                ? "unattended"
-                : firewallAskCall
-                  ? "firewall"
-                  : externalTaintedCall
-                    ? "external_taint"
-                    : requiresMandatoryApproval
-                      ? "mandatory"
-                      : approvalResolved.source,
+              routineLifted
+                ? "routine_allow"
+                : routineReviewRead
+                  ? "routine_review"
+                  : requiresUnattendedApproval
+                    ? "unattended"
+                    : firewallAskCall
+                      ? "firewall"
+                      : externalTaintedCall
+                        ? "external_taint"
+                        : requiresMandatoryApproval
+                          ? "mandatory"
+                          : approvalResolved.source,
             );
           }
           const bypassApproval = gateDecision === "allow" && requiresApprovalByDefault;
@@ -6089,6 +6151,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               approvalReason: approvalCardReason,
               mailBatch: preparedMailBatch,
               noAlwaysAllow,
+              routineAlways: routineAllowable,
               serviceName: callRoute?.serverName,
               mailAccount:
                 meetingTaintedCall || externalTaintedCall ? undefined : await approvalMailAccount(),

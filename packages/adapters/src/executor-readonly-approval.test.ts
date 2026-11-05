@@ -216,6 +216,7 @@ function fixture({
   unattended = trigger === "webhook",
   externalTaint = false,
   routineManagedKind,
+  routineRules = [] as string[],
   scratchpadItem,
   skillRows = [] as Record<string, unknown>[],
   secrets = [] as string[],
@@ -371,6 +372,8 @@ function fixture({
   externalTaint?: boolean;
   /** Makes the run a routine run; the routine's managedKind. */
   routineManagedKind?: string | null;
+  /** Tools the owner chose "Always for this routine" for. */
+  routineRules?: string[];
   /** The stored scratchpad item the gate looks up for scratchpad_update/complete. */
   scratchpadItem?: { category: string | null } | null;
   /** Stored skill rows the skill and tool lookups find. */
@@ -762,7 +765,11 @@ function fixture({
       ),
       findFirst: vi.fn(async () => scratchpadItem ?? null),
     },
-    actionApprovalRule: { findMany: vi.fn(async () => rules) },
+    actionApprovalRule: {
+      findMany: vi.fn(async ({ where }: { where?: { routineId?: string | null } } = {}) =>
+        where?.routineId ? routineRules.map((matchValue) => ({ matchValue })) : rules,
+      ),
+    },
     actionAutoReviewPreference: { findUnique: vi.fn(async () => ({ enabled: autoReview })) },
     externalEffect,
   };
@@ -7520,5 +7527,136 @@ describe("public research agents and meeting text", () => {
       expect.objectContaining({ scope: "isolated" }),
       expect.anything(),
     );
+  });
+});
+
+describe("Always for this routine and Auto Review of routine reads", () => {
+  const routine = (name: string, extra: Record<string, unknown> = {}) => {
+    const f = fixture({
+      name,
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: null,
+      ...(name === "mail_send"
+        ? {
+            mail: {
+              listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+            },
+          }
+        : {}),
+      ...extra,
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x", id: "T-1" }, executionId: "call-1" }]);
+    return f;
+  };
+  const cardActions = (f: ReturnType<typeof fixture>) =>
+    (
+      (
+        f.pauseRunForInput.mock.calls as unknown as [{ blocks: { actions: { id: string }[] }[] }][]
+      )[0]?.[0].blocks[0]?.actions ?? []
+    ).map((action) => action.id);
+
+  it("offers Always for this routine on a background write card, and keeps the reason", async () => {
+    const f = routine("write_file");
+    await f.run();
+    expect(cardActions(f)).toEqual(["allow", "always_routine", "deny"]);
+  });
+
+  it.each([
+    ["a send", "mail_send", {}],
+    ["a webhook run", "write_file", { trigger: "webhook" }],
+    ["a tainted run", "write_file", { externalTaint: true }],
+    ["a firewalled agent", "write_file", { firewall: true }],
+    ["an attended run", "write_file", { trigger: "user", unattended: false }],
+  ])("does not offer it for %s", async (_label, name, extra) => {
+    const f = routine(name, extra);
+    await f.run({ expectFailure: true });
+    expect(cardActions(f)).not.toContain("always_routine");
+  });
+
+  it("runs a tool the owner allowed for this routine with no card, and logs it", async () => {
+    const f = routine("write_file", { routineRules: ["write_file"] });
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    const sources = (
+      f.events.append.mock.calls as unknown as [{ type: string; payload: { source?: string } }][]
+    )
+      .filter(([event]) => event.type === "approval.decided")
+      .map(([event]) => event.payload.source);
+    expect(sources).toContain("routine_allow");
+  });
+
+  it.each([
+    ["a send", "mail_send", {}],
+    ["a webhook run", "write_file", { trigger: "webhook" }],
+    ["a tainted run", "write_file", { externalTaint: true }],
+    ["a firewalled agent", "write_file", { firewall: true }],
+    ["another tool", "shell", {}],
+  ])("does not honour the routine rule for %s", async (_label, name, extra) => {
+    const f = routine(name, { routineRules: ["write_file", "mail_send"], ...extra });
+    await f.run({ expectFailure: true });
+    const sources = (
+      f.events.append.mock.calls as unknown as [{ type: string; payload: { source?: string } }][]
+    )
+      .filter(([event]) => event.type === "approval.decided")
+      .map(([event]) => event.payload.source);
+    expect(sources).not.toContain("routine_allow");
+    if (!(extra as { firewall?: boolean }).firewall)
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  describe("Auto Review of routine reads", () => {
+    const read = (decision: "pass" | "ask" | "throw", extra: Record<string, unknown> = {}) => {
+      reviewMock.mockReset();
+      if (decision === "throw") reviewMock.mockRejectedValue(new Error("down"));
+      else reviewMock.mockResolvedValue({ decision, reason: "fits", model: "mock" });
+      return routine("ticket_get", { ticketBoard: true, autoReview: true, ...extra });
+    };
+
+    it("lets the judge pass a private read in a clean routine run", async () => {
+      const f = read("pass");
+      await f.run({ expectFailure: true });
+      expect(reviewMock).toHaveBeenCalledOnce();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    });
+
+    it.each(["ask", "throw"] as const)("asks a person when the judge says %s", async (decision) => {
+      const f = read(decision);
+      await f.run({ expectFailure: true });
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("never judges in a webhook or tainted run, or without a provider", async () => {
+      for (const extra of [
+        { trigger: "webhook" },
+        { externalTaint: true },
+        { autoReview: false },
+      ]) {
+        const f = read("pass", extra);
+        await f.run({ expectFailure: true });
+        expect(f.pauseRunForInput, JSON.stringify(extra)).toHaveBeenCalledOnce();
+      }
+      expect(reviewMock).not.toHaveBeenCalled();
+    });
+
+    it("never judges a write, a send, or a read after outside content", async () => {
+      reviewMock.mockReset();
+      reviewMock.mockResolvedValue({ decision: "pass", reason: "fits", model: "mock" });
+      for (const name of ["write_file", "mail_send"]) {
+        const f = routine(name, { autoReview: true });
+        await f.run({ expectFailure: true });
+        expect(f.pauseRunForInput, name).toHaveBeenCalledOnce();
+      }
+      expect(reviewMock).not.toHaveBeenCalled();
+      const after = routine("ticket_get", { ticketBoard: true, autoReview: true });
+      after.setCalls([
+        { name: "web_search", args: { query: "news" }, executionId: "call-1" },
+        { args: { id: "T-1" }, executionId: "call-2" },
+      ]);
+      await after.run({ expectFailure: true });
+      expect(after.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(reviewMock).not.toHaveBeenCalled();
+    });
   });
 });

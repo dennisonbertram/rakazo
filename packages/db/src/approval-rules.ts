@@ -7,7 +7,7 @@ export type ApprovalRuleEffect = "always_allow" | "require_approval" | "block";
 export type ApprovalRuleKind = "tool" | "connector" | "category" | "site";
 
 type Db = PrismaClient | Prisma.TransactionClient;
-type Scope = { spaceId: string; userId: string; botId?: string | null };
+type Scope = { spaceId: string; userId: string; botId?: string | null; routineId?: string | null };
 type Target = Scope & { matchKind: ApprovalRuleKind; matchValue: string };
 
 /** Rules saved before the table used these names for two of its action types. */
@@ -20,6 +20,7 @@ const targetWhere = (target: Target, matchValues: string[]) => ({
   spaceId: target.spaceId,
   createdByUserId: target.userId,
   botId: target.botId ?? null,
+  routineId: target.routineId ?? null,
   matchKind: target.matchKind,
   OR: matchValues.map((value) => ({ matchValue: { equals: value, mode: "insensitive" as const } })),
 });
@@ -37,6 +38,7 @@ export async function setApprovalRule(db: Db, input: Target & { effect: Approval
         spaceId: input.spaceId,
         createdByUserId: input.userId,
         botId: input.botId ?? null,
+        routineId: input.routineId ?? null,
         effect: input.effect,
         matchKind: input.matchKind,
         matchValue: input.matchValue,
@@ -64,10 +66,29 @@ export function listApprovalRules(prisma: Db, scope: Scope) {
     where: {
       spaceId: scope.spaceId,
       createdByUserId: scope.userId,
+      routineId: null,
       OR: scope.botId ? [{ botId: null }, { botId: scope.botId }] : [{ botId: null }],
     },
     orderBy: { createdAt: "asc" },
   });
+}
+
+/** Tools the owner chose "Always for this routine" for. Only that routine's runs read them. */
+export async function listRoutineToolAllows(
+  prisma: Db,
+  scope: { spaceId: string; userId: string; routineId: string },
+): Promise<Set<string>> {
+  const rows = await prisma.actionApprovalRule.findMany({
+    where: {
+      spaceId: scope.spaceId,
+      createdByUserId: scope.userId,
+      routineId: scope.routineId,
+      matchKind: "tool",
+      effect: "always_allow",
+    },
+    select: { matchValue: true },
+  });
+  return new Set(rows.map((row) => row.matchValue));
 }
 
 /** Sets one row of the approvals table; `null` clears the bot override or resets the space row. */
