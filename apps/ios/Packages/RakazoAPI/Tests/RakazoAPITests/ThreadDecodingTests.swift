@@ -99,3 +99,22 @@ func decodesReplyBatchAskAsAPlainCardWithDiscardOnly() throws {
   let answered = try JSONDecoder().decode(AskBlock.self, from: Data(pressed.utf8))
   #expect(answered.outcome == .answered(nil))
 }
+
+@Test
+func decodesGoalOnSnapshotAndGoalBlock() throws {
+  let snapshot = try JSONDecoder().decode(
+    ThreadSnapshot.self,
+    from: Data(
+      #"{"threadId":"t","cursor":3,"messages":[],"olderCursor":null,"run":null,"goal":{"id":"g","text":"Find three suppliers","status":"active","stopReason":null,"lastReason":null,"continuations":0,"startedAt":"2026-01-01T00:00:00.000Z"}}"#
+        .utf8))
+  #expect(snapshot.goal?.text == "Find three suppliers")
+  #expect(snapshot.goal?.status == "active")
+  let none = try JSONDecoder().decode(
+    ThreadSnapshot.self, from: Data(#"{"threadId":"t","cursor":3,"goal":null}"#.utf8))
+  #expect(none.goal == nil)
+  let block = try JSONDecoder().decode(
+    MessageBlock.self,
+    from: Data(#"{"kind":"goal","outcome":"met","reason":"All found.","text":"Goal met. All found."}"#.utf8))
+  #expect(block.kind == .goal)
+  #expect(block.fields["outcome"]?.stringValue == "met")
+}

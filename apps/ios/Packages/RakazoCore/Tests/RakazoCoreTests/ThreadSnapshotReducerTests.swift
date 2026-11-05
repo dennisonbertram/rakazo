@@ -275,3 +275,24 @@ func messageUpdateKeepsMetadata() throws {
   #expect(message.replyQuote == "q")
   #expect(message.seq == 8)
 }
+
+@Test("folds thread.goal.updated into the snapshot and clears it on null or thread.cleared")
+func foldsGoalUpdates() throws {
+  let goal: JSONValue = .object([
+    "id": .string("goal-1"), "text": .string("Find three suppliers"), "status": .string("paused"),
+    "stopReason": .string("owner"), "lastReason": .null, "continuations": .number(2),
+    "startedAt": .string(threadAt),
+  ])
+  let set = try reduceThreadSnapshot(
+    makeSnapshot(), makeEvent("thread.goal.updated", seq: 6, payload: ["goal": goal]))
+  #expect(set?.cursor == 6)
+  #expect(set?.goal?.text == "Find three suppliers")
+  #expect(set?.goal?.status == "paused")
+  let none = try reduceThreadSnapshot(
+    set, makeEvent("thread.goal.updated", seq: 7, payload: ["goal": .null]))
+  #expect(none?.goal == nil)
+  let again = try reduceThreadSnapshot(
+    set, makeEvent("thread.cleared", seq: 8))
+  #expect(again?.goal == nil)
+  #expect(try isThreadSnapshotEvent(makeEvent("thread.goal.updated")))
+}
