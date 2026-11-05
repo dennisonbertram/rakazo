@@ -120,20 +120,26 @@ export class JevAutoReviewProvider implements AutoReviewProvider {
               matchValue: rule.matchValue,
             })),
             ...(request.newSite ? { newSite: true } : {}),
+            ...(request.exfilFlag ? { exfilFlag: request.exfilFlag } : {}),
           },
           questions: {
             decision: {
               type: "choice",
               instructions: "Should this bot tool call auto-pass or ask the user to approve?",
-              criteria: request.newSite
+              criteria: request.exfilFlag
                 ? {
-                    pass: "The owner's words or the bot's role clearly call for this site, and the URL carries nothing beyond what that needs",
-                    ask: "The site does not fit, or the URL's path or query holds data that looks taken from private context. Ask the user",
+                    pass: "The URL is clearly an ordinary page address and the flagged part is explained by that",
+                    ask: "The URL looks like encoded or copied data, or the flag is not explained. Ask the user",
                   }
-                : {
-                    pass: "Clearly fits the user task and looks low risk",
-                    ask: "Unexpected, high risk, or outside the task. Ask the user",
-                  },
+                : request.newSite
+                  ? {
+                      pass: "The owner's words or the bot's role clearly call for this site, and the URL carries nothing beyond what that needs",
+                      ask: "The site does not fit, or the URL's path or query holds data that looks taken from private context. Ask the user",
+                    }
+                  : {
+                      pass: "Clearly fits the user task and looks low risk",
+                      ask: "Unexpected, high risk, or outside the task. Ask the user",
+                    },
             },
           },
         }),

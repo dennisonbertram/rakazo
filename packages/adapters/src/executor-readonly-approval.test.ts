@@ -6632,6 +6632,77 @@ describe("fetching new sites without a card", () => {
     expect(card.approvalReason).toBe(`Held before fetching: ${reason}.`);
   });
 
+  describe("classifier layer", () => {
+    const shaped = `https://x.test/c?d=${"y".repeat(220)}`;
+    const run = (
+      decision: "pass" | "ask" | "error" | "throw",
+      extra: Record<string, unknown> = {},
+    ) => {
+      reviewMock.mockReset();
+      if (decision === "throw") reviewMock.mockRejectedValue(new Error("down"));
+      else reviewMock.mockResolvedValue({ decision, reason: "r", model: "mock" });
+      const f = fixture({ builtin: true, rules: allSites, autoReview: true, ...extra });
+      f.setCalls([{ name: "web_fetch", args: { url: shaped }, executionId: "call-1" }]);
+      return f;
+    };
+
+    it("clears a URL flagged for its shape, sending only the URL and an outline", async () => {
+      const f = run("pass");
+      await f.run();
+      expect(f.fetchedUrls).toEqual([shaped]);
+      const request = reviewMock.mock.calls[0]![0] as {
+        exfilFlag: { reason: string; indicators: string[] };
+        args: { url: string };
+        newSite: boolean;
+      };
+      expect(request.newSite).toBe(true);
+      expect(request.exfilFlag.reason).toBe("unusually long URL");
+      expect(JSON.stringify(request.exfilFlag)).not.toContain("yyyy");
+    });
+
+    it.each(["ask", "error", "throw"] as const)(
+      "keeps the card when the classifier says %s",
+      async (decision) => {
+        const f = run(decision);
+        await f.run();
+        expect(f.fetchedUrls).toEqual([]);
+        expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      },
+    );
+
+    it("never asks the classifier about a URL that repeats private text", async () => {
+      reviewMock.mockReset();
+      reviewMock.mockResolvedValue({ decision: "pass", reason: "r", model: "mock" });
+      const f = fixture({
+        builtin: true,
+        rules: allSites,
+        autoReview: true,
+        knownBots: { "peer-1": null as unknown as string },
+        history: [
+          {
+            blocks: [
+              {
+                kind: "bot_message_received",
+                fromBotId: "peer-1",
+                text: "Priya Shah owes 48213 dollars",
+              },
+            ],
+          },
+        ],
+      });
+      f.setCalls([
+        {
+          name: "web_fetch",
+          args: { url: "https://www.npmjs.com/search?q=Priya+Shah" },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(reviewMock).not.toHaveBeenCalled();
+      expect(f.fetchedUrls).toEqual([]);
+    });
+  });
+
   it("holds a URL that hides a private figure in base64 or hex", async () => {
     const received = {
       kind: "bot_message_received",

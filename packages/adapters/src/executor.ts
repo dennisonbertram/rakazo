@@ -298,6 +298,7 @@ import {
   unattendedEndedToolResult,
   uncertainEffectResult,
 } from "./approval-effect.js";
+import type { AutoReviewChecker } from "./auto-review.js";
 import {
   autoReviewTimeoutMs,
   deploymentAutoReviewDefault,
@@ -3355,6 +3356,74 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
             })
             .then((rows) => rows.map((row) => withInboxAgentStandIn(row, bot)));
+        // The Auto Review provider for this run: the injected one, or one built from the deployment's
+        // setting (`llm` or `jev`; both stay behind the AutoReviewProvider interface).
+        const buildReviewProvider = async (
+          injected: AutoReviewProvider | undefined,
+          checker: AutoReviewChecker | null | undefined,
+        ): Promise<AutoReviewProvider> => {
+          let provider = injected;
+          if (!provider) {
+            const kind = resolveAutoReviewProviderKind();
+            if (kind === "jev" || kind === "scripted") {
+              provider = createAutoReviewProvider(kind);
+            } else {
+              const reviewCredential = await findModelCredential(
+                deps.prisma,
+                { userId: run.userId, spaceId: run.spaceId },
+                checker!.provider,
+                checker!.model,
+              );
+              const judgeKey = await resolveModelKey(
+                deps,
+                run.userId,
+                run.spaceId,
+                reviewCredential,
+                checker!.provider,
+                checker!.model,
+                (values) => runSecrets.push(...values),
+              );
+              provider = createAutoReviewProvider("llm", {
+                llm: {
+                  onUsage: (event) =>
+                    recordUsage(deps.prisma, event, {
+                      spaceId: run.spaceId,
+                      userId: run.userId,
+                      botId: bot.id,
+                      parentRunId: runId,
+                      runId,
+                      operationId: `auto-review:${runId}`,
+                      operationKind: "setup",
+                    }),
+                  runtime: deps.runtime,
+                  checker: checker!,
+                  apiKey: judgeKey.oauth ? undefined : judgeKey.apiKey,
+                  accountId: judgeKey.accountId,
+                  gatewayId: judgeKey.gatewayId,
+                  baseUrl: judgeKey.baseUrl,
+                  cacheCapabilities: judgeKey.cacheCapabilities,
+                  contextWindow: judgeKey.contextWindow,
+                  maxTokens: judgeKey.maxTokens,
+                  reasoning: judgeKey.reasoning,
+                  oauth: judgeKey.oauth
+                    ? {
+                        credential: judgeKey.oauth,
+                        persist: judgeKey.persistOAuth,
+                        retire: judgeKey.retireOAuth,
+                      }
+                    : undefined,
+                  runId,
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  botId: bot.id,
+                  threadId: thread.id,
+                  timeoutMs: autoReviewTimeoutMs(),
+                },
+              });
+            }
+          }
+          return provider!;
+        };
         // Whether this bot may fetch a new site without asking, and what private data it can read
         // (shown on the "Allow all sites" card). Read at each call; see the siteGate comment.
         const standingSiteAccess = async (): Promise<{
@@ -5268,10 +5337,74 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ? await standingSiteAccess()
               : undefined;
           let standingHold: Extract<UrlVerdict, { verdict: "fragment" | "suspicious" }> | undefined;
+          let standingNote = "clean";
           if (standingSites?.standing) {
             const verdict = checkFetchUrl(fetchUrl!, await outboundFragments());
             if (verdict.verdict === "clean") siteGate = "allow";
             else standingHold = verdict;
+            // The optional Auto Review provider may clear a URL flagged for its shape, never one
+            // that repeats private text. It gets the URL, the owner's own words and an outline
+            // (kinds of data the agent can read, short hashes of flagged tokens), never the run's
+            // private text. Any doubt, error or missing provider leaves the card.
+            if (verdict.verdict === "suspicious") {
+              const checker = resolveAutoReviewChecker();
+              const available =
+                (await loadAutoReviewPreference()) &&
+                (Boolean(deps.autoReview) ||
+                  (checker !== null &&
+                    (isAutoReviewCheckerConfigured({}) ||
+                      Boolean(
+                        await findModelCredential(
+                          deps.prisma,
+                          { userId: run.userId, spaceId: run.spaceId },
+                          checker.provider,
+                        ),
+                      ))));
+              if (available) {
+                try {
+                  const provider = await buildReviewProvider(deps.autoReview, checker);
+                  const judged = await provider.review(
+                    {
+                      toolName: "web_fetch",
+                      connectorKind: "web",
+                      args: { url: redactSecrets(fetchUrl!, runSecrets) },
+                      userTask: redactSecrets(await loadOwnerWords(), runSecrets),
+                      botDescription: redactSecrets(
+                        `${bot.name}: ${bot.title}\n${bot.description}`,
+                        runSecrets,
+                      ),
+                      matchingRules: [],
+                      newSite: true,
+                      exfilFlag: {
+                        reason: verdict.reason,
+                        indicators: verdict.indicators,
+                        canRead: standingSites.privateAccess,
+                        readOutsideContent: await isOutsideContentSeen(),
+                      },
+                    },
+                    {
+                      operationId: `auto-review:${runId}`,
+                      traceId: `auto-review:${runId}`,
+                      spaceId: run.spaceId,
+                      userId: run.userId,
+                      botId: bot.id,
+                      runId,
+                      signal: AbortSignal.any([
+                        context.signal,
+                        AbortSignal.timeout(autoReviewTimeoutMs()),
+                      ]),
+                    },
+                  );
+                  standingNote = `classifier ${judged.decision}`;
+                  if (judged.decision === "pass") {
+                    siteGate = "allow";
+                    standingHold = undefined;
+                  }
+                } catch {
+                  standingNote = "classifier error";
+                }
+              }
+            }
           }
           // Once outside content is in the run, injected text could choose a connector read's
           // arguments, so a read on a connector this run had not used yet is treated as a write.
@@ -5313,7 +5446,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (standingSites?.standing && fetchSite) {
             await recordDecision(standingHold ? "ask" : "allow", "all_sites", {
               site: fetchSite,
-              reason: standingHold?.reason ?? "clean",
+              reason: standingHold
+                ? [standingHold.reason, standingNote === "clean" ? "" : standingNote]
+                    .filter(Boolean)
+                    .join("; ")
+                : standingNote,
               ...(standingHold?.verdict === "suspicious"
                 ? { indicators: standingHold.indicators }
                 : {}),
@@ -5474,6 +5611,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             })());
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
+            // A fetch the exfiltration check held is never cleared by a saved rule or another review.
+            standingHold !== undefined ||
             mailModifyNeedsToolRule ||
             protectedArchive ||
             scheduleNamesNewSite ||
@@ -5639,66 +5778,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   AbortSignal.timeout(autoReviewTimeoutMs()),
                 ]),
               };
-              let provider = injectedReview;
-              if (!provider) {
-                const kind = resolveAutoReviewProviderKind();
-                if (kind === "jev" || kind === "scripted") {
-                  provider = createAutoReviewProvider(kind);
-                } else {
-                  const reviewCredential = await findModelCredential(
-                    deps.prisma,
-                    { userId: run.userId, spaceId: run.spaceId },
-                    checker!.provider,
-                    checker!.model,
-                  );
-                  const judgeKey = await resolveModelKey(
-                    deps,
-                    run.userId,
-                    run.spaceId,
-                    reviewCredential,
-                    checker!.provider,
-                    checker!.model,
-                    (values) => runSecrets.push(...values),
-                  );
-                  provider = createAutoReviewProvider("llm", {
-                    llm: {
-                      onUsage: (event) =>
-                        recordUsage(deps.prisma, event, {
-                          spaceId: run.spaceId,
-                          userId: run.userId,
-                          botId: bot.id,
-                          parentRunId: runId,
-                          runId,
-                          operationId: `auto-review:${runId}`,
-                          operationKind: "setup",
-                        }),
-                      runtime: deps.runtime,
-                      checker: checker!,
-                      apiKey: judgeKey.oauth ? undefined : judgeKey.apiKey,
-                      accountId: judgeKey.accountId,
-                      gatewayId: judgeKey.gatewayId,
-                      baseUrl: judgeKey.baseUrl,
-                      cacheCapabilities: judgeKey.cacheCapabilities,
-                      contextWindow: judgeKey.contextWindow,
-                      maxTokens: judgeKey.maxTokens,
-                      reasoning: judgeKey.reasoning,
-                      oauth: judgeKey.oauth
-                        ? {
-                            credential: judgeKey.oauth,
-                            persist: judgeKey.persistOAuth,
-                            retire: judgeKey.retireOAuth,
-                          }
-                        : undefined,
-                      runId,
-                      spaceId: run.spaceId,
-                      userId: run.userId,
-                      botId: bot.id,
-                      threadId: thread.id,
-                      timeoutMs: autoReviewTimeoutMs(),
-                    },
-                  });
-                }
-              }
+              const provider = await buildReviewProvider(injectedReview, checker);
               const judge = await provider.review(reviewRequest, reviewContext);
               if (context.signal.aborted) return;
               reviewReason = judge.reason;
@@ -5910,6 +5990,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? undefined
                 : await resolveMoneyNames(callRoute?.toolName ?? name, args, readApprovalName);
             const noAlwaysAllow =
+              standingHold !== undefined ||
               desktopReadSearch ||
               meetingTaintedCall ||
               externalTaintedCall ||
