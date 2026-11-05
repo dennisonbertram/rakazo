@@ -199,6 +199,8 @@ export const OWNER_INITIATED_TRIGGERS = new Set([
   "routine",
   "skill",
   "call_end",
+  // A goal run continues the owner's own /goal request.
+  "goal",
 ]);
 
 /** Owner only: the bot's owner started the run, in a direct thread, outside a messaging channel. */

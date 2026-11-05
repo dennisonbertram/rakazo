@@ -1,6 +1,17 @@
-import type { ThreadGoal } from "@rakazo/contracts";
-import type { Prisma } from "./client.js";
+import type { MessageBlock, ThreadGoal } from "@rakazo/contracts";
+import type { GoalCheckRun, GoalEnd, GoalStep, GoalVerdict } from "@rakazo/core";
+import {
+  blocksToAgentHistoryText,
+  goalContinuationPrompt,
+  goalEnd,
+  goalStep,
+  newRunExternalTaint,
+  newRunUnattended,
+  parseGoalEvidence,
+} from "@rakazo/core";
+import type { Prisma, PrismaClient } from "./client.js";
 import { appendEventInTransaction } from "./events.js";
+import { createThreadMessageInTransaction } from "./messages.js";
 
 /** Every goal query is scoped to the Space and the owning user; the thread belongs to a bot. */
 export type GoalScope = { spaceId: string; userId: string; threadId: string; botId: string };
@@ -99,4 +110,303 @@ export async function startGoal(tx: Prisma.TransactionClient, scope: GoalScope, 
     },
   });
   return { goal, seq: await emitGoal(tx, scope, goal) };
+}
+
+// ---- The goal check -----------------------------------------------------------------------
+
+const LIVE_RUN_STATUSES = ["queued", "leased", "running", "waiting_input", "waiting_takeover"];
+
+/** The goal and the ended run a check would judge; null when there is nothing to judge. */
+export async function loadGoalToCheck(
+  prisma: PrismaClient,
+  input: { goalId: string; runId: string },
+) {
+  const goal = await prisma.threadGoal.findFirst({ where: { id: input.goalId, status: "active" } });
+  if (!goal || goal.lastCheckedRunId === input.runId) return null;
+  const run = await prisma.run.findFirst({
+    where: {
+      id: input.runId,
+      goalId: goal.id,
+      spaceId: goal.spaceId,
+      userId: goal.userId,
+      threadId: goal.threadId,
+    },
+  });
+  return run ? { goal, run } : null;
+}
+
+export async function threadHasLiveRun(
+  prisma: Pick<PrismaClient, "run">,
+  goal: Pick<GoalRow, "threadId" | "botId">,
+) {
+  const live = await prisma.run.findFirst({
+    where: { threadId: goal.threadId, botId: goal.botId, status: { in: LIVE_RUN_STATUSES } },
+    select: { id: true },
+  });
+  return live !== null;
+}
+
+/** What the goal check reads: the goal's last 5 ended runs with their evidence, the work list, the last reply. */
+export async function loadGoalCheckInput(prisma: PrismaClient, goal: GoalRow, judgedRunId: string) {
+  const [recent, items, reply] = await Promise.all([
+    prisma.run.findMany({
+      where: {
+        goalId: goal.id,
+        spaceId: goal.spaceId,
+        status: { in: ["completed", "failed", "cancelled"] },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { id: true, status: true, error: true, goalEvidence: true },
+    }),
+    prisma.scratchpadItem.findMany({
+      where: { spaceId: goal.spaceId, userId: goal.userId, botId: goal.botId },
+      orderBy: { updatedAt: "desc" },
+      take: 30,
+      select: { title: true, status: true, notes: true },
+    }),
+    prisma.message.findFirst({
+      where: { threadId: goal.threadId, runId: judgedRunId, role: "bot" },
+      orderBy: { seq: "desc" },
+      select: { blocks: true },
+    }),
+  ]);
+  const runs: Array<GoalCheckRun & { id: string }> = recent.reverse().map((run) => ({
+    id: run.id,
+    status: run.status,
+    error: run.error,
+    evidence: parseGoalEvidence(run.goalEvidence),
+  }));
+  return {
+    runs,
+    workItems: items,
+    lastReply: reply ? blocksToAgentHistoryText(reply.blocks as MessageBlock[]) : "",
+  };
+}
+
+/** Cost of the goal's runs since it last started, plus the goal checks recorded against them. A null cost counts as 0. */
+export async function goalSpendUsd(prisma: PrismaClient, goal: GoalRow): Promise<number> {
+  const runs = await prisma.run.findMany({
+    where: { goalId: goal.id, spaceId: goal.spaceId },
+    select: { id: true },
+  });
+  const ids = runs.map((run) => run.id);
+  if (ids.length === 0) return 0;
+  const total = await prisma.usageRecord.aggregate({
+    _sum: { costUsd: true },
+    where: {
+      spaceId: goal.spaceId,
+      userId: goal.userId,
+      createdAt: { gte: goal.startedAt },
+      OR: [{ runId: { in: ids } }, { parentRunId: { in: ids } }],
+    },
+  });
+  return total._sum.costUsd ?? 0;
+}
+
+const lockThread = (tx: Prisma.TransactionClient, threadId: string) =>
+  tx.$queryRaw`SELECT id FROM threads WHERE id = ${threadId} FOR UPDATE`;
+
+/**
+ * Under the thread lock that send, finalize and stop use: the goal is still active, this run is not
+ * judged yet and no run is live. Anything else means another worker or the owner got there first.
+ */
+async function checkStillOpen(
+  tx: Prisma.TransactionClient,
+  input: { goalId: string; runId: string; threadId: string },
+) {
+  await lockThread(tx, input.threadId);
+  const goal = await tx.threadGoal.findFirst({ where: { id: input.goalId, status: "active" } });
+  if (!goal || goal.lastCheckedRunId === input.runId) return null;
+  if (await threadHasLiveRun(tx, goal)) return null;
+  return goal;
+}
+
+/** Pauses an active goal without a verdict: its last run was cancelled, or the check cannot run. */
+export async function pauseGoalAfterCheck(
+  prisma: PrismaClient,
+  input: { goalId: string; runId: string; stopReason: "owner" | "check_failed" | "model_error" },
+) {
+  const found = await prisma.threadGoal.findUnique({
+    where: { id: input.goalId },
+    select: { threadId: true },
+  });
+  if (!found) return null;
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const goal = await checkStillOpen(tx, { ...input, threadId: found.threadId });
+    if (!goal) return null;
+    const row = await tx.threadGoal.update({
+      where: { id: goal.id },
+      data: { status: "paused", stopReason: input.stopReason, lastCheckedRunId: input.runId },
+    });
+    return { threadId: goal.threadId, seq: await emitGoal(tx, goal, row) };
+  });
+}
+
+export type GoalCheckOutcome =
+  | { kind: "skipped" }
+  | { kind: "continued"; threadId: string; seq: number; runId: string }
+  | { kind: "ended"; threadId: string; seq: number; end: GoalEnd };
+
+/**
+ * Writes a verdict. In one transaction under the thread lock it re-checks that the goal is open,
+ * then either creates the continuation run (trigger `goal`, the mode of a run the owner's message
+ * starts) or ends the goal with one `goal` message. The caller enqueues `run.continue` and tells
+ * realtime after the commit.
+ */
+export async function commitGoalVerdict(
+  prisma: PrismaClient,
+  input: {
+    goalId: string;
+    judged: { id: string; failed: boolean; madeProgress: boolean };
+    verdict: GoalVerdict;
+    /** The judged run failed because the model connection cannot run: the goal ends, whatever the verdict. */
+    modelError?: boolean;
+    spendUsd: number;
+    now: Date;
+    /** What the cited evidence said, for the end block. */
+    evidenceText: Record<string, string>;
+  },
+): Promise<GoalCheckOutcome> {
+  const found = await prisma.threadGoal.findUnique({
+    where: { id: input.goalId },
+    select: { threadId: true },
+  });
+  if (!found) return { kind: "skipped" };
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const goal = await checkStillOpen(tx, {
+      goalId: input.goalId,
+      runId: input.judged.id,
+      threadId: found.threadId,
+    });
+    if (!goal) return { kind: "skipped" } as const;
+    const step: GoalStep = input.modelError
+      ? { kind: "stopped", stalls: goal.stalls + 1, limit: "model_error" }
+      : goalStep({
+          verdict: input.verdict.verdict,
+          runFailed: input.judged.failed,
+          madeProgress: input.judged.madeProgress,
+          continuations: goal.continuations,
+          stalls: goal.stalls,
+          startedAt: goal.startedAt,
+          now: input.now,
+          spendUsd: input.spendUsd,
+        });
+    const verdictJson = { ...input.verdict } as Prisma.InputJsonObject;
+    const common = {
+      lastCheckedRunId: input.judged.id,
+      lastVerdict: verdictJson,
+      stalls: step.stalls,
+    };
+
+    if (step.kind === "continue") {
+      const judged = await tx.run.findUniqueOrThrow({
+        where: { id: input.judged.id },
+        select: {
+          modelPinned: true,
+          modelProvider: true,
+          modelId: true,
+          modelCredentialId: true,
+          thinkingLevel: true,
+        },
+      });
+      const row = await tx.threadGoal.update({
+        where: { id: goal.id },
+        data: { ...common, continuations: { increment: 1 } },
+      });
+      const task = await tx.task.create({
+        data: {
+          spaceId: goal.spaceId,
+          botId: goal.botId,
+          threadId: goal.threadId,
+          userId: goal.userId,
+          prompt: goalContinuationPrompt({
+            reason: input.verdict.reason,
+            next: input.verdict.next || "Keep working.",
+            text: goal.text,
+          }),
+          status: "queued",
+        },
+      });
+      const run = await tx.run.create({
+        data: {
+          spaceId: goal.spaceId,
+          botId: goal.botId,
+          threadId: goal.threadId,
+          taskId: task.id,
+          userId: goal.userId,
+          status: "queued",
+          trigger: "goal",
+          unattended: newRunUnattended({ trigger: "goal" }),
+          externalTaint: newRunExternalTaint({ trigger: "goal" }),
+          goalId: goal.id,
+          // A model the owner pinned for the run stays pinned; otherwise the bot's own connection is resolved when it runs, as for a message.
+          ...(judged.modelPinned
+            ? {
+                modelProvider: judged.modelProvider,
+                modelId: judged.modelId,
+                modelCredentialId: judged.modelCredentialId,
+                thinkingLevel: judged.thinkingLevel,
+                modelPinned: true,
+              }
+            : {}),
+        },
+      });
+      return {
+        kind: "continued",
+        threadId: goal.threadId,
+        seq: await emitGoal(tx, goal, row),
+        runId: run.id,
+      } as const;
+    }
+
+    const end = goalEnd(step, input.verdict);
+    const status = end.outcome;
+    const row = await tx.threadGoal.update({
+      where: { id: goal.id },
+      data: {
+        ...common,
+        status,
+        endedAt: input.now,
+        stopReason:
+          step.kind === "stopped"
+            ? step.limit
+            : step.kind === "blocked" && step.stalled
+              ? "stalled"
+              : null,
+      },
+    });
+    const evidence =
+      end.outcome === "met"
+        ? input.verdict.evidence.map((id) => ({ id, text: input.evidenceText[id] ?? "" }))
+        : undefined;
+    const blocks: MessageBlock[] = [
+      {
+        kind: "goal",
+        outcome: end.outcome,
+        reason: end.reason,
+        ...(evidence ? { evidence } : {}),
+        text: end.text,
+      },
+    ];
+    const message = await createThreadMessageInTransaction(tx, {
+      threadId: goal.threadId,
+      role: "bot",
+      blocks,
+      botId: goal.botId,
+    });
+    await appendEventInTransaction(tx, {
+      spaceId: goal.spaceId,
+      threadId: goal.threadId,
+      botId: goal.botId,
+      type: "thread.message.created",
+      payload: { messageId: message.id, role: "bot", blocks },
+    });
+    return {
+      kind: "ended",
+      threadId: goal.threadId,
+      seq: await emitGoal(tx, goal, row),
+      end,
+    } as const;
+  });
 }

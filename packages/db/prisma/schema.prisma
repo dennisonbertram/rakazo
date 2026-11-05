@@ -1159,6 +1159,8 @@ model Run {
   /// The thread goal this run works toward, while one is active. Cleared when the goal is deleted.
   goalId               String?
   goal                 ThreadGoal?       @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  /// What a goal run's tool calls returned, for the goal check: [{ id, tool, args, ok, result }], at most 24 KB.
+  goalEvidence         Json?
 
   @@unique([spaceId, clientNonce])
   @@index([status, leaseExpiresAt])

@@ -62,6 +62,7 @@ function tx(options?: {
       deleteMany: vi.fn(async () => ({ count: 1 })),
     },
     computerExecutionLease: { updateMany: vi.fn(async () => ({ count: 1 })) },
+    threadGoal: { findFirst: vi.fn(async () => null) },
     computer: { updateMany: vi.fn(async () => ({ count: 1 })) },
     steeringMessage: {
       updateMany: vi.fn(async () => ({ count: 1 })),

@@ -320,6 +320,33 @@ describe("resolveActionApproval", () => {
 describe("planActionGate", () => {
   const consequential = true;
 
+  it("never plans Auto Review for a goal run", () => {
+    const base = { consequential, autoReviewEnabled: true, checkerConfigured: true, goalRun: true };
+    for (const source of ["default", "action_type_default"] as const) {
+      for (const decision of ["allow", "ask"] as const) {
+        expect(planActionGate({ ...base, resolved: { decision, source, matchingRules: [] } })).toBe(
+          decision,
+        );
+      }
+    }
+    // A new site asks instead of going to the judge.
+    expect(
+      planActionGate({
+        ...base,
+        resolved: { decision: "allow", source: "default", matchingRules: [] },
+        newDestination: true,
+      }),
+    ).toBe("ask");
+    // The same call in an owner run is still judged.
+    expect(
+      planActionGate({
+        ...base,
+        goalRun: false,
+        resolved: { decision: "allow", source: "default", matchingRules: [] },
+      }),
+    ).toBe("judge");
+  });
+
   it("lets require_approval win without judging", () => {
     expect(
       planActionGate({

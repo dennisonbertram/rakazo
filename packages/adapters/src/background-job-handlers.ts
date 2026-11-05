@@ -51,6 +51,7 @@ import type { FinanceSyncDeps } from "./finance-sync.js";
 import { syncFinanceForUser } from "./finance-sync.js";
 import type { GmailPushConfig } from "./gmail-push.js";
 import { ensureMailWatch, runMailWatchRenewal } from "./gmail-push.js";
+import { runGoalCheck } from "./goal-check.js";
 import { GoogleContactPhotoSource } from "./google-contact-photos.js";
 import { compactHistory } from "./history-compaction.js";
 import { createInboxClassifierProvider } from "./inbox-classifier-factory.js";
@@ -184,6 +185,8 @@ export function createBackgroundJobHandlers(deps: {
     deps.prisma.computer.findUnique({ where: { id: computerId }, select: OWNER });
   const thread = ({ threadId }: { threadId: string }) =>
     deps.prisma.thread.findUnique({ where: { id: threadId }, select: OWNER });
+  const goal = ({ goalId }: { goalId: string }) =>
+    deps.prisma.threadGoal.findUnique({ where: { id: goalId }, select: OWNER });
   const skill = ({ skillId }: { skillId: string }) =>
     deps.prisma.taughtSkill.findUnique({ where: { id: skillId }, select: OWNER });
   const cloudAgent = ({ agentId }: { agentId: string }) =>
@@ -617,6 +620,19 @@ export function createBackgroundJobHandlers(deps: {
     "pages.snapshots.retention": async () => {
       await runPageSnapshotRetention(deps.prisma);
     },
+    "goal.check": asOwner(goal, async (payload) => {
+      await runGoalCheck(
+        {
+          prisma: deps.prisma,
+          jobs: deps.jobs,
+          events: deps.events,
+          notificationEvents: deps.notificationEvents,
+          runtime: deps.runtime,
+          ...(deps.executor.resolveModel ? { resolveModel: deps.executor.resolveModel } : {}),
+        },
+        payload,
+      );
+    }),
     "history.compact": asOwner(thread, async (payload) => {
       // Retrieval policies use stored context without paid message-count compaction.
       // Skip legacy backlog work after a policy change.

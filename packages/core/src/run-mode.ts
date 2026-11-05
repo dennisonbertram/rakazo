@@ -3,11 +3,13 @@
  * Every `run.create` must set it; `run-create-sites.test.ts` fails if one does not.
  *
  * | Run is created by                                                    | unattended |
- * | user, reaction, call_end, skill; follow_up with no source run        | false      |
+ * | user, reaction, call_end, skill, goal; follow_up with no source run  | false      |
  * | any run caused by another run (follow_up, spawn, resume, bot_message)| copy source|
  * | routine, webhook, messaging, cloud_agent, created, tickets, mcp, unknown | true  |
  */
-const OWNER_LIVE_TRIGGERS = new Set(["user", "reaction", "call_end", "skill"]);
+// A goal run (/goal) is the owner's own request continued by the server: it gets exactly what a run
+// started by their message gets, so the bot's allow rules apply and anything else raises a card.
+const OWNER_LIVE_TRIGGERS = new Set(["user", "reaction", "call_end", "skill", "goal"]);
 
 export function newRunUnattended(input: {
   trigger: string;

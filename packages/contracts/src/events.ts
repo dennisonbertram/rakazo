@@ -617,6 +617,15 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     /** A result that arrived while the receiver still waits on these delegates. Server-written. */
     stillWaitingFor: z.array(z.string()).optional(),
   }),
+  z.object({
+    /** How a /goal ended. `text` is the plain line that clients without a renderer show. */
+    kind: z.literal("goal"),
+    outcome: z.enum(["met", "blocked", "stopped"]),
+    reason: z.string(),
+    /** The tool results the goal check cited; only for `met`. */
+    evidence: z.array(z.object({ id: z.string(), text: z.string() })).optional(),
+    text: z.string(),
+  }),
 ]);
 export type MessageBlock = z.infer<typeof MessageBlock>;
 

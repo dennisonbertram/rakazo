@@ -847,6 +847,8 @@ export function planActionGate(input: {
   routineRead?: boolean;
   /** A fetch to a site the run was not given (see outboundSiteGate). */
   newDestination?: boolean;
+  /** A goal run (/goal) never plans a judge: the owner is not there to be spared a card, and nothing is auto-approved. */
+  goalRun?: boolean;
 }): "ask" | "allow" | "judge" | "block" {
   const { resolved } = input;
   if (resolved.decision === "block") return "block";
@@ -857,12 +859,13 @@ export function planActionGate(input: {
   // Review, and in an unattended run, which never plans a judge, a person decides.
   if (input.newDestination) {
     if (resolved.decision === "ask" && resolved.source === "require_approval") return "ask";
-    return !input.unattended && input.autoReviewEnabled && input.checkerConfigured
+    return !input.unattended && !input.goalRun && input.autoReviewEnabled && input.checkerConfigured
       ? "judge"
       : "ask";
   }
   const judgeable =
     (!input.unattended || input.routineRead === true) &&
+    !input.goalRun &&
     input.consequential &&
     input.autoReviewEnabled &&
     input.checkerConfigured &&

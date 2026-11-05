@@ -10174,6 +10174,55 @@
                                                 "text"
                                               ],
                                               "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "const": "goal"
+                                                },
+                                                "outcome": {
+                                                  "type": "string",
+                                                  "enum": [
+                                                    "met",
+                                                    "blocked",
+                                                    "stopped"
+                                                  ]
+                                                },
+                                                "reason": {
+                                                  "type": "string"
+                                                },
+                                                "evidence": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "id": {
+                                                        "type": "string"
+                                                      },
+                                                      "text": {
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "id",
+                                                      "text"
+                                                    ],
+                                                    "additionalProperties": false
+                                                  }
+                                                },
+                                                "text": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "outcome",
+                                                "reason",
+                                                "text"
+                                              ],
+                                              "additionalProperties": false
                                             }
                                           ]
                                         }
@@ -50159,6 +50208,55 @@
                                         "text"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "goal"
+                                        },
+                                        "outcome": {
+                                          "type": "string",
+                                          "enum": [
+                                            "met",
+                                            "blocked",
+                                            "stopped"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": "string"
+                                        },
+                                        "evidence": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "text": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "text"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "outcome",
+                                        "reason",
+                                        "text"
+                                      ],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
@@ -68613,6 +68711,55 @@
                                         "kind",
                                         "fromBotId",
                                         "fromBotName",
+                                        "text"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "goal"
+                                        },
+                                        "outcome": {
+                                          "type": "string",
+                                          "enum": [
+                                            "met",
+                                            "blocked",
+                                            "stopped"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": "string"
+                                        },
+                                        "evidence": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "text": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "text"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "outcome",
+                                        "reason",
                                         "text"
                                       ],
                                       "additionalProperties": false
@@ -115802,7 +115949,8 @@
                                   "cloud_agent",
                                   "created",
                                   "tickets",
-                                  "mcp"
+                                  "mcp",
+                                  "goal"
                                 ]
                               },
                               "notificationsEnabled": {
@@ -128659,6 +128807,55 @@
                                         "text"
                                       ],
                                       "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "goal"
+                                        },
+                                        "outcome": {
+                                          "type": "string",
+                                          "enum": [
+                                            "met",
+                                            "blocked",
+                                            "stopped"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": "string"
+                                        },
+                                        "evidence": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "text": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "text"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "outcome",
+                                        "reason",
+                                        "text"
+                                      ],
+                                      "additionalProperties": false
                                     }
                                   ]
                                 }
@@ -131732,6 +131929,55 @@
                                         "kind",
                                         "fromBotId",
                                         "fromBotName",
+                                        "text"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "goal"
+                                        },
+                                        "outcome": {
+                                          "type": "string",
+                                          "enum": [
+                                            "met",
+                                            "blocked",
+                                            "stopped"
+                                          ]
+                                        },
+                                        "reason": {
+                                          "type": "string"
+                                        },
+                                        "evidence": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "text": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "text"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "text": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "outcome",
+                                        "reason",
                                         "text"
                                       ],
                                       "additionalProperties": false
@@ -137090,7 +137336,8 @@
                               "subagent",
                               "compaction",
                               "triage",
-                              "company_import"
+                              "company_import",
+                              "goal_check"
                             ]
                           },
                           "parentRunId": {
@@ -140981,7 +141228,8 @@
               "cloud_agent",
               "created",
               "tickets",
-              "mcp"
+              "mcp",
+              "goal"
             ]
           },
           "routineId": {
@@ -151345,7 +151593,8 @@
               "cloud_agent",
               "created",
               "tickets",
-              "mcp"
+              "mcp",
+              "goal"
             ]
           },
           "routineId": {

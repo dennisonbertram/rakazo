@@ -1279,7 +1279,16 @@ export const UsageRecordSchema = z.object({
   callId: z.string().nullable().optional(),
   operationId: z.string().nullable().optional(),
   operationKind: z
-    .enum(["answer", "setup", "retrieval", "subagent", "compaction", "triage", "company_import"])
+    .enum([
+      "answer",
+      "setup",
+      "retrieval",
+      "subagent",
+      "compaction",
+      "triage",
+      "company_import",
+      "goal_check",
+    ])
     .optional(),
   parentRunId: z.string().nullable().optional(),
   agentId: z.string().nullable().optional(),
