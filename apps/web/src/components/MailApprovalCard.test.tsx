@@ -162,7 +162,7 @@ const choose = (el: HTMLSelectElement, value: string) =>
 
 it("holds Send until a sender is chosen when no account was named and several are connected", async () => {
   const { account: _account, ...unnamed } = mail;
-  const { onAnswer } = await render({ mail: unnamed, accounts });
+  const { onAnswer } = await render({ mail: { ...unnamed, choices: accounts } });
   expect(button("Send")?.disabled).toBe(true);
   await choose(select()!, "c2");
   expect(button("Send")?.disabled).toBe(false);
@@ -171,19 +171,18 @@ it("holds Send until a sender is chosen when no account was named and several ar
   expect(onAnswer).toHaveBeenCalledWith("allow", undefined, { account: "c2" });
 });
 
-it("holds Send while accounts load or failed, and offers a retry on failure", async () => {
+it("lists only the accounts the server offered for this agent", async () => {
   const { account: _account, ...unnamed } = mail;
-  await render({ mail: unnamed, accountsStatus: "loading" });
-  expect(button("Send")?.disabled).toBe(true);
-  const onRetryAccounts = vi.fn();
-  await render({ mail: unnamed, accountsStatus: "error", onRetryAccounts });
-  expect(button("Send")?.disabled).toBe(true);
-  await click(button("Retry"));
-  expect(onRetryAccounts).toHaveBeenCalled();
+  await render({ mail: { ...unnamed, choices: accounts } });
+  expect([...select()!.options].map((option) => option.textContent)).toEqual([
+    "Choose an account",
+    "work@example.test",
+    "home@example.test",
+  ]);
 });
 
 it("shows a plain From line with a single account and sends the agent's call unchanged", async () => {
-  const { onAnswer } = await render({ accounts: accounts.slice(0, 1) });
+  const { onAnswer } = await render();
   expect(select()).toBeNull();
   await click(button("Send"));
   await sent();
@@ -600,7 +599,7 @@ it("gives a failed send with no error text a reason and the next step", async ()
 
 it("says why Send is disabled until a sender is chosen", async () => {
   const { account: _account, ...unnamed } = mail;
-  await render({ mail: unnamed, accounts });
+  await render({ mail: { ...unnamed, choices: accounts } });
   expect(host.querySelector("[id$=-hint]")?.textContent).toBe("Choose an account to send from.");
   await choose(select()!, "c2");
   expect(host.querySelector("[id$=-hint]")).toBeNull();
@@ -629,7 +628,7 @@ it("keeps the More button on the Send and Discard line when the account hint sho
     { connectionId: "c1", label: "a", address: "a@example.test" },
     { connectionId: "c2", label: "b", address: "b@example.test" },
   ];
-  await render({ mail: { ...mail, account: undefined }, accounts, accountsStatus: "ready" });
+  await render({ mail: { ...mail, account: undefined, choices: accounts } });
   const hint = [...host.querySelectorAll("p")].find((p) =>
     p.textContent?.includes("Choose an account to send from."),
   );

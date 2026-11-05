@@ -8763,6 +8763,28 @@
                                                     "account": {
                                                       "type": "string"
                                                     },
+                                                    "choices": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "connectionId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "address": {
+                                                            "type": "string"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "connectionId",
+                                                          "label"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      }
+                                                    },
                                                     "to": {
                                                       "type": "array",
                                                       "items": {
@@ -48207,6 +48229,28 @@
                                             "account": {
                                               "type": "string"
                                             },
+                                            "choices": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "connectionId": {
+                                                    "type": "string"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "address": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "connectionId",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            },
                                             "to": {
                                               "type": "array",
                                               "items": {
@@ -65611,6 +65655,28 @@
                                             },
                                             "account": {
                                               "type": "string"
+                                            },
+                                            "choices": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "connectionId": {
+                                                    "type": "string"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "address": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "connectionId",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
                                             },
                                             "to": {
                                               "type": "array",
@@ -124985,6 +125051,28 @@
                                             "account": {
                                               "type": "string"
                                             },
+                                            "choices": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "connectionId": {
+                                                    "type": "string"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "address": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "connectionId",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            },
                                             "to": {
                                               "type": "array",
                                               "items": {
@@ -127953,6 +128041,28 @@
                                             },
                                             "account": {
                                               "type": "string"
+                                            },
+                                            "choices": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "connectionId": {
+                                                    "type": "string"
+                                                  },
+                                                  "label": {
+                                                    "type": "string"
+                                                  },
+                                                  "address": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "connectionId",
+                                                  "label"
+                                                ],
+                                                "additionalProperties": false
+                                              }
                                             },
                                             "to": {
                                               "type": "array",

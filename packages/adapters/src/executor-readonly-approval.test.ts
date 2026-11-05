@@ -1855,6 +1855,59 @@ describe("unattended mail_modify and mail_send", () => {
   });
 });
 
+describe("the From of a mail approval card", () => {
+  const second = { id: "acct-2", address: "other@example.test" };
+  const first = { id: "acct-1", address: "hello@example.test" };
+  /** Gmail rows as the access rules read them: limited to bot-1 (granted), or to nobody (not granted). */
+  const row = (id: string, granted: boolean) => ({
+    ...mailConnectionRow(),
+    id,
+    allAgents: false,
+    privateByDefault: true,
+    botAccess: granted ? [{ botId: "bot-1", canWrite: false }] : [],
+  });
+  const cardFor = async (granted: string[]) => {
+    const f = fixture({
+      name: "mail_send",
+      builtin: true,
+      mail: { listAccounts: vi.fn(async () => [first, second]) },
+      connectionRows: [
+        row("acct-1", granted.includes("acct-1")),
+        row("acct-2", granted.includes("acct-2")),
+      ],
+    });
+    f.setCalls([
+      { args: { to: ["a@example.test"], subject: "Hi", body: "Hello" }, executionId: "call-1" },
+    ]);
+    await f.run();
+    return f;
+  };
+  const mailOf = (f: Awaited<ReturnType<typeof cardFor>>) =>
+    (
+      f.pauseRunForInput.mock.calls[0] as unknown as [
+        { blocks: { mail?: { account?: string; choices?: { connectionId: string }[] } }[] },
+      ]
+    )[0].blocks[0]?.mail;
+
+  it("is the one account the agent may use, with nothing to choose", async () => {
+    const f = await cardFor(["acct-1"]);
+    expect(mailOf(f)).toMatchObject({ account: "hello@example.test" });
+    expect(mailOf(f)?.choices).toBeUndefined();
+  });
+
+  it("offers a choice of exactly the accounts the agent may use when there are several", async () => {
+    const f = await cardFor(["acct-1", "acct-2"]);
+    expect(mailOf(f)?.account).toBeUndefined();
+    expect(mailOf(f)?.choices?.map((choice) => choice.connectionId)).toEqual(["acct-1", "acct-2"]);
+  });
+
+  it("refuses the call with no card when the agent may use none", async () => {
+    const f = await cardFor([]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.any(String) });
+  });
+});
+
 describe("built-in mail on a connection with an integration agent", () => {
   beforeEach(() => {
     reviewMock.mockReset();

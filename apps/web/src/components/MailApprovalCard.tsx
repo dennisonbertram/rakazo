@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { MailAccountSummary, MailApproval, MailEdits } from "@rakazo/contracts";
+import type { MailApproval, MailEdits } from "@rakazo/contracts";
 import { isClosedApprovalAnswer, SKIPPED_APPROVAL_ANSWER } from "@rakazo/core";
 import {
   Button,
@@ -76,9 +76,6 @@ export function MailApprovalCard({
   allowDisabled = false,
   onFieldsChange,
   toOnly = false,
-  accounts = [],
-  accountsStatus = "ready",
-  onRetryAccounts,
   reason,
   embedded,
 }: {
@@ -103,11 +100,6 @@ export function MailApprovalCard({
   allowDisabled?: boolean;
   onFieldsChange?: (fields: Required<Omit<MailEdits, "account" | "send">>) => void;
   toOnly?: boolean;
-  /** The person's connected mail accounts; with more than one, the card lets them pick the sender. */
-  accounts?: readonly MailAccountSummary[];
-  /** Until the accounts are known, a send that names no sender cannot go out. */
-  accountsStatus?: "loading" | "error" | "ready";
-  onRetryAccounts?: () => void;
   /** A row of a card that has its own header and buttons: shows only the fields. */
   embedded?: { editing: boolean };
 }) {
@@ -144,11 +136,10 @@ export function MailApprovalCard({
   const shown = answered ? initial : fields;
   const canSendSaved = answered && draft && mail.outcome === "saved" && canSend && !!onSendDraft;
   const canSendNow = interactive && draft && canSend && !allowLabel;
-  // With no sender named, the send waits for the accounts, and for a pick when there are several.
-  const senderOpen = interactive && !mail.account && !mail.locked;
-  const chooseAccount = senderOpen && accountsStatus === "ready" && accounts.length > 1;
-  const needsAccount =
-    senderOpen && (accountsStatus !== "ready" || (accounts.length > 1 && !account));
+  // The server lists the accounts this agent may send from when it could not pick one itself.
+  const accounts = mail.choices ?? [];
+  const chooseAccount = interactive && !mail.account && !mail.locked && accounts.length > 1;
+  const needsAccount = chooseAccount && !account;
 
   // A finished card folds up to its header, unless the person still has something to do with it.
   useEffect(() => {
@@ -441,12 +432,6 @@ export function MailApprovalCard({
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
-              </Row>
-            ) : senderOpen && accountsStatus === "error" ? (
-              <Row label={t`From`}>
-                <Button variant="link" className="h-auto p-0" onClick={onRetryAccounts}>
-                  <Trans>Retry</Trans>
-                </Button>
               </Row>
             ) : mail.account ? (
               <Row label={t`From`}>

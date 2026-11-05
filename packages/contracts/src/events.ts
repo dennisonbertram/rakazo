@@ -166,6 +166,12 @@ export const MailApprovalSchema = z.object({
   tool: z.enum(["mail_draft", "mail_send"]),
   /** Connected account address, when the call named one. */
   account: z.string().optional(),
+  /** With no account named and several the agent may use: the accounts to choose the sender from. */
+  choices: z
+    .array(
+      z.object({ connectionId: z.string(), label: z.string(), address: z.string().optional() }),
+    )
+    .optional(),
   to: z.array(z.string()),
   cc: z.array(z.string()),
   bcc: z.array(z.string()),
