@@ -57,6 +57,14 @@ const openDocument = (url: string) => {
 
 const NEW_PROSPECT: Prefill = { name: "", email: null, organization: null, kind: "prospect" };
 
+/** A row with no person yet carries its record's id, so its actions add the first person. */
+const hasNoPerson = (prospect: Contact) => prospect.pipelineRecord?.id === prospect.id;
+const firstPerson = ({ name, id }: Contact): Prefill => ({
+  ...NEW_PROSPECT,
+  name,
+  pipelineRecordId: id,
+});
+
 /** The Fundraising page: the round and the prospect pipeline. */
 export function FundraisingPage({
   onShowAgent,
@@ -183,6 +191,7 @@ export function FundraisingPage({
   const mercuryConnected = overview ? overview.mercury.status !== "not_connected" : false;
   // With Mercury the SAFE is made there: open it, then mark the prospect Waiting for Mercury.
   function sendSafe(prospect: Contact) {
+    if (hasNoPerson(prospect)) return setEditing(firstPerson(prospect));
     if (!mercuryConnected) return setSending(prospect);
     if (!prospect.email?.trim()) return setNeedsEmail(prospect);
     openMercury();
@@ -332,7 +341,9 @@ export function FundraisingPage({
                     t`Could not undo Send SAFE`,
                   )
                 }
-                onEdit={setEditing}
+                onEdit={(prospect) =>
+                  setEditing(hasNoPerson(prospect) ? firstPerson(prospect) : prospect)
+                }
                 onMove={(prospect, stage) => void move(prospect, stage)}
               />
             </SectionCard>
@@ -493,6 +504,8 @@ export function FundraisingPage({
             contact={"id" in editing ? editing : null}
             prefill={"id" in editing ? undefined : editing}
             contacts={contacts ?? []}
+            // A first person joins a record that already has its stage and amount.
+            pipelineFields={"id" in editing || !editing.pipelineRecordId}
             onClose={() => setEditing(null)}
             onSaved={(saved) => {
               load();

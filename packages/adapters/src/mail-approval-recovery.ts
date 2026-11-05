@@ -13,20 +13,44 @@ export const MAIL_APPROVAL_STALE_MS = 2 * 60_000;
  * What the agent reads when it resumes. The claim records the cautious one, since nothing is known
  * yet (and a crash must not leave it believing the mail went out); the real outcome replaces it.
  */
-export function mailApprovalAgentNote(send: boolean, outcome?: Outcome, edited = true): string {
+export function mailApprovalAgentNote(
+  send: boolean,
+  outcome?: Outcome,
+  edited = true,
+  sentAs?: { to: string[]; from?: string | undefined },
+): string {
   const what = send ? "email" : "draft";
   const did = edited
     ? `edited this ${what} on the approval card`
     : `used the approval card for this ${what}`;
   if (outcome === "sent" || outcome === "saved") {
+    const who = sentAs?.to.length
+      ? `This email was sent to ${sentAs.to.join(", ")}${sentAs.from ? ` from ${sentAs.from}` : ""}. `
+      : "";
     return send
-      ? `The user ${edited ? "edited this email and sent it" : "sent this email"} themselves from the approval card. Do not send it again.`
+      ? `${who}The user ${edited ? "edited this email and sent it" : "sent this email"} themselves from the approval card. Do not send it again.`
       : "The user edited this email and saved it as a draft themselves from the approval card. Do not save it again.";
   }
   if (outcome === "failed") {
     return `The user ${did}, but their ${send ? "send" : "save"} failed and nothing was ${send ? "sent" : "saved"}. Do not tell them it was ${send ? "sent" : "saved"}. Tell them in your next message that it failed and that the card keeps the draft to open in the composer.`;
   }
   return `The user ${did} and the outcome of their ${send ? "send" : "save"} is ${outcome === "unknown" ? "unknown" : "not known yet"}. Do not ${send ? "send" : "save"} it again; they should check ${send ? "Sent" : "Drafts"}.`;
+}
+
+/** The note an unsettled claim carries: nothing is known yet about the person's own send. */
+const claimNotes = () => [
+  mailApprovalAgentNote(true),
+  mailApprovalAgentNote(true, undefined, false),
+  mailApprovalAgentNote(false),
+];
+
+/**
+ * A mail effect the person answered by sending or saving it themselves from the card, as opposed to
+ * one they refused. Older rows stay "denied" with an outcome, so this reads the result, not the status.
+ */
+export function isCardMailSend(result: unknown): boolean {
+  const stored = (result ?? {}) as { note?: unknown; outcome?: unknown };
+  return stored.outcome !== undefined || claimNotes().includes(stored.note as string);
 }
 
 /** How an approved mail_send or mail_draft call ended, from its tool result, for its card. */
@@ -75,11 +99,7 @@ export async function reconcileMailApprovals(deps: {
       kind: { in: ["mail_draft", "mail_send"] },
       status: "denied",
       updatedAt: { lte: cutoff },
-      OR: [
-        mailApprovalAgentNote(true),
-        mailApprovalAgentNote(true, undefined, false),
-        mailApprovalAgentNote(false),
-      ].map((note) => ({ result: { path: ["note"], equals: note } })),
+      OR: claimNotes().map((note) => ({ result: { path: ["note"], equals: note } })),
     },
     orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
     take: deps.batchSize,
@@ -148,17 +168,15 @@ export async function reconcileMailApprovals(deps: {
         where: { runId: effect.runId, role: "bot" },
         select: { id: true, threadId: true, blocks: true },
       });
+      const cardBlock = (block: unknown): block is { mail?: Partial<MailApproval> } =>
+        block !== null &&
+        typeof block === "object" &&
+        (block as { kind?: unknown }).kind === "ask" &&
+        (block as { approvalEffectId?: unknown }).approvalEffectId === effect.id;
       const card = messages.find(
-        (message) =>
-          Array.isArray(message.blocks) &&
-          message.blocks.some(
-            (block) =>
-              block !== null &&
-              typeof block === "object" &&
-              (block as { kind?: unknown }).kind === "ask" &&
-              (block as { approvalEffectId?: unknown }).approvalEffectId === effect.id,
-          ),
+        (message) => Array.isArray(message.blocks) && message.blocks.some(cardBlock),
       );
+      const shown = (card?.blocks as unknown[] | undefined)?.find(cardBlock)?.mail;
       // A cleared thread has no card; the effect's note is still settled so it leaves the scan.
       await deps.events.setMailApprovalOutcome({
         spaceId: effect.spaceId,
@@ -175,7 +193,10 @@ export async function reconcileMailApprovals(deps: {
               },
             }
           : {}),
-        note: mailApprovalAgentNote(send, outcome),
+        note: mailApprovalAgentNote(send, outcome, true, {
+          to: shown?.to ?? [],
+          from: shown?.account,
+        }),
         onlyIf: {
           note: claimNote,
           compose: {
@@ -261,10 +282,10 @@ export function mailSendRefusal(
     // The user's own edited send on the approval card: the agent cannot know its text, so any
     // new call about the same thing in this run is refused.
     const cardSend =
-      effect.status === "denied" &&
-      (result.outcome === "sent" ||
-        result.outcome === "unknown" ||
-        result.note === mailApprovalAgentNote(true));
+      result.outcome === "sent" ||
+      result.outcome === "unknown" ||
+      result.note === mailApprovalAgentNote(true) ||
+      result.note === mailApprovalAgentNote(true, undefined, false);
     if (cardSend) {
       return result.outcome === "sent"
         ? "The user already sent this email from the approval card. Do not send it again or offer another approval for it; tell the user it was sent."

@@ -146,6 +146,8 @@ export async function answerEditedMailApproval(
       mail: {
         ...withoutAccount(checked.edits),
         connectionId: account.id,
+        // The card names the account it really went from, which may be the one picked on the card.
+        ...(account.address ? { account: account.address } : {}),
         // The card now describes an email that is being sent, not a draft being saved.
         ...(sendNow ? { tool: "mail_send" as const } : {}),
       },
@@ -224,7 +226,10 @@ export async function answerEditedMailApproval(
       effectId: pending.effectId,
       outcome,
       providerIds: composeIds(sentRow),
-      note: mailApprovalAgentNote(send, outcome, edited),
+      note: mailApprovalAgentNote(send, outcome, edited, {
+        to: strings(merged.to),
+        from: account.address ?? undefined,
+      }),
     });
   } finally {
     await afterClaim();

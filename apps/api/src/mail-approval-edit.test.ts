@@ -189,11 +189,12 @@ describe("answerEditedMailApproval", () => {
     });
     await t.edit({ account: "conn-2" });
     expect(t.sent[0]).toMatchObject({ connectionId: "conn-2" });
-    // The picked id selects the connection; it is not published on the card.
+    // The card and the agent's result name the account it really went from.
     expect(
-      (t.answers[0] as unknown as { mailDenial: { mail: Record<string, unknown> } }).mailDenial
-        .mail,
-    ).not.toHaveProperty("account");
+      (t.answers[0] as unknown as { mailDenial: { mail: Record<string, unknown> } }).mailDenial.mail
+        .account,
+    ).toBe("sales@example.test");
+    expect((t.effect.result as { note: string }).note).toContain("from sales@example.test.");
   });
 
   it("resolves a picked connection by id even when two labels share a prefix", async () => {
@@ -262,7 +263,7 @@ describe("answerEditedMailApproval", () => {
   it("tells the agent the person sent it, not edited it, when Send now changed nothing", async () => {
     const plain = setup({ kind: "mail_draft" });
     await plain.edit({ send: true });
-    expect((plain.effect.result as { note: string }).note).toBe(
+    expect((plain.effect.result as { note: string }).note).toContain(
       "The user sent this email themselves from the approval card. Do not send it again.",
     );
     expect(plain.answers[0]?.mailDenial).toMatchObject({

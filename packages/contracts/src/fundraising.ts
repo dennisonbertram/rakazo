@@ -75,7 +75,7 @@ export const FundraisingOverviewSchema = z.object({
   /** SAFE money of the shown round that is signed, and that is paid. */
   signedCents: z.number().int(),
   fundedCents: z.number().int(),
-  /** Prospects still in the pipeline: those with an active SAFE have left it. */
+  /** One row per record still in the pipeline, as its primary contact: those with an active SAFE have left it. */
   prospects: z.array(ContactSchema),
   safes: z.array(SafeSchema),
 });
@@ -118,7 +118,10 @@ export type ProspectImportResult = {
   failed: { row: number; name: string; reason: string }[];
 };
 
-/** Changes only the pipeline fields of an existing prospect. Null clears the check size or next step. */
+/**
+ * Changes only the pipeline fields of an existing prospect, named by its contact or, for a record
+ * with no person yet, by the record. Null clears the check size or next step.
+ */
 export const ProspectSaveInputSchema = z.object({
   id: Id,
   stage: ContactStageSchema.optional(),
