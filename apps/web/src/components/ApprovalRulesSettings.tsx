@@ -85,7 +85,7 @@ export function ApprovalRulesSettings() {
       <p className="mt-3 text-[13px] text-muted-foreground">
         <Trans>
           Background runs always ask before they send, change or run anything, except mail changes
-          you always allowed.
+          you always allowed and tools you allowed for one routine.
         </Trans>
       </p>
       {error ? <p className="mt-3 text-[13px] text-destructive">{error}</p> : null}
