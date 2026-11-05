@@ -54,6 +54,12 @@ msgstr "(opens in Devin)"
 msgid "{0, plural, one {# change} other {# changes}}"
 msgstr "{0, plural, one {# change} other {# changes}}"
 
+#. placeholder {0}: data.savedContacts.length
+#. placeholder {0}: result.savedContacts
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# contact already saved} other {# contacts already saved}}"
+msgstr "{0, plural, one {# contact already saved} other {# contacts already saved}}"
+
 #. placeholder {0}: counts.unreviewedDocuments
 #: src/pages/Legal.tsx
 msgid "{0, plural, one {# Data room document not yet checked by Legal} other {# Data room documents not yet checked by Legal}}"
@@ -107,15 +113,36 @@ msgstr "{0, plural, one {# model} other {# models}}"
 msgid "{0, plural, one {# needs you} other {# need you}}"
 msgstr "{0, plural, one {# needs you} other {# need you}}"
 
+#. placeholder {0}: data.newContacts.length
+#. placeholder {0}: result.newContacts
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# new contact} other {# new contacts}}"
+msgstr "{0, plural, one {# new contact} other {# new contacts}}"
+
 #. placeholder {0}: glance.legalDueSoon
 #: src/pages/shell/space-sidebar.tsx
 msgid "{0, plural, one {# overdue or due in the next 7 days} other {# overdue or due in the next 7 days}}"
 msgstr "{0, plural, one {# overdue or due in the next 7 days} other {# overdue or due in the next 7 days}}"
 
+#. placeholder {0}: data.existing.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# prospect already in Fundraising} other {# prospects already in Fundraising}}"
+msgstr "{0, plural, one {# prospect already in Fundraising} other {# prospects already in Fundraising}}"
+
+#. placeholder {0}: data.noPerson.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# prospect with no person yet} other {# prospects with no person yet}}"
+msgstr "{0, plural, one {# prospect with no person yet} other {# prospects with no person yet}}"
+
 #. placeholder {0}: rows.length
 #: src/pages/Inbox.tsx
 msgid "{0, plural, one {# result} other {# results}}"
 msgstr "{0, plural, one {# result} other {# results}}"
+
+#. placeholder {0}: result.failed.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# row failed} other {# rows failed}}"
+msgstr "{0, plural, one {# row failed} other {# rows failed}}"
 
 #. placeholder {0}: counted.length
 #: src/pages/Investors.tsx
@@ -137,10 +164,20 @@ msgstr "{0, plural, one {# task done by your bots} other {# tasks done by your b
 msgid "{0, plural, one {#+ result} other {#+ results}}"
 msgstr "{0, plural, one {#+ result} other {#+ results}}"
 
+#. placeholder {0}: data.add
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Add # prospect to Fundraising} other {Add # prospects to Fundraising}}"
+msgstr "{0, plural, one {Add # prospect to Fundraising} other {Add # prospects to Fundraising}}"
+
 #. placeholder {0}: state.count
 #: src/components/data-room/DropZone.tsx
 msgid "{0, plural, one {Added # file} other {Added # files}}"
 msgstr "{0, plural, one {Added # file} other {Added # files}}"
+
+#. placeholder {0}: result.added
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Added # prospect to Fundraising} other {Added # prospects to Fundraising}}"
+msgstr "{0, plural, one {Added # prospect to Fundraising} other {Added # prospects to Fundraising}}"
 
 #. placeholder {0}: chosen.length
 #: src/components/data-room/AutoSortDialog.tsx
@@ -170,6 +207,11 @@ msgstr "{0, plural, one {Its # transaction will be removed from Finance.} other 
 msgid "{0, plural, one {Last full month} other {Last # full months}}"
 msgstr "{0, plural, one {Last full month} other {Last # full months}}"
 
+#. placeholder {0}: question.referred
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {referred # prospect} other {referred # prospects}}"
+msgstr "{0, plural, one {referred # prospect} other {referred # prospects}}"
+
 #. placeholder {0}: finishedRuns.length
 #: src/pages/ActivityList.tsx
 msgid "{0, plural, one {Show # finished run} other {Show # finished runs}}"
@@ -184,6 +226,21 @@ msgstr "{0, plural, one {Sorted # item} other {Sorted # items}}"
 #: src/components/ContactDeleteConfirm.tsx
 msgid "{0, plural, one {the link to # SAFE} other {the links to # SAFEs}}"
 msgstr "{0, plural, one {the link to # SAFE} other {the links to # SAFEs}}"
+
+#. placeholder {0}: data.update
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Update # prospect in Fundraising} other {Update # prospects in Fundraising}}"
+msgstr "{0, plural, one {Update # prospect in Fundraising} other {Update # prospects in Fundraising}}"
+
+#. placeholder {0}: data.update
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Update # prospect} other {Update # prospects}}"
+msgstr "{0, plural, one {Update # prospect} other {Update # prospects}}"
+
+#. placeholder {0}: result.updated
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Updated # prospect in Fundraising} other {Updated # prospects in Fundraising}}"
+msgstr "{0, plural, one {Updated # prospect in Fundraising} other {Updated # prospects in Fundraising}}"
 
 #. placeholder {0}: Math.ceil(oauth.expiresInSeconds / 60)
 #: src/pages/ModelSettingsOverlay.tsx
@@ -447,6 +504,10 @@ msgstr "{accounts} + crypto"
 msgid "{accounts} + stablecoins"
 msgstr "{accounts} + stablecoins"
 
+#: src/components/PipelineImportCard.tsx
+msgid "{adding, plural, one {Add # prospect} other {Add # prospects}}"
+msgstr "{adding, plural, one {Add # prospect} other {Add # prospects}}"
+
 #: src/components/compose/RecipientField.tsx
 msgid "{address} isn't a valid email address"
 msgstr "{address} isn't a valid email address"
@@ -530,10 +591,6 @@ msgstr "{count} of {total} selected"
 #: src/pages/CompanyImport.tsx
 msgid "{count} read tools"
 msgstr "{count} read tools"
-
-#: src/components/MailReplyBatchCard.tsx
-msgid "{count} replies"
-msgstr "{count} replies"
 
 #: src/pages/Fundraising.tsx
 msgid "{count} SAFEs are signed and unpaid."
@@ -642,6 +699,10 @@ msgstr "{items, plural, one {# item} other {# items}}"
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "{late, plural, one {Overdue by # day} other {Overdue by # days}}"
 msgstr "{late, plural, one {Overdue by # day} other {Overdue by # days}}"
+
+#: src/components/PipelineImportCard.tsx
+msgid "{left} left to choose"
+msgstr "{left} left to choose"
 
 #: src/pages/Fundraising.tsx
 msgid "{legalSafes} SAFEs found in Legal"
@@ -1346,6 +1407,7 @@ msgstr "Adding {added} of {total} · {0}"
 msgid "Adding a contact"
 msgstr "Adding a contact"
 
+#: src/components/PipelineImportCard.tsx
 #: src/pages/shell/working-label.ts
 msgid "Adding prospects"
 msgstr "Adding prospects"
@@ -2542,6 +2604,7 @@ msgstr "Can't reach the server."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
+#: src/components/PipelineImportCard.tsx
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -2849,7 +2912,6 @@ msgid "Check queue"
 msgstr "Check queue"
 
 #: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
 #: src/pages/Investors.tsx
 msgid "Check size"
 msgstr "Check size"
@@ -3276,6 +3338,7 @@ msgid "Comment"
 msgstr "Comment"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Committed"
 msgstr "Committed"
 
@@ -4513,6 +4576,10 @@ msgstr "Could not save this choice"
 msgid "Could not save time zone"
 msgstr "Could not save time zone"
 
+#: src/components/PipelineImportCard.tsx
+msgid "Could not save:"
+msgstr "Could not save:"
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Could not search"
 msgstr "Could not search"
@@ -4569,6 +4636,7 @@ msgstr "Could not stop sharing."
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailReplyBatchCard.tsx
+#: src/components/PipelineImportCard.tsx
 #: src/pages/Shell.tsx
 msgid "Could not submit this answer"
 msgstr "Could not submit this answer"
@@ -5289,6 +5357,7 @@ msgid "Digest"
 msgstr "Digest"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Diligence"
 msgstr "Diligence"
 
@@ -6451,6 +6520,12 @@ msgstr "Funding"
 msgid "Fundraising"
 msgstr "Fundraising"
 
+#. placeholder {0}: record.name
+#. placeholder {1}: pipelineStatusNames()[record.status]
+#: src/pages/ContactDetail.tsx
+msgid "Fundraising: {0} · {1}"
+msgstr "Fundraising: {0} · {1}"
+
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Gateway ID"
@@ -7144,6 +7219,14 @@ msgstr "Interval unit"
 msgid "Intro"
 msgstr "Intro"
 
+#: src/pages/ContactDetail.tsx
+msgid "Intro made"
+msgstr "Intro made"
+
+#: src/pages/ContactDetail.tsx
+msgid "Intro requested"
+msgstr "Intro requested"
+
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/components/cap-table/HoldingsTable.tsx
 msgid "Invested"
@@ -7454,6 +7537,10 @@ msgstr "Learned"
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Leave"
 msgstr "Leave"
+
+#: src/components/PipelineImportCard.tsx
+msgid "Leave Referred by empty"
+msgstr "Leave Referred by empty"
 
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/FilterBar.tsx
@@ -7982,6 +8069,10 @@ msgstr "Meeting"
 msgid "Meeting {time}"
 msgstr "Meeting {time}"
 
+#: src/pages/ContactDetail.tsx
+msgid "Meeting booked"
+msgstr "Meeting booked"
+
 #: src/lib/slash-skills.ts
 msgid "Meeting notes"
 msgstr "Meeting notes"
@@ -8127,6 +8218,10 @@ msgstr "Messaging"
 #: src/pages/shell/working-label.ts
 msgid "Messaging you"
 msgstr "Messaging you"
+
+#: src/pages/ContactDetail.tsx
+msgid "Met"
+msgstr "Met"
 
 #: src/components/fundraising/SafeDialog.tsx
 msgid "MFN"
@@ -8581,6 +8676,10 @@ msgstr "New bot"
 msgid "New Bot"
 msgstr "New Bot"
 
+#: src/components/PipelineImportCard.tsx
+msgid "New contact"
+msgstr "New contact"
+
 #: src/components/MailReplyBatchCard.tsx
 msgid "New email"
 msgstr "New email"
@@ -8721,7 +8820,6 @@ msgid "Next run {nextRun}"
 msgstr "Next run {nextRun}"
 
 #: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
 msgid "Next step"
 msgstr "Next step"
 
@@ -8879,6 +8977,10 @@ msgstr "No draft made, see Ask"
 #: src/pages/investors/UpdateEditor.tsx
 msgid "no email"
 msgstr "no email"
+
+#: src/components/PipelineImportCard.tsx
+msgid "No email"
+msgstr "No email"
 
 #: src/pages/CompanyImport.tsx
 msgid "No extraction model"
@@ -9249,6 +9351,10 @@ msgstr "Not now"
 msgid "Not on this thread"
 msgstr "Not on this thread"
 
+#: src/pages/ContactDetail.tsx
+msgid "Not reached"
+msgstr "Not reached"
+
 #: src/components/data-room/ItemRows.tsx
 msgid "Not read"
 msgstr "Not read"
@@ -9353,6 +9459,10 @@ msgstr "nothing"
 #: src/pages/finance/FinanceLists.tsx
 msgid "Nothing due in the next 30 days"
 msgstr "Nothing due in the next 30 days"
+
+#: src/components/PipelineImportCard.tsx
+msgid "Nothing else changed."
+msgstr "Nothing else changed."
 
 #: src/components/ComputerUpdateProgress.tsx
 msgid "Nothing is still running"
@@ -9910,6 +10020,7 @@ msgid "Party"
 msgstr "Party"
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Passed"
 msgstr "Passed"
 
@@ -11764,6 +11875,10 @@ msgstr "Saved"
 msgid "Saved {0}"
 msgstr "Saved {0}"
 
+#: src/components/PipelineImportCard.tsx
+msgid "Saved contacts are not overwritten."
+msgstr "Saved contacts are not overwritten."
+
 #: src/pages/shell/BotAccessSection.tsx
 msgid "Saved, but another account of this app limits access"
 msgstr "Saved, but another account of this app limits access"
@@ -12702,6 +12817,10 @@ msgstr "Skip for now"
 msgid "Skip or deploy key"
 msgstr "Skip or deploy key"
 
+#: src/components/PipelineImportCard.tsx
+msgid "Skip this row"
+msgstr "Skip this row"
+
 #: src/components/SkipToContent.tsx
 msgid "Skip to content"
 msgstr "Skip to content"
@@ -12714,6 +12833,8 @@ msgstr "Skip to message box"
 msgid "Skip tour"
 msgstr "Skip tour"
 
+#: src/components/AskCard.tsx
+#: src/components/MailApprovalCard.tsx
 #: src/components/MailReplyBatchCard.tsx
 msgid "Skipped"
 msgstr "Skipped"
@@ -12941,8 +13062,6 @@ msgid "Stablecoins only"
 msgstr "Stablecoins only"
 
 #: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
-#: src/pages/Investors.tsx
 msgid "Stage"
 msgstr "Stage"
 
@@ -13018,6 +13137,11 @@ msgstr "Stats"
 #: src/pages/legal/LegalContracts.tsx
 msgid "Status"
 msgstr "Status"
+
+#. placeholder {0}: candidate.stays
+#: src/components/PipelineImportCard.tsx
+msgid "Stays on {0}"
+msgstr "Stays on {0}"
 
 #. placeholder {0}: stepIndex + 1
 #. placeholder {1}: step || field
@@ -14634,6 +14758,10 @@ msgstr "View chat"
 msgid "View evidence"
 msgstr "View evidence"
 
+#: src/components/PipelineImportCard.tsx
+msgid "View in Pipeline"
+msgstr "View in Pipeline"
+
 #: src/pages/CompanyRefresh.tsx
 msgid "View progress"
 msgstr "View progress"
@@ -14945,6 +15073,10 @@ msgstr "Which bills are unpaid?"
 msgid "Which bots can use {appName}?"
 msgstr "Which bots can use {appName}?"
 
+#: src/components/PipelineImportCard.tsx
+msgid "Which contact is this?"
+msgstr "Which contact is this?"
+
 #: src/components/PageAgentIntro.tsx
 msgid "Which contracts have the highest value?"
 msgstr "Which contracts have the highest value?"
@@ -14965,6 +15097,10 @@ msgstr "Which event?"
 #: src/pages/Shell.tsx
 msgid "Who are our investors?"
 msgstr "Who are our investors?"
+
+#: src/components/PipelineImportCard.tsx
+msgid "Who made these introductions?"
+msgstr "Who made these introductions?"
 
 #: src/components/PageAgentIntro.tsx
 #: src/lib/investors-agent.ts

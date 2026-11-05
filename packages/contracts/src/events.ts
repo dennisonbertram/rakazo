@@ -341,6 +341,8 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     mail: MailApprovalSchema.optional(),
     /** A reply batch: Discard is the card's only action; Send selected is its own request. */
     mailBatch: MailBatchCountsSchema.optional(),
+    /** A list import: Deny is the card's only action; Add is its own request, on web and desktop. */
+    pipelineImport: z.object({ importId: Id }).optional(),
     /**
      * A held message from one bot to an external bot: Allow delivers exactly the text on the card,
      * once. It is answered without a waiting run.

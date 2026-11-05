@@ -268,6 +268,7 @@ import {
   FundraiseRoundSaveInputSchema,
   FundraiseRoundSchema,
   FundraisingOverviewSchema,
+  PipelineImportCardSchema,
   ProspectSaveInputSchema,
   SafeAssignInputSchema,
   SafeMarkInputSchema,
@@ -851,6 +852,24 @@ export const appContract = {
           username: z.string().min(1).max(512).optional(),
           /** Only with "allow" on a mail approval: fields the person changed. Recipients are comma-separated text. */
           mail: MailEditsSchema.optional(),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
+    /** What a list import card shows, for the run's own user. */
+    pipelineImport: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id }))
+      .output(PipelineImportCardSchema),
+    /**
+     * Add on a list import card, with every question answered. A list or contact that changed since
+     * `hash` was read rejects the press and changes nothing. Only the web and desktop card sends it.
+     */
+    applyPipelineImport: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          hash: z.string().max(128),
+          answers: z.record(z.string().max(300), z.string().max(300)),
         }),
       )
       .output(z.object({ ok: z.literal(true) })),

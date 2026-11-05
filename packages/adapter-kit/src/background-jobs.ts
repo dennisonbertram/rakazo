@@ -40,6 +40,11 @@ const payloadSchemas = {
     spaceId: z.string().min(1),
     userId: z.string().min(1),
   }),
+  "pipeline.import": z.object({
+    importId: z.string().min(1),
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+  }),
   "inbox.triage": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
   "mail.sync": z.object({
     spaceId: z.string().min(1),
@@ -391,6 +396,17 @@ export function mailReplyBatchJob(
     name: "mail.reply.batch",
     payload,
     replaceKey: mailReplyBatchJobKey(payload.effectId),
+  };
+}
+
+/** Applies one import's queued rows. Rows take turns, so a second job for the import changes nothing. */
+export function pipelineImportJob(
+  payload: BackgroundJobPayloads["pipeline.import"],
+): BackgroundJob {
+  return {
+    name: "pipeline.import",
+    payload,
+    replaceKey: `pipeline.import:${payload.importId}`,
   };
 }
 

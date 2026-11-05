@@ -8864,6 +8864,18 @@
                                                   ],
                                                   "additionalProperties": false
                                                 },
+                                                "pipelineImport": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "importId": {
+                                                      "$ref": "#/components/schemas/RpcBootstrapOutputSchema0"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "importId"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
                                                 "share": {
                                                   "type": "boolean"
                                                 },
@@ -48308,6 +48320,18 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "pipelineImport": {
+                                          "type": "object",
+                                          "properties": {
+                                            "importId": {
+                                              "$ref": "#/components/schemas/RpcExportBotOutputSchema0"
+                                            }
+                                          },
+                                          "required": [
+                                            "importId"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "share": {
                                           "type": "boolean"
                                         },
@@ -65710,6 +65734,18 @@
                                             "sent",
                                             "failed",
                                             "unknown"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "pipelineImport": {
+                                          "type": "object",
+                                          "properties": {
+                                            "importId": {
+                                              "$ref": "#/components/schemas/RpcGroupsGetOutputSchema0"
+                                            }
+                                          },
+                                          "required": [
+                                            "importId"
                                           ],
                                           "additionalProperties": false
                                         },
@@ -124297,6 +124333,193 @@
         ]
       }
     },
+    "/rpc/threads/applyPipelineImport": {
+      "post": {
+        "operationId": "rpc_threads_applyPipelineImport",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "$ref": "#/components/schemas/RpcThreadsApplyPipelineImportInputSchema0"
+                      },
+                      "groupId": {
+                        "$ref": "#/components/schemas/RpcThreadsApplyPipelineImportInputSchema0"
+                      },
+                      "runId": {
+                        "$ref": "#/components/schemas/RpcThreadsApplyPipelineImportInputSchema0"
+                      },
+                      "messageId": {
+                        "$ref": "#/components/schemas/RpcThreadsApplyPipelineImportInputSchema0"
+                      },
+                      "hash": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "answers": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "maxLength": 300
+                        }
+                      }
+                    },
+                    "required": [
+                      "runId",
+                      "messageId",
+                      "hash",
+                      "answers"
+                    ],
+                    "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                    "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/threads/clear": {
       "post": {
         "operationId": "rpc_threads_clear",
@@ -125083,6 +125306,18 @@
                                             "sent",
                                             "failed",
                                             "unknown"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "pipelineImport": {
+                                          "type": "object",
+                                          "properties": {
+                                            "importId": {
+                                              "$ref": "#/components/schemas/RpcThreadsGetOutputSchema0"
+                                            }
+                                          },
+                                          "required": [
+                                            "importId"
                                           ],
                                           "additionalProperties": false
                                         },
@@ -128055,6 +128290,18 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "pipelineImport": {
+                                          "type": "object",
+                                          "properties": {
+                                            "importId": {
+                                              "$ref": "#/components/schemas/RpcThreadsMessagesOutputSchema0"
+                                            }
+                                          },
+                                          "required": [
+                                            "importId"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "share": {
                                           "type": "boolean"
                                         },
@@ -129451,6 +129698,375 @@
                       "additionalProperties": false,
                       "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
                       "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/threads/pipelineImport": {
+      "post": {
+        "operationId": "rpc_threads_pipelineImport",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "$ref": "#/components/schemas/RpcThreadsPipelineImportInputSchema0"
+                      },
+                      "groupId": {
+                        "$ref": "#/components/schemas/RpcThreadsPipelineImportInputSchema0"
+                      },
+                      "runId": {
+                        "$ref": "#/components/schemas/RpcThreadsPipelineImportInputSchema0"
+                      },
+                      "messageId": {
+                        "$ref": "#/components/schemas/RpcThreadsPipelineImportInputSchema0"
+                      }
+                    },
+                    "required": [
+                      "runId",
+                      "messageId"
+                    ],
+                    "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
+                    "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "reviewing",
+                            "applying",
+                            "done",
+                            "closed"
+                          ]
+                        },
+                        "hash": {
+                          "type": "string"
+                        },
+                        "add": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "update": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "person",
+                                  "referrer"
+                                ]
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "firm": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "referred": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "newRecord": {
+                                "type": "boolean"
+                              },
+                              "candidates": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "email": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "organization": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "stays": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "email",
+                                    "organization",
+                                    "stays"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "allowNew": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "name",
+                              "firm",
+                              "referred",
+                              "newRecord",
+                              "candidates",
+                              "allowNew"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "newContacts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "savedContacts": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "noPerson": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "existing": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "result": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "added": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "updated": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "newContacts": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "savedContacts": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "failed": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "firm": {
+                                        "type": "string"
+                                      },
+                                      "reason": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "firm",
+                                      "reason"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "added",
+                                "updated",
+                                "newContacts",
+                                "savedContacts",
+                                "failed"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "hash",
+                        "add",
+                        "update",
+                        "questions",
+                        "newContacts",
+                        "savedContacts",
+                        "noPerson",
+                        "existing",
+                        "result"
+                      ],
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -138796,7 +139412,7 @@
         ]
       },
       "RpcBotsUpdateInputSchema22": {
-        "maxItems": 142,
+        "maxItems": 143,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
@@ -148046,6 +148662,10 @@
         "type": "string",
         "minLength": 1
       },
+      "RpcThreadsApplyPipelineImportInputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
       "RpcThreadsClearInputSchema0": {
         "$ref": "#/components/schemas/RpcThreadsClearInputSchema1"
       },
@@ -149083,6 +149703,10 @@
         ]
       },
       "RpcThreadsMessagesInputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcThreadsPipelineImportInputSchema0": {
         "type": "string",
         "minLength": 1
       },

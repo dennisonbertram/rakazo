@@ -54,6 +54,12 @@ msgstr ""
 msgid "{0, plural, one {# change} other {# changes}}"
 msgstr ""
 
+#. placeholder {0}: data.savedContacts.length
+#. placeholder {0}: result.savedContacts
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# contact already saved} other {# contacts already saved}}"
+msgstr ""
+
 #. placeholder {0}: counts.unreviewedDocuments
 #: src/pages/Legal.tsx
 msgid "{0, plural, one {# Data room document not yet checked by Legal} other {# Data room documents not yet checked by Legal}}"
@@ -107,14 +113,35 @@ msgstr "{0, plural, one {# modèle} other {# modèles}}"
 msgid "{0, plural, one {# needs you} other {# need you}}"
 msgstr ""
 
+#. placeholder {0}: data.newContacts.length
+#. placeholder {0}: result.newContacts
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# new contact} other {# new contacts}}"
+msgstr ""
+
 #. placeholder {0}: glance.legalDueSoon
 #: src/pages/shell/space-sidebar.tsx
 msgid "{0, plural, one {# overdue or due in the next 7 days} other {# overdue or due in the next 7 days}}"
 msgstr ""
 
+#. placeholder {0}: data.existing.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# prospect already in Fundraising} other {# prospects already in Fundraising}}"
+msgstr ""
+
+#. placeholder {0}: data.noPerson.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# prospect with no person yet} other {# prospects with no person yet}}"
+msgstr ""
+
 #. placeholder {0}: rows.length
 #: src/pages/Inbox.tsx
 msgid "{0, plural, one {# result} other {# results}}"
+msgstr ""
+
+#. placeholder {0}: result.failed.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# row failed} other {# rows failed}}"
 msgstr ""
 
 #. placeholder {0}: counted.length
@@ -137,9 +164,19 @@ msgstr ""
 msgid "{0, plural, one {#+ result} other {#+ results}}"
 msgstr ""
 
+#. placeholder {0}: data.add
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Add # prospect to Fundraising} other {Add # prospects to Fundraising}}"
+msgstr ""
+
 #. placeholder {0}: state.count
 #: src/components/data-room/DropZone.tsx
 msgid "{0, plural, one {Added # file} other {Added # files}}"
+msgstr ""
+
+#. placeholder {0}: result.added
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Added # prospect to Fundraising} other {Added # prospects to Fundraising}}"
 msgstr ""
 
 #. placeholder {0}: chosen.length
@@ -170,6 +207,11 @@ msgstr ""
 msgid "{0, plural, one {Last full month} other {Last # full months}}"
 msgstr ""
 
+#. placeholder {0}: question.referred
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {referred # prospect} other {referred # prospects}}"
+msgstr ""
+
 #. placeholder {0}: finishedRuns.length
 #: src/pages/ActivityList.tsx
 msgid "{0, plural, one {Show # finished run} other {Show # finished runs}}"
@@ -183,6 +225,21 @@ msgstr ""
 #. placeholder {0}: linked.safes
 #: src/components/ContactDeleteConfirm.tsx
 msgid "{0, plural, one {the link to # SAFE} other {the links to # SAFEs}}"
+msgstr ""
+
+#. placeholder {0}: data.update
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Update # prospect in Fundraising} other {Update # prospects in Fundraising}}"
+msgstr ""
+
+#. placeholder {0}: data.update
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Update # prospect} other {Update # prospects}}"
+msgstr ""
+
+#. placeholder {0}: result.updated
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Updated # prospect in Fundraising} other {Updated # prospects in Fundraising}}"
 msgstr ""
 
 #. placeholder {0}: Math.ceil(oauth.expiresInSeconds / 60)
@@ -447,6 +504,10 @@ msgstr ""
 msgid "{accounts} + stablecoins"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "{adding, plural, one {Add # prospect} other {Add # prospects}}"
+msgstr ""
+
 #: src/components/compose/RecipientField.tsx
 msgid "{address} isn't a valid email address"
 msgstr ""
@@ -529,10 +590,6 @@ msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "{count} read tools"
-msgstr ""
-
-#: src/components/MailReplyBatchCard.tsx
-msgid "{count} replies"
 msgstr ""
 
 #: src/pages/Fundraising.tsx
@@ -641,6 +698,10 @@ msgstr ""
 
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "{late, plural, one {Overdue by # day} other {Overdue by # days}}"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "{left} left to choose"
 msgstr ""
 
 #: src/pages/Fundraising.tsx
@@ -1346,6 +1407,7 @@ msgstr ""
 msgid "Adding a contact"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
 #: src/pages/shell/working-label.ts
 msgid "Adding prospects"
 msgstr ""
@@ -2542,6 +2604,7 @@ msgstr "Impossible d'atteindre le serveur."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
+#: src/components/PipelineImportCard.tsx
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -2849,7 +2912,6 @@ msgid "Check queue"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
 #: src/pages/Investors.tsx
 msgid "Check size"
 msgstr ""
@@ -3276,6 +3338,7 @@ msgid "Comment"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Committed"
 msgstr ""
 
@@ -4513,6 +4576,10 @@ msgstr "Impossible d'enregistrer ce choix"
 msgid "Could not save time zone"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "Could not save:"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Could not search"
 msgstr ""
@@ -4569,6 +4636,7 @@ msgstr ""
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailReplyBatchCard.tsx
+#: src/components/PipelineImportCard.tsx
 #: src/pages/Shell.tsx
 msgid "Could not submit this answer"
 msgstr "Impossible de soumettre cette réponse"
@@ -5289,6 +5357,7 @@ msgid "Digest"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Diligence"
 msgstr ""
 
@@ -6451,6 +6520,12 @@ msgstr ""
 msgid "Fundraising"
 msgstr ""
 
+#. placeholder {0}: record.name
+#. placeholder {1}: pipelineStatusNames()[record.status]
+#: src/pages/ContactDetail.tsx
+msgid "Fundraising: {0} · {1}"
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
 msgid "Gateway ID"
@@ -7144,6 +7219,14 @@ msgstr "Unité de l'intervalle"
 msgid "Intro"
 msgstr ""
 
+#: src/pages/ContactDetail.tsx
+msgid "Intro made"
+msgstr ""
+
+#: src/pages/ContactDetail.tsx
+msgid "Intro requested"
+msgstr ""
+
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/components/cap-table/HoldingsTable.tsx
 msgid "Invested"
@@ -7454,6 +7537,10 @@ msgstr ""
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Leave"
 msgstr "Quitter"
+
+#: src/components/PipelineImportCard.tsx
+msgid "Leave Referred by empty"
+msgstr ""
 
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/FilterBar.tsx
@@ -7982,6 +8069,10 @@ msgstr ""
 msgid "Meeting {time}"
 msgstr ""
 
+#: src/pages/ContactDetail.tsx
+msgid "Meeting booked"
+msgstr ""
+
 #: src/lib/slash-skills.ts
 msgid "Meeting notes"
 msgstr ""
@@ -8126,6 +8217,10 @@ msgstr "Messagerie"
 
 #: src/pages/shell/working-label.ts
 msgid "Messaging you"
+msgstr ""
+
+#: src/pages/ContactDetail.tsx
+msgid "Met"
 msgstr ""
 
 #: src/components/fundraising/SafeDialog.tsx
@@ -8581,6 +8676,10 @@ msgstr ""
 msgid "New Bot"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "New contact"
+msgstr ""
+
 #: src/components/MailReplyBatchCard.tsx
 msgid "New email"
 msgstr ""
@@ -8721,7 +8820,6 @@ msgid "Next run {nextRun}"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
 msgid "Next step"
 msgstr ""
 
@@ -8878,6 +8976,10 @@ msgstr ""
 
 #: src/pages/investors/UpdateEditor.tsx
 msgid "no email"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "No email"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
@@ -9249,6 +9351,10 @@ msgstr "Pas maintenant"
 msgid "Not on this thread"
 msgstr ""
 
+#: src/pages/ContactDetail.tsx
+msgid "Not reached"
+msgstr ""
+
 #: src/components/data-room/ItemRows.tsx
 msgid "Not read"
 msgstr ""
@@ -9352,6 +9458,10 @@ msgstr ""
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceLists.tsx
 msgid "Nothing due in the next 30 days"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "Nothing else changed."
 msgstr ""
 
 #: src/components/ComputerUpdateProgress.tsx
@@ -9910,6 +10020,7 @@ msgid "Party"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Passed"
 msgstr ""
 
@@ -11764,6 +11875,10 @@ msgstr "Enregistré"
 msgid "Saved {0}"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "Saved contacts are not overwritten."
+msgstr ""
+
 #: src/pages/shell/BotAccessSection.tsx
 msgid "Saved, but another account of this app limits access"
 msgstr ""
@@ -12702,6 +12817,10 @@ msgstr ""
 msgid "Skip or deploy key"
 msgstr "Passer ou clé de déploiement"
 
+#: src/components/PipelineImportCard.tsx
+msgid "Skip this row"
+msgstr ""
+
 #: src/components/SkipToContent.tsx
 msgid "Skip to content"
 msgstr ""
@@ -12714,6 +12833,8 @@ msgstr ""
 msgid "Skip tour"
 msgstr ""
 
+#: src/components/AskCard.tsx
+#: src/components/MailApprovalCard.tsx
 #: src/components/MailReplyBatchCard.tsx
 msgid "Skipped"
 msgstr ""
@@ -12941,8 +13062,6 @@ msgid "Stablecoins only"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
-#: src/pages/Investors.tsx
 msgid "Stage"
 msgstr ""
 
@@ -13017,6 +13136,11 @@ msgstr ""
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 msgid "Status"
+msgstr ""
+
+#. placeholder {0}: candidate.stays
+#: src/components/PipelineImportCard.tsx
+msgid "Stays on {0}"
 msgstr ""
 
 #. placeholder {0}: stepIndex + 1
@@ -14634,6 +14758,10 @@ msgstr "Voir la conversation"
 msgid "View evidence"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "View in Pipeline"
+msgstr ""
+
 #: src/pages/CompanyRefresh.tsx
 msgid "View progress"
 msgstr ""
@@ -14945,6 +15073,10 @@ msgstr ""
 msgid "Which bots can use {appName}?"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "Which contact is this?"
+msgstr ""
+
 #: src/components/PageAgentIntro.tsx
 msgid "Which contracts have the highest value?"
 msgstr ""
@@ -14964,6 +15096,10 @@ msgstr ""
 #: src/lib/investors-agent.ts
 #: src/pages/Shell.tsx
 msgid "Who are our investors?"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "Who made these introductions?"
 msgstr ""
 
 #: src/components/PageAgentIntro.tsx

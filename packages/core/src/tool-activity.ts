@@ -51,7 +51,7 @@ export type ToolAction =
   | "contact-add"
   | "contact-save"
   | "fundraising-round-save"
-  | "fundraising-prospects-save"
+  | "pipeline-import"
   | "contacts-read"
   | "cap-table-read"
   | "cap-table-update"
@@ -71,7 +71,8 @@ const TOOL_ACTIONS: Record<string, ToolAction> = {
   contacts_add: "contact-add",
   contacts_save: "contact-save",
   fundraising_round_save: "fundraising-round-save",
-  fundraising_prospects_save: "fundraising-prospects-save",
+  pipeline_import_stage: "pipeline-import",
+  pipeline_import_review: "pipeline-import",
   contacts_list: "contacts-read",
   cap_table_read: "cap-table-read",
   cap_table_update: "cap-table-update",

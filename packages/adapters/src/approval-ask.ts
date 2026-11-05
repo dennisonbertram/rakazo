@@ -16,6 +16,7 @@ import {
   isZernioEndpoint,
   MAIL_REPLY_BATCH_TOOL,
   MAX_COMPOSE_BODY,
+  PIPELINE_IMPORT_REVIEW_TOOL,
 } from "@rakazo/contracts";
 import {
   ALL_SITES_ACTION_ID,
@@ -68,10 +69,26 @@ export function buildApprovalAskBlock(
     shareTarget?: string;
     /** mail_reply_batch: the stored rows. */
     mailBatch?: readonly MailBatchCardRow[];
+    /** pipeline_import_review: the review of the import. */
+    pipelineImport?: { importId: string; text: string; detail: string };
   },
 ): MessageBlock {
   if (toolName === MAIL_REPLY_BATCH_TOOL) {
     return buildMailBatchAskBlock(effectId, options?.mailBatch ?? [], options?.approvalReason);
+  }
+  if (toolName === PIPELINE_IMPORT_REVIEW_TOOL && options?.pipelineImport) {
+    // Add is its own request from the web and desktop card; the phone apps show this text and Deny.
+    const { importId, text, detail } = options.pipelineImport;
+    return {
+      kind: "ask",
+      approvalEffectId: effectId,
+      text,
+      detail,
+      approvalReason: options.approvalReason,
+      pipelineImport: { importId },
+      status: "pending",
+      actions: [{ id: "deny", label: "Deny" }],
+    };
   }
   if (toolName === "respond_agent_connection") {
     // Shows who asked, from what was captured before the effect was recorded, not from the model.
@@ -110,15 +127,13 @@ export function buildApprovalAskBlock(
       options?.serviceName,
       options?.moneyNames,
     );
-  const prospectsCard = toolName === "fundraising_prospects_save";
   const fullDetail =
-    prospectsCard ||
     options?.fullMail ||
     options?.fullCompany ||
     options?.integrationWriteTool !== undefined ||
     options?.imessage ||
     options?.schedule;
-  const fullDetailOpen = options?.fullMail || options?.imessage || options?.schedule;
+  const _fullDetailOpen = options?.fullMail || options?.imessage || options?.schedule;
   const detail = shareTarget
     ? `${shareTarget} will ask before every action after it reads the meeting.`
     : options?.schedule
@@ -165,10 +180,7 @@ export function buildApprovalAskBlock(
     ),
     // Raw tool arguments sit behind a Details disclosure; a card the person reads to decide stays open.
     detailFolded:
-      (options?.integrationWriteTool !== undefined ||
-        isSendMoney(toolName) ||
-        options?.schedule ||
-        prospectsCard) &&
+      (options?.integrationWriteTool !== undefined || isSendMoney(toolName) || options?.schedule) &&
       !options?.fullMail &&
       !options?.imessage
         ? true
@@ -205,7 +217,7 @@ export function buildApprovalAskBlock(
             },
             ...(options?.fullMail ||
             options?.fullCompany ||
-            FUNDRAISING_WRITES.has(toolName) ||
+            toolName === "fundraising_round_save" ||
             options?.integrationWriteTool !== undefined ||
             options?.noAlwaysAllow ||
             toolName === "imessage_send"
@@ -642,12 +654,6 @@ export function describeApprovalAction(
   if (toolName === "fundraising_round_save") {
     return `${args.id ? "Change" : "Start"} round “${args.name ? String(args.name) : "Untitled"}”`;
   }
-  if (toolName === "fundraising_prospects_save") {
-    const rows = prospectRows(args);
-    const names = rows.slice(0, 3).map(prospectLabel).join(", ");
-    const replacing = args.overwrite === true ? ", replacing fields already set" : "";
-    return `Add or update ${rows.length} ${rows.length === 1 ? "prospect" : "prospects"}${replacing}${names ? ` (${names}${rows.length > 3 ? ` and ${rows.length - 3} more` : ""})` : ""}`;
-  }
   const target = webFetchSite(toolName, args) ?? pickScopeLabel(args);
   const label = serviceName
     ? `${serviceName}: ${humanizeToolName(toolName)}`
@@ -667,32 +673,8 @@ const HAND_WRITTEN_TOOLS = new Set([
   "create_space",
   "contacts_save",
   "fundraising_round_save",
-  "fundraising_prospects_save",
+  PIPELINE_IMPORT_REVIEW_TOOL,
 ]);
-
-const FUNDRAISING_WRITES = new Set(["fundraising_round_save", "fundraising_prospects_save"]);
-const prospectRows = (args: Record<string, unknown>): Record<string, unknown>[] =>
-  Array.isArray(args.rows)
-    ? args.rows.filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
-    : [];
-const prospectLabel = (row: Record<string, unknown>) => String(row.firm ?? row.name ?? "Unnamed");
-
-/** One line per row with every field the call writes, so the card shows exactly what is saved. */
-function prospectsDetail(args: Record<string, unknown>): string {
-  return prospectRows(args)
-    .map((row) => {
-      const parts = [
-        row.name && row.firm ? String(row.name) : undefined,
-        row.email ? String(row.email) : undefined,
-        row.stage ? String(row.stage) : undefined,
-        row.amountUsd != null ? formatAmount(row.amountUsd, "USD") : undefined,
-        row.nextStep ? `next step: ${String(row.nextStep)}` : undefined,
-        row.notes ? `notes: ${String(row.notes)}` : undefined,
-      ].filter(Boolean);
-      return `${prospectLabel(row)}${parts.length ? `: ${parts.join("; ")}` : ""}`;
-    })
-    .join("\n");
-}
 
 /** The scope an email thread agent's read asks about, so the card shows what would be looked up. */
 const READ_SCOPE_KEYS: Record<string, string[]> = {
@@ -726,10 +708,6 @@ function formatApprovalDetail(
       lines.push(`${label}: ${key === "name" ? String(value) : formatAmount(value, "USD")}`);
     }
     return lines.join("\n") || undefined;
-  }
-  if (toolName === "fundraising_prospects_save") {
-    lines.push(prospectsDetail(args));
-    return lines.join("\n");
   }
   // A fetch carries data in its path and query, so the card shows the whole URL.
   const keys =

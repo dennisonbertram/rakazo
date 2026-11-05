@@ -645,6 +645,7 @@ import {
   OPENROUTER_OAUTH_PROVIDER,
   OpenRouterOAuthError,
 } from "./openrouter-oauth.js";
+import { applyPipelineImport, readPipelineImport } from "./pipeline-import.js";
 import { rememberedMessageIds, rememberThreadMessage } from "./remember-message.js";
 import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
@@ -2942,7 +2943,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
             disabledBuiltinTools: source.disabledBuiltinTools,
             audience: source.audience === "external" ? "external" : "internal",
             firewall: source.firewall,
-            proactivity: source.proactivity === "low" || source.proactivity === "high" ? source.proactivity : "medium",
+            proactivity:
+              source.proactivity === "low" || source.proactivity === "high"
+                ? source.proactivity
+                : "medium",
             externalMessageTargets: source.externalMessageTargets,
             externalComputerTools: source.externalComputerTools,
           })
@@ -3857,6 +3861,23 @@ export function createRouter(deps: RouterDeps): AppRouter {
         });
         return { ok: true as const };
       }),
+      pipelineImport: authed.threads.pipelineImport.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return readPipelineImport(deps, context.actor, target, input);
+      }),
+      applyPipelineImport: authed.threads.applyPipelineImport.handler(
+        async ({ context, input }) => {
+          const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+          await applyPipelineImport(deps, context.actor, target, input);
+          // The card is answered, so its "needs approval" notification has nothing left to ask.
+          await markSeen(deps.prisma, {
+            ...context.actor,
+            surface: "thread",
+            threadId: target.threadId,
+          }).catch((error) => getLogger().error("thread pipeline import notification", error));
+          return { ok: true as const };
+        },
+      ),
       mailBatch: authed.threads.mailBatch.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         return readMailBatch(deps, context.actor, target, input);

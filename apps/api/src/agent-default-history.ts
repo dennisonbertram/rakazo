@@ -83,8 +83,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   investors: {
-    current: "9bbc2eff839fb9bb44f8cf30ede1297838a9256eda58b1e97d1f05fcbaff116a",
+    current: "cae501926de7ef9e354077e02247c398db716da05475ab0b9c2b5440a46844c4",
     past: [
+      "9bbc2eff839fb9bb44f8cf30ede1297838a9256eda58b1e97d1f05fcbaff116a",
       "37f7a321ad300f58bf82ea048444b47e259d0b4035a00d46f67b5b04063fb677",
       "cb8966528abe3e84f1331998b19259240efe100cf42750c3d1340cb2617a6b87",
       "f33cf5a1e0400eb1f205cdcba9709e91202a7d7bf9e05061db141a3330b71d16",

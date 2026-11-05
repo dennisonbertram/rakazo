@@ -509,25 +509,37 @@ code-b
       },
     ];
   }
-  // "fundraising fixture round|prospects <json>": the Investors agent's writes, for demo and tests.
-  const fundraisingFixture = /fundraising fixture (round|prospects)\s+(\{[\s\S]*\})/i.exec(prompt);
+  // "pipeline import fixture <json rows>": stage in calls of 60, then one review, for demo and tests.
+  const importFixture = /pipeline import fixture\s+(\[[\s\S]*\])/i.exec(prompt);
+  if (importFixture) {
+    try {
+      const rows = JSON.parse(importFixture[1] as string) as unknown[];
+      const calls = Array.from({ length: Math.ceil(rows.length / 60) }, (_, index) => ({
+        toolCalls: [
+          {
+            name: "pipeline_import_stage",
+            args: {
+              rows: rows.slice(index * 60, (index + 1) * 60),
+              ...(index === 0 ? { start: true } : {}),
+            },
+          },
+        ],
+      }));
+      return [
+        ...calls,
+        { toolCalls: [{ name: "pipeline_import_review", args: {} }] },
+        { assistant: "the list is handled on the card.", complete: true },
+      ];
+    } catch {
+      // Not JSON: fall through to the other intents.
+    }
+  }
+  // "fundraising fixture round <json>": the Investors agent's round write, for demo and tests.
+  const fundraisingFixture = /fundraising fixture round\s+(\{[\s\S]*\})/i.exec(prompt);
   if (fundraisingFixture) {
     try {
-      const args = JSON.parse(fundraisingFixture[2] as string) as Record<string, unknown>;
-      return [
-        {
-          toolCalls: [
-            {
-              name:
-                fundraisingFixture[1]?.toLowerCase() === "round"
-                  ? "fundraising_round_save"
-                  : "fundraising_prospects_save",
-              args,
-            },
-          ],
-          complete: true,
-        },
-      ];
+      const args = JSON.parse(fundraisingFixture[1] as string) as Record<string, unknown>;
+      return [{ toolCalls: [{ name: "fundraising_round_save", args }], complete: true }];
     } catch {
       // Not JSON: fall through to the other intents.
     }

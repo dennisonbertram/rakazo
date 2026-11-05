@@ -783,6 +783,8 @@ export interface BackgroundJobPayloads {
   "mail.search.expire": { searchId: string };
   /** Sends the approved rows of one reply batch; one queued job per batch. */
   "mail.reply.batch": { effectId: string; spaceId: string; userId: string };
+  /** Applies the rows of one approved list import; one queued job per import. */
+  "pipeline.import": { importId: string; spaceId: string; userId: string };
   /** Classifies a user's new inbox mail and syncs their to-dos; one queued job per user and space. */
   "inbox.triage": { userId: string; spaceId: string };
   /** Syncs one mail connection into the cache; one queued job per connection. */
