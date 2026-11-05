@@ -4676,12 +4676,21 @@ describe("unattended runs and block rules", () => {
     },
   );
 
-  it("an unattended read_history that is not on the safe list asks on a card", async () => {
-    const f = fixture({ name: "read_history", builtin: true, unattended: true });
-    f.setCalls([{ args: {}, executionId: "c1" }]);
-    await f.run({ expectFailure: true });
-    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
-    expect(f.effects).toHaveLength(1);
+  it("an unattended run reads its own history without a card, and a tainted one still asks", async () => {
+    const free = fixture({ name: "read_history", builtin: true, unattended: true });
+    free.setCalls([{ args: {}, executionId: "c1" }]);
+    await free.run({ expectFailure: true });
+    expect(free.pauseRunForInput).not.toHaveBeenCalled();
+
+    const tainted = fixture({
+      name: "read_history",
+      builtin: true,
+      unattended: true,
+      externalTaint: true,
+    });
+    tainted.setCalls([{ args: {}, executionId: "c1" }]);
+    await tainted.run({ expectFailure: true });
+    expect(tainted.pauseRunForInput).toHaveBeenCalledOnce();
   });
 
   it("an unattended run calls Praci's own page tool without a card, and a tainted one still asks", async () => {
