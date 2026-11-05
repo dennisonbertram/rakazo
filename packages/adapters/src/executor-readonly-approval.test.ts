@@ -265,6 +265,7 @@ function fixture({
   parallel = false,
   pageBrowser,
   firewall = false,
+  semanticMemory,
   firewalledBots = [] as string[],
   groupId = null as string | null,
   ticketAuthor = null as string | null,
@@ -275,6 +276,8 @@ function fixture({
   scriptedRuntime?: boolean;
   /** The bot's Firewall switch at the start of the run. */
   firewall?: boolean;
+  /** A semantic memory provider the space has configured, with its default scope. */
+  semanticMemory?: { provider: unknown; defaultScope: string };
   /** Other agents in the space with Firewall on. */
   firewalledBots?: string[];
   /** The run is in this group thread; its members are `firewalledBots` plus bot-1. */
@@ -856,7 +859,7 @@ function fixture({
       },
       commit,
     },
-    memoryProviders: { resolve: async () => null },
+    memoryProviders: { resolve: async () => (semanticMemory as never) ?? null },
     events: {
       append: appendEvent,
       pauseRunForInput,
@@ -6494,7 +6497,6 @@ describe("agent firewall", () => {
   });
 });
 
-<<<<<<< HEAD
 describe("fetching new sites without a card", () => {
   const pausedCardOf = (f: ReturnType<typeof fixture>) =>
     (f.pauseRunForInput.mock.calls as unknown as [{ blocks: Record<string, unknown>[] }][])[0]?.[0]
@@ -6667,7 +6669,7 @@ describe("public research apps linked as Composio connections", () => {
   const run = (
     toolName: string,
     { provider = "exa", ...extra }: Record<string, unknown> = {},
-    query = "npm packages for csv parsing",
+    query: string | Record<string, unknown> = "npm packages for csv parsing",
   ) => {
     const t = tool(toolName);
     const f = fixture({
@@ -6680,7 +6682,7 @@ describe("public research apps linked as Composio connections", () => {
       availableTools: [t],
       ...extra,
     });
-    f.setCalls([{ args: { query }, executionId: "call-1" }]);
+    f.setCalls([{ args: typeof query === "string" ? { query } : query, executionId: "call-1" }]);
     return f;
   };
 
@@ -6774,7 +6776,9 @@ describe("public research apps linked as Composio connections", () => {
     ]);
     await f.run();
     expect(f.fetchedUrls).toEqual([]);
-=======
+  });
+});
+
 describe("mail_reply_batch", () => {
   const replies = [
     { replyToId: "m1", to: ["sam@customer.example"], subject: "Re: one", body: "Hello one" },
@@ -7163,6 +7167,114 @@ describe("mail_reply_batch", () => {
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
       expect(f.results[0]).toEqual({ error: DENIED_ACTION_MESSAGE });
     });
->>>>>>> origin/main
+  });
+});
+
+describe("public research agents and meeting text", () => {
+  const priya = {
+    kind: "bot_message_received",
+    fromBotId: "peer-1",
+    text: "Priya Shah owes 48213 dollars",
+  };
+
+  it("an Exa agent holding meeting text gets no all-sites choice on a new-site card", async () => {
+    const f = fixture({
+      builtin: true,
+      trigger: "bot_message",
+      peer: {
+        senderInScope: true,
+        linked: false,
+        ownerOrigin: true,
+        senderSpawnKey: integrationAgentSpawnKey("server-1"),
+      },
+      mcpServers: [
+        { id: "server-1", endpoint: "https://mcp.granola.ai/mcp", agentBotId: "peer-1" },
+      ],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    const card = (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: { actions: { id: string }[] }[] }][]
+    )[0]![0].blocks[0]!;
+    expect(card.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
+  });
+
+  it("checks every nested string of a research tool call, such as Tavily's urls list", async () => {
+    const key = integrationAgentSpawnKey("connection-1");
+    const t = {
+      name: "TAVILY_MCP_TAVILY_EXTRACT",
+      description: "extract",
+      inputSchema: { type: "object", properties: {} },
+      route: { connectorId: "composio", toolName: "TAVILY_MCP_TAVILY_EXTRACT" },
+    } as ConnectorTool;
+    const f = fixture({
+      name: t.name,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      route: t.route,
+      availableTools: [t],
+      knownBots: { "peer-1": null as unknown as string },
+      history: [{ blocks: [priya] }],
+      connectionRows: [
+        {
+          id: "connection-1",
+          spaceId: "space-1",
+          userId: "user-1",
+          connectorId: "composio",
+          provider: "tavily_mcp",
+          displayName: "Tavily",
+          status: "connected",
+          allAgents: false,
+          botAccess: [{ botId: "bot-1" }],
+          agentBotId: "bot-1",
+          writesEnabled: false,
+        },
+      ],
+    });
+    f.setCalls([
+      {
+        args: { urls: ["https://example.org/?q=Priya+Shah+48213"], options: { depth: "basic" } },
+        executionId: "call-1",
+      },
+    ]);
+    await f.run();
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it("gives a public research agent isolated memory, never the shared pool", async () => {
+    const save = vi.fn(async () => ({ ok: true }));
+    const f = fixture({
+      name: "save_memory",
+      builtin: true,
+      spawnKey: integrationAgentSpawnKey("connection-1"),
+      semanticMemory: {
+        provider: { save, recall: vi.fn(async () => null) },
+        defaultScope: "shared",
+      },
+      connectionRows: [
+        {
+          id: "connection-1",
+          spaceId: "space-1",
+          userId: "user-1",
+          connectorId: "composio",
+          provider: "exa",
+          displayName: "Exa",
+          status: "connected",
+          allAgents: false,
+          botAccess: [{ botId: "bot-1" }],
+          agentBotId: "bot-1",
+          writesEnabled: false,
+        },
+      ],
+    });
+    f.setCalls([{ args: { content: "note" }, executionId: "call-1" }]);
+    await f.run();
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "isolated" }),
+      expect.anything(),
+    );
   });
 });

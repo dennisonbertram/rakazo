@@ -507,7 +507,12 @@ async function commitAnswerRunInput(
         where: { id: run.botId, spaceId: input.spaceId },
         select: { audience: true, firewall: true },
       });
+      const thread = await tx.thread.findFirst({
+        where: { id: input.threadId },
+        select: { meetingTaintedAt: true },
+      });
       if (
+        thread?.meetingTaintedAt ||
         approvalEffect.kind !== "web_fetch" ||
         run.userId !== input.answeredByUserId ||
         run.trigger === "webhook" ||

@@ -126,6 +126,7 @@ import {
   callIdFromClientNonce,
   checkInInstruction,
   checkOutbound,
+  collectStrings,
   connectionAccessFilter,
   connectionRowsForAudience,
   connectorKindFromToolName,
@@ -2434,7 +2435,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           context.mcpServerIds = [...gtmMcpServerIds];
         }
         const memoryScope = configuredMemory
-          ? bot.firewall === true
+          ? bot.firewall === true || publicResearchAgent
             ? "isolated" // never the pool shared across agents
             : effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
@@ -5180,9 +5181,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (await (async () => {
               if (!(await standingSiteAccess()).publicResearch) return false;
               const fragments = await outboundFragments();
-              const text = Object.values(args)
-                .filter((value): value is string => typeof value === "string")
-                .join(" ");
+              const text = collectStrings(args).join(" ");
               return Boolean(fragments) && checkOutbound({ text, fragments: fragments! }).allow;
             })());
           const requiresUnattendedApproval =
@@ -5890,6 +5889,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               meetingTaintedCall || externalTaintedCall
                 ? undefined
                 : await resolveMoneyNames(callRoute?.toolName ?? name, args, readApprovalName);
+            const noAlwaysAllow =
+              desktopReadSearch ||
+              meetingTaintedCall ||
+              externalTaintedCall ||
+              requiresUnattendedApproval ||
+              runTainted ||
+              COMPANY_TOOL_NAMES.has(name);
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
               // The card's reason line already says "Requested by an external bot".
               reviewReason:
@@ -5904,18 +5910,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 COMPANY_TOOL_NAMES.has(name),
               integrationWriteTool,
               allSites:
-                siteGate === "new" && standingSites?.offerAllSites && !standingSites.standing
+                !noAlwaysAllow &&
+                siteGate === "new" &&
+                standingSites?.offerAllSites &&
+                !standingSites.standing
                   ? { privateAccess: standingSites.privateAccess }
                   : undefined,
               approvalReason: approvalCardReason,
               mailBatch: preparedMailBatch,
-              noAlwaysAllow:
-                desktopReadSearch ||
-                meetingTaintedCall ||
-                externalTaintedCall ||
-                requiresUnattendedApproval ||
-                runTainted ||
-                COMPANY_TOOL_NAMES.has(name),
+              noAlwaysAllow,
               serviceName: callRoute?.serverName,
               mailAccount:
                 meetingTaintedCall || externalTaintedCall ? undefined : await approvalMailAccount(),
@@ -9370,66 +9373,65 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
               // An owner's private message must not steer an Elio peer run: it stays unclaimed and
               // the owner run that starts when this one finishes answers it.
-              claimSteering:
-                hidePrivateVoiceHistory
-                  ? undefined
-                  : async (seenIds) => {
-                      const steering = await deps.events.claimSteering({
-                        threadId: thread.id,
-                        botId: bot.id,
-                        runId,
-                        leaseOwner: workerId,
-                        leaseFence: fence,
-                        seenIds,
-                        // A message that carries the external mark is not taken into a run that was
-                        // built without it (tools, context and notice would be wrong). It waits and
-                        // starts its own run, which is built marked.
-                        excludeExternalOrigin:
-                          externalChain === undefined && bot.audience !== "external",
-                      });
-                      return Promise.all(
-                        steering.map(async (item) => {
-                          const { images, files, unavailableInstruction } =
-                            await settleSteeringAttachmentLoads(
-                              loadCurrentTurnImages(deps, item.blocks, context),
-                              deps.artifacts
-                                ? materializeCurrentTurnFiles(
-                                    {
-                                      prisma: deps.prisma,
-                                      artifacts: deps.artifacts,
-                                      sandbox: deps.sandbox,
-                                    },
-                                    item.blocks,
-                                    {
-                                      context,
-                                      computer,
-                                      computerMode,
-                                      markWorkspaceDirty: workspaceCheckpoint.markDirty,
-                                    },
-                                  )
-                                : Promise.resolve([]),
-                              item.blocks,
-                              context.signal,
-                            );
-                          workspaceCheckpoint.markFiles(files);
-                          const filesInstruction = currentTurnFilesInstruction(files);
-                          return {
-                            id: item.id,
-                            messageId: item.messageId,
-                            historyText: item.text,
-                            text: [
-                              await loadReplyContext(deps.prisma, thread.id, item.messageId),
-                              item.text,
-                              filesInstruction,
-                              unavailableInstruction,
-                            ]
-                              .filter(Boolean)
-                              .join("\n\n"),
-                            images,
-                          };
-                        }),
-                      );
-                    },
+              claimSteering: hidePrivateVoiceHistory
+                ? undefined
+                : async (seenIds) => {
+                    const steering = await deps.events.claimSteering({
+                      threadId: thread.id,
+                      botId: bot.id,
+                      runId,
+                      leaseOwner: workerId,
+                      leaseFence: fence,
+                      seenIds,
+                      // A message that carries the external mark is not taken into a run that was
+                      // built without it (tools, context and notice would be wrong). It waits and
+                      // starts its own run, which is built marked.
+                      excludeExternalOrigin:
+                        externalChain === undefined && bot.audience !== "external",
+                    });
+                    return Promise.all(
+                      steering.map(async (item) => {
+                        const { images, files, unavailableInstruction } =
+                          await settleSteeringAttachmentLoads(
+                            loadCurrentTurnImages(deps, item.blocks, context),
+                            deps.artifacts
+                              ? materializeCurrentTurnFiles(
+                                  {
+                                    prisma: deps.prisma,
+                                    artifacts: deps.artifacts,
+                                    sandbox: deps.sandbox,
+                                  },
+                                  item.blocks,
+                                  {
+                                    context,
+                                    computer,
+                                    computerMode,
+                                    markWorkspaceDirty: workspaceCheckpoint.markDirty,
+                                  },
+                                )
+                              : Promise.resolve([]),
+                            item.blocks,
+                            context.signal,
+                          );
+                        workspaceCheckpoint.markFiles(files);
+                        const filesInstruction = currentTurnFilesInstruction(files);
+                        return {
+                          id: item.id,
+                          messageId: item.messageId,
+                          historyText: item.text,
+                          text: [
+                            await loadReplyContext(deps.prisma, thread.id, item.messageId),
+                            item.text,
+                            filesInstruction,
+                            unavailableInstruction,
+                          ]
+                            .filter(Boolean)
+                            .join("\n\n"),
+                          images,
+                        };
+                      }),
+                    );
+                  },
             },
             context,
           );
