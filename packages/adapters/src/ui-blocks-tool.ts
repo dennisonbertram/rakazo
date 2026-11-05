@@ -9,7 +9,7 @@ export const uiBlocksInputSchema = z.object({
 });
 
 export const UI_BLOCKS_GUIDANCE =
-  "In a chat reply, show tabular data, multi-part summaries, key metrics, lists of items and warnings with render_ui (table, sections, summary, stats, cards, callout) instead of Markdown tables or headings; this overrides create_ui_artifact for replies, which stays for standalone dashboards and reports. Call it at the point in the reply where the block belongs, keep ordinary prose in normal text, and do not repeat a block's content in text.";
+  "In a chat reply, show tabular data, multi-part summaries, key metrics, lists of items and warnings with render_ui (table, sections, summary, stats, cards, callout) instead of Markdown tables or headings. Call it at the point in the reply where the block belongs, and keep ordinary prose in normal text.";
 
 /** Checks the model's arguments; the problems come back to it as plain strings so it can retry. */
 export function parseUiBlocks(
