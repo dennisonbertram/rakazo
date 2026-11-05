@@ -37,7 +37,13 @@ import { mailRequestIsValid } from "./approval-ask.js";
 import type { FirewallMailDeps } from "./firewall-mail.js";
 import { firewallMailReadDecision, threadParticipants } from "./firewall-mail.js";
 import type { PriorMailEffect } from "./mail-approval-recovery.js";
-import { MAIL_APPROVAL_STALE_MS, mailSendRefusal } from "./mail-approval-recovery.js";
+import {
+  MAIL_APPROVAL_STALE_MS,
+  MAIL_DUPLICATE_WINDOW_MS,
+  mailSendRefusal,
+  sentCopyMatches,
+  sentToSameSubject,
+} from "./mail-approval-recovery.js";
 import { displayAddress, parseRecipients } from "./mail-compose.js";
 import { protectedSenders } from "./mail-protected-senders.js";
 import type { MailToolDeps } from "./mail-tools.js";
@@ -274,9 +280,24 @@ export async function mailReplyFlags(
     const onThread = threadParticipants(threadOf(row)).map((address) => address.toLowerCase());
     return [...new Set(recipientsOf[index])].filter((address) => !onThread.includes(address));
   });
-  const [withMail, duplicates] = await Promise.all([
+  const [withMail, duplicates, justSent] = await Promise.all([
     addressesWithMail(prisma, scope, connectionIds, [...new Set(outsidersOf.flat())]),
     duplicateEmails(prisma, scope, rows, recipientsOf),
+    prisma.cachedMailMessage.findMany({
+      where: {
+        ...scope,
+        fromSelf: true,
+        receivedAt: { gte: new Date(Date.now() - MAIL_DUPLICATE_WINDOW_MS) },
+      },
+      select: {
+        connectionId: true,
+        threadId: true,
+        toAddresses: true,
+        ccAddresses: true,
+        subject: true,
+        snippet: true,
+      },
+    }),
   ]);
   const shared = sharedText(rows);
   const inboundOf = (row: MailReplyFlagInput) => threadOf(row).filter((m) => !m.fromSelf);
@@ -364,6 +385,17 @@ export async function mailReplyFlags(
       if (guard === "no_reply_sender") flags.add("no_reply_address");
       if (guard === "corrected") flags.add("no_reply_needed");
     }
+    // A new email has no thread and may be reworded, so someone just emailed about this subject
+    // counts, from any of the owner's accounts. A reply is compared with its thread's own sends.
+    const alreadySent = newEmail
+      ? justSent.some((message) => sentToSameSubject(message, { recipients, subject: row.subject }))
+      : justSent.some(
+          (message) =>
+            message.connectionId === row.connectionId &&
+            message.threadId === row.providerThreadId &&
+            sentCopyMatches(message, row),
+        );
+    if (alreadySent) flags.add("already_sent");
     if (bodyHasLink(row.body)) flags.add("has_link");
     return {
       flags: flagOrder(flags),

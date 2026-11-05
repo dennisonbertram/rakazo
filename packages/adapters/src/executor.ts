@@ -95,6 +95,7 @@ import {
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  MAIL_ALREADY_SENT_REASON,
   MAIL_REPLY_BATCH_TOOL,
   MEETING_MARK_REASON,
   MEETING_ROUTE_PROMPT_START,
@@ -513,6 +514,7 @@ import {
   failedMailToAgent,
   isCardMailSend,
   mailSendRefusal,
+  recentlySentSameEmail,
 } from "./mail-approval-recovery.js";
 import { threadHasProtectedSender } from "./mail-protected-senders.js";
 import type { PreparedMailReply } from "./mail-reply-batch.js";
@@ -6066,25 +6068,39 @@ export function createRunExecutor(deps: ExecutorDeps) {
             };
           }
 
+          // A repeat of an email that just went out never leaves without a person seeing the warning,
+          // whatever rule would have allowed it.
+          const repeatsSentEmail =
+            name === "mail_send" &&
+            applied?.duplicate === false &&
+            (await recentlySentSameEmail(
+              deps.prisma,
+              { spaceId: run.spaceId, userId: bot.userId, threadId: run.threadId },
+              args,
+              new Date(),
+            ));
+          if (repeatsSentEmail) gateDecision = "ask";
           const needsApproval = gateDecision === "ask";
           // One plain line on the card, only for a background, tainted or rule-caused ask.
-          const approvalCardReason = firewallAskCall
-            ? FIREWALL_CARD_REASON
-            : requiresUnattendedApproval || mailModifyNeedsToolRule
-              ? "Asked because this ran in the background."
-              : externalTaintedCall
-                ? EXTERNAL_REQUEST_REASON
-                : meetingTaintedCall && !meetingAgent
-                  ? MEETING_MARK_REASON
-                  : approvalResolved.source === "require_approval" && actionType
-                    ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
-                    : standingHold
-                      ? `Held before fetching: ${standingHold.reason}.`
-                      : protectedArchive
-                        ? PROTECTED_ARCHIVE_REASON
-                        : agentAccountWrite
-                          ? AGENT_ACCOUNT_REASON
-                          : undefined;
+          const approvalCardReason = repeatsSentEmail
+            ? MAIL_ALREADY_SENT_REASON
+            : firewallAskCall
+              ? FIREWALL_CARD_REASON
+              : requiresUnattendedApproval || mailModifyNeedsToolRule
+                ? "Asked because this ran in the background."
+                : externalTaintedCall
+                  ? EXTERNAL_REQUEST_REASON
+                  : meetingTaintedCall && !meetingAgent
+                    ? MEETING_MARK_REASON
+                    : approvalResolved.source === "require_approval" && actionType
+                      ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
+                      : standingHold
+                        ? `Held before fetching: ${standingHold.reason}.`
+                        : protectedArchive
+                          ? PROTECTED_ARCHIVE_REASON
+                          : agentAccountWrite
+                            ? AGENT_ACCOUNT_REASON
+                            : undefined;
           // Record each decision once; a replay of the same effect already has its event.
           if (
             !applied?.duplicate &&

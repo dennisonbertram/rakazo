@@ -253,6 +253,93 @@ function sameThread(a: Record<string, unknown>, b: Record<string, unknown>): boo
   return addresses(a.to) === addresses(b.to) && baseSubject(a.subject) === baseSubject(b.subject);
 }
 
+/** How long a matching sent email counts as a possible accident rather than a follow-up. */
+export const MAIL_DUPLICATE_WINDOW_MS = 15 * 60_000;
+
+const comparable = (value: string) =>
+  value
+    .replace(/\s+/g, " ")
+    .replace(/(…|\.\.\.)$/, "")
+    .trim()
+    .toLowerCase();
+
+/**
+ * Whether a message in Sent is this email: the same people, and text that starts the same. The
+ * cached message keeps only the provider's snippet, so that is all there is to compare.
+ */
+export function sentCopyMatches(
+  sent: { toAddresses: readonly string[]; snippet: string },
+  mail: { to?: unknown; body?: unknown },
+): boolean {
+  const snippet = comparable(sent.snippet);
+  return (
+    snippet.length > 0 &&
+    addresses(sent.toAddresses) === addresses(mail.to) &&
+    comparable(text(mail.body)).startsWith(snippet)
+  );
+}
+
+/** Whether a message in Sent went to any of these lowercased addresses about the same thing. */
+export function sentToSameSubject(
+  sent: { toAddresses: readonly string[]; ccAddresses: readonly string[]; subject: string },
+  mail: { recipients: readonly string[]; subject: string },
+): boolean {
+  return (
+    baseSubject(sent.subject) === baseSubject(mail.subject) &&
+    addresses([...sent.toAddresses, ...sent.ccAddresses])
+      .split(",")
+      .some((address) => mail.recipients.includes(address))
+  );
+}
+
+/**
+ * Whether this mail_send repeats an email that already went out moments ago, in any run: from a
+ * sent call in this conversation (exact text, right away), or from Sent (any path, once synced,
+ * such as the composer or a reply batch). The card then warns; only a person's press can send it.
+ */
+export async function recentlySentSameEmail(
+  prisma: Pick<PrismaClient, "externalEffect" | "cachedMailMessage">,
+  scope: { spaceId: string; userId: string; threadId: string },
+  args: Record<string, unknown>,
+  now: Date,
+): Promise<boolean> {
+  if (!text(args.body) || addresses(args.to) === "") return false;
+  const since = new Date(now.getTime() - MAIL_DUPLICATE_WINDOW_MS);
+  const effects = await prisma.externalEffect.findMany({
+    where: {
+      spaceId: scope.spaceId,
+      kind: "mail_send",
+      status: "completed",
+      updatedAt: { gte: since },
+      run: { threadId: scope.threadId },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: { request: true, result: true },
+  });
+  const sentCall = effects.some(
+    (effect) =>
+      !(effect.result as { error?: unknown } | null)?.error &&
+      sameEmail(args, effect.request as Record<string, unknown>),
+  );
+  if (sentCall) return true;
+  const sent = await prisma.cachedMailMessage.findMany({
+    where: {
+      spaceId: scope.spaceId,
+      userId: scope.userId,
+      fromSelf: true,
+      receivedAt: { gte: since },
+    },
+    orderBy: { receivedAt: "desc" },
+    take: 50,
+    select: { toAddresses: true, subject: true, snippet: true },
+  });
+  return sent.some(
+    (message) =>
+      baseSubject(message.subject) === baseSubject(args.subject) && sentCopyMatches(message, args),
+  );
+}
+
 /** A bracketed stand-in the model left for the user to fill, such as "[Your Name]". */
 const PLACEHOLDER = /\[(?:your|my|sender|insert|recipient)[^\]\n]{0,40}\]/i;
 

@@ -5,7 +5,61 @@ import {
   isCardMailSend,
   mailApprovalAgentNote,
   mailSendRefusal,
+  recentlySentSameEmail,
 } from "./mail-approval-recovery.js";
+
+describe("recentlySentSameEmail", () => {
+  const now = new Date("2026-03-01T12:00:00Z");
+  const mail = {
+    to: ["Sam <sam@example.test>"],
+    subject: "Intro",
+    body: "Hello Sam,\n  nice to meet.",
+  };
+  const scope = { spaceId: "s", userId: "u", threadId: "t" };
+  const prisma = (effects: unknown[], sent: unknown[] = []) =>
+    ({
+      externalEffect: { findMany: async () => effects },
+      cachedMailMessage: { findMany: async () => sent },
+    }) as never;
+  const check = (client: never, args: Record<string, unknown> = mail) =>
+    recentlySentSameEmail(client, scope, args, now);
+
+  it("matches a sent call in this conversation, including one sent from its card", async () => {
+    const request = { ...mail, subject: "Re: intro", to: ["sam@example.test"] };
+    await expect(check(prisma([{ request, result: { ok: true } }]))).resolves.toBe(true);
+    const card = { request, result: { ok: true, outcome: "sent", note: "n" } };
+    await expect(check(prisma([card]))).resolves.toBe(true);
+  });
+
+  it("does not count a failed call, or a corrected body", async () => {
+    await expect(check(prisma([{ request: mail, result: { error: "boom" } }]))).resolves.toBe(
+      false,
+    );
+    const other = { request: { ...mail, body: "Correction" }, result: { ok: true } };
+    await expect(check(prisma([other]))).resolves.toBe(false);
+  });
+
+  it("matches Sent by people, subject and the text the snippet keeps", async () => {
+    const copy = {
+      toAddresses: ["sam@example.test"],
+      subject: "Re: Intro",
+      snippet: "Hello Sam, nice...",
+    };
+    await expect(check(prisma([], [copy]))).resolves.toBe(true);
+    await expect(check(prisma([], [{ ...copy, subject: "Other" }]))).resolves.toBe(false);
+    await expect(check(prisma([], [{ ...copy, snippet: "Different" }]))).resolves.toBe(false);
+    await expect(check(prisma([], [{ ...copy, snippet: "" }]))).resolves.toBe(false);
+    await expect(check(prisma([], [{ ...copy, toAddresses: ["pat@example.test"] }]))).resolves.toBe(
+      false,
+    );
+  });
+
+  it("does not look for a send that names only a saved draft", async () => {
+    await expect(check(prisma([{ request: {}, result: {} }]), { draftId: "d1" })).resolves.toBe(
+      false,
+    );
+  });
+});
 
 describe("approvedMailOutcome", () => {
   it("is sent or saved when the tool succeeded", () => {

@@ -41,6 +41,10 @@ export const ChooseSender: Story = {
     },
   },
 };
+/** The same email went out moments ago: the card warns, and Send is no longer the primary action. */
+export const AlreadySent: Story = {
+  args: { reason: "Already sent to this person a few minutes ago" },
+};
 export const WithCc: Story = {
   args: { mail: { ...mail, cc: ["lee@example.test"], bcc: ["pat@example.test"] } },
 };
