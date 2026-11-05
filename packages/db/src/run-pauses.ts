@@ -17,6 +17,7 @@ import {
   isConversationalRun,
   isSecretAskBlock,
   resolveAskChoice,
+  routineAlwaysAllowable,
   SKIPPED_APPROVAL_ANSWER,
   SKIPPED_APPROVAL_NOTE,
 } from "@rakazo/core";
@@ -442,6 +443,7 @@ async function commitAnswerRunInput(
       botId: true,
       userId: true,
       externalTaint: true,
+      routineId: true,
       checkpoint: true,
       trigger: true,
       task: { select: { prompt: true } },
@@ -527,6 +529,31 @@ async function commitAnswerRunInput(
       }
       approvalUserId = input.answeredByUserId;
     }
+    // "Always for this routine" needs a routine run, its owner, and a tool that may be allowed so.
+    if (input.answer === "always_routine") {
+      const bot = await tx.bot.findFirst({
+        where: { id: run.botId, spaceId: input.spaceId },
+        select: { audience: true, firewall: true },
+      });
+      const thread = await tx.thread.findFirst({
+        where: { id: input.threadId },
+        select: { meetingTaintedAt: true },
+      });
+      if (
+        !run.routineId ||
+        run.userId !== input.answeredByUserId ||
+        run.trigger === "webhook" ||
+        run.externalTaint ||
+        thread?.meetingTaintedAt ||
+        !bot ||
+        bot.firewall ||
+        bot.audience === "external" ||
+        !routineAlwaysAllowable({ toolName: approvalEffect.kind })
+      ) {
+        return null;
+      }
+      approvalUserId = input.answeredByUserId;
+    }
     // Only the run's owner can answer for their data.
     if (
       (approvalEffect.kind === AI_CONSENT_EFFECT_KIND ||
@@ -592,7 +619,8 @@ async function commitAnswerRunInput(
     const allowed =
       (input.answer === "allow" ||
         input.answer === "always" ||
-        input.answer === ALL_SITES_ACTION_ID) &&
+        input.answer === ALL_SITES_ACTION_ID ||
+        input.answer === "always_routine") &&
       !staleConsent;
     const consent = approvalEffect!.kind === AI_CONSENT_EFFECT_KIND;
     if (consent && allowed) {
@@ -643,6 +671,16 @@ async function commitAnswerRunInput(
         botId: run.botId,
         matchKind: "tool",
         matchValue: "web_fetch",
+        effect: "always_allow",
+      });
+    }
+    if (input.answer === "always_routine") {
+      await setApprovalRule(tx, {
+        spaceId: input.spaceId,
+        userId: approvalUserId!,
+        routineId: run.routineId,
+        matchKind: "tool",
+        matchValue: approvalEffect!.kind,
         effect: "always_allow",
       });
     }
