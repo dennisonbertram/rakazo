@@ -5,6 +5,7 @@ import { IntegrationsHome } from "../components/integrations/IntegrationsHome";
 import { McpDetail } from "../components/integrations/McpDetail";
 import { OmiPage } from "../components/integrations/OmiPage";
 import { OmiTrash } from "../components/integrations/OmiSegments";
+import { SourceDetail } from "../components/integrations/SourceDetail";
 import { useIntegrations } from "../components/integrations/useIntegrations";
 import { IntegrationSetupPage } from "./IntegrationSetup";
 
@@ -41,6 +42,7 @@ export function IntegrationsPage({
       />
       <Route path="omi/trash" element={<OmiTrash />} />
       <Route path="mcp/:serverId" element={<McpDetail data={data} />} />
+      <Route path="source/:sourceId" element={<SourceDetail data={data} />} />
       <Route path="setup" element={<IntegrationSetupPage />} />
       <Route
         path="*"

@@ -296,6 +296,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SegmentRow, OmiSegments, OmiTrash | [apps/web/src/components/integrations/OmiSegments.tsx](../../apps/web/src/components/integrations/OmiSegments.tsx) | [OmiPage.stories.tsx](../../apps/web/src/components/integrations/OmiPage.stories.tsx), [OmiSegments.stories.tsx](../../apps/web/src/components/integrations/OmiSegments.stories.tsx) | web |
 | IntegrationTile, StatusBadge, TileMenu, AgentStack, AgentToggleList, CardHead, SectionTitle, SourceBadge | [apps/web/src/components/integrations/parts.tsx](../../apps/web/src/components/integrations/parts.tsx) | [parts.stories.tsx](../../apps/web/src/components/integrations/parts.stories.tsx) | web |
 | SignInStep | [apps/web/src/components/integrations/SignInStep.tsx](../../apps/web/src/components/integrations/SignInStep.tsx) | [SignInStep.stories.tsx](../../apps/web/src/components/integrations/SignInStep.stories.tsx) | web |
+| SourceDetail | [apps/web/src/components/integrations/SourceDetail.tsx](../../apps/web/src/components/integrations/SourceDetail.tsx) | [SourceDetail.stories.tsx](../../apps/web/src/components/integrations/SourceDetail.stories.tsx) | web |
 
 ## Web components/investors
 

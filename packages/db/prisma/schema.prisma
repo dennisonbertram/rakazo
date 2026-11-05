@@ -900,6 +900,8 @@ model Bot {
   agentForServers        McpServer[]           @relation("McpServerAgent")
   agentForConnections    Connection[]          @relation("ConnectionAgent")
   connectionAccess       BotConnectionAccess[]
+  agentForSources        CapabilityInstall[]   @relation("SourceAgent")
+  sourceAccess           BotSourceAccess[]
   groupMembers           ChatGroupMember[]
   botSecrets             BotSecret[]
   skillSettings          BotSkillSetting[]
@@ -1667,21 +1669,48 @@ model BotConnectionAccess {
 }
 
 model CapabilityInstall {
-  id        String   @id @default(cuid())
-  spaceId   String
-  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  userId    String
-  kind      String
-  name      String
-  source    String
-  version   String?
-  digest    String?
-  secretId  String?
-  config    Json     @default("{}")
-  createdAt DateTime @default(now())
+  id            String            @id @default(cuid())
+  spaceId       String
+  space         Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId        String
+  kind          String
+  name          String
+  source        String
+  version       String?
+  digest        String?
+  secretId      String?
+  config        Json              @default("{}")
+  createdAt     DateTime          @default(now())
+  /// The source's own agent (MCP, API and GraphQL sources). Cleared if the bot is deleted.
+  agentBotId    String?
+  agentBot      Bot?              @relation("SourceAgent", fields: [agentBotId], references: [id], onDelete: SetNull)
+  /// Every internal agent may use the source. New sources start false: private to their own agent.
+  allAgents     Boolean           @default(false)
+  /// Other agents may be given access. Stays true while every other agent is off.
+  agentShared   Boolean           @default(false)
+  /// Agents may make changes (each change still asks); a non-owner needs its own canWrite grant unless allAgents.
+  writesEnabled Boolean           @default(false)
+  botAccess     BotSourceAccess[]
 
   @@index([spaceId, userId])
   @@map("capability_installs")
+}
+
+/// Which agents besides the source's own may use a directly connected source (the shape of BotConnectionAccess).
+model BotSourceAccess {
+  id        String            @id @default(cuid())
+  spaceId   String
+  userId    String
+  installId String
+  install   CapabilityInstall @relation(fields: [installId], references: [id], onDelete: Cascade)
+  botId     String
+  bot       Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
+  canWrite  Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  @@unique([installId, botId])
+  @@index([botId])
+  @@map("bot_source_access")
 }
 
 model MemoryDocument {
