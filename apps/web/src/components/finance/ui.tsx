@@ -338,7 +338,15 @@ export function DetailHead({
   const back = crumbs.length <= 3;
   const heading =
     title === undefined ? null : (
-      <h1 className="min-w-0 text-lg leading-7 font-semibold">{title}</h1>
+      <h1
+        className={cn(
+          "min-w-0 text-lg leading-7 font-semibold",
+          // Beside Back the title takes what the row has left (and wraps), so Ask stays on this row.
+          back && "max-sm:flex-1 max-sm:basis-0",
+        )}
+      >
+        {title}
+      </h1>
     );
   // On a phone the actions join the title row's flex line (`contents`), so Ask stays beside the
   // title and the company and the page's own action take the next line.
@@ -406,7 +414,7 @@ export function DetailHead({
         {/* On a phone the company takes what the row has left (and truncates). Beside a Back button it
             keeps room for its name and wraps to the next line, with Ask, rather than being cut to a few letters. */}
         <CompanyMenu
-          className={back ? "max-sm:order-1" : "max-sm:min-w-0 max-sm:flex-1 max-sm:basis-16"}
+          className={back ? "max-sm:order-1 max-sm:basis-full" : "max-sm:min-w-0 max-sm:flex-1 max-sm:basis-16"}
         />
         {back ? end : null}
       </div>
