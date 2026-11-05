@@ -657,7 +657,7 @@ describe("select all", () => {
     await render(batch(twelve()));
     expect(items()).toHaveLength(8);
     await click(selectAll() ?? undefined);
-    await click(buttonMatching(/Review all/));
+    expect(buttonMatching(/Review all/)).toBeUndefined();
     expect(items()).toHaveLength(12);
     expect(selectAll()?.checked).toBe(true);
     expect(buttonMatching(/Send selected/)?.textContent).toContain("(9)");
@@ -711,7 +711,6 @@ describe("select all", () => {
   it("sends exactly the ticked rows, collapsed ones included", async () => {
     await render(batch(twelve()));
     await click(selectAll() ?? undefined);
-    await click(buttonMatching(/Review all/));
     await pressSend(/Send selected/);
     const sentIds = rpc.threads.sendMailBatch.mock.calls[0]?.[0].rows.map(
       (r: { itemId: string }) => r.itemId,

@@ -474,11 +474,12 @@ export function MailReplyBatchCard({
             checked={allTicked}
             indeterminate={eligibleTicked > 0 && !allTicked}
             disabled={busy}
-            onCheckedChange={() =>
-              setTicks(
-                allTicked ? new Set() : new Set([...ticks, ...eligible.map((r) => r.itemId)]),
-              )
-            }
+            onCheckedChange={() => {
+              if (allTicked) return setTicks(new Set());
+              setTicks(new Set([...ticks, ...eligible.map((r) => r.itemId)]));
+              // Every ticked row must be visible before Send, so ticking opens the list.
+              if (list.capped && !list.expanded) list.toggle();
+            }}
           />
           <label htmlFor={`${ids.messageId}-select-all`} className="text-sm text-foreground">
             <Trans>Select all</Trans>
