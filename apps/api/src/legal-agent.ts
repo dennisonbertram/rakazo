@@ -10,6 +10,7 @@ import {
 } from "@rakazo/contracts";
 import { nextCronDateAcrossStrict } from "@rakazo/core";
 import type { createRepos, PrismaClient } from "@rakazo/db";
+import { isPastDefault } from "./agent-default-history.js";
 
 export { lockLegalBot };
 
@@ -149,7 +150,8 @@ export async function ensureLegalAgent(
   }
   // Instructions are set only at creation; one still equal to an older default moves to the current
   // one, and a user's edit never matches, so it is left alone.
-  const oldInstructions = OLDER_AGENT_INSTRUCTIONS.includes(bot.instructions);
+  const oldInstructions =
+    OLDER_AGENT_INSTRUCTIONS.includes(bot.instructions) || isPastDefault("legal", bot.instructions);
   if (oldInstructions) {
     await deps.prisma.bot.updateMany({
       where: { ...owner, instructions: bot.instructions },

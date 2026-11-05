@@ -7,6 +7,7 @@ import {
   pageAgentColor,
 } from "@rakazo/contracts";
 import type { createRepos } from "@rakazo/db";
+import { isPastDefault } from "./agent-default-history.js";
 
 /** Earlier defaults. A bot whose instructions still equal one is upgraded; an edited bot is left alone. */
 export const PREVIOUS_COMPANY_AGENT_INSTRUCTIONS = [
@@ -26,7 +27,11 @@ export async function ensureCompanyAgent(
     notifyOnFinish: true,
     color: pageAgentColor("company"),
   });
-  if (!PREVIOUS_COMPANY_AGENT_INSTRUCTIONS.includes(bot.instructions)) return bot;
+  if (
+    !PREVIOUS_COMPANY_AGENT_INSTRUCTIONS.includes(bot.instructions) &&
+    !isPastDefault("company", bot.instructions)
+  )
+    return bot;
   await deps.repos.replaceBotInstructions(actor, bot.id, {
     from: bot.instructions,
     to: COMPANY_AGENT_INSTRUCTIONS,
