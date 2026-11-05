@@ -475,6 +475,22 @@ describePostgres("list import (PostgreSQL)", () => {
       );
     });
 
+    it("two addresses that differ only in punctuation are two people", async () => {
+      await importList([
+        { firm: "Fund A", referrer: { name: "Alex Bell", email: "a.b@example.test" } },
+        { firm: "Fund B", referrer: { name: "Alex Bell", email: "ab@example.test" } },
+      ]);
+      const referrers = await prisma.contact.findMany({
+        where: scope,
+        select: { email: true },
+        orderBy: { email: "asc" },
+      });
+      expect(referrers.map((r) => r.email)).toEqual(["a.b@example.test", "ab@example.test"]);
+      expect((await record("Fund A")).referredByContactId).not.toBe(
+        (await record("Fund B")).referredByContactId,
+      );
+    });
+
     it("a partial name asks rather than creates; leaving it empty sets nothing", async () => {
       const jordan = await contact({ name: "Jordan Sample", kind: "other" });
       await stage([{ firm: "Fund A", referrer: { name: "J. Sample" } }]);
@@ -882,6 +898,104 @@ describePostgres("list import (PostgreSQL)", () => {
       expect(enqueued).toEqual([
         expect.objectContaining({ name: "pipeline.import", keepExisting: true }),
       ]);
+    });
+  });
+
+  describe("staging against a press", () => {
+    /** Holds the thread row, so the calls below line up behind it in a known order. */
+    async function holdThread() {
+      let release = () => {};
+      let held = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const acquired = new Promise<void>((resolve) => {
+        held = resolve;
+      });
+      const holder = runAsSystem("list import race test", () =>
+        raw.$transaction(
+          async (tx) => {
+            await tx.$queryRaw`SELECT id FROM threads WHERE id = ${threadId} FOR UPDATE`;
+            held();
+            await gate;
+          },
+          { timeout: 30_000 },
+        ),
+      );
+      await acquired;
+      return async () => {
+        release();
+        await holder;
+      };
+    }
+    /** Until this many sessions wait on a lock. Gives up quietly: the assertions still decide. */
+    async function untilBlocked(sessions: number) {
+      for (let i = 0; i < 100; i += 1) {
+        const [row] = await prisma.$queryRaw<{ waiting: bigint }[]>`
+          SELECT count(*) AS waiting FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'`;
+        if (Number(row?.waiting) >= sessions) return;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+
+    it("a press that waited first stands: staging after it cannot reopen the import", async () => {
+      await stage([{ firm: "Fund A" }]);
+      const c = asCard(await review());
+      const { hash } = await read(c);
+      const importId = (c.prepared as { importId: string }).importId;
+      const stagingRun = await startRun();
+      const release = await holdThread();
+      const pressing = asOwner(() =>
+        applyPipelineImport(deps(), actor, target(), { ...c.ids, hash, answers: {} }),
+      );
+      await untilBlocked(1);
+      const staging = stage([{ firm: "Fund B" }], { runId: stagingRun.id });
+      await untilBlocked(2);
+      await release();
+      await pressing;
+      await staging;
+      const accepted = await prisma.pipelineImport.findUniqueOrThrow({
+        where: { id: importId },
+        include: { rows: true },
+      });
+      expect(accepted).toMatchObject({ status: "applying", effectId: c.effect.id });
+      expect(accepted.rows.map((row) => row.normalizedFirm)).toEqual(["funda"]);
+      await drain(importId);
+      expect((await prisma.run.findUniqueOrThrow({ where: { id: c.run.id } })).status).toBe(
+        "queued",
+      );
+      expect(await prisma.pipelineRecord.count({ where: { ...scope, name: "Fund A" } })).toBe(1);
+      const next = await prisma.pipelineImport.findFirstOrThrow({
+        where: { ...scope, status: "staging" },
+        include: { rows: true },
+      });
+      expect(next.rows.map((row) => row.normalizedFirm)).toEqual(["fundb"]);
+    });
+
+    it("a stage that waited first closes the card, and the press changes nothing", async () => {
+      await stage([{ firm: "Fund A" }]);
+      const c = asCard(await review());
+      const { hash } = await read(c);
+      const stagingRun = await startRun();
+      const release = await holdThread();
+      const staging = stage([{ firm: "Fund B" }], { runId: stagingRun.id });
+      await untilBlocked(1);
+      const pressing = asOwner(() =>
+        applyPipelineImport(deps(), actor, target(), { ...c.ids, hash, answers: {} }),
+      ).then(
+        () => "accepted",
+        () => "refused",
+      );
+      await untilBlocked(2);
+      await release();
+      await staging;
+      expect(await pressing).toBe("refused");
+      expect(
+        await prisma.externalEffect.findUniqueOrThrow({ where: { id: c.effect.id } }),
+      ).toMatchObject({ status: "denied" });
+      expect(enqueued.filter((job) => job.name === "pipeline.import")).toEqual([]);
+      expect(await recordCount()).toBe(0);
     });
   });
 

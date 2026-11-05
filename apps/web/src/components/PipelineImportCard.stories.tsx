@@ -12,6 +12,7 @@ const review: CardData = {
   questions: [
     {
       id: "p:1:0",
+      row: 1,
       kind: "person",
       name: "Avery Example",
       firm: "Sample Street Capital",
@@ -37,6 +38,7 @@ const review: CardData = {
     },
     {
       id: "r:sam",
+      row: null,
       kind: "referrer",
       name: "Sam Example",
       firm: null,

@@ -129889,6 +129889,18 @@
                               "id": {
                                 "type": "string"
                               },
+                              "row": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "kind": {
                                 "type": "string",
                                 "enum": [
@@ -129959,6 +129971,7 @@
                             },
                             "required": [
                               "id",
+                              "row",
                               "kind",
                               "name",
                               "firm",

@@ -7185,6 +7185,13 @@ describe("list import tools", () => {
     });
   });
 
+  it("a call of the removed tool, approved before a deploy, tells the agent to re-stage", async () => {
+    const f = importRun("fundraising_prospects_save", {}, { rows: [{ firm: "Peak Fund" }] });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("pipeline_import_stage") });
+  });
+
   it("a list with nothing to change ends with no card", async () => {
     const f = importRun("pipeline_import_review");
     f.preparePipelineImportCard.mockResolvedValue({ nothing: true, rows: 3 });

@@ -4696,6 +4696,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (voiceAgent && !offeredToolNames.has(name)) {
             return { error: `Tool ${name} is not available to Elio.` };
           }
+          // A card of the tool this replaced, still open when it was removed. It wrote nothing.
+          if (name === "fundraising_prospects_save") {
+            return {
+              error:
+                "That tool was replaced, so nothing was saved. Stage the list with pipeline_import_stage, then call pipeline_import_review.",
+            };
+          }
           // The Investors agent has a fixed list; a name outside it never reaches a connector.
           if (investorsAgent && !offeredToolNames.has(name)) {
             return { error: `Tool ${name} is not available to this bot.` };

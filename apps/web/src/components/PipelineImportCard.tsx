@@ -236,9 +236,12 @@ export function PipelineImportCard({
   const people = data.questions.filter((question) => question.kind === "person");
   const referrers = data.questions.filter((question) => question.kind === "referrer");
   const left = data.questions.filter((question) => !choices[question.id]).length;
-  const skipped = people.filter(
-    (question) => question.newRecord && choices[question.id] === PIPELINE_IMPORT_SKIP,
-  ).length;
+  // Skipping any person skips their firm's row, once however many of its people are skipped.
+  const skipped = new Set(
+    people
+      .filter((question) => question.newRecord && choices[question.id] === PIPELINE_IMPORT_SKIP)
+      .map((question) => question.row),
+  ).size;
   const adding = data.add - skipped;
   const onlyUpdates = data.add === 0;
   const choose = (id: string) => (value: string) =>

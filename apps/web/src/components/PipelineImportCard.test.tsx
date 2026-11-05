@@ -42,6 +42,7 @@ const reviewing = (extra: Partial<CardData> = {}): CardData => ({
   questions: [
     {
       id: "p:0:0",
+      row: 0,
       kind: "person",
       name: "Drew Example",
       firm: "Peak Fund",
@@ -60,6 +61,7 @@ const reviewing = (extra: Partial<CardData> = {}): CardData => ({
     },
     {
       id: "r:sam",
+      row: null,
       kind: "referrer",
       name: "Sam Example",
       firm: null,
@@ -180,6 +182,39 @@ describe("PipelineImportCard", () => {
     await click(radio("Skip this row"));
     await click(radio("Leave Referred by empty", 1));
     expect(button("Add 2 prospects")?.disabled).toBe(false);
+  });
+
+  it("two skipped people on one firm count as one row", async () => {
+    const base = reviewing().questions[0] as CardData["questions"][number];
+    await render(
+      reviewing({
+        add: 1,
+        questions: [
+          { ...base, id: "p:0:0", row: 0 },
+          { ...base, id: "p:0:1", row: 0, name: "Blake Example" },
+        ],
+      }),
+    );
+    await click(radio("Skip this row", 0));
+    await click(radio("Skip this row", 1));
+    // Skipping the only firm leaves nothing to add; it was never below zero.
+    expect(button("Add 0 prospects")?.disabled).toBe(true);
+  });
+
+  it("two skipped people on one of two firms still add the other", async () => {
+    const base = reviewing().questions[0] as CardData["questions"][number];
+    await render(
+      reviewing({
+        add: 2,
+        questions: [
+          { ...base, id: "p:0:0", row: 0 },
+          { ...base, id: "p:0:1", row: 0, name: "Blake Example" },
+        ],
+      }),
+    );
+    await click(radio("Skip this row", 0));
+    await click(radio("Skip this row", 1));
+    expect(button("Add 1 prospect")?.disabled).toBe(false);
   });
 
   it("says when a match stays on another prospect", async () => {

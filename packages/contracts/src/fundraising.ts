@@ -140,6 +140,8 @@ export const PipelineImportCandidateSchema = z.object({
 /** A question on the card. Nothing is pre-answered, and the server checks every answer. */
 export const PipelineImportQuestionSchema = z.object({
   id: z.string(),
+  /** The list row a person belongs to; people of one row are skipped together. Null for a referrer. */
+  row: z.number().int().nullable(),
   kind: z.enum(["person", "referrer"]),
   name: z.string(),
   /** A person's firm. */

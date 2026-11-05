@@ -28,13 +28,29 @@ const pipeline = FUNDRAISING_PIPELINE;
 const LONG = { timeout: 60_000 };
 const OPEN = ["staging", "reviewing"];
 
-/** A retry of one row, a second worker and a staging call take turns, per user. */
+/**
+ * A retry of one row, a second worker, a staging call, a review and a press take turns, per user, so
+ * none of them acts on an import another has just moved. Taken before the thread row, always.
+ */
 const takeTurn = (tx: Tx, { spaceId, userId }: Scope) =>
   tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`pipeline-import:${spaceId}:${userId}`}, 0))`;
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const REPLACED_NOTE =
   "A newer review of this import replaced this card, so nothing changed. Do not call it again in this run.";
+
+/** Moves an import only from the state read under this turn. Anything else rolls the call back. */
+async function moveImport(
+  tx: Tx,
+  from: { id: string; status: string; effectId: string | null },
+  data: { status: string; effectId?: string | null },
+) {
+  const moved = await tx.pipelineImport.updateMany({
+    where: { id: from.id, status: from.status, effectId: from.effectId },
+    data,
+  });
+  if (moved.count !== 1) throw new Error("The import changed while it was being moved.");
+}
 
 /** Closes the import's open card, if it has one, as replaced. A later review posts the new card. */
 async function closeOpenCard(tx: Tx, scope: Scope, effectId: string | null) {
@@ -167,7 +183,7 @@ export async function stagePipelineImportRows(
     let closed: Awaited<ReturnType<typeof closeOpenCard>>;
     if (open && input.start && open.runId !== input.runId) {
       closed = await closeOpenCard(tx, scope, open.effectId);
-      await tx.pipelineImport.update({ where: { id: open.id }, data: { status: "discarded" } });
+      await moveImport(tx, open, { status: "discarded" });
       open = null;
     }
     open ??= await tx.pipelineImport.create({
@@ -225,10 +241,7 @@ export async function stagePipelineImportRows(
     }
     if (changed && open.status === "reviewing") {
       closed ??= await closeOpenCard(tx, scope, open.effectId);
-      await tx.pipelineImport.update({
-        where: { id: open.id },
-        data: { status: "staging", effectId: null },
-      });
+      await moveImport(tx, open, { status: "staging", effectId: null });
     }
     return { importId: open.id, staged: byFirm.size, added, rejected, closed };
   }, LONG);
@@ -389,6 +402,7 @@ function buildReview(
       const questionId = `p:${row.position}:${index}`;
       questions.set(questionId, {
         id: questionId,
+        row: row.position,
         kind: "person",
         name: person.name,
         firm,
@@ -468,7 +482,9 @@ function buildReview(
 
   // Each distinct referrer, once, for the rows that have no referrer yet.
   const referrerGroups = new Map<string, { person: Person; rows: number }>();
-  const referrerKeyOf = (person: Person) => normalized(person.email ?? person.name);
+  // An address is compared whole: a.b@ and ab@ are two people. Only a name is normalized.
+  const referrerKeyOf = (person: Person) =>
+    person.email ? `e:${person.email}` : `n:${normalized(person.name)}`;
   for (const row of rows) {
     const data = row.data as PipelineImportRow;
     const record = recordOf.get(row.normalizedFirm);
@@ -493,6 +509,7 @@ function buildReview(
       const questionId = `r:${key}`;
       questions.set(questionId, {
         id: questionId,
+        row: null,
         kind: "referrer",
         name: person.name,
         firm: null,
@@ -647,15 +664,12 @@ export async function preparePipelineImportCard(
     if (rows === 0) return { error: "Nothing is staged. Call pipeline_import_stage first." };
     const { add, update, questions, newContacts, savedContacts, noPerson } = review.card;
     if (add === 0 && update === 0) {
-      await tx.pipelineImport.update({ where: { id: open.id }, data: { status: "done" } });
+      await moveImport(tx, open, { status: "done" });
       return { nothing: true as const, rows };
     }
     const closed =
       open.effectId === effectId ? undefined : await closeOpenCard(tx, scope, open.effectId);
-    await tx.pipelineImport.update({
-      where: { id: open.id },
-      data: { status: "reviewing", effectId },
-    });
+    await moveImport(tx, open, { status: "reviewing", effectId });
     const lines = [
       "Saved contacts are not overwritten.",
       ...(newContacts.length ? [count(newContacts.length, "new contact", "new contacts")] : []),
@@ -824,6 +838,7 @@ export async function acceptPipelineImport(
   const scope = { spaceId: input.spaceId, userId: input.userId };
   const committed = await prisma.$transaction(
     async (tx: Tx): Promise<AcceptPipelineImportResult & { seq?: number }> => {
+      await takeTurn(tx, scope);
       await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
       const run = await tx.run.findFirst({
         where: {

@@ -4879,7 +4879,7 @@ model PipelineImportRow {
   import         PipelineImport @relation(fields: [importId, spaceId, userId], references: [id, spaceId, userId], onDelete: Cascade)
   position       Int
   normalizedFirm String
-  /// A PipelineImportRow.
+  /// A PipelineImportRow. On an import closed by migration 20261231000057, whatever the old column held.
   data           Json
   /// "staged" | "queued" | "applied" | "skipped" | "unchanged" | "failed"
   state          String         @default("staged")
