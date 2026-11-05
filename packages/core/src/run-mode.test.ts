@@ -2,7 +2,7 @@ import { RUN_TRIGGERS } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import { chainedRunMode, newRunExternalTaint, newRunUnattended } from "./run-mode.js";
 
-const OWNER_LIVE = ["user", "reaction", "call_end", "skill", "follow_up"];
+const OWNER_LIVE = ["user", "reaction", "call_end", "skill", "follow_up", "goal"];
 
 describe("newRunUnattended", () => {
   it.each(RUN_TRIGGERS)("%s without a source run", (trigger) => {
@@ -52,5 +52,13 @@ describe("chainedRunMode", () => {
 
   it("fails closed when the source is unknown", () => {
     expect(chainedRunMode("follow_up", null)).toEqual({ unattended: true, externalTaint: true });
+  });
+});
+
+describe("goal runs", () => {
+  it("get what a run started by the owner's message gets", () => {
+    expect(newRunUnattended({ trigger: "goal" })).toBe(newRunUnattended({ trigger: "user" }));
+    expect(newRunUnattended({ trigger: "goal" })).toBe(false);
+    expect(newRunExternalTaint({ trigger: "goal" })).toBe(false);
   });
 });

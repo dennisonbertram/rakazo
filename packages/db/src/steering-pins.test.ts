@@ -32,6 +32,7 @@ describe("createPendingSteeringRun with connection pins", () => {
         updateMany: vi.fn(),
       },
       task: { create: vi.fn().mockResolvedValue({ id: "task-1" }) },
+      threadGoal: { findFirst: vi.fn().mockResolvedValue(null) },
     };
 
     await createPendingSteeringRun(tx as never, {

@@ -13,6 +13,7 @@ import {
 } from "@rakazo/contracts";
 import {
   expandSkillReferencesInPrompt,
+  GOAL_GUIDANCE,
   GTM_PAGE_INSTRUCTIONS,
   ONCE_ROUTINE_CRON,
   ownsLine,
@@ -2861,6 +2862,29 @@ describe("userTurnInstructions", () => {
       const prompt = text({ tenacity });
       expect(prompt).toContain(WORK_LIST_GUIDANCE);
       expect(prompt).toContain(ACT_ON_REVIEWED_PLAN_GUIDANCE);
+    });
+
+    it("adds the goal section only to a goal run, right after the work list", () => {
+      const prompt = text({ tenacity: "medium", goalRun: true });
+      expect(prompt).toContain(GOAL_GUIDANCE);
+      expect(prompt.indexOf(GOAL_GUIDANCE)).toBe(
+        prompt.indexOf(WORK_LIST_GUIDANCE) + WORK_LIST_GUIDANCE.length + 1,
+      );
+      expect(text({ tenacity: "medium" })).not.toContain(GOAL_GUIDANCE);
+      expect(text({ tenacity: "limited", goalRun: true })).not.toContain(GOAL_GUIDANCE);
+    });
+
+    it("runs a low agent at medium for a goal, and leaves limited and high alone", () => {
+      expect(tenacityLevelFor({ proactivity: "low", restricted: false })).toBe("low");
+      expect(tenacityLevelFor({ proactivity: "low", restricted: false, goalRun: true })).toBe(
+        "medium",
+      );
+      expect(tenacityLevelFor({ proactivity: "low", restricted: true, goalRun: true })).toBe(
+        "limited",
+      );
+      expect(tenacityLevelFor({ proactivity: "high", restricted: false, goalRun: true })).toBe(
+        "high",
+      );
     });
 
     it("leaves it out of a restricted run, which keeps the truthfulness rule", () => {

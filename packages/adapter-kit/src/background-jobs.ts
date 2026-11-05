@@ -27,6 +27,7 @@ const payloadSchemas = {
   }),
   "skill.teaching-expire": z.object({ skillId: z.string().min(1) }),
   "history.compact": z.object({ threadId: z.string().min(1) }),
+  "goal.check": z.object({ goalId: z.string().min(1), runId: z.string().min(1) }),
   "messaging.deliver": z.object({ runId: z.string().min(1).optional() }),
   "notifications.deliver": z.object({}),
   "notifications.retention": z.object({}),
@@ -349,6 +350,15 @@ export function historyCompactJob(threadId: string): BackgroundJob {
     payload: { threadId },
     replaceKey: historyCompactJobKey(threadId),
     maxAttempts: HISTORY_COMPACT_MAX_ATTEMPTS,
+  };
+}
+
+/** One queued check per goal: a newer run's end replaces an older queued check. */
+export function goalCheckJob(goalId: string, runId: string): BackgroundJob {
+  return {
+    name: "goal.check",
+    payload: { goalId, runId },
+    replaceKey: `goal:${goalId}`,
   };
 }
 

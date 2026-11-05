@@ -1,5 +1,10 @@
 import type { JobPublisher } from "@rakazo/adapter-kit";
-import { messagingDeliverJob, routineWakeupJob, runContinueJob } from "@rakazo/adapter-kit";
+import {
+  goalCheckJob,
+  messagingDeliverJob,
+  routineWakeupJob,
+  runContinueJob,
+} from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
 import { stuckWorkStatusMessages } from "@rakazo/core";
 import type { NotificationEvents, Pool, PrismaClient, ThreadEvents } from "@rakazo/db";
@@ -218,6 +223,11 @@ export function createJobReconciler(
         } catch (error) {
           getLogger().error("mail reply batch reconciliation", error);
         }
+      }
+      try {
+        await reconcileGoalChecks(deps.prisma, deps.jobs, batchSize);
+      } catch (error) {
+        getLogger().error("goal check reconciliation", error);
       }
       try {
         await reconcilePipelineImports({
@@ -486,6 +496,47 @@ export function createJobReconciler(
       await deps.leadership?.release();
     },
   };
+}
+
+/**
+ * An active goal whose newest goal run ended without a check (the worker died between finalize and
+ * the enqueue) gets one. Only goals with no live run on the thread: a live run enqueues its own.
+ */
+async function reconcileGoalChecks(prisma: PrismaClient, jobs: JobPublisher, batchSize: number) {
+  const goals = await prisma.threadGoal.findMany({
+    where: {
+      status: "active",
+      NOT: {
+        thread: {
+          runs: {
+            some: {
+              status: { in: ["queued", "leased", "running", "waiting_input", "waiting_takeover"] },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { updatedAt: "asc" },
+    take: batchSize,
+    select: {
+      id: true,
+      lastCheckedRunId: true,
+      runs: {
+        where: { status: { in: ["completed", "failed", "cancelled"] } },
+        orderBy: { completedAt: "desc" },
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+  await Promise.all(
+    goals.flatMap((goal) => {
+      const newest = goal.runs[0];
+      return newest && newest.id !== goal.lastCheckedRunId
+        ? [jobs.enqueue({ ...goalCheckJob(goal.id, newest.id), keepExisting: true })]
+        : [];
+    }),
+  );
 }
 
 /** Prefer the full bot transcript for a run so interim progress is not mistaken for the sole result. */
