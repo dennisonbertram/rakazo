@@ -37,6 +37,8 @@ const TARGET_MAX = 200;
 const PROOF_MAX = 2_000;
 const WAITING_ON_MAX = 200;
 const REASON_MAX = 500;
+/** Rows one scratchpad_add or scratchpad_update call may touch. */
+const SCRATCHPAD_BATCH_MAX = 50;
 /** The completion tool keeps its reasons shorter than the user-facing edit API. */
 const TOOL_REASON_MAX = 200;
 const EFFECT_KEY = /^[^:\s]{1,200}:[^:\s]{1,200}:[a-f0-9]{64}(?::[1-9]\d*)?$/;
@@ -143,6 +145,11 @@ export function isScratchpadStatus(value: unknown): value is ScratchpadStatus {
 
 function coerceScratchpadStatus(value: unknown): ScratchpadStatus {
   return isScratchpadStatus(value) ? value : "open";
+}
+
+/** For the approval gate, which sees a stored category as text. */
+export function isGatedScratchpadCategory(category: string | null): boolean {
+  return isGated(categoryValue(category));
 }
 
 function isGated(
@@ -445,6 +452,71 @@ export async function addScratchpadItemFromTool(
     }
     throw error;
   }
+}
+
+/**
+ * A work list: many plain open rows in one call. Rows carry no category, channel or hand-off, so
+ * none is a gated item. A row whose title is already open is left alone, so adding a list twice
+ * does not double it.
+ */
+export async function addScratchpadItemsFromTool(
+  deps: ScratchpadToolDeps,
+  input: Scope & { items: unknown; callerSpawnKey?: string | null },
+) {
+  if (mailThreadOf(input.callerSpawnKey)) {
+    return { error: "An email chat keeps one to-do per email. Add one item, without items." };
+  }
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    return { error: "items must be a list of rows, each with a title." };
+  }
+  if (input.items.length > SCRATCHPAD_BATCH_MAX) {
+    return { error: `items can hold at most ${SCRATCHPAD_BATCH_MAX} rows; add the rest next.` };
+  }
+  const rows: { title: string; notes: string; open: Record<string, Date | string | null> }[] = [];
+  for (const raw of input.items as Record<string, unknown>[]) {
+    const title = typeof raw?.title === "string" ? raw.title.trim() : "";
+    if (!title) return { error: "Every row needs a title." };
+    if (title.length > TITLE_MAX) {
+      return { error: `title must be at most ${TITLE_MAX} characters.` };
+    }
+    const notes = typeof raw.notes === "string" ? raw.notes.trim() : "";
+    if (notes.length > NOTES_MAX) {
+      return { error: `notes must be at most ${NOTES_MAX} characters.` };
+    }
+    const open = openItemFields({
+      ...(raw.dueAt != null ? { dueAt: String(raw.dueAt) } : {}),
+      ...(raw.waitingOn != null ? { waitingOn: String(raw.waitingOn) } : {}),
+    });
+    if ("error" in open) return open;
+    rows.push({ title, notes, open: open.data });
+  }
+  return deps.prisma.$transaction(async (tx) => {
+    const existing = await tx.scratchpadItem.findMany({
+      where: {
+        ...scopeOf(input),
+        status: { in: OPEN_SCRATCHPAD_STATUSES },
+        title: { in: rows.map((row) => row.title) },
+      },
+      select: { title: true },
+    });
+    const taken = new Set(existing.map((row) => row.title));
+    const items: { id: string; title: string }[] = [];
+    for (const row of rows) {
+      if (taken.has(row.title)) continue;
+      taken.add(row.title);
+      const created = await tx.scratchpadItem.create({
+        data: {
+          ...scopeOf(input),
+          title: row.title,
+          notes: row.notes,
+          status: "open",
+          ...row.open,
+        },
+      });
+      items.push({ id: created.id, title: created.title });
+    }
+    return { added: items.length, alreadyOpen: existing.length, items };
+  });
 }
 
 type ScratchpadUpdateInput = Scope & {
@@ -859,6 +931,35 @@ export function updateScratchpadItemFromTool(
   input: ScratchpadUpdateInput,
 ) {
   return updateScratchpadItem(deps, input, false);
+}
+
+/** The same change on many rows, each through the normal update and its gates. */
+export async function updateScratchpadItemsFromTool(
+  deps: ScratchpadToolDeps & { now?: () => Date },
+  input: Scope & {
+    itemIds: unknown;
+    status?: string;
+    notes?: string;
+    dueAt?: string | null;
+    waitingOn?: string | null;
+  },
+) {
+  const { itemIds, ...change } = input;
+  if (!Array.isArray(itemIds) || itemIds.length === 0) {
+    return { error: "itemIds must be a list of ids." };
+  }
+  if (itemIds.length > SCRATCHPAD_BATCH_MAX) {
+    return { error: `itemIds can hold at most ${SCRATCHPAD_BATCH_MAX} ids; update the rest next.` };
+  }
+  let updated = 0;
+  const failed: { itemId: string; error: string }[] = [];
+  for (const itemId of new Set(itemIds.map(String))) {
+    const result = await updateScratchpadItemFromTool(deps, { ...change, itemId });
+    if ("item" in result) updated += 1;
+    else
+      failed.push({ itemId, error: ("error" in result && result.error) || "Item changed; retry." });
+  }
+  return { updated, failed };
 }
 
 export function updateScratchpadItemFromUser(

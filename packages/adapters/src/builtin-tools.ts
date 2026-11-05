@@ -1978,11 +1978,28 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "scratchpad_add",
     description:
-      "Add an open-work item to this bot's scratchpad. Use for todos or parked work that should outlive this turn. Not a reminder or schedule. Record who or what the item waits on (waitingOn) and when it is due (dueAt) whenever you know them, so the user is told when it goes past due.",
+      "Add an open-work item to this bot's scratchpad, or many at once with items. Use for todos, parked work or the work list of a job that should outlive this turn. Not a reminder or schedule. Record who or what the item waits on (waitingOn) and when it is due (dueAt) whenever you know them, so the user is told when it goes past due.",
     inputSchema: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Short title for the item." },
+        title: { type: "string", description: "Short title for the item. Required without items." },
+        items: {
+          type: "array",
+          maxItems: 50,
+          description:
+            "A work list: one open row per recipient, batch or step, in place of every other field. A title already open is skipped. The result gives each new row's id.",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              notes: { type: "string" },
+              dueAt: { type: "string" },
+              waitingOn: { type: "string", maxLength: 120 },
+            },
+            required: ["title"],
+            additionalProperties: false,
+          },
+        },
         status: {
           type: "string",
           enum: ["open", "parked", "done"],
@@ -2010,18 +2027,23 @@ export const builtinAgentTools: ConnectorTool[] = [
             "Email chats only: when the to-do belongs to another agent's area, name that agent and the item is recorded there (linked to this email) instead of on this chat's bot.",
         },
       },
-      required: ["title"],
       additionalProperties: false,
     },
   },
   {
     name: "scratchpad_update",
     description:
-      "Update a scratchpad item's title, status, notes, target, schedule, proof, due date (dueAt) or what it waits on (waitingOn). Keep waitingOn and dueAt current; send an empty string to clear waitingOn and null to clear dueAt.",
+      "Update a scratchpad item's title, status, notes, target, schedule, proof, due date (dueAt) or what it waits on (waitingOn). Keep waitingOn and dueAt current; send an empty string to clear waitingOn and null to clear dueAt. To make the same change to many rows, pass itemIds with only status, notes, dueAt or waitingOn.",
     inputSchema: {
       type: "object",
       properties: {
-        itemId: { type: "string" },
+        itemId: { type: "string", description: "The item. Required without itemIds." },
+        itemIds: {
+          type: "array",
+          maxItems: 50,
+          items: { type: "string" },
+          description: "Many items, in place of itemId.",
+        },
         title: { type: "string" },
         status: { type: "string", enum: ["open", "parked", "done"] },
         notes: { type: "string" },
@@ -2039,7 +2061,6 @@ export const builtinAgentTools: ConnectorTool[] = [
             "What the item waits on. Write exactly 'you' when it waits on the owner, otherwise the other party's name, for example 'Acme legal'.",
         },
       },
-      required: ["itemId"],
       additionalProperties: false,
     },
   },
