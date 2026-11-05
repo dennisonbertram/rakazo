@@ -270,11 +270,11 @@ function fixture({
   groupId = null as string | null,
   ticketAuthor = null as string | null,
   otherGrants = 0,
-  sources = [] as { id: string; agentBotId: string | null }[],
+  sources = [] as { id: string; agentBotId: string | null; grantedTo?: string[] }[],
   scriptedRuntime = false,
 }: {
   /** Directly connected sources, keyed by the agent they belong to. */
-  sources?: { id: string; agentBotId: string | null }[];
+  sources?: { id: string; agentBotId: string | null; grantedTo?: string[] }[];
   /** The runtime says it is the scripted one. */
   scriptedRuntime?: boolean;
   /** The bot's Firewall switch at the start of the run. */
@@ -562,10 +562,27 @@ function fixture({
     },
     capabilityInstall: {
       count: vi.fn(
-        async ({ where }: { where: { id: string; agentBotId: string } }) =>
-          sources.filter(
-            (source) => source.id === where.id && source.agentBotId === where.agentBotId,
-          ).length,
+        async ({
+          where,
+        }: {
+          where: {
+            id?: string;
+            agentBotId?: string;
+            OR?: { agentBotId?: string; botAccess?: { some: { botId: string } } }[];
+          };
+        }) =>
+          where.OR
+            ? sources.filter((source) =>
+                where.OR!.some(
+                  (clause) =>
+                    (clause.agentBotId !== undefined && source.agentBotId === clause.agentBotId) ||
+                    (clause.botAccess !== undefined &&
+                      source.grantedTo?.includes(clause.botAccess.some.botId)),
+                ),
+              ).length
+            : sources.filter(
+                (source) => source.id === where.id && source.agentBotId === where.agentBotId,
+              ).length,
       ),
       findMany: vi.fn(async () => []),
     },
@@ -6961,6 +6978,29 @@ describe("public research apps linked as Composio connections", () => {
     expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
     expect(JSON.stringify([f.request()!.instructions, f.request()!.history])).not.toContain(fact);
+    // Company facts could leave in a URL, so it gets neither the index nor the lookup tool.
+    expect(f.request()!.instructions).not.toContain("company_context_lookup");
+    expect(f.offeredTools).not.toContain("company_context_lookup");
+  });
+
+  it.each([
+    ["granted to it", { id: "src-1", agentBotId: null, grantedTo: ["bot-1"] }],
+    ["its own", { id: "src-1", agentBotId: "bot-1" }],
+  ])("asks when a directly connected source is %s", async (_name, source) => {
+    const f = fixture({
+      builtin: true,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      connectionRows: [connection()],
+      availableTools: [tool("EXA_SEARCH")],
+      sources: [source],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
   });
 
   it("asks when the same agent is also granted another app", async () => {

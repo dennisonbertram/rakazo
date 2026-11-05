@@ -2335,7 +2335,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   where: { spaceId: run.spaceId, userId: bot.userId, agentBotId: bot.id },
                   select: { endpoint: true },
                 });
+                // A directly connected source that is this agent's own, or granted to it, is private
+                // access like a connection grant.
+                const sources = await deps.prisma.capabilityInstall.count({
+                  where: {
+                    spaceId: run.spaceId,
+                    userId: bot.userId,
+                    OR: [{ agentBotId: bot.id }, { botAccess: { some: { botId: bot.id } } }],
+                  },
+                });
                 return (
+                  sources === 0 &&
                   own.length + servers.length > 0 &&
                   own.every(isPublicResearchConnection) &&
                   servers.every((server) => isPublicResearchEndpoint(server.endpoint))
@@ -2657,6 +2667,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           companyImporter ||
           meetingAgent ||
           bot.firewall === true ||
+          // A public research agent fetches freely, so company facts must not sit in its prompt.
+          publicResearchAgent ||
           run.externalTaint === true ||
           externalTaint()
         );
@@ -2673,7 +2685,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           // Read from the database on every attempt; never stored in the bot's instructions.
           companyContextAllowed
-            ? loadCompanyContextIndex(deps.memory, context, (text) => redactSecrets(text, runSecrets))
+            ? loadCompanyContextIndex(deps.memory, context, (text) =>
+                redactSecrets(text, runSecrets),
+              )
             : Promise.resolve(undefined),
           messagingChannelRun || voiceAgent || restrictedContext || companyAgent || companyImporter
             ? Promise.resolve("")
