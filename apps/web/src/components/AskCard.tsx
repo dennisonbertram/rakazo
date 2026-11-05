@@ -10,6 +10,7 @@ import {
   isClosedApprovalAnswer,
   isSecretAskBlock,
   resolveAskChoice,
+  SKIPPED_APPROVAL_ANSWER,
 } from "@rakazo/core";
 import { Button, Input } from "@rakazo/ui-web";
 import { Check, ChevronDown, KeyRound, X } from "lucide-react";
@@ -36,6 +37,7 @@ function formatAnsweredState(
   // A card the server closed itself reads the same whatever kind of approval it was.
   if (approval && answer === "superseded") return t`Replaced by a newer request`;
   if (approval && answer === "expired") return t`Expired`;
+  if (approval && answer === SKIPPED_APPROVAL_ANSWER) return t`Skipped`;
   if (share && approval) return answer === "allow" ? t`Shared` : t`Not shared`;
   if (consent && approval) return answer === "allow" ? t`Allowed` : t`Not now`;
   // A typed answer is already the user's own bubble; only a chosen option is named here.
@@ -50,6 +52,8 @@ function formatAnsweredState(
   if (outcome === "cancelled") return t`Cancelled`;
   if (answer === "allow") return waitsFor ? t`Approved here. Waiting for ${waitsFor}` : t`Approved`;
   if (answer === "always") return t`Always allowed`;
+  if (answer === "always_bot_sites") return t`Allowed for all sites`;
+  if (answer === "always_routine") return t`Always allowed for this routine`;
   if (answer === "deny") return t`Denied`;
   return t`Answered: ${answer}`;
 }
@@ -62,13 +66,30 @@ function answeredTone(
   outcome?: "created" | "cancelled",
 ): { className: string; Icon?: typeof Check } {
   if (secret || outcome === "created") return { className: "text-success" };
-  if (!approval || outcome === "cancelled" || isClosedApprovalAnswer(answer))
+  if (
+    !approval ||
+    outcome === "cancelled" ||
+    isClosedApprovalAnswer(answer) ||
+    answer === SKIPPED_APPROVAL_ANSWER
+  )
     return { className: "text-muted-foreground" };
   if (answer === "deny") return { className: "text-destructive", Icon: X };
-  if (answer === "allow" || answer === "always")
+  if (
+    answer === "allow" ||
+    answer === "always" ||
+    answer === "always_bot_sites" ||
+    answer === "always_routine"
+  )
     return { className: "text-foreground", Icon: Check };
   return { className: "text-muted-foreground" };
 }
+
+/** Answers that save a standing permission; shown as quiet links under the one-off answers. */
+const STANDING_ACTIONS: ReadonlySet<string> = new Set([
+  "always",
+  "always_bot_sites",
+  "always_routine",
+]);
 
 function approvalActionLabel(
   id: string,
@@ -90,6 +111,9 @@ function approvalActionLabel(
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
   if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
   if (id === "deny") return t`Deny`;
+  if (id === "always_routine") return t`Always for this routine`;
+  if (id === "always_bot_sites" && fallback === "Allow all sites for this agent")
+    return t`Allow all sites for this agent`;
   return fallback;
 }
 
@@ -336,12 +360,12 @@ export function AskCard({
           {[...askActions]
             .sort(
               (a, b) =>
-                Number(approvalActions && a.id === "always") -
-                Number(approvalActions && b.id === "always"),
+                Number(approvalActions && STANDING_ACTIONS.has(a.id)) -
+                Number(approvalActions && STANDING_ACTIONS.has(b.id)),
             )
             .map((action) =>
               // A standing permission is a quiet text action under the one-off answers.
-              approvalActions && action.id === "always" ? (
+              approvalActions && STANDING_ACTIONS.has(action.id) ? (
                 <div key={action.id} className="flex flex-wrap items-baseline gap-x-2 px-1 pt-1">
                   <Button
                     variant="link"
@@ -362,9 +386,11 @@ export function AskCard({
                       )
                     )}
                   </Button>
-                  <span className="text-[13px] text-muted-foreground">
-                    <Trans>Won't ask again anywhere in this space.</Trans>
-                  </span>
+                  {action.id === "always" ? (
+                    <span className="text-[13px] text-muted-foreground">
+                      <Trans>Won't ask again anywhere in this space.</Trans>
+                    </span>
+                  ) : null}
                 </div>
               ) : (
                 <Button

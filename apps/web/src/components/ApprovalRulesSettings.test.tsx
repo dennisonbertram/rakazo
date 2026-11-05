@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { i18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -16,10 +18,13 @@ const api = vi.hoisted(() => ({
   table: vi.fn(),
   setActionType: vi.fn(),
 }));
-vi.mock("../lib/rpc", () => ({ rpc: { approvalRules: api } }));
+const bots = vi.hoisted(() => ({ list: vi.fn() }));
+vi.mock("../lib/rpc", () => ({ rpc: { approvalRules: api, bots } }));
 
 import { ApprovalActionsTable } from "./ApprovalActionsTable";
 import { ApprovalRulesSettings } from "./ApprovalRulesSettings";
+
+i18n.loadAndActivate({ locale: "en", messages: {} });
 
 const TYPES = [
   ["send_email", true],
@@ -58,6 +63,7 @@ beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.resetAllMocks();
   api.list.mockResolvedValue([]);
+  bots.list.mockResolvedValue([]);
   api.setActionType.mockResolvedValue({ ok: true });
   container = document.createElement("div");
   document.body.append(container);
@@ -71,7 +77,13 @@ afterEach(() => {
 
 it("shows one select per action type, primary rows first and the rest under More actions", async () => {
   api.table.mockResolvedValue({ rows: rows() });
-  await act(async () => root.render(<ApprovalRulesSettings />));
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <ApprovalRulesSettings />
+      </I18nProvider>,
+    ),
+  );
   await act(async () => {});
   expect(container.querySelectorAll("select").length).toBe(9);
   const more = container.querySelector("details");
@@ -82,7 +94,13 @@ it("shows one select per action type, primary rows first and the rest under More
 
 it("saves a changed space row and reloads the table", async () => {
   api.table.mockResolvedValue({ rows: rows() });
-  await act(async () => root.render(<ApprovalActionsTable />));
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <ApprovalActionsTable />
+      </I18nProvider>,
+    ),
+  );
   await act(async () => {});
   await change(select("send_email"), "block");
   expect(api.setActionType).toHaveBeenCalledWith({
@@ -95,7 +113,13 @@ it("saves a changed space row and reloads the table", async () => {
 
 it("for a bot, shows the override and sends null for Same as all bots", async () => {
   api.table.mockResolvedValue({ rows: rows({ send_email: "block" }) });
-  await act(async () => root.render(<ApprovalActionsTable botId="bot-1" />));
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <ApprovalActionsTable botId="bot-1" />
+      </I18nProvider>,
+    ),
+  );
   await act(async () => {});
   expect(select("send_email")?.value).toBe("block");
   expect(select("spend_money")?.value).toBe("same");
@@ -110,7 +134,13 @@ it("for a bot, shows the override and sends null for Same as all bots", async ()
 it("shows an error when saving fails", async () => {
   api.table.mockResolvedValue({ rows: rows() });
   api.setActionType.mockRejectedValue(new Error("x"));
-  await act(async () => root.render(<ApprovalActionsTable />));
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <ApprovalActionsTable />
+      </I18nProvider>,
+    ),
+  );
   await act(async () => {});
   await change(select("send_email"), "allow");
   expect(container.textContent).toContain("Something went wrong");
@@ -127,7 +157,13 @@ it("disables Allow for a tool rule that always needs approval", async () => {
       createdAt: "2026-01-01T00:00:00.000Z",
     },
   ]);
-  await act(async () => root.render(<ApprovalRulesSettings />));
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <ApprovalRulesSettings />
+      </I18nProvider>,
+    ),
+  );
   await act(async () => {});
   const ruleSelect = container.querySelector<HTMLSelectElement>("li select");
   expect(ruleSelect?.value).toBe("ask");
@@ -146,7 +182,13 @@ const toolRule = {
 it("names a tool rule readably and keeps the raw id in the title", async () => {
   api.table.mockResolvedValue({ rows: rows() });
   api.list.mockResolvedValue([toolRule]);
-  await act(async () => root.render(<ApprovalRulesSettings />));
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <ApprovalRulesSettings />
+      </I18nProvider>,
+    ),
+  );
   await act(async () => {});
   const item = container.querySelector("li");
   const name = item?.querySelector<HTMLElement>("[title]");
@@ -159,7 +201,13 @@ it("disables the row's select while its save is pending", async () => {
   api.table.mockResolvedValue({ rows: rows() });
   api.list.mockResolvedValue([toolRule]);
   api.set.mockReturnValue(new Promise(() => {}));
-  await act(async () => root.render(<ApprovalRulesSettings />));
+  await act(async () =>
+    root.render(
+      <I18nProvider i18n={i18n}>
+        <ApprovalRulesSettings />
+      </I18nProvider>,
+    ),
+  );
   await act(async () => {});
   await change(container.querySelector<HTMLSelectElement>("li select"), "block");
   expect(api.set).toHaveBeenCalledTimes(1);

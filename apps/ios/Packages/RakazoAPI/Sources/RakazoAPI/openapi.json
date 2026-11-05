@@ -4009,6 +4009,19 @@
                               }
                             ]
                           },
+                          "routineId": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcApprovalRulesListOutputSchema0"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "routineName": {
+                            "type": "string"
+                          },
                           "createdAt": {
                             "type": "string"
                           }
@@ -4386,6 +4399,19 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "routineId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcApprovalRulesSetOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "routineName": {
+                          "type": "string"
                         },
                         "createdAt": {
                           "type": "string"
@@ -13476,6 +13502,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -13530,6 +13565,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -13966,6 +14002,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -14020,6 +14065,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -14456,6 +14502,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -14510,6 +14565,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -14935,6 +14991,15 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "proactivity": {
+                            "default": "medium",
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          },
                           "externalMessageTargets": {
                             "default": [],
                             "type": "array",
@@ -14989,6 +15054,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
                           "webhookConfigured",
@@ -15415,6 +15481,15 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "proactivity": {
+                            "default": "medium",
+                            "type": "string",
+                            "enum": [
+                              "low",
+                              "medium",
+                              "high"
+                            ]
+                          },
                           "externalMessageTargets": {
                             "default": [],
                             "type": "array",
@@ -15469,6 +15544,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
                           "webhookConfigured",
@@ -16567,6 +16643,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -16621,6 +16706,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -16817,14 +16903,17 @@
                       "firewall": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema25"
                       },
-                      "externalMessageTargets": {
+                      "proactivity": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema26"
                       },
-                      "externalComputerTools": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
                       },
-                      "runsOn": {
+                      "externalComputerTools": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema28"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema29"
                       }
                     },
                     "required": [
@@ -17136,6 +17225,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -17190,6 +17288,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -18773,6 +18872,165 @@
         ]
       }
     },
+    "/rpc/capabilities/createAgent": {
+      "post": {
+        "operationId": "rpc_capabilities_createAgent",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "botId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "botId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/capabilities/install": {
       "post": {
         "operationId": "rpc_capabilities_install",
@@ -18871,8 +19129,7 @@
                       "type": "object",
                       "properties": {
                         "id": {
-                          "type": "string",
-                          "minLength": 1
+                          "$ref": "#/components/schemas/RpcCapabilitiesInstallOutputSchema0"
                         },
                         "kind": {
                           "type": "string",
@@ -18915,6 +19172,37 @@
                         },
                         "createdAt": {
                           "type": "string"
+                        },
+                        "agentBotId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCapabilitiesInstallOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "allAgents": {
+                          "type": "boolean"
+                        },
+                        "agentShared": {
+                          "type": "boolean"
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "usableBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesInstallOutputSchema0"
+                          }
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesInstallOutputSchema0"
+                          }
                         }
                       },
                       "required": [
@@ -19069,8 +19357,7 @@
                         "type": "object",
                         "properties": {
                           "id": {
-                            "type": "string",
-                            "minLength": 1
+                            "$ref": "#/components/schemas/RpcCapabilitiesListOutputSchema0"
                           },
                           "kind": {
                             "type": "string",
@@ -19113,6 +19400,37 @@
                           },
                           "createdAt": {
                             "type": "string"
+                          },
+                          "agentBotId": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/RpcCapabilitiesListOutputSchema0"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "allAgents": {
+                            "type": "boolean"
+                          },
+                          "agentShared": {
+                            "type": "boolean"
+                          },
+                          "writesEnabled": {
+                            "type": "boolean"
+                          },
+                          "usableBotIds": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/RpcCapabilitiesListOutputSchema0"
+                            }
+                          },
+                          "writeBotIds": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/RpcCapabilitiesListOutputSchema0"
+                            }
                           }
                         },
                         "required": [
@@ -19285,6 +19603,1229 @@
                       },
                       "required": [
                         "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/capabilities/rename": {
+      "post": {
+        "operationId": "rpc_capabilities_rename",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcCapabilitiesRenameOutputSchema0"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "skill",
+                            "plugin",
+                            "mcp",
+                            "api",
+                            "graphql",
+                            "connection"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "digest": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "secretConfigured": {
+                          "type": "boolean"
+                        },
+                        "config": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCapabilitiesRenameOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "allAgents": {
+                          "type": "boolean"
+                        },
+                        "agentShared": {
+                          "type": "boolean"
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "usableBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesRenameOutputSchema0"
+                          }
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesRenameOutputSchema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "name",
+                        "source",
+                        "version",
+                        "digest",
+                        "secretConfigured",
+                        "config",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/capabilities/setAgentAccess": {
+      "post": {
+        "operationId": "rpc_capabilities_setAgentAccess",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "$ref": "#/components/schemas/RpcCapabilitiesSetAgentAccessInputSchema0"
+                      },
+                      "botId": {
+                        "$ref": "#/components/schemas/RpcCapabilitiesSetAgentAccessInputSchema0"
+                      },
+                      "on": {
+                        "type": "boolean"
+                      },
+                      "canWrite": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "botId",
+                      "on"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcCapabilitiesSetAgentAccessOutputSchema0"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "skill",
+                            "plugin",
+                            "mcp",
+                            "api",
+                            "graphql",
+                            "connection"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "digest": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "secretConfigured": {
+                          "type": "boolean"
+                        },
+                        "config": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCapabilitiesSetAgentAccessOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "allAgents": {
+                          "type": "boolean"
+                        },
+                        "agentShared": {
+                          "type": "boolean"
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "usableBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetAgentAccessOutputSchema0"
+                          }
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetAgentAccessOutputSchema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "name",
+                        "source",
+                        "version",
+                        "digest",
+                        "secretConfigured",
+                        "config",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/capabilities/setAllAgents": {
+      "post": {
+        "operationId": "rpc_capabilities_setAllAgents",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "on": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "on"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcCapabilitiesSetAllAgentsOutputSchema0"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "skill",
+                            "plugin",
+                            "mcp",
+                            "api",
+                            "graphql",
+                            "connection"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "digest": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "secretConfigured": {
+                          "type": "boolean"
+                        },
+                        "config": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCapabilitiesSetAllAgentsOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "allAgents": {
+                          "type": "boolean"
+                        },
+                        "agentShared": {
+                          "type": "boolean"
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "usableBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetAllAgentsOutputSchema0"
+                          }
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetAllAgentsOutputSchema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "name",
+                        "source",
+                        "version",
+                        "digest",
+                        "secretConfigured",
+                        "config",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/capabilities/setExclusive": {
+      "post": {
+        "operationId": "rpc_capabilities_setExclusive",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "exclusive": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "exclusive"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcCapabilitiesSetExclusiveOutputSchema0"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "skill",
+                            "plugin",
+                            "mcp",
+                            "api",
+                            "graphql",
+                            "connection"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "digest": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "secretConfigured": {
+                          "type": "boolean"
+                        },
+                        "config": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCapabilitiesSetExclusiveOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "allAgents": {
+                          "type": "boolean"
+                        },
+                        "agentShared": {
+                          "type": "boolean"
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "usableBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetExclusiveOutputSchema0"
+                          }
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetExclusiveOutputSchema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "name",
+                        "source",
+                        "version",
+                        "digest",
+                        "secretConfigured",
+                        "config",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/capabilities/setWrites": {
+      "post": {
+        "operationId": "rpc_capabilities_setWrites",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "enabled"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcCapabilitiesSetWritesOutputSchema0"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "skill",
+                            "plugin",
+                            "mcp",
+                            "api",
+                            "graphql",
+                            "connection"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "digest": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "secretConfigured": {
+                          "type": "boolean"
+                        },
+                        "config": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcCapabilitiesSetWritesOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "allAgents": {
+                          "type": "boolean"
+                        },
+                        "agentShared": {
+                          "type": "boolean"
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "usableBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetWritesOutputSchema0"
+                          }
+                        },
+                        "writeBotIds": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcCapabilitiesSetWritesOutputSchema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "name",
+                        "source",
+                        "version",
+                        "digest",
+                        "secretConfigured",
+                        "config",
+                        "createdAt"
                       ],
                       "additionalProperties": false
                     }
@@ -19704,6 +21245,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -19758,6 +21308,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -20516,6 +22067,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -20570,6 +22130,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -26080,6 +27641,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -26134,6 +27704,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -38150,6 +39721,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -38204,6 +39784,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -45185,6 +46766,15 @@
                                   "default": false,
                                   "type": "boolean"
                                 },
+                                "proactivity": {
+                                  "default": "medium",
+                                  "type": "string",
+                                  "enum": [
+                                    "low",
+                                    "medium",
+                                    "high"
+                                  ]
+                                },
                                 "externalMessageTargets": {
                                   "default": [],
                                   "type": "array",
@@ -45239,6 +46829,7 @@
                                 "disabledBuiltinTools",
                                 "audience",
                                 "firewall",
+                                "proactivity",
                                 "externalMessageTargets",
                                 "externalComputerTools",
                                 "webhookConfigured",
@@ -49525,6 +51116,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -49579,6 +51179,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -66721,6 +68322,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -66775,6 +68385,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -68390,6 +70001,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -68444,6 +70064,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -69233,6 +70854,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -69287,6 +70917,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -76220,6 +77851,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -76274,6 +77914,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -83198,6 +84839,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -83252,6 +84902,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -119788,6 +121439,15 @@
                                     "default": false,
                                     "type": "boolean"
                                   },
+                                  "proactivity": {
+                                    "default": "medium",
+                                    "type": "string",
+                                    "enum": [
+                                      "low",
+                                      "medium",
+                                      "high"
+                                    ]
+                                  },
                                   "externalMessageTargets": {
                                     "default": [],
                                     "type": "array",
@@ -119839,6 +121499,7 @@
                                   "disabledBuiltinTools",
                                   "audience",
                                   "firewall",
+                                  "proactivity",
                                   "externalMessageTargets",
                                   "externalComputerTools",
                                   "webhookConfigured",
@@ -132913,6 +134574,15 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
                         "externalMessageTargets": {
                           "default": [],
                           "type": "array",
@@ -132967,6 +134637,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
                         "webhookConfigured",
@@ -135320,6 +136991,15 @@
             "default": false,
             "type": "boolean"
           },
+          "proactivity": {
+            "default": "medium",
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
           "externalMessageTargets": {
             "default": [],
             "type": "array",
@@ -135371,6 +137051,7 @@
           "disabledBuiltinTools",
           "audience",
           "firewall",
+          "proactivity",
           "externalMessageTargets",
           "externalComputerTools",
           "webhookConfigured",
@@ -136792,16 +138473,24 @@
         "type": "boolean"
       },
       "RpcBotsUpdateInputSchema26": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "RpcBotsUpdateInputSchema27": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema27": {
+      "RpcBotsUpdateInputSchema28": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema28": {
+      "RpcBotsUpdateInputSchema29": {
         "anyOf": [
           {
             "type": "string",
@@ -136874,6 +138563,38 @@
           "local",
           "google"
         ]
+      },
+      "RpcCapabilitiesInstallOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcCapabilitiesListOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcCapabilitiesRenameOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcCapabilitiesSetAgentAccessOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcCapabilitiesSetAgentAccessInputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcCapabilitiesSetAllAgentsOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcCapabilitiesSetExclusiveOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcCapabilitiesSetWritesOutputSchema0": {
+        "type": "string",
+        "minLength": 1
       },
       "RpcCartaAgentOutputSchema0": {
         "type": "string",

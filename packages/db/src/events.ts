@@ -41,6 +41,7 @@ import {
   answerWaitingRunWithTextInTransaction,
   pauseRunForInput,
   pauseRunForTakeover,
+  skipWaitingApprovalsInTransaction,
 } from "./run-pauses.js";
 import { claimSteering } from "./steering.js";
 import { withTransactionRetry } from "./transaction-retry.js";
@@ -53,6 +54,7 @@ export {
   claimSteering,
   pauseRunForInput,
   pauseRunForTakeover,
+  skipWaitingApprovalsInTransaction,
 };
 
 const EVENT_BATCH_SIZE = 200;

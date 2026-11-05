@@ -35,6 +35,7 @@ export * from "./data-room-references.js";
 export * from "./echo.js";
 export * from "./email-cards.js";
 export * from "./events.js";
+export * from "./exfil-check.js";
 export * from "./farewell.js";
 export * from "./featured-connectors.js";
 export * from "./finance/crypto.js";

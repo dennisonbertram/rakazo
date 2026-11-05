@@ -232,3 +232,15 @@ export const CheckInDaily: Story = {
     mockRpc({ "checkIn.get": { cadence: "daily" } });
   },
 };
+
+/** The Proactive select sits under Check in and saves on change; High is the most the agent does on its own. */
+export const ProactiveHigh: Story = {
+  beforeEach: setup,
+  args: { bot: { ...scoutBot, proactivity: "high" } },
+};
+
+/** A firewalled agent ignores the level, so the select is disabled with a short reason. */
+export const ProactiveLockedByFirewall: Story = {
+  beforeEach: setup,
+  args: { bot: { ...scoutBot, firewall: true } },
+};

@@ -251,8 +251,11 @@ function formatApprovalAnswer(
   if (approval && outcome === "created") return t("Created");
   if (approval && outcome === "cancelled") return t("Cancelled");
   if (approval && answer === "allow") return t("Allowed once");
+  if (approval && answer === "always_routine") return t("Always allowed for this routine");
+  if (approval && answer === "always_bot_sites") return t("Allowed for all sites");
   if (approval && answer === "always") return t("Always allowed");
   if (approval && answer === "deny") return t("Denied");
+  if (approval && answer === "skipped") return t("Skipped");
   // A reply batch pressed on another surface; its results are on that surface's card.
   if (answer === "send") return t("Send selected");
   return t("Answered: {answer}", { answer: selectedAskActionLabel(answer, actions) });

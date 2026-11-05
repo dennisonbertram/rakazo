@@ -1786,6 +1786,17 @@ export interface AutoReviewRequest {
    * tool results or inbound messages, so injected text cannot argue for the site.
    */
   newSite?: boolean;
+  /**
+   * A fetch the deterministic exfiltration check flagged (with `newSite`, so `args` is only the
+   * URL). `indicators` are kinds, lengths and short hashes, never private text. The review may
+   * only clear the flag; it never sees what the run read, only an outline of what it can read.
+   */
+  exfilFlag?: {
+    reason: string;
+    indicators: string[];
+    canRead: string[];
+    readOutsideContent: boolean;
+  };
 }
 
 export interface AutoReviewResult {

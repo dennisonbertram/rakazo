@@ -222,6 +222,39 @@ export const ApprovalWithToolId: Story = {
   },
 };
 
+/** A fetch to a site the run was not given: allow once, this site, or every site for this agent. */
+export const NewSiteWithAllSites: Story = {
+  args: {
+    block: ask({
+      text: "Review before Web fetch",
+      approvalEffectId: "effect_demo",
+      site: "npmjs.com",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always", label: "Always allow npmjs.com" },
+        { id: "always_bot_sites", label: "Allow all sites for this agent (it can read mail)" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
+/** A background routine card: allow once, or always for this routine only. */
+export const RoutineCardWithAlways: Story = {
+  args: {
+    block: ask({
+      text: "Review before Write file",
+      approvalEffectId: "effect_demo",
+      approvalReason: "Asked because this ran in the background.",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always_routine", label: "Always for this routine" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
 export const ApprovalAlwaysAllowed: Story = {
   args: {
     block: ask({

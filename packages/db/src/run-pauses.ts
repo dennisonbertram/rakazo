@@ -10,12 +10,16 @@ import {
 } from "@rakazo/contracts";
 import type { ClosedApprovalAnswer } from "@rakazo/core";
 import {
+  ALL_SITES_ACTION_ID,
   callIdFromClientNonce,
   closeApprovalAsks,
   isApprovalAskBlock,
   isConversationalRun,
   isSecretAskBlock,
   resolveAskChoice,
+  routineAlwaysAllowable,
+  SKIPPED_APPROVAL_ANSWER,
+  SKIPPED_APPROVAL_NOTE,
 } from "@rakazo/core";
 import { SITE_GATED_TOOLS, urlSite } from "@rakazo/core/egress";
 import { setApprovalRule } from "./approval-rules.js";
@@ -438,6 +442,8 @@ async function commitAnswerRunInput(
     select: {
       botId: true,
       userId: true,
+      externalTaint: true,
+      routineId: true,
       checkpoint: true,
       trigger: true,
       task: { select: { prompt: true } },
@@ -496,6 +502,56 @@ async function commitAnswerRunInput(
     }
     if (input.answer === "always") {
       if (run.userId !== input.answeredByUserId) return null;
+      approvalUserId = input.answeredByUserId;
+    }
+    // "Allow all sites" is the owner's choice for a plain agent's web_fetch: never from a webhook or
+    // tainted run, and never for a firewalled or external agent.
+    if (input.answer === ALL_SITES_ACTION_ID) {
+      const bot = await tx.bot.findFirst({
+        where: { id: run.botId, spaceId: input.spaceId },
+        select: { audience: true, firewall: true },
+      });
+      const thread = await tx.thread.findFirst({
+        where: { id: input.threadId },
+        select: { meetingTaintedAt: true },
+      });
+      if (
+        thread?.meetingTaintedAt ||
+        approvalEffect.kind !== "web_fetch" ||
+        run.userId !== input.answeredByUserId ||
+        run.trigger === "webhook" ||
+        run.externalTaint ||
+        !bot ||
+        bot.firewall ||
+        bot.audience === "external"
+      ) {
+        return null;
+      }
+      approvalUserId = input.answeredByUserId;
+    }
+    // "Always for this routine" needs a routine run, its owner, and a tool that may be allowed so.
+    if (input.answer === "always_routine") {
+      const bot = await tx.bot.findFirst({
+        where: { id: run.botId, spaceId: input.spaceId },
+        select: { audience: true, firewall: true },
+      });
+      const thread = await tx.thread.findFirst({
+        where: { id: input.threadId },
+        select: { meetingTaintedAt: true },
+      });
+      if (
+        !run.routineId ||
+        run.userId !== input.answeredByUserId ||
+        run.trigger === "webhook" ||
+        run.externalTaint ||
+        thread?.meetingTaintedAt ||
+        !bot ||
+        bot.firewall ||
+        bot.audience === "external" ||
+        !routineAlwaysAllowable({ toolName: approvalEffect.kind })
+      ) {
+        return null;
+      }
       approvalUserId = input.answeredByUserId;
     }
     // Only the run's owner can answer for their data.
@@ -560,7 +616,12 @@ async function commitAnswerRunInput(
   }
 
   if (approvalAsk) {
-    const allowed = (input.answer === "allow" || input.answer === "always") && !staleConsent;
+    const allowed =
+      (input.answer === "allow" ||
+        input.answer === "always" ||
+        input.answer === ALL_SITES_ACTION_ID ||
+        input.answer === "always_routine") &&
+      !staleConsent;
     const consent = approvalEffect!.kind === AI_CONSENT_EFFECT_KIND;
     if (consent && allowed) {
       const recipientKey = consentRequest(approvalEffect!.request)!.recipientKey;
@@ -601,6 +662,26 @@ async function commitAnswerRunInput(
         where: { spaceId_userId_clientId: key },
         create: { ...key, connectionId },
         update: {},
+      });
+    }
+    if (input.answer === ALL_SITES_ACTION_ID) {
+      await setApprovalRule(tx, {
+        spaceId: input.spaceId,
+        userId: approvalUserId!,
+        botId: run.botId,
+        matchKind: "tool",
+        matchValue: "web_fetch",
+        effect: "always_allow",
+      });
+    }
+    if (input.answer === "always_routine") {
+      await setApprovalRule(tx, {
+        spaceId: input.spaceId,
+        userId: approvalUserId!,
+        routineId: run.routineId,
+        matchKind: "tool",
+        matchValue: approvalEffect!.kind,
+        effect: "always_allow",
       });
     }
     // "Always" on a fetch card allows that site, never every site the tool can reach.
@@ -716,6 +797,90 @@ export async function answerWaitingRunWithTextInTransaction(
   if (!found) return null;
   if (isApprovalAskBlock(found.pendingAsk) || isSecretAskBlock(found.pendingAsk)) return null;
   return commitAnswerRunInput(tx, { ...input, messageId: found.messageId, answer });
+}
+
+/**
+ * The owner sent a message instead of answering the approval cards a waiting run holds. Every open
+ * card of the run closes as skipped and its effect is denied, never approved, so nothing runs and no
+ * rule is saved; the run resumes and its tool results say the owner moved on. Secret requests,
+ * questions and cards answered elsewhere (a shared message, a page source) are not skippable: null
+ * leaves everything as it was. The thread lock and the run's status make a concurrent approval and
+ * this skip exclusive.
+ */
+export async function skipWaitingApprovalsInTransaction(
+  tx: Prisma.TransactionClient,
+  input: { spaceId: string; threadId: string; runId: string },
+): Promise<{ threadId: string; seq: number } | null> {
+  await tx.$queryRaw`SELECT id FROM threads WHERE id = ${input.threadId} FOR UPDATE`;
+  const run = await tx.run.findFirst({
+    where: {
+      id: input.runId,
+      spaceId: input.spaceId,
+      threadId: input.threadId,
+      status: "waiting_input",
+    },
+    select: { botId: true },
+  });
+  if (!run) return null;
+  const messages = await tx.message.findMany({
+    where: { threadId: input.threadId, runId: input.runId, role: "bot" },
+    orderBy: { seq: "desc" },
+    take: 50,
+    select: { id: true, blocks: true },
+  });
+  const open: Array<{
+    id: string;
+    blocks: ReturnType<typeof closeApprovalAsks>;
+    effectIds: string[];
+  }> = [];
+  for (const message of messages) {
+    const parsed = MessageBlockSchema.array().safeParse(message.blocks);
+    if (!parsed.success) continue;
+    const asks = parsed.data.flatMap((block) =>
+      block.kind === "ask" && block.status !== "answered" ? [block] : [],
+    );
+    if (asks.length === 0) continue;
+    if (asks.some((ask) => !isApprovalAskBlock(ask) || ask.pageSource || ask.share)) return null;
+    open.push({
+      id: message.id,
+      blocks: closeApprovalAsks(parsed.data, SKIPPED_APPROVAL_ANSWER),
+      effectIds: asks.flatMap((ask) => (ask.approvalEffectId ? [ask.approvalEffectId] : [])),
+    });
+  }
+  if (open.length === 0) return null;
+  const queued = await tx.run.updateMany({
+    where: {
+      id: input.runId,
+      spaceId: input.spaceId,
+      threadId: input.threadId,
+      status: "waiting_input",
+    },
+    data: { status: "queued" },
+  });
+  if (queued.count !== 1) return null;
+  let seq = 0;
+  for (const card of open) {
+    await tx.externalEffect.updateMany({
+      where: {
+        id: { in: card.effectIds },
+        spaceId: input.spaceId,
+        runId: input.runId,
+        status: "intended",
+      },
+      data: { status: "denied", result: { note: SKIPPED_APPROVAL_NOTE } },
+    });
+    await tx.message.update({ where: { id: card.id }, data: { blocks: card.blocks } });
+    const updated = await appendEventInTransaction(tx, {
+      spaceId: input.spaceId,
+      threadId: input.threadId,
+      botId: run.botId,
+      type: "thread.message.updated",
+      runId: input.runId,
+      payload: { messageId: card.id, role: "bot", blocks: card.blocks },
+    });
+    seq = updated.seq;
+  }
+  return { threadId: input.threadId, seq };
 }
 
 export async function pauseRunForInput(
