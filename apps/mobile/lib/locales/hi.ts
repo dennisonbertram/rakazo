@@ -959,4 +959,6 @@ export const HI_MESSAGES: Record<string, string> = {
   Overdue: "अतिदेय",
   Upcoming: "आगामी",
   "No date": "कोई तिथि नहीं",
+  "Send selected": "चुने हुए भेजें",
+  Skipped: "छोड़ा गया",
 };

@@ -964,4 +964,6 @@ export const KO_MESSAGES: Record<string, string> = {
   Overdue: "기한 초과",
   Upcoming: "예정",
   "No date": "날짜 없음",
+  "Send selected": "선택 항목 보내기",
+  Skipped: "건너뜀",
 };
