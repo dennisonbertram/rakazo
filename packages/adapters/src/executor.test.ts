@@ -349,10 +349,13 @@ async function runIdentityExecutor({
         : ambientContext
           ? [
               {
+                id: "synthetic-private-memory",
                 path: "synthetic-private-memory",
                 content: "DURABLE_MEMORY_PRIVATE_MARKER",
                 revision: 1,
                 updatedAt: "2026-01-01T00:00:00.000Z",
+                // Pinned so the fixture does not fade as the wall clock passes.
+                pinned: true,
               },
             ]
           : [],
