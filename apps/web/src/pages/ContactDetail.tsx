@@ -1,13 +1,13 @@
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { Contact, ContactDetail } from "@rakazo/contracts";
+import type { Contact, ContactDetail, PipelineStatus } from "@rakazo/contracts";
 import { Button, ContactAvatar } from "@rakazo/ui-web";
 import { Pencil } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { ContactDialog, contactKindNames, contactStageNames } from "../components/ContactDialog";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ContactDialog, contactKindNames } from "../components/ContactDialog";
 import { InboxMessageDialog } from "../components/inbox/InboxMessageDialog";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { RowsSkeleton } from "../components/RowsSkeleton";
@@ -31,6 +31,17 @@ const safeStatusNames = (): Record<string, string> => ({
   funded: t`Funded`,
   expired: t`Expired`,
   canceled: t`Canceled`,
+});
+
+const pipelineStatusNames = (): Record<PipelineStatus, string> => ({
+  not_reached: t`Not reached`,
+  intro_requested: t`Intro requested`,
+  intro_made: t`Intro made`,
+  meeting_booked: t`Meeting booked`,
+  met: t`Met`,
+  diligence: t`Diligence`,
+  committed: t`Committed`,
+  passed: t`Passed`,
 });
 
 function Section({ title, children }: { title: ReactNode; children: ReactNode }) {
@@ -85,19 +96,12 @@ export function ContactDetailPage({ id, spaceName }: { id: string; spaceName?: s
 
   const kinds = contactKindNames();
   const contact = detail?.contact;
+  const record = contact?.pipelineRecord;
   const facts: [string, string | null | undefined][] = contact
     ? [
         [t`Email`, contact.email],
         [t`Organization`, contact.organization],
         [t`Kind`, kinds[contact.kind]],
-        [t`Stage`, contact.stage ? contactStageNames()[contact.stage] : null],
-        [
-          t`Check size`,
-          contact.checkSizeCents == null
-            ? null
-            : usdFigure(contact.checkSizeCents / 100, 0, i18n.locale || "en"),
-        ],
-        [t`Next step`, contact.nextStep],
         [t`Added by`, contact.addedBy?.name],
         [t`Notes`, contact.notes],
       ]
@@ -150,6 +154,14 @@ export function ContactDetailPage({ id, spaceName }: { id: string; spaceName?: s
                 ) : null,
               )}
             </dl>
+            {record ? (
+              <Link
+                to="/app/fundraising"
+                className="mt-3 block text-sm underline underline-offset-2"
+              >
+                {t`Fundraising: ${record.name} · ${pipelineStatusNames()[record.status]}`}
+              </Link>
+            ) : null}
             {detail.mail.length > 0 ? (
               <Section title={<Trans>Emails</Trans>}>
                 {detail.mail.map((mail) => (

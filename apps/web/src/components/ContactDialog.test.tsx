@@ -19,9 +19,17 @@ vi.mock("@lingui/core/macro", () => ({
 vi.mock("@lingui/react/macro", () => ({
   Trans: ({ children }: { children: ReactNode }) => children,
 }));
-const rpcMock = vi.hoisted(() => ({ linked: vi.fn(), remove: vi.fn(), save: vi.fn() }));
+const rpcMock = vi.hoisted(() => ({
+  linked: vi.fn(),
+  remove: vi.fn(),
+  save: vi.fn(),
+  prospectSave: vi.fn(),
+}));
 vi.mock("../lib/rpc", () => ({
-  rpc: { contacts: { linked: rpcMock.linked, delete: rpcMock.remove, save: rpcMock.save } },
+  rpc: {
+    contacts: { linked: rpcMock.linked, delete: rpcMock.remove, save: rpcMock.save },
+    fundraising: { prospects: { save: rpcMock.prospectSave } },
+  },
 }));
 
 import { ContactDialog } from "./ContactDialog";
@@ -170,4 +178,66 @@ it("shows no duplicate error when editing the contact that owns the email", asyn
   await typeEmail("DANA@example.test");
   expect(document.querySelector('[role="alert"]')).toBeNull();
   expect(button("Save")?.hasAttribute("disabled")).toBe(false);
+});
+
+const prospect: Contact = {
+  ...ada,
+  kind: "prospect",
+  stage: "meeting",
+  checkSizeCents: 2_500_000,
+  nextStep: "Send the deck",
+};
+async function typeInto(id: string, value: string) {
+  const input = document.getElementById(id) as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+const showProspect = (pipelineFields: boolean) =>
+  act(() =>
+    root.render(
+      <ContactDialog
+        contact={prospect}
+        pipelineFields={pipelineFields}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    ),
+  );
+
+it("never sends pipeline fields from the Contacts page, and shows none", async () => {
+  showProspect(false);
+  await flush();
+  for (const id of ["contact-stage", "contact-check-size", "contact-next-step"])
+    expect(document.getElementById(id)).toBeNull();
+  await typeInto("contact-email", "new@example.test");
+  rpcMock.save.mockResolvedValue(prospect);
+  await click(button("Save"));
+  expect(rpcMock.save).toHaveBeenCalledTimes(1);
+  const sent = rpcMock.save.mock.calls[0]?.[0];
+  expect(sent).toMatchObject({ id: "c1", email: "new@example.test" });
+  for (const key of ["stage", "checkSizeCents", "nextStep"]) expect(sent).not.toHaveProperty(key);
+  expect(rpcMock.prospectSave).not.toHaveBeenCalled();
+});
+
+it("on the Fundraising page, an email edit leaves the record alone", async () => {
+  showProspect(true);
+  await flush();
+  await typeInto("contact-email", "new@example.test");
+  rpcMock.save.mockResolvedValue(prospect);
+  await click(button("Save"));
+  const sent = rpcMock.save.mock.calls[0]?.[0];
+  for (const key of ["stage", "checkSizeCents", "nextStep"]) expect(sent).not.toHaveProperty(key);
+  expect(rpcMock.prospectSave).not.toHaveBeenCalled();
+});
+
+it("on the Fundraising page, sends the record only the field that changed", async () => {
+  showProspect(true);
+  await flush();
+  await typeInto("contact-check-size", "30,000");
+  rpcMock.save.mockResolvedValue(prospect);
+  rpcMock.prospectSave.mockResolvedValue(prospect);
+  await click(button("Save"));
+  expect(rpcMock.prospectSave).toHaveBeenCalledWith({ id: "c1", checkSizeCents: 3_000_000 });
 });
