@@ -6622,3 +6622,140 @@ describe("fetching new sites without a card", () => {
     expect(actions[2]!.label).toMatch(/^Allow all sites for this agent \(it can read .*mail/);
   });
 });
+
+describe("public research apps linked as Composio connections", () => {
+  const key = integrationAgentSpawnKey("connection-1");
+  const connection = (provider = "exa", extra: Record<string, unknown> = {}) => ({
+    id: "connection-1",
+    spaceId: "space-1",
+    userId: "user-1",
+    connectorId: "composio",
+    provider,
+    providerRef: "account-1",
+    displayName: provider,
+    status: "connected",
+    allAgents: false,
+    botAccess: [{ botId: "bot-1" }],
+    agentBotId: "bot-1",
+    writesEnabled: false,
+    ...extra,
+  });
+  const tool = (name: string, readOnly?: boolean): ConnectorTool => ({
+    name,
+    description: name,
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    ...(readOnly === undefined ? {} : { readOnly }),
+    route: { connectorId: "composio", toolName: name },
+  });
+  const run = (
+    toolName: string,
+    { provider = "exa", ...extra }: Record<string, unknown> = {},
+    query = "npm packages for csv parsing",
+  ) => {
+    const t = tool(toolName);
+    const f = fixture({
+      name: t.name,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      route: t.route,
+      connectionRows: [connection(provider as string)],
+      availableTools: [t],
+      ...extra,
+    });
+    f.setCalls([{ args: { query }, executionId: "call-1" }]);
+    return f;
+  };
+
+  it.each([
+    ["exa", "EXA_SEARCH"],
+    ["exa", "EXA_GET_CONTENTS_FOR_URLS"],
+    ["tavily_mcp", "TAVILY_MCP_TAVILY_SEARCH"],
+    ["tavily_mcp", "TAVILY_MCP_TAVILY_EXTRACT"],
+  ])("runs %s's %s from a bot-to-bot run with no card", async (provider, toolName) => {
+    const f = run(toolName, { provider });
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.execute).toHaveBeenCalledOnce();
+  });
+
+  it("still asks for a tool that is not a public search or page read", async () => {
+    // Writes are off for the account, so the tool is not even offered.
+    const f = run("EXA_CREATE_WEBSET");
+    await f.run();
+    expect(f.offeredTools).not.toContain("EXA_CREATE_WEBSET");
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it("still asks for another app's agent, and for a webhook run", async () => {
+    const gmail = run("GMAIL_FETCH_EMAILS", { provider: "GMAIL" });
+    await gmail.run();
+    expect(gmail.execute).not.toHaveBeenCalled();
+    const webhook = run("EXA_SEARCH", { trigger: "webhook" });
+    await webhook.run();
+    expect(webhook.execute).not.toHaveBeenCalled();
+  });
+
+  it("asks when the query repeats private text the agent was sent", async () => {
+    const f = run(
+      "EXA_SEARCH",
+      {
+        knownBots: { "peer-1": null as unknown as string },
+        history: [
+          {
+            blocks: [
+              {
+                kind: "bot_message_received",
+                fromBotId: "peer-1",
+                text: "Priya Shah owes 48213 dollars",
+              },
+            ],
+          },
+        ],
+      },
+      "Priya Shah 48213",
+    );
+    await f.run();
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it("fetches a new public site with no card, and loads no user memory", async () => {
+    const fact = "PRIVATE-USER-FACT-7731";
+    const t = tool("EXA_SEARCH");
+    const f = fixture({
+      builtin: true,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      connectionRows: [connection()],
+      availableTools: [t],
+      existingSharedMemory: fact,
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(JSON.stringify([f.request()!.instructions, f.request()!.history])).not.toContain(fact);
+  });
+
+  it("asks when the same agent is also granted another app", async () => {
+    const f = fixture({
+      builtin: true,
+      spawnKey: key,
+      trigger: "bot_message",
+      peer: { senderInScope: true, linked: false },
+      connectionRows: [
+        connection(),
+        { ...mailConnectionRow(), allAgents: false, botAccess: [{ botId: "bot-1" }] },
+      ],
+      availableTools: [tool("EXA_SEARCH")],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" }, executionId: "c1" },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+  });
+});
