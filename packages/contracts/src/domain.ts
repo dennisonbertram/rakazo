@@ -890,6 +890,27 @@ export const MemoryDocumentSchema = z.object({
 });
 export type MemoryDocument = z.infer<typeof MemoryDocumentSchema>;
 
+/** One company context section: a memory document of scope "company". */
+export const CompanyContextSectionSchema = z.object({
+  id: Id,
+  /** Stable slug; it does not change when the section is renamed. */
+  slug: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  text: z.string(),
+  revision: z.number().int(),
+  updatedAt: z.string(),
+});
+export type CompanyContextSection = z.infer<typeof CompanyContextSectionSchema>;
+
+export const CompanyContextRevisionSchema = z.object({
+  revision: z.number().int(),
+  title: z.string(),
+  text: z.string(),
+  createdAt: z.string(),
+});
+export type CompanyContextRevision = z.infer<typeof CompanyContextRevisionSchema>;
+
 export const ConnectionSchema = z.object({
   id: Id,
   connectorId: z.string(),

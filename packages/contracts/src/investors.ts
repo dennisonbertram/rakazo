@@ -31,6 +31,7 @@ export const INVESTORS_AGENT_BUILTIN_TOOLS = [
   "investor_update_draft",
   "audit_request_upsert",
   "skill_read",
+  "company_context_lookup",
   "finance_overview",
   "finance_breakdown",
   "search_data_room",

@@ -265,6 +265,7 @@ describe("ensureInvestorsAgent", () => {
     );
     expect(INVESTORS_AGENT_BUILTIN_TOOLS).not.toContain("mail_send");
     expect(INVESTORS_AGENT_BUILTIN_TOOLS).toContain("cap_table_update");
+    expect(INVESTORS_AGENT_BUILTIN_TOOLS).toContain("company_context_lookup");
     for (const name of INVESTORS_AGENT_BUILTIN_TOOLS) {
       expect(name).not.toMatch(/delete|remove|trash|^mcp__/);
     }
