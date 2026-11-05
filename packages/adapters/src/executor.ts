@@ -11908,6 +11908,27 @@ export async function loadFinanceConnectionLine(
 export const MAIL_SORTING_LINE =
   'Facts: some of the user\'s mail has not been sorted yet, so the To do list may be incomplete. If asked what to do, what is open or what needs attention, answer first from what you can see (the inbox overview and mail search still work); do not say there are no tasks, do not say you cannot recommend anything, and do not say how long sorting will take or that the list will appear. Mention it only in one short closing clause, such as "some recent mail is still being sorted", and end with [Open Inbox](/app/inbox).';
 
+/** The live-source text goes only to a run offered those tools, which firewalled and external runs are not. */
+function pagesGuidance(disabled?: ReadonlySet<string>): string {
+  const sources = builtinOffered(disabled, "page_source_set");
+  const errors = sources && builtinOffered(disabled, "page_source_list");
+  return [
+    'Put durable output the user will revisit on a page (a summary, tracker, or dashboard); keep ordinary replies in chat. Each page result has a link; whenever you name a page in a reply, write it as a Markdown link to that exact link value, never as bold text and without saying where it sits. Do the same for a Data room file with a link. page_read, page_write and page_edit take an optional page (a title from page_list) and use the first page without it. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order.',
+    sources
+      ? ' Live data: numbers come from sources, never from you. Call page_source_set first ({name, tool, args, schedule}; tools: finance_overview, finance_breakdown, finance_transactions, finance_recurring, cap_table_read, fundraising_read, contacts_list, board_tickets) and read the preview it returns to choose paths (JSON Pointers like /cash/balance). Then use fences, each with one line of JSON on the line after the opener and nothing after the fence name, for example ```metric then {"label":"Cash","source":"Overview","path":"/cash","format":"usd"} then ```. metric: {"label", "source", "path", "format": "number"|"usd"|"percent"|"text"}; table: {"name", "source", "path" (a JSON Pointer string to an array of objects), "columns"?: [{"key", "label", "format"?}], "limit"?}; a chart gets "source", "path" and "over": "latest" (rows are the array at path) or "history" (one {at, value} row per stored result; the path points at a number), and still needs a few sample rows in data. A source with kind "mcp" ({name, kind, server, tool, args, schedule}) reads one read-only tool of an MCP server you have. A source with kind "http" ({name, kind, url, secret?, accept?, schedule}) does one GET of a JSON or CSV API (CSV becomes an array of row objects); a secret is the name of a saved key for that site. Both need the owner\'s approval; keep going without waiting. A block shows what the source last stored.'
+      : undefined,
+    errors ? " page_source_list shows errors." : undefined,
+    sources ? " At most 20 live blocks per page." : undefined,
+    ' A page with kind "html" is one HTML document that page_write and page_edit save whole.',
+    sources
+      ? ' Its sources must exist (page_source_set) and be named in the head: <meta name="praci-sources" content="Overview, Revenue"> and, for sources whose past results it needs, <meta name="praci-history" content="Revenue">. The page receives data through window message events: addEventListener("message", (e) => { if (e.data?.type === "praci-data") render(e.data.sources) }); sources[name] has status, fetchedAt, error?, value (the newest result) and history ([{at, value}], newest first). Expect the event again after each refresh.'
+      : undefined,
+    " The page has no network and cannot load remote scripts, fonts, images or frames: inline all script, CSS and images (data: URIs).",
+  ]
+    .filter(Boolean)
+    .join("");
+}
+
 export function userTurnInstructions(parts: {
   botInstructions: string;
   voiceAgent?: boolean;
@@ -12006,11 +12027,9 @@ export function userTurnInstructions(parts: {
       "render_plot",
       "For a chart image in the chat, use render_plot.",
     ),
-    offeredBuiltinClause(
-      parts.disabledBuiltinTools,
-      "page_write",
-      'Put durable output the user will revisit on a page (a summary, tracker, or dashboard); keep ordinary replies in chat. Each page result has a link; whenever you name a page in a reply, write it as a Markdown link to that exact link value, never as bold text and without saying where it sits. Do the same for a Data room file with a link. page_read, page_write and page_edit take an optional page (a title from page_list) and use the first page without it. Call page_read first, then page_write (whole page) or page_edit (one unique piece; prefer it for small changes). Charts are a ```chart fence holding one line of JSON {"name", "spec", "data"}, where spec is {title?, x?, y?, marks: [{type, options}]} and data holds the rows. Scale settings go in the spec\'s x and y objects and channels in the mark options; use ISO dates (YYYY-MM-DD) with x: {type: "utc"} for time series, and x: {domain: [...]} listing ordered categories in order. Live data: numbers come from sources, never from you. Call page_source_set first ({name, tool, args, schedule}; tools: finance_overview, finance_breakdown, finance_transactions, finance_recurring, cap_table_read, fundraising_read, contacts_list, board_tickets) and read the preview it returns to choose paths (JSON Pointers like /cash/balance). Then use fences, each with one line of JSON on the line after the opener and nothing after the fence name, for example ```metric then {"label":"Cash","source":"Overview","path":"/cash","format":"usd"} then ```. metric: {"label", "source", "path", "format": "number"|"usd"|"percent"|"text"}; table: {"name", "source", "path" (a JSON Pointer string to an array of objects), "columns"?: [{"key", "label", "format"?}], "limit"?}; a chart gets "source", "path" and "over": "latest" (rows are the array at path) or "history" (one {at, value} row per stored result; the path points at a number), and still needs a few sample rows in data. A source with kind "mcp" ({name, kind, server, tool, args, schedule}) reads one read-only tool of an MCP server you have. A source with kind "http" ({name, kind, url, secret?, accept?, schedule}) does one GET of a JSON or CSV API (CSV becomes an array of row objects); a secret is the name of a saved key for that site. Both need the owner\'s approval; keep going without waiting. A block shows what the source last stored; page_source_list shows errors. At most 20 live blocks per page. A page with kind "html" is one HTML document that page_write and page_edit save whole. Its sources must exist (page_source_set) and be named in the head: <meta name="praci-sources" content="Overview, Revenue"> and, for sources whose past results it needs, <meta name="praci-history" content="Revenue">. The page receives data through window message events: addEventListener("message", (e) => { if (e.data?.type === "praci-data") render(e.data.sources) }); sources[name] has status, fetchedAt, error?, value (the newest result) and history ([{at, value}], newest first). Expect the event again after each refresh. The page has no network and cannot load remote scripts, fonts, images or frames: inline all script, CSS and images (data: URIs).',
-    ),
+    builtinOffered(parts.disabledBuiltinTools, "page_write")
+      ? pagesGuidance(parts.disabledBuiltinTools)
+      : undefined,
     offeredBuiltinClause(
       parts.disabledBuiltinTools,
       "pins_write",

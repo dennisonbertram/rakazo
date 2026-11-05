@@ -5364,6 +5364,32 @@ describe("unattended runs and block rules", () => {
       expect(text).toContain("Never ask for a raw credential in chat");
     });
 
+    it.each([
+      ["a firewalled agent", { firewall: true }],
+      ["an external bot", { audience: "external" as const }],
+    ])(
+      "%s has pages, and is not told about the live-source tools it lacks",
+      async (_label, options) => {
+        const { text, tools } = await prompts(options);
+        const names = tools.map((tool) => tool.name);
+        expect(names).toContain("page_write");
+        expect(names).not.toContain("page_source_set");
+        expect(names).not.toContain("page_source_list");
+        expect(text).toContain("Put durable output the user will revisit on a page");
+        for (const line of ["page_source_", "Live data:", "praci-sources"]) {
+          expect(text).not.toContain(line);
+        }
+      },
+    );
+
+    it("a run offered the source tools still gets the live-source text", async () => {
+      const { text, tools } = await prompts({});
+      expect(tools.map((tool) => tool.name)).toContain("page_source_set");
+      expect(text).toContain("Live data: numbers come from sources");
+      expect(text).toContain("page_source_list shows errors");
+      expect(text).toContain("praci-sources");
+    });
+
     it("an external bot is not told how to connect a bank", async () => {
       const { text } = await prompts({ audience: "external" });
       expect(text).not.toContain("Add a bank account in Finance");
