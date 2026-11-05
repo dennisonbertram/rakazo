@@ -159,3 +159,11 @@ func malformedSuccessBodyIsDecodingError() async throws {
   let rpc = RPCClient(auth: try await signedInClient(transport), transport: transport)
   await #expect(throws: RPCError.decoding) { let _: Me = try await rpc.call("me") }
 }
+
+@Test
+func goalReplyIsAStatusLineNotAServerError() async throws {
+  let body = #"{"json":{"defined":true,"code":"BAD_REQUEST","status":400,"message":"No goal set.","data":{"goalReply":true}}}"#
+  let transport = FakeTransport([session, rpcResponse(body, status: 400)])
+  let rpc = RPCClient(auth: try await signedInClient(transport), transport: transport)
+  await #expect(throws: RPCError.goalReply("No goal set.")) { let _: Me = try await rpc.call("threads/send") }
+}

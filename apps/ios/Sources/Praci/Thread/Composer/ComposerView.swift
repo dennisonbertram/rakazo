@@ -24,11 +24,16 @@ struct ComposerView: View {
           .font(.footnote).foregroundStyle(Color.token(.mutedForeground))
           .accessibilityIdentifier("offlineBanner")
       }
+      if let goal = model.snapshot?.goal { goalLine(goal) }
       if let reply = composer.reply { replyStrip(reply) }
       if !composer.attachments.isEmpty { chips }
       if let notice = composer.notice {
         Text(notice).font(.footnote).foregroundStyle(Color.token(.destructive))
           .accessibilityIdentifier("composerNotice")
+      }
+      if let answer = SendQueue.shared.notices[composer.originKey] {
+        Text(answer).font(.footnote).foregroundStyle(Color.token(.mutedForeground))
+          .accessibilityIdentifier("composerAnswer")
       }
       DictationNotice(model: dictation)
       HStack(alignment: .bottom, spacing: 8) {
@@ -111,6 +116,28 @@ struct ComposerView: View {
       .accessibilityLabel("Send")
       .accessibilityIdentifier("send")
     }
+  }
+
+  /// The goal text, with "Paused" or "Waiting on you" only when it is not making progress.
+  private func goalLine(_ goal: ThreadGoal) -> some View {
+    let status = goalStatus(goal, run: model.snapshot?.run)
+    return HStack(spacing: 8) {
+      Image(systemName: "scope").font(.footnote).foregroundStyle(Color.token(.mutedForeground))
+      Text(goal.text).font(.footnote).lineLimit(1)
+      if let status {
+        Text(status).font(.footnote).foregroundStyle(Color.token(.mutedForeground))
+          .layoutPriority(1)
+      }
+      Spacer(minLength: 0)
+      Button { Task { await composer.clearGoal(app, model) } } label: {
+        Image(systemName: "xmark").font(.footnote.weight(.semibold)).frame(width: 22, height: 22)
+      }
+      .buttonStyle(.glass)
+      .buttonBorderShape(.circle)
+      .accessibilityLabel("Clear goal")
+      .accessibilityIdentifier("clearGoal")
+    }
+    .accessibilityIdentifier("goalLine")
   }
 
   private func replyStrip(_ reply: ReplyTarget) -> some View {
