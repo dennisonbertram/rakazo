@@ -335,7 +335,7 @@ Each is one PR, hand-checked in `pnpm demo:up`.
 | S8 | Agent tools, prompt, researched details | Always asks; `url` required; pipeline fixed by spawn key | Agent researches a prospect |
 | S9 | Native iPhone | Portable package tests | Simulator |
 | S10 | GTM Leads, with the decisions in section 6 | Fundraising unchanged; Fit moves nothing | Add a lead, send an invite |
-| S11 | Drop old contact columns and contract fields, after one release | Sync's raw SQL has no old column | Page unchanged |
+| S11 | Drop old contact columns and contract fields, after one release. Also drop the transition triggers on `contacts` and their functions, and first move `contacts.roundId` of investors on no record, which Assign still reads | Sync's raw SQL has no old column | Page unchanged |
 
 S4, S5, S6 and S7 can run in parallel after S3. A check the demo cannot provide, such as a real Google invite reaching an
 attendee, is stated in the PR.

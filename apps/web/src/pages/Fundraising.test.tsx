@@ -377,6 +377,39 @@ it("offers no Undo when restoring would move a commitment into another round", a
   expect(button("Undo")).toBeUndefined();
 });
 
+it("a row with no person keeps its stage and asks for a first person, not a SAFE", async () => {
+  const record = { id: "rec1", name: "Sample Street Capital", status: "committed" as const };
+  const row = prospect("rec1", "Sample Street Capital", {
+    email: null,
+    stage: "committed",
+    checkSizeCents: 500_000,
+    roundId: "r1",
+    pipelineRecord: record,
+  });
+  rpcMock.overview.mockResolvedValue(overview(openRound, [row], 500_000));
+  await show();
+  await click(button("Send SAFE"));
+  expect(document.body.textContent).toContain("Save Sample Street Capital as a contact");
+  expect((document.getElementById("contact-name") as HTMLInputElement).value).toBe(
+    "Sample Street Capital",
+  );
+  // The first person joins the record as it is: no stage or amount to overwrite it.
+  expect(document.getElementById("contact-stage")).toBeNull();
+  // A different name still joins this record: the record's id travels with the dialog.
+  await typeInto("contact-name", "Riley Placeholder");
+  rpcMock.contactSave.mockResolvedValue(prospect("c9", "Riley Placeholder"));
+  await click(button("Save"));
+  const sent = rpcMock.contactSave.mock.calls[0]?.[0];
+  expect(sent).toMatchObject({
+    name: "Riley Placeholder",
+    kind: "prospect",
+    pipelineRecordId: "rec1",
+  });
+  for (const key of ["id", "stage", "checkSizeCents", "nextStep"])
+    expect(sent).not.toHaveProperty(key);
+  expect(rpcMock.safeSave).not.toHaveBeenCalled();
+});
+
 it("opens the contact that already has the typed email instead of failing", async () => {
   const existing = { ...prospect("c7", "Dee Existing"), kind: "investor" as const, stage: null };
   rpcMock.overview.mockResolvedValue(overview(null, []));

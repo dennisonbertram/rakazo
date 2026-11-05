@@ -22,6 +22,8 @@ model AiDataConsent {
 }
 
 model User {
+  pipelineRecords PipelineRecord[]
+  pipelineImports PipelineImport[]
   scratchpadApprovals         ScratchpadApproval[]
   aiDataConsents              AiDataConsent[]
   mailSearches                MailSearch[]
@@ -526,6 +528,8 @@ model Member {
 }
 
 model Space {
+  pipelineRecords PipelineRecord[]
+  pipelineImports PipelineImport[]
   artifactShares              ArtifactShare[]
   scratchpadApprovals         ScratchpadApproval[]
   notifications               Notification[]
@@ -3290,6 +3294,7 @@ model Contact {
   /// A ContactKind: "investor", "auditor", "customer", "vendor", "partner", "advisor", "legal", "prospect" or "other"
   kind             String                @default("investor")
   notes            String?
+  /// Frozen by migration 20261231000052: pipeline_records holds stage, check size, next step, round and Waiting for Mercury. Dropped in a later release.
   /// Prospect pipeline stage: target, intro, meeting, diligence, committed or passed; null for other contacts.
   stage            String?
   checkSizeCents   BigInt?
@@ -3313,6 +3318,9 @@ model Contact {
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   companyEntities CompanyEntity[] @relation("CompanyEntityContact")
+  pipelinePeople  PipelineRecordPerson[]
+  /// Records this contact referred.
+  referredRecords PipelineRecord[] @relation("PipelineRecordReferrer")
 
   @@unique([spaceId, userId, email])
   @@unique([id, spaceId, userId])
@@ -3490,6 +3498,7 @@ model FundraiseRound {
   updatedAt   DateTime  @updatedAt
   contacts    Contact[]
   safes       Safe[]
+  pipelineRecords PipelineRecord[]
 
   @@index([spaceId, userId])
   @@map("fundraise_rounds")
@@ -4746,4 +4755,105 @@ model MeetingCaptureChunk {
 
   @@unique([captureId, track, seq])
   @@map("meeting_capture_chunks")
+}
+
+/// One row on a pipeline: a firm or person being raised from, with zero or more linked contacts.
+model PipelineRecord {
+  id                  String    @id @default(cuid())
+  spaceId             String
+  space               Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "fundraising" for now.
+  pipeline            String    @default("fundraising")
+  name                String
+  /// Lowercase letters and digits of the name; two records can never be the same firm.
+  normalizedName      String
+  /// A PipelineStatus.
+  status              String    @default("not_reached")
+  statusBeforePassed  String?
+  /// The investor's stance: "in", "maybe" or "out". Never touches money.
+  interest            String?
+  referredByContactId String?
+  referredBy          Contact?  @relation("PipelineRecordReferrer", fields: [referredByContactId, spaceId, userId], references: [id, spaceId, userId], onDelete: SetNull)
+  amountCents         BigInt?
+  nextStep            String?
+  nextCallAt          DateTime?
+  nextCallHasTime     Boolean   @default(false)
+  /// When Send SAFE opened Mercury; null when not waiting for a Mercury SAFE.
+  waitingSince        DateTime?
+  /// The round open when the status was last saved as committed; null otherwise.
+  roundId             String?
+  round               FundraiseRound? @relation(fields: [roundId], references: [id], onDelete: SetNull)
+  /// [{label, value, source: list|agent|owner, url?, at}]
+  details             Json      @default("[]")
+  /// A list's priority tier, such as "Wave 2".
+  group               String?
+  /// A list's row order; breaks ties when sorting.
+  listOrder           Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  people              PipelineRecordPerson[]
+  events              PipelineEvent[]
+
+  @@unique([spaceId, userId, pipeline, normalizedName])
+  @@unique([id, spaceId, userId, pipeline])
+  @@unique([id, spaceId, userId])
+  @@index([roundId])
+  @@index([referredByContactId])
+  @@map("pipeline_records")
+}
+
+/// A contact on a record. A contact sits in one record per pipeline; at most one person per record is primary (partial unique index in the migration).
+model PipelineRecordPerson {
+  id        String         @id @default(cuid())
+  spaceId   String
+  userId    String
+  pipeline  String         @default("fundraising")
+  recordId  String
+  record    PipelineRecord @relation(fields: [recordId, spaceId, userId, pipeline], references: [id, spaceId, userId, pipeline], onDelete: Cascade)
+  contactId String
+  contact   Contact        @relation(fields: [contactId, spaceId, userId], references: [id, spaceId, userId], onDelete: Cascade)
+  isPrimary Boolean        @default(false)
+  createdAt DateTime       @default(now())
+
+  @@unique([spaceId, userId, pipeline, contactId])
+  @@index([recordId])
+  @@map("pipeline_record_people")
+}
+
+/// One entry on a record's timeline.
+model PipelineEvent {
+  id       String         @id @default(cuid())
+  spaceId  String
+  userId   String
+  recordId String
+  record   PipelineRecord @relation(fields: [recordId, spaceId, userId], references: [id, spaceId, userId], onDelete: Cascade)
+  /// "call" | "note" | "status" | "interest" | "invite" | "import"
+  kind     String
+  /// "user" or a bot id.
+  actor    String         @default("user")
+  at       DateTime       @default(now())
+  payload  Json           @default("{}")
+
+  @@index([recordId, at])
+  @@map("pipeline_events")
+}
+
+/// Rows staged for one import, reviewed on one card.
+model PipelineImport {
+  id            String   @id @default(cuid())
+  spaceId       String
+  space         Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pipeline      String   @default("fundraising")
+  rows          Json     @default("[]")
+  status        String   @default("staging")
+  cardMessageId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([spaceId, userId])
+  @@map("pipeline_imports")
 }

@@ -26,6 +26,19 @@ export const ContactStageSchema = z.enum([
 ]);
 export type ContactStage = z.infer<typeof ContactStageSchema>;
 
+/** A record's place on the Fundraising pipeline, in order. */
+export const PipelineStatusSchema = z.enum([
+  "not_reached",
+  "intro_requested",
+  "intro_made",
+  "meeting_booked",
+  "met",
+  "diligence",
+  "committed",
+  "passed",
+]);
+export type PipelineStatus = z.infer<typeof PipelineStatusSchema>;
+
 export const ContactSchema = z.object({
   id: Id,
   name: z.string(),
@@ -33,12 +46,17 @@ export const ContactSchema = z.object({
   organization: z.string().nullable(),
   kind: ContactKindSchema,
   notes: z.string().nullable(),
-  /** Pipeline fields; null on a contact that is not a prospect. */
+  /** Fundraising fields, read from the contact's pipeline record; null on a contact with none. */
   stage: ContactStageSchema.nullish(),
   checkSizeCents: z.number().int().nullish(),
   nextStep: z.string().nullish(),
   /** The round open when the stage was last saved as committed. */
   roundId: Id.nullish(),
+  /**
+   * The Fundraising record this contact is on. On the Fundraising overview, a row whose `id` equals
+   * this record's id is a record with no person yet.
+   */
+  pipelineRecord: z.object({ id: Id, name: z.string(), status: PipelineStatusSchema }).nullish(),
   /** Investor portal dates (read-only): last link issued, last opened, and when access was revoked. */
   portalLinkSentAt: IsoDate.nullish(),
   portalLastSeenAt: IsoDate.nullish(),
@@ -70,6 +88,8 @@ export const ContactSaveInputSchema = z.object({
   nextStep: z.string().trim().max(500).nullish(),
   /** Keeps a Committed prospect in this round (Undo of a delete) instead of the open one. */
   roundId: Id.optional(),
+  /** A new contact's Fundraising record, for the first person of a record with none. */
+  pipelineRecordId: Id.optional(),
 });
 export type ContactSaveInput = z.infer<typeof ContactSaveInputSchema>;
 
