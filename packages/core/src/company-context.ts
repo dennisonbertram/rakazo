@@ -101,3 +101,16 @@ export function buildCompanyContextIndex(
   }
   return `${open}${lines.slice(0, listed).join("")}${tail}${close}`;
 }
+
+const COMPANY_INDEX_BLOCK =
+  /Company context the owner wrote follows[^\n]*\n<company_context>\n[\s\S]*?<\/company_context>\n?/;
+
+/**
+ * A resumed run reuses the system prompt saved at its pause. Swap the index in it for the one in
+ * the current prompt (or drop it when the current prompt has none), so an edit or a newly turned-on
+ * Firewall applies after the pause.
+ */
+export function refreshCompanyContextBlock(saved: string, current: string): string {
+  const fresh = COMPANY_INDEX_BLOCK.exec(current)?.[0] ?? "";
+  return saved.replace(COMPANY_INDEX_BLOCK, () => fresh);
+}
