@@ -125,7 +125,7 @@ Issue links follow the pattern `https://github.com/openai/codex/issues/<n>` and 
 1. `/goal <text>` is parsed **on the server** in `sendThreadMessage`, so every surface works the day the server ships, including native iOS and the API. Clients add a picker entry and a status line on top.
 2. One `ThreadGoal` row per bot thread, in Postgres. While a goal is active, every run on that thread carries `goalId`.
 3. When a goal run ends (completed or failed), the worker enqueues `goal.check`. A separate tool-less model call (the **goal check**) reads the goal, the work list, and an **evidence log** of tool results that the executor recorded. It returns `met`, `continue` or `blocked` and cites evidence ids. The server rejects `met` if any cited id does not exist.
-4. On `continue`, the server creates the next run in one transaction under the thread lock. It is an unattended run with a server-written continuation prompt. Writes still raise cards.
+4. On `continue`, the server creates the next run in one transaction under the thread lock, with a server-written continuation prompt. The run gets the same mode as a run started by the owner's message: the bot's allow rules apply, and anything they do not allow raises an approval card, which pauses the goal. Auto Review never decides in a goal run.
 5. A pending card or question pauses the loop by itself, because the run has not ended. Answering it resumes the run, and the check runs when the run ends.
 6. Limits are enforced by the server: 25 continuations, 4 hours and $5 per goal. The **stall counter** counts runs with no tool calls, failed runs and `blocked` verdicts, and resets on a run that makes progress. At 3 the goal ends as blocked.
 7. Stop pauses the goal. The owner's next message resumes it with fresh limits. `/goal clear` ends it.
@@ -191,7 +191,7 @@ goal.check: load goal, evidence and work list ─► goal check model ─► ver
   ```
 
   The run also gets the `GOAL_GUIDANCE` prompt section (§3.6).
-- **Run mode.** The new trigger `goal` makes the run **unattended**, and taint is inherited from the judged run (`newRunExternalTaint` with source). The firewall, taint and meeting-taint rules are unchanged. A goal never approves anything, never adds rules, and never raises proactivity.
+- **Run mode.** A continuation run (trigger `goal`) gets exactly what a run started by the owner's message gets: `unattended: false` and `externalTaint: false`, so the bot's allow rules apply and every other action raises an approval card that pauses the goal. Thread-level meeting taint, the firewall, in-run outside-content taint and the exfiltration rules apply exactly as they do to an owner's run. Auto Review never decides in a goal run, the card keeps its normal buttons, and a goal never approves anything, never adds rules and never raises proactivity.
 
 ### 3.4 Limits
 
@@ -273,7 +273,7 @@ model ThreadGoal {
   - `parseGoalCommand`: set, bare, clear, too long, `/goals x` is not a command, leading whitespace.
   - Limit arithmetic.
   - Verdict validation: unknown ids, `met` without evidence, bad JSON.
-  - `newRunUnattended({trigger: "goal"})` returns true, and taint is inherited.
+  - `newRunUnattended({trigger: "goal"})` and `newRunExternalTaint({trigger: "goal"})` match `trigger: "user"` (both false), and `planActionGate` never uses Auto Review for `goal` runs.
 - **DB / API (integration, Postgres).**
   - `/goal` creates a goal and a run with `goalId`.
   - `/goal` replaces an open goal.
@@ -289,7 +289,7 @@ model ThreadGoal {
   - A card pauses the loop, and approving it resumes the loop.
   - Each limit fires: runs, time (fake clock), spend (seeded `UsageRecord`), and stalls (runs with no tools).
   - A model-error failure ends the goal.
-  - A tainted source gives a tainted continuation, and a write inside a goal run raises a card with no "Always allow".
+  - A continuation run has the owner-message mode. A tool the allow rules do not cover raises a card and pauses the goal, Auto Review is never consulted, and a planted "goal met" inside a tool result does not end the goal without a valid evidence id.
 - **Demo path.** `RAKAZO_GOAL_CHECK=scripted` follows the existing `scripted-auto-review` pattern, so `pnpm demo:up` with the scripted runtime can show set → continue → met by hand, with no model.
 - **UI.**
   - Stories for the goal line (working, paused, waiting on you) and the goal block (met, blocked, limit).
@@ -318,7 +318,7 @@ Acceptance: the DB/API tests in §3.9 pass, and `/goal` typed from any client cr
 **S2. Evidence log, goal check, loop and limits (worker).** This slice adds:
 
 - `Run.goalEvidence` collection in the executor.
-- The `goal.check` job, the LLM and scripted goal-check providers, verdict validation and the continuation run (trigger `goal`, unattended).
+- The `goal.check` job, the LLM and scripted goal-check providers, verdict validation and the continuation run (trigger `goal`, owner-message mode).
 - Limits and the stall counter.
 - A reconciler sweep.
 - The `goal` message block and the end notification, with per-run finish pushes suppressed.
@@ -336,7 +336,7 @@ Acceptance: the worker tests in §3.9 pass, and a hand test in `pnpm demo:up` wi
 
 **S4. Expo mobile.** The same picker entry, goal line (native, using `lib/native` chrome) and block renderer. It also fixes the `runSlashAction` fallthrough and updates i18n.
 
-**S5. Native iOS.** This slice decodes `goal` on `ThreadSnapshot` and the event, adds a goal line in SwiftUI with a native clear button, and renders the `goal` block. The typed command already works after S1. **TBD:** how the Swift decoder treats an unknown block kind before S5 ships. If it fails, S2 must wait for S5 or add a fallback.
+**S5. Native iOS.** This slice decodes `goal` on `ThreadSnapshot` and the event, adds a goal line in SwiftUI with a native clear button, and renders the `goal` block. The typed command already works after S1. Older iOS builds are safe before S5: the Swift decoder maps an unknown block kind to `.unknown`, and `ThreadMessageView` draws an unknown block's `text` field as a footnote (`apps/ios/Packages/RakazoAPI/Sources/RakazoAPI/MessageBlock.swift`, `apps/ios/Sources/Praci/Thread/ThreadMessageView.swift`). The `goal` block therefore always carries a plain `text` field, such as "Goal met. Found 3 suppliers."
 
 **S6. Real-model check and tuning.** This slice adds an eval set under `docs/evals/` and runs it on the default connection. It tunes the rubric and `GOAL_GUIDANCE` and records the measured false-`met` rate and cost per goal. The limits change only if the measurements give a reason.
 
@@ -359,16 +359,16 @@ Every visible word, and why it is needed.
 
 There is no explainer text, no counters on the line, and no settings.
 
-## 6. Decisions for the owner
+## 6. Decisions (made by the owner, 2026-11-05)
 
-| # | Decision | Recommendation | Alternative |
-|---|---|---|---|
-| D1 | Mode of continuation runs | **Unattended**: every write asks, even when the owner set the goal while watching. A loop that runs for hours is the case unattended mode was built for. | Copy the owner's mode. Then files, shell and browser run without asking, even overnight. |
-| D2 | Model for the goal check | **The bot's own connection** (`executor.resolveModel`). No new setting. Costs a little more per check. | Add a generic "check model" to the shared connection settings, which is cheaper but adds UI and a setting. |
-| D3 | Limits | **25 continuations, 4 hours, $5, 3 stalls**, fixed constants, with fresh limits on resume. | Per-goal values in the command (`/goal … for 2h`), as Claude Code suggests. This needs parsing and more copy. |
-| D4 | Resuming a paused goal | **The owner's next message resumes it**, as in Claude Code. There is no `/goal resume`. | An explicit `/goal resume`, so asking a question does not restart the loop. |
-| D5 | Group threads | **Not in v1**, with an error message. | Judge the group's lead bot only. |
-| D6 | Replies during the loop | **Visible**, one line each, as instructed by the guidance. | Silent until the end. Cheaper to read, but the owner cannot see progress without opening the work list. |
+| # | Decision |
+|---|---|
+| D1 | Continuation runs follow the bot's own rules. They get what a run started by the owner's message gets: allow rules apply, and anything not allowed raises an approval card that pauses the goal. Firewall, taint, external-content and exfiltration rules are unchanged. Nothing is ever auto-approved, so Auto Review does not decide in goal runs. |
+| D2 | The bot's own connection (`executor.resolveModel`) runs the goal check, against the evidence log. |
+| D3 | Fixed limits: 25 continuations, 4 hours, $5 and 3 stalls, reset on resume. |
+| D4 | The owner's next message resumes a paused goal. There is no `/goal resume`. |
+| D5 | Goals work only in a bot's own thread in v1. `/goal` in a group returns an error. |
+| D6 | Each goal run replies in one line. |
 
 ## 7. Cut from v1
 
