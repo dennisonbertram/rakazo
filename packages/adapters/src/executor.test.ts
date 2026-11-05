@@ -493,7 +493,7 @@ async function runIdentityExecutor({
       ),
     },
     mcpServer: { findMany: vi.fn(async () => []) },
-    dataRoomItem: { findFirst: dataRoomItemFindFirst },
+    capabilityInstall: { count: vi.fn(async () => 0) },    dataRoomItem: { findFirst: dataRoomItemFindFirst },
     dataRoomFolder: { findMany: vi.fn(async () => []) },
     dataRoomItemText: {
       findFirst: vi.fn(async () => (dataRoomItem ? { text: dataRoomItem.text } : null)),
