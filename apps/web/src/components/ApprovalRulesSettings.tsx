@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { ActionApprovalRule, ApprovalChoice } from "@rakazo/contracts";
+import type { ActionApprovalRule, ApprovalChoice, Bot } from "@rakazo/contracts";
 import {
   actionTypeForTool,
   CHOICE_TO_EFFECT,
@@ -19,8 +19,13 @@ export function ApprovalRulesSettings() {
   const [rules, setRules] = useState<ActionApprovalRule[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [bots, setBots] = useState<Bot[]>([]);
 
   useEffect(() => {
+    rpc.bots
+      .list()
+      .then(setBots)
+      .catch(() => undefined);
     rpc.approvalRules
       .list()
       .then(setRules)
@@ -61,6 +66,10 @@ export function ApprovalRulesSettings() {
 
   // The table owns category rules and bot overrides; the list holds the per-tool and per-connector rules.
   const listedRules = rules.filter((rule) => rule.matchKind !== "category" && !rule.botId);
+  // An agent's "Allow all sites" rule: the owner can only remove it.
+  const agentSiteRules = rules.filter(
+    (rule) => rule.botId && rule.matchKind === "tool" && rule.matchValue === "web_fetch",
+  );
 
   return (
     <div data-testid="action-confirmation-settings">
@@ -77,6 +86,32 @@ export function ApprovalRulesSettings() {
         </Trans>
       </p>
       {error ? <p className="mt-3 text-[13px] text-destructive">{error}</p> : null}
+      {agentSiteRules.length > 0 ? (
+        <ul className="mt-4 space-y-2">
+          {agentSiteRules.map((rule) => (
+            <li
+              key={rule.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border px-3.5 py-2"
+            >
+              <span className="min-w-0 break-words text-[13.5px] text-foreground/75">
+                {bots.find((bot) => bot.id === rule.botId)?.name ?? t`An agent`}
+                <span className="block text-[12px] text-muted-foreground">
+                  <Trans>Fetches any site</Trans>
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0 text-muted-foreground"
+                disabled={saving === rule.id}
+                onClick={() => void removeRule(rule.id)}
+              >
+                <Trans>Remove</Trans>
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {listedRules.length > 0 ? (
         <ul className="mt-4 space-y-2">
           {listedRules.map((rule) => {

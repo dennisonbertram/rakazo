@@ -50,6 +50,7 @@ function formatAnsweredState(
   if (outcome === "cancelled") return t`Cancelled`;
   if (answer === "allow") return waitsFor ? t`Approved here. Waiting for ${waitsFor}` : t`Approved`;
   if (answer === "always") return t`Always allowed`;
+  if (answer === "always_bot_sites") return t`Allowed for all sites`;
   if (answer === "deny") return t`Denied`;
   return t`Answered: ${answer}`;
 }
@@ -65,10 +66,13 @@ function answeredTone(
   if (!approval || outcome === "cancelled" || isClosedApprovalAnswer(answer))
     return { className: "text-muted-foreground" };
   if (answer === "deny") return { className: "text-destructive", Icon: X };
-  if (answer === "allow" || answer === "always")
+  if (answer === "allow" || answer === "always" || answer === "always_bot_sites")
     return { className: "text-foreground", Icon: Check };
   return { className: "text-muted-foreground" };
 }
+
+/** Answers that save a standing permission; shown as quiet links under the one-off answers. */
+const STANDING_ACTIONS: ReadonlySet<string> = new Set(["always", "always_bot_sites"]);
 
 function approvalActionLabel(
   id: string,
@@ -90,6 +94,8 @@ function approvalActionLabel(
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
   if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
   if (id === "deny") return t`Deny`;
+  if (id === "always_bot_sites" && fallback === "Allow all sites for this agent")
+    return t`Allow all sites for this agent`;
   return fallback;
 }
 
@@ -336,12 +342,12 @@ export function AskCard({
           {[...askActions]
             .sort(
               (a, b) =>
-                Number(approvalActions && a.id === "always") -
-                Number(approvalActions && b.id === "always"),
+                Number(approvalActions && STANDING_ACTIONS.has(a.id)) -
+                Number(approvalActions && STANDING_ACTIONS.has(b.id)),
             )
             .map((action) =>
               // A standing permission is a quiet text action under the one-off answers.
-              approvalActions && action.id === "always" ? (
+              approvalActions && STANDING_ACTIONS.has(action.id) ? (
                 <div key={action.id} className="flex flex-wrap items-baseline gap-x-2 px-1 pt-1">
                   <Button
                     variant="link"
@@ -362,9 +368,11 @@ export function AskCard({
                       )
                     )}
                   </Button>
-                  <span className="text-[13px] text-muted-foreground">
-                    <Trans>Won't ask again anywhere in this space.</Trans>
-                  </span>
+                  {action.id === "always" ? (
+                    <span className="text-[13px] text-muted-foreground">
+                      <Trans>Won't ask again anywhere in this space.</Trans>
+                    </span>
+                  ) : null}
                 </div>
               ) : (
                 <Button

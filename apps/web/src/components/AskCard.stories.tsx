@@ -222,6 +222,23 @@ export const ApprovalWithToolId: Story = {
   },
 };
 
+/** A fetch to a site the run was not given: allow once, this site, or every site for this agent. */
+export const NewSiteWithAllSites: Story = {
+  args: {
+    block: ask({
+      text: "Review before Web fetch",
+      approvalEffectId: "effect_demo",
+      site: "npmjs.com",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always", label: "Always allow npmjs.com" },
+        { id: "always_bot_sites", label: "Allow all sites for this agent (it can read mail)" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
 export const ApprovalAlwaysAllowed: Story = {
   args: {
     block: ask({

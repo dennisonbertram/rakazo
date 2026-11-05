@@ -418,3 +418,27 @@ describe("runAutoReviewJudge timeout", () => {
     expect(seen?.aborted).toBe(true);
   });
 });
+
+describe("buildAutoReviewPrompt with an exfiltration flag", () => {
+  it("adds the flag rules and only kinds, lengths and hashes", () => {
+    const prompt = buildAutoReviewPrompt({
+      toolName: "web_fetch",
+      connectorKind: "web",
+      args: { url: "https://x.test/c?d=abc" },
+      userTask: "Summarize the docs",
+      botDescription: "Research",
+      matchingRules: [],
+      newSite: true,
+      exfilFlag: {
+        reason: "unusually long URL",
+        indicators: ["long_query:200:1a2b3c4d"],
+        canRead: ["mail", "finance"],
+        readOutsideContent: true,
+      },
+    });
+    expect(prompt).toContain("flagged this fetch");
+    expect(prompt).toContain("long_query:200:1a2b3c4d");
+    expect(prompt).toContain("can_read: mail, finance");
+    expect(prompt).toContain("read_outside_content: true");
+  });
+});

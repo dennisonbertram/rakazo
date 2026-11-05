@@ -88,6 +88,9 @@ import {
   isLegalAgentSpawnKey,
   isMailAgentSpawnKey,
   isMailThreadAgentSpawnKey,
+  isPublicResearchConnection,
+  isPublicResearchEndpoint,
+  isPublicResearchTool,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
@@ -102,7 +105,7 @@ import {
   VOICE_AGENT_BUILTIN_TOOLS,
   ZERNIO_READ_TOOLS,
 } from "@rakazo/contracts";
-import type { ActionApprovalRule, ToolCallStreak } from "@rakazo/core";
+import type { ActionApprovalRule, ToolCallStreak, UrlVerdict } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
   accountAllowedIn,
@@ -114,13 +117,16 @@ import {
   attachToolNotes,
   BLOCKED_ACTION_MESSAGE,
   blocksToAgentHistoryText,
+  botAllowsAllSites,
   botMayUseConnection,
   botMessageAllowsSilence,
   botUsesConnectorTools,
   CALL_CLIENT_NONCE_PREFIX,
   CHECK_IN_MANAGED_KIND,
   callIdFromClientNonce,
+  checkFetchUrl,
   checkInInstruction,
+  collectStrings,
   connectionAccessFilter,
   connectionRowsForAudience,
   connectorKindFromToolName,
@@ -166,10 +172,12 @@ import {
   plainRunError,
   plainTextFromMarkdown,
   planActionGate,
+  privateDataAreas,
   promptInvokesSkill,
   quietRoutineGuidance,
   redactSecrets,
   renderBotDirectory,
+  repeatsPrivateText,
   resolveActionApproval,
   resolveActionApprovalDetail,
   resolveBotAddress,
@@ -290,6 +298,7 @@ import {
   unattendedEndedToolResult,
   uncertainEffectResult,
 } from "./approval-effect.js";
+import type { AutoReviewChecker } from "./auto-review.js";
 import {
   autoReviewTimeoutMs,
   deploymentAutoReviewDefault,
@@ -2315,6 +2324,34 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ? linkedAppAgentConnection
             : undefined;
         const integrationAgent = integrationSpawnKey && !appAgentIdentity;
+        // A public research agent (Composio Exa or Tavily, or an MCP server on the research list)
+        // that is not firewalled or external. It gets no user memory: its prompt holds nothing
+        // its URLs could repeat. Private access is checked per call (see standingSiteAccess).
+        const publicResearchAgent =
+          integrationSpawnKey && bot.audience !== "external" && bot.firewall !== true
+            ? await (async () => {
+                const own = storedConnections.filter((row) => row.agentBotId === bot.id);
+                const servers = await deps.prisma.mcpServer.findMany({
+                  where: { spaceId: run.spaceId, userId: bot.userId, agentBotId: bot.id },
+                  select: { endpoint: true },
+                });
+                // A directly connected source that is this agent's own, or granted to it, is private
+                // access like a connection grant.
+                const sources = await deps.prisma.capabilityInstall.count({
+                  where: {
+                    spaceId: run.spaceId,
+                    userId: bot.userId,
+                    OR: [{ agentBotId: bot.id }, { botAccess: { some: { botId: bot.id } } }],
+                  },
+                });
+                return (
+                  sources === 0 &&
+                  own.length + servers.length > 0 &&
+                  own.every(isPublicResearchConnection) &&
+                  servers.every((server) => isPublicResearchEndpoint(server.endpoint))
+                );
+              })()
+            : false;
         const financeOnly = isFinanceAgentSpawnKey(bot.spawnKey) || cartaAgent || integrationAgent;
         // The Legal agent works from the Data Room, mail and Drive through its own tools only: no
         // Composio, MCP or other connector tools, and a fixed list of built-ins (read-only mail).
@@ -2411,7 +2448,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           context.mcpServerIds = [...gtmMcpServerIds];
         }
         const memoryScope = configuredMemory
-          ? bot.firewall === true
+          ? bot.firewall === true || publicResearchAgent
             ? "isolated" // never the pool shared across agents
             : effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
@@ -2498,15 +2535,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   const tools = await deps.connector!.discoverTools(scopedContext, [
                     current.connectorId,
                   ]);
+                  // Exa's and Tavily's search and page-read tools are reads whatever the provider declares.
+                  const publicRead = (tool: { name: string; readOnly?: boolean }) =>
+                    tool.readOnly === true ||
+                    (isPublicResearchConnection(current) && isPublicResearchTool(tool.name));
                   return tools
                     .filter((tool) => tool.route?.connectorId === current.connectorId)
-                    .filter((tool) => tool.readOnly === true || current.writesEnabled)
+                    .filter((tool) => publicRead(tool) || current.writesEnabled)
                     .map((tool) => ({
                       ...tool,
                       route: {
                         ...tool.route!,
                         connectionId: current.id,
-                        discoveredReadOnly: tool.readOnly === true,
+                        discoveredReadOnly: publicRead(tool),
                       },
                     }));
                 }
@@ -2626,6 +2667,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           companyImporter ||
           meetingAgent ||
           bot.firewall === true ||
+          // A public research agent fetches freely, so company facts must not sit in its prompt.
+          publicResearchAgent ||
           run.externalTaint === true ||
           externalTaint()
         );
@@ -2642,7 +2685,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           // Read from the database on every attempt; never stored in the bot's instructions.
           companyContextAllowed
-            ? loadCompanyContextIndex(deps.memory, context, (text) => redactSecrets(text, runSecrets))
+            ? loadCompanyContextIndex(deps.memory, context, (text) =>
+                redactSecrets(text, runSecrets),
+              )
             : Promise.resolve(undefined),
           messagingChannelRun || voiceAgent || restrictedContext || companyAgent || companyImporter
             ? Promise.resolve("")
@@ -2652,7 +2697,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 bot.id,
                 context,
                 undefined,
-                bot.firewall !== true,
+                bot.firewall !== true && !publicResearchAgent,
               ),
           messagingChannelRun || voiceAgent || companyAgent || companyImporter
             ? Promise.resolve("")
@@ -3350,6 +3395,111 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
             })
             .then((rows) => rows.map((row) => withInboxAgentStandIn(row, bot)));
+        // The Auto Review provider for this run: the injected one, or one built from the deployment's
+        // setting (`llm` or `jev`; both stay behind the AutoReviewProvider interface).
+        const buildReviewProvider = async (
+          injected: AutoReviewProvider | undefined,
+          checker: AutoReviewChecker | null | undefined,
+        ): Promise<AutoReviewProvider> => {
+          let provider = injected;
+          if (!provider) {
+            const kind = resolveAutoReviewProviderKind();
+            if (kind === "jev" || kind === "scripted") {
+              provider = createAutoReviewProvider(kind);
+            } else {
+              const reviewCredential = await findModelCredential(
+                deps.prisma,
+                { userId: run.userId, spaceId: run.spaceId },
+                checker!.provider,
+                checker!.model,
+              );
+              const judgeKey = await resolveModelKey(
+                deps,
+                run.userId,
+                run.spaceId,
+                reviewCredential,
+                checker!.provider,
+                checker!.model,
+                (values) => runSecrets.push(...values),
+              );
+              provider = createAutoReviewProvider("llm", {
+                llm: {
+                  onUsage: (event) =>
+                    recordUsage(deps.prisma, event, {
+                      spaceId: run.spaceId,
+                      userId: run.userId,
+                      botId: bot.id,
+                      parentRunId: runId,
+                      runId,
+                      operationId: `auto-review:${runId}`,
+                      operationKind: "setup",
+                    }),
+                  runtime: deps.runtime,
+                  checker: checker!,
+                  apiKey: judgeKey.oauth ? undefined : judgeKey.apiKey,
+                  accountId: judgeKey.accountId,
+                  gatewayId: judgeKey.gatewayId,
+                  baseUrl: judgeKey.baseUrl,
+                  cacheCapabilities: judgeKey.cacheCapabilities,
+                  contextWindow: judgeKey.contextWindow,
+                  maxTokens: judgeKey.maxTokens,
+                  reasoning: judgeKey.reasoning,
+                  oauth: judgeKey.oauth
+                    ? {
+                        credential: judgeKey.oauth,
+                        persist: judgeKey.persistOAuth,
+                        retire: judgeKey.retireOAuth,
+                      }
+                    : undefined,
+                  runId,
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  botId: bot.id,
+                  threadId: thread.id,
+                  timeoutMs: autoReviewTimeoutMs(),
+                },
+              });
+            }
+          }
+          return provider!;
+        };
+        // Whether this bot may fetch a new site without asking, and what private data it can read
+        // (shown on the "Allow all sites" card). Read at each call; see the siteGate comment.
+        const standingSiteAccess = async (): Promise<{
+          standing: boolean;
+          publicResearch: boolean;
+          offerAllSites: boolean;
+          privateAccess: string[];
+        }> => {
+          const none = {
+            standing: false,
+            publicResearch: false,
+            offerAllSites: false,
+            privateAccess: [] as string[],
+          };
+          if (
+            run.trigger === "webhook" ||
+            run.externalTaint === true ||
+            externalTaint() ||
+            bot.audience === "external" ||
+            externalChain !== undefined ||
+            (await firewallNow())
+          ) {
+            return none;
+          }
+          const privateAccess = privateDataAreas(builtins.map((tool) => tool.name));
+          const rows = await connectionRowsStored();
+          const granted = rows.some((row) => row.agentBotId !== bot.id && row.botAccess.length > 0);
+          if (granted) privateAccess.push("connected apps");
+          const publicResearch = publicResearchAgent && privateAccess.length === 0 && !granted;
+          const chosen = botAllowsAllSites(await loadApprovalRules(), bot.id);
+          return {
+            standing: chosen || publicResearch,
+            publicResearch,
+            offerAllSites: true,
+            privateAccess,
+          };
+        };
         // What the access rules see: "all agents" does not reach an external or firewalled bot.
         const connectionRowsNow = async () => {
           const firewalled = await firewallNow();
@@ -5136,13 +5286,40 @@ export function createRunExecutor(deps: ExecutorDeps) {
               } else firewallAskCall = true;
             }
           }
-          const requiresUnattendedApproval = unattendedToolRequiresApproval(
-            run.unattended,
-            name,
-            viaConnector,
-            declaredReadOnly,
-            policyArgs,
-          );
+          // A public research agent's own search and page-read tools (Composio Exa or Tavily, or an
+          // MCP server on the research list) run without a card, from any trigger but a webhook or
+          // a tainted run. The arguments (query, URLs) are checked against the private text the run
+          // read or was sent; a match, or an unknown record, leaves the usual card.
+          const researchRoute = viaConnector
+            ? (resolvedTool ?? connectorTools.get(name))?.route
+            : undefined;
+          const publicResearchRead =
+            viaConnector &&
+            publicResearchAgent &&
+            declaredReadOnly !== false &&
+            researchRoute !== undefined &&
+            (researchRoute.connectorId === "mcp"
+              ? isPublicResearchEndpoint(researchRoute.endpoint)
+              : researchRoute.connectorId === "composio" &&
+                researchRoute.connectionId === linkedAppAgentConnection?.id) &&
+            isPublicResearchTool(researchRoute.toolName ?? name) &&
+            (await (async () => {
+              if (!(await standingSiteAccess()).publicResearch) return false;
+              const fragments = await outboundFragments();
+              return (
+                Boolean(fragments) &&
+                !collectStrings(args).some((text) => repeatsPrivateText(text, fragments!))
+              );
+            })());
+          const requiresUnattendedApproval =
+            !publicResearchRead &&
+            unattendedToolRequiresApproval(
+              run.unattended,
+              name,
+              viaConnector,
+              declaredReadOnly,
+              policyArgs,
+            );
           const connectorKind = connectorKindFromToolName(
             name,
             connectedPlugins.map((plugin) => plugin.provider),
@@ -5197,7 +5374,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botId: bot.id,
           });
           const connectorTrust = connectorTrustKey(connectorCall.route, connectorKind);
-          const siteGate =
+          let siteGate =
             fetchUrl && fetchSite
               ? outboundSiteGate({
                   site: fetchSite,
@@ -5206,6 +5383,84 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   rules: approvalRules.filter((rule) => !rule.botId || rule.botId === bot.id),
                 })
               : "allow";
+          // A new site the agent may fetch without asking: the owner chose "Allow all sites for
+          // this agent", or the agent is a public research agent holding no private access. Never
+          // for a firewalled, external or tainted run or a webhook run, and never when the URL
+          // repeats private data this run read or was sent (an unknown record also holds it).
+          const standingSites =
+            siteGate === "new" && name === "web_fetch" && fetchUrl
+              ? await standingSiteAccess()
+              : undefined;
+          let standingHold: Extract<UrlVerdict, { verdict: "fragment" | "suspicious" }> | undefined;
+          let standingNote = "clean";
+          if (standingSites?.standing) {
+            const verdict = checkFetchUrl(fetchUrl!, await outboundFragments());
+            if (verdict.verdict === "clean") siteGate = "allow";
+            else standingHold = verdict;
+            // The optional Auto Review provider may clear a URL flagged for its shape, never one
+            // that repeats private text. It gets the URL, the owner's own words and an outline
+            // (kinds of data the agent can read, short hashes of flagged tokens), never the run's
+            // private text. Any doubt, error or missing provider leaves the card.
+            if (verdict.verdict === "suspicious") {
+              const checker = resolveAutoReviewChecker();
+              const available =
+                (await loadAutoReviewPreference()) &&
+                (Boolean(deps.autoReview) ||
+                  (checker !== null &&
+                    (isAutoReviewCheckerConfigured({}) ||
+                      Boolean(
+                        await findModelCredential(
+                          deps.prisma,
+                          { userId: run.userId, spaceId: run.spaceId },
+                          checker.provider,
+                        ),
+                      ))));
+              if (available) {
+                try {
+                  const provider = await buildReviewProvider(deps.autoReview, checker);
+                  const judged = await provider.review(
+                    {
+                      toolName: "web_fetch",
+                      connectorKind: "web",
+                      args: { url: redactSecrets(fetchUrl!, runSecrets) },
+                      userTask: redactSecrets(await loadOwnerWords(), runSecrets),
+                      botDescription: redactSecrets(
+                        `${bot.name}: ${bot.title}\n${bot.description}`,
+                        runSecrets,
+                      ),
+                      matchingRules: [],
+                      newSite: true,
+                      exfilFlag: {
+                        reason: verdict.reason,
+                        indicators: verdict.indicators,
+                        canRead: standingSites.privateAccess,
+                        readOutsideContent: await isOutsideContentSeen(),
+                      },
+                    },
+                    {
+                      operationId: `auto-review:${runId}`,
+                      traceId: `auto-review:${runId}`,
+                      spaceId: run.spaceId,
+                      userId: run.userId,
+                      botId: bot.id,
+                      runId,
+                      signal: AbortSignal.any([
+                        context.signal,
+                        AbortSignal.timeout(autoReviewTimeoutMs()),
+                      ]),
+                    },
+                  );
+                  standingNote = `classifier ${judged.decision}`;
+                  if (judged.decision === "pass") {
+                    siteGate = "allow";
+                    standingHold = undefined;
+                  }
+                } catch {
+                  standingNote = "classifier error";
+                }
+              }
+            }
+          }
           // Once outside content is in the run, injected text could choose a connector read's
           // arguments, so a read on a connector this run had not used yet is treated as a write.
           const connectorReadGated =
@@ -5216,7 +5471,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               connectorTrusted: (await loadTrustedConnectors()).has(connectorTrust),
             });
           const runTainted = run.externalTaint === true || externalTaint();
-          const recordDecision = async (decision: "allow" | "ask" | "block", source: string) => {
+          const recordDecision = async (
+            decision: "allow" | "ask" | "block",
+            source: string,
+            extra?: Record<string, unknown>,
+          ) => {
             try {
               await deps.events.append({
                 spaceId: run.spaceId,
@@ -5231,12 +5490,27 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   source,
                   unattended: run.unattended === true,
                   tainted: runTainted,
+                  ...extra,
                 },
               });
             } catch (error) {
               getLogger().warn("approval decision not recorded", { runId: run.id, error });
             }
           };
+          // Every fetch under a standing site allowance is logged with its decision, never the URL.
+          if (standingSites?.standing && fetchSite) {
+            await recordDecision(standingHold ? "ask" : "allow", "all_sites", {
+              site: fetchSite,
+              reason: standingHold
+                ? [standingHold.reason, standingNote === "clean" ? "" : standingNote]
+                    .filter(Boolean)
+                    .join("; ")
+                : standingNote,
+              ...(standingHold?.verdict === "suspicious"
+                ? { indicators: standingHold.indicators }
+                : {}),
+            });
+          }
           // A Block rule beats every ask and every approved-but-unrun effect: no card, no effect.
           if (
             approvalResolved.decision === "block" ||
@@ -5311,7 +5585,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               siteGate === "new" ||
               connectorReadGated ||
               scheduleAsks ||
-              toolRequiresApproval(name, viaConnector, declaredReadOnly));
+              (!publicResearchRead && toolRequiresApproval(name, viaConnector, declaredReadOnly)));
           const callRoute = (resolvedTool ?? connectorTools.get(name))?.route;
           // A write through a connector (Composio, Pipedream, also via the catalog wrapper) on a
           // connection that has its own agent is by another bot: it always asks, whatever saved rule matches.
@@ -5343,13 +5617,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return rows.some((row) => row.agentBotId !== null);
           })();
           // Integration-agent writes use the shared preset classification and always show the full call.
-          const integrationWriteTool = isIntegrationAgentWrite(
-            bot.spawnKey,
-            callRoute,
-            declaredReadOnly,
-          )
-            ? callRoute?.toolName
-            : undefined;
+          const integrationWriteTool =
+            !publicResearchRead &&
+            isIntegrationAgentWrite(bot.spawnKey, callRoute, declaredReadOnly)
+              ? callRoute?.toolName
+              : undefined;
           // A run that read a meeting agent's reply holds untrusted meeting text: every call that
           // writes, sends or reaches the network asks, on a card that cannot become a saved rule.
           // Read at each call, so a run that is marked mid-way (a reply arrives) asks from then on.
@@ -5408,6 +5680,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             })());
           const requiresMandatoryApproval =
             requiresUnattendedApproval ||
+            // A fetch the exfiltration check held is never cleared by a saved rule or another review.
+            standingHold !== undefined ||
             mailModifyNeedsToolRule ||
             protectedArchive ||
             scheduleNamesNewSite ||
@@ -5573,66 +5847,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   AbortSignal.timeout(autoReviewTimeoutMs()),
                 ]),
               };
-              let provider = injectedReview;
-              if (!provider) {
-                const kind = resolveAutoReviewProviderKind();
-                if (kind === "jev" || kind === "scripted") {
-                  provider = createAutoReviewProvider(kind);
-                } else {
-                  const reviewCredential = await findModelCredential(
-                    deps.prisma,
-                    { userId: run.userId, spaceId: run.spaceId },
-                    checker!.provider,
-                    checker!.model,
-                  );
-                  const judgeKey = await resolveModelKey(
-                    deps,
-                    run.userId,
-                    run.spaceId,
-                    reviewCredential,
-                    checker!.provider,
-                    checker!.model,
-                    (values) => runSecrets.push(...values),
-                  );
-                  provider = createAutoReviewProvider("llm", {
-                    llm: {
-                      onUsage: (event) =>
-                        recordUsage(deps.prisma, event, {
-                          spaceId: run.spaceId,
-                          userId: run.userId,
-                          botId: bot.id,
-                          parentRunId: runId,
-                          runId,
-                          operationId: `auto-review:${runId}`,
-                          operationKind: "setup",
-                        }),
-                      runtime: deps.runtime,
-                      checker: checker!,
-                      apiKey: judgeKey.oauth ? undefined : judgeKey.apiKey,
-                      accountId: judgeKey.accountId,
-                      gatewayId: judgeKey.gatewayId,
-                      baseUrl: judgeKey.baseUrl,
-                      cacheCapabilities: judgeKey.cacheCapabilities,
-                      contextWindow: judgeKey.contextWindow,
-                      maxTokens: judgeKey.maxTokens,
-                      reasoning: judgeKey.reasoning,
-                      oauth: judgeKey.oauth
-                        ? {
-                            credential: judgeKey.oauth,
-                            persist: judgeKey.persistOAuth,
-                            retire: judgeKey.retireOAuth,
-                          }
-                        : undefined,
-                      runId,
-                      spaceId: run.spaceId,
-                      userId: run.userId,
-                      botId: bot.id,
-                      threadId: thread.id,
-                      timeoutMs: autoReviewTimeoutMs(),
-                    },
-                  });
-                }
-              }
+              const provider = await buildReviewProvider(injectedReview, checker);
               const judge = await provider.review(reviewRequest, reviewContext);
               if (context.signal.aborted) return;
               reviewReason = judge.reason;
@@ -5727,7 +5942,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ? MEETING_MARK_REASON
                   : approvalResolved.source === "require_approval" && actionType
                     ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
-                    : undefined;
+                    : standingHold
+                      ? `Held before fetching: ${standingHold.reason}.`
+                      : undefined;
           // Record each decision once; a replay of the same effect already has its event.
           if (
             !applied?.duplicate &&
@@ -5841,6 +6058,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
               meetingTaintedCall || externalTaintedCall
                 ? undefined
                 : await resolveMoneyNames(callRoute?.toolName ?? name, args, readApprovalName);
+            const noAlwaysAllow =
+              standingHold !== undefined ||
+              desktopReadSearch ||
+              meetingTaintedCall ||
+              externalTaintedCall ||
+              requiresUnattendedApproval ||
+              runTainted ||
+              COMPANY_TOOL_NAMES.has(name);
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
               // The card's reason line already says "Requested by an external bot".
               reviewReason:
@@ -5854,15 +6079,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 (name === "company_fact_upsert" || name === "company_import_start") &&
                 COMPANY_TOOL_NAMES.has(name),
               integrationWriteTool,
+              allSites:
+                !noAlwaysAllow &&
+                siteGate === "new" &&
+                standingSites?.offerAllSites &&
+                !standingSites.standing
+                  ? { privateAccess: standingSites.privateAccess }
+                  : undefined,
               approvalReason: approvalCardReason,
               mailBatch: preparedMailBatch,
-              noAlwaysAllow:
-                desktopReadSearch ||
-                meetingTaintedCall ||
-                externalTaintedCall ||
-                requiresUnattendedApproval ||
-                runTainted ||
-                COMPANY_TOOL_NAMES.has(name),
+              noAlwaysAllow,
               serviceName: callRoute?.serverName,
               mailAccount:
                 meetingTaintedCall || externalTaintedCall ? undefined : await approvalMailAccount(),
@@ -8693,6 +8919,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   select: {
                     id: true,
                     connectorId: true,
+                    provider: true,
                     allAgents: true,
                     writesEnabled: true,
                     botAccess: {
@@ -8709,7 +8936,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ) {
                   return "This connected account is no longer available to the agent.";
                 }
-                if (declaredReadOnly !== true && !current.writesEnabled) {
+                if (
+                  declaredReadOnly !== true &&
+                  !current.writesEnabled &&
+                  !(
+                    isPublicResearchConnection(current) &&
+                    isPublicResearchTool(dispatchRoute?.toolName ?? name)
+                  )
+                ) {
                   return "Changes are off for this connected account.";
                 }
               }
