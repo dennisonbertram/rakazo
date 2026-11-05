@@ -210,9 +210,10 @@ export interface AnswerRunInput {
   /** Only for a login card; `answer` carries its password. */
   username?: string;
   /**
-   * The person edited a mail approval and sends it themselves, through the compose path, after
-   * this denial. Only a "deny" by the run's own user on a pending mail approval takes it: `note`
-   * becomes the denied tool's result, and `mail` is what the card then shows.
+   * The person edited a mail approval and sends it themselves, through the compose path. Only a
+   * "deny" by the run's own user on a pending mail approval takes it. It stops the agent's own call
+   * from running: the effect is denied only until setMailApprovalOutcome settles it, and the card
+   * records "allow". `note` is the agent's result meanwhile, and `mail` is what the card then shows.
    */
   mailDenial?: { note: string; mail: Partial<MailApproval> };
 }
@@ -745,6 +746,16 @@ export async function setApprovalWaitsFor(
   if (committed) await notifyRealtime(realtime, committed.threadId, committed.seq);
 }
 
+function cardSendSettled(outcome: SetMailApprovalOutcomeInput["outcome"], note: string) {
+  if (outcome === "sent" || outcome === "saved") {
+    return { status: "completed", result: { ok: true, note, outcome } };
+  }
+  if (outcome === "unknown") {
+    return { status: "uncertain", result: { error: note, note, outcome, uncertain: true } };
+  }
+  return { status: "completed", result: { error: note, note, outcome } };
+}
+
 /** Records how the person's own send of an edited mail approval ended, for the card to show. */
 export async function setMailApprovalOutcome(
   prisma: PrismaClient,
@@ -770,7 +781,9 @@ export async function setMailApprovalOutcome(
     if (input.note) {
       await tx.externalEffect.updateMany({
         where: { id: input.effectId, spaceId: input.spaceId, status: "denied" },
-        data: { result: { note: input.note, outcome: input.outcome } },
+        // The card send has ended, so the effect stops being a denial and says what happened: this
+        // status and result are what the agent reads, here and when it resumes from a checkpoint.
+        data: cardSendSettled(input.outcome, input.note),
       });
     }
     if (!input.messageId) return null;

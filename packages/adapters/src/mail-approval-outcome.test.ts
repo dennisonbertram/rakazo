@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { resolveDuplicateEffectGate } from "./approval-effect.js";
 import {
   approvedMailOutcome,
+  isCardMailSend,
   mailApprovalAgentNote,
   mailSendRefusal,
 } from "./mail-approval-recovery.js";
@@ -51,6 +53,43 @@ describe("mailSendRefusal", () => {
     const sent = effect("denied", { note: mailApprovalAgentNote(true, "sent"), outcome: "sent" });
     const again = { ...reply, body: "Hi Sam, 10am works. Best, Alex" };
     expect(mailSendRefusal(again, [sent], "r1")).toMatch(/already sent/);
+  });
+
+  it("refuses any repeat of a card send stored as completed or uncertain", () => {
+    const sent = effect("completed", {
+      ok: true,
+      note: mailApprovalAgentNote(true, "sent"),
+      outcome: "sent",
+    });
+    const again = { ...reply, body: "Hi Sam, 10am works. Best, Alex" };
+    expect(mailSendRefusal(again, [sent], "r1")).toMatch(/already sent/);
+    const unknown = effect("uncertain", { error: "n", outcome: "unknown", uncertain: true });
+    expect(mailSendRefusal(again, [unknown], "r1")).toMatch(/may not have gone out/);
+  });
+
+  it("names who the email went to and from which account, and reads as sent", () => {
+    const note = mailApprovalAgentNote(true, "sent", false, {
+      to: ["pat@example.test", "robin@example.test"],
+      from: "me@example.test",
+    });
+    expect(note).toContain(
+      "This email was sent to pat@example.test, robin@example.test from me@example.test.",
+    );
+    expect(note).toContain("Do not send it again.");
+    expect(note).not.toMatch(/deni|declin|discard/i);
+    expect(
+      resolveDuplicateEffectGate({ status: "completed", result: { ok: true, note } }, "mail_send"),
+    ).toEqual({ action: "return", result: { ok: true, note } });
+  });
+
+  it("tells a card send from a real denial, so one does not stop a different email", () => {
+    expect(isCardMailSend({ note: "x", outcome: "sent" })).toBe(true);
+    expect(isCardMailSend({ note: "x", outcome: "failed" })).toBe(true);
+    expect(isCardMailSend({ note: mailApprovalAgentNote(true) })).toBe(true);
+    expect(isCardMailSend({ note: mailApprovalAgentNote(true, undefined, false) })).toBe(true);
+    expect(isCardMailSend({ note: mailApprovalAgentNote(false) })).toBe(true);
+    expect(isCardMailSend(null)).toBe(false);
+    expect(isCardMailSend({ note: "Skipped by the user." })).toBe(false);
   });
 
   it("refuses while the user's own send is still in flight", () => {
