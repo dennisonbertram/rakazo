@@ -35,6 +35,7 @@ import type {
 } from "@rakazo/adapter-kit";
 import {
   DEFAULT_CONTEXT_STRATEGY,
+  goalCheckJob,
   historyCompactJob,
   isOutOfCredit,
   MEMORY_KINDS,
@@ -115,6 +116,7 @@ import {
   ACTIVE_RUN_STATUSES,
   accountAllowedIn,
   actionTypeForTool,
+  appendGoalEvidence,
   appendTextSegment,
   appendToolCallSegment,
   applyJudgeDecision,
@@ -149,6 +151,7 @@ import {
   firewallToolClass,
   formatSkillRunPrompt,
   formatSkillsCatalogInstruction,
+  GOAL_GUIDANCE,
   GOOGLE_BUILTIN_WRITES,
   GTM_PAGE_INSTRUCTIONS,
   humanizeToolName,
@@ -173,6 +176,7 @@ import {
   outboundSiteGate,
   ownsLine,
   PrivateFragments,
+  parseGoalEvidence,
   parseSkillMd,
   plainRunError,
   plainTextFromMarkdown,
@@ -311,6 +315,7 @@ import {
   autoReviewTimeoutMs,
   deploymentAutoReviewDefault,
   isAutoReviewCheckerConfigured,
+  redactNestedReviewValue,
   redactToolArgsForReview,
   resolveAutoReviewChecker,
   resolveAutoReviewProviderKind,
@@ -2907,6 +2912,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               .enqueue(runContinueJob(failed.continuationRunId))
               .catch((error) => getLogger().error("steering continuation enqueue", error));
           }
+          await enqueueGoalCheck(deps, run);
           if (run.trigger === "bot_message") {
             await returnBotMessageOutcome(
               deps,
@@ -3033,6 +3039,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // same consent; the owner's own run user holds it.
           (run.trigger === "user" ||
             run.trigger === "follow_up" ||
+            run.trigger === "goal" ||
             (run.trigger === "bot_message" && peerMessage?.ownerOrigin === true)) &&
           selected.provider;
         const consentUserId = run.trigger === "bot_message" ? run.userId : bot.userId;
@@ -3403,7 +3410,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         } | null> => {
           // In a chat the mail goes to the model running this chat, so that recipient is the one that
           // needs consent. Background runs keep the Inbox's own check.
-          if (run.trigger === "user") {
+          if (run.trigger === "user" || run.trigger === "goal") {
             try {
               const recipient = aiRecipient({
                 provider: runModelProvider,
@@ -4146,7 +4153,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ];
         const gtmPostEligible =
           run.trigger !== "created" &&
-          ["user", "follow_up", "routine"].includes(run.trigger) &&
+          ["user", "follow_up", "goal", "routine"].includes(run.trigger) &&
           gtmAgent &&
           bot.userId === run.userId &&
           bot.archivedAt === null &&
@@ -4753,6 +4760,60 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           return result;
         };
+        // A goal run keeps what its tool calls returned, for the goal check that judges it. The log
+        // survives a pause for approval because each call is written to the run as it completes.
+        let goalEvidence = run.goalId ? parseGoalEvidence(run.goalEvidence) : [];
+        let goalEvidenceWrite: Promise<unknown> = Promise.resolve();
+        const recordGoalEvidence = (
+          name: string,
+          args: Record<string, unknown>,
+          result: unknown,
+          thrown?: unknown,
+        ) => {
+          // Redact the values before JSON escapes them: a secret with a quote or backslash no
+          // longer matches once serialized.
+          const show = (value: unknown) => {
+            try {
+              const json = JSON.stringify(value);
+              return json === undefined
+                ? ""
+                : JSON.stringify(redactNestedReviewValue(JSON.parse(json), runSecrets));
+            } catch {
+              return "[unserializable]";
+            }
+          };
+          const failed = thrown !== undefined || toolResultError(result) !== undefined;
+          goalEvidence = appendGoalEvidence(goalEvidence, {
+            tool: redactSecrets(name, runSecrets),
+            args: show(redactToolArgsForReview(args, runSecrets)),
+            ok: !failed,
+            result: thrown !== undefined ? show({ error: String(thrown) }) : show(result),
+          });
+          const snapshot = goalEvidence;
+          goalEvidenceWrite = goalEvidenceWrite
+            .then(() =>
+              deps.prisma.run.updateMany({
+                where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },
+                data: { goalEvidence: snapshot },
+              }),
+            )
+            .catch((error: unknown) => getLogger().warn("goal evidence write failed", { error }));
+        };
+        // The owner can set a goal while this run is live; the send path then points the run's row
+        // at it. Read the row before each call so Auto Review, evidence and the end-of-run goal
+        // check follow the row, not the copy read when the run started.
+        const refreshGoalId = async () => {
+          if (run.goalId) return;
+          try {
+            const row = await deps.prisma.run.findUnique({
+              where: { id: runId },
+              select: { goalId: true },
+            });
+            if (row?.goalId) run.goalId = row.goalId;
+          } catch (error) {
+            getLogger().warn("goal id refresh failed", { error });
+          }
+        };
         const applyTool = async (
           name: string,
           args: Record<string, unknown>,
@@ -4760,8 +4821,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           route?: unknown,
           observer?: AgentToolExecutionObserver,
         ) => {
+          await refreshGoalId();
           try {
             const result = await applyToolCall(name, args, executionId, route, observer);
+            if (run.goalId && !isToolPauseResult(result)) recordGoalEvidence(name, args, result);
             if (!isToolPauseResult(result) && !NO_FRAGMENT_TOOLS.has(name)) {
               const text = JSON.stringify(result);
               if (PUBLIC_RESULT_TOOLS.has(name)) privateFragments.addPublic(text);
@@ -4774,6 +4837,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               );
             }
             return result;
+          } catch (error) {
+            if (run.goalId && !context.signal.aborted)
+              recordGoalEvidence(name, args, undefined, error);
+            throw error;
           } finally {
             if (toolResultTaintsRun(name)) outsideContentSeen = true;
             settleReadEffect.delete(executionId);
@@ -4997,7 +5064,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               bot.archivedAt !== null ||
               bot.audience === "external" ||
               thread.groupId ||
-              !["user", "follow_up", "routine"].includes(run.trigger)
+              !["user", "follow_up", "goal", "routine"].includes(run.trigger)
             ) {
               return { error: "GTM posting is unavailable for this run." };
             }
@@ -5578,6 +5645,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             if (verdict.verdict === "suspicious") {
               const checker = resolveAutoReviewChecker();
               const available =
+                !run.goalId &&
                 (await loadAutoReviewPreference()) &&
                 (Boolean(deps.autoReview) ||
                   (checker !== null &&
@@ -5950,16 +6018,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
               : firewallLifted && !approvalResolved.matchingRules.length
                 ? { decision: "allow" as const, source: "default" as const, matchingRules: [] }
                 : approvalResolved;
+          // A goal run never uses Auto Review: nothing it does is approved by a model.
           const autoReviewPref =
-            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+            requiresMandatoryApproval || run.goalId || (run.unattended && !routineReviewRead)
               ? false
               : await loadAutoReviewPreference();
           const injectedReview =
-            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+            requiresMandatoryApproval || run.goalId || (run.unattended && !routineReviewRead)
               ? undefined
               : deps.autoReview;
           const checker =
-            requiresMandatoryApproval || (run.unattended && !routineReviewRead)
+            requiresMandatoryApproval || run.goalId || (run.unattended && !routineReviewRead)
               ? undefined
               : resolveAutoReviewChecker();
           const checkerConfigured =
@@ -5987,6 +6056,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   autoReviewEnabled: autoReviewPref,
                   checkerConfigured,
                   unattended: run.unattended,
+                  goalRun: Boolean(run.goalId),
                   routineRead: routineReviewRead,
                   newDestination: siteGate === "new",
                 });
@@ -6482,7 +6552,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           };
           let delegatesToInbox = false;
           let delegatesToModel = false;
-          if (name === "message_bot" && (run.trigger === "user" || run.trigger === "follow_up")) {
+          if (
+            name === "message_bot" &&
+            (run.trigger === "user" || run.trigger === "follow_up" || run.trigger === "goal")
+          ) {
             const owned = await deps.prisma.bot.findMany({
               where: { spaceId: run.spaceId, userId: run.userId, archivedAt: null },
               select: { id: true, name: true, spawnKey: true },
@@ -7578,7 +7651,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               if (
                 consentBlock.recipient &&
                 !claimedEffect &&
-                run.trigger === "user" &&
+                (run.trigger === "user" || run.trigger === "goal") &&
                 READ_ONLY_AGENT_TOOLS.has(name)
               ) {
                 const asked = await askMailConsent(consentBlock.recipient);
@@ -9768,7 +9841,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         : undefined,
                     quietGuidance,
                     routineRun: run.trigger === "routine",
+                    goalRun: Boolean(run.goalId),
                     tenacity: tenacityLevelFor({
+                      goalRun: Boolean(run.goalId),
                       proactivity: bot.proactivity,
                       restricted:
                         bot.firewall === true ||
@@ -10273,6 +10348,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   toolCallStreak.count,
                 );
                 await settleRunningHelpers();
+                await goalEvidenceWrite;
                 const stopped = await deps.events.finalizeRun({
                   spaceId: run.spaceId,
                   threadId: thread.id,
@@ -10299,6 +10375,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     .enqueue(runContinueJob(stopped.continuationRunId))
                     .catch((error) => getLogger().error("steering continuation enqueue", error));
                 }
+                await enqueueGoalCheck(deps, run);
                 if (run.trigger === "bot_message") {
                   await returnBotMessageOutcome(
                     deps,
@@ -10551,6 +10628,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ? botMessageOutcomeFromMidTurn(text, midTurnUserTexts)
               : null;
           await settleRunningHelpers();
+          await goalEvidenceWrite;
           const completed = await deps.events.finalizeRun({
             spaceId: run.spaceId,
             threadId: thread.id,
@@ -10580,6 +10658,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               .enqueue(runContinueJob(completed.continuationRunId))
               .catch((error) => getLogger().error("steering continuation enqueue", error));
           }
+          await enqueueGoalCheck(deps, run);
           if (botMessageOutcome) {
             // Prefer the final reply. If the turn only posted mid-turn progress, return that
             // text explicitly as status. Delivery uses a stable auto-outcome key; mark
@@ -10603,10 +10682,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // The text was held for the owner's approval: no push may preview it. The held share has
           // its own notification, which names the recipient only.
           const notifyBody = heldForOwner ? "" : completionNotificationPreview(text);
+          // A goal run sends no finish push; the goal's end sends the one notification.
           if (
             runSendsFinishNotification(run.trigger) &&
             notifyBody &&
-            !completed.continuationRunId
+            !completed.continuationRunId &&
+            !run.goalId
           ) {
             await notifyRun(deps, run, {
               kind: "completion",
@@ -10682,6 +10763,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const { message, rawMessage } = failure;
           if (message !== rawMessage) getLogger().error("run failed", { runId, error: rawMessage });
           await settleRunningHelpers();
+          await goalEvidenceWrite;
           await failRun(deps, run, bot, attempt.id, workerId, fence, message, error);
           // A refusal of the deployment's own key is the operator's problem, not the user's.
           if (
@@ -10965,7 +11047,10 @@ async function runNotice(
   };
 }
 
-async function threadHoldsMeetingText(deps: ExecutorDeps, threadId: string): Promise<boolean> {
+async function threadHoldsMeetingText(
+  deps: Pick<ExecutorDeps, "prisma">,
+  threadId: string,
+): Promise<boolean> {
   try {
     const row = await deps.prisma.thread.findUnique({
       where: { id: threadId },
@@ -11064,8 +11149,8 @@ async function notifyFailedRoutineRun(
   );
 }
 
-async function notifyRun(
-  deps: ExecutorDeps,
+export async function notifyRun(
+  deps: Pick<ExecutorDeps, "prisma" | "notificationEvents">,
   run: {
     id?: string;
     spaceId: string;
@@ -11414,6 +11499,7 @@ export function selectBuiltinToolsForRun(options: {
       (!options.gtmAgent ||
         options.trigger === "user" ||
         options.trigger === "follow_up" ||
+        options.trigger === "goal" ||
         !["request_takeover", "request_secret"].includes(tool.name)) &&
       (options.ticketBoardEnabled ||
         (tool.name !== "board_tickets" && !tool.name.startsWith("ticket_"))) &&
@@ -11654,9 +11740,13 @@ export function tenacityGuidance(level: TenacityLevel): string {
 export function tenacityLevelFor(input: {
   proactivity: string | undefined;
   restricted: boolean;
+  /** A goal run is an explicit request to keep going, so a low agent works at medium. */
+  goalRun?: boolean;
 }): TenacityLevel {
   if (input.restricted) return "limited";
-  return input.proactivity === "low" || input.proactivity === "high" ? input.proactivity : "medium";
+  if (input.proactivity === "high") return "high";
+  if (input.proactivity === "low" && !input.goalRun) return "low";
+  return "medium";
 }
 
 function toolUsageLine(parts: {
@@ -12062,6 +12152,8 @@ export function userTurnInstructions(parts: {
   tenacity?: TenacityLevel;
   /** Added for quiet routines; follows replyGuidance. */
   quietGuidance?: string | undefined;
+  /** This run works toward a /goal. */
+  goalRun?: boolean;
   /** This run is a routine's. */
   routineRun?: boolean;
   disabledBuiltinTools?: ReadonlySet<string>;
@@ -12135,6 +12227,7 @@ export function userTurnInstructions(parts: {
           builtinOffered(parts.disabledBuiltinTools, "scratchpad_update")
             ? WORK_LIST_GUIDANCE
             : undefined,
+          parts.goalRun ? GOAL_GUIDANCE : undefined,
           ACT_ON_REVIEWED_PLAN_GUIDANCE,
           parts.routineRun ? ROUTINE_WORK_GUIDANCE : undefined,
         ]
@@ -12672,6 +12765,21 @@ async function stopRequeuedRun(
 
 type RunRow = NonNullable<Awaited<ReturnType<ExecutorDeps["prisma"]["run"]["findUnique"]>>>;
 
+/** Best effort, like the compaction enqueue: the reconciler finds an ended goal run nobody checked. */
+async function enqueueGoalCheck(deps: ExecutorDeps, run: { id: string; goalId: string | null }) {
+  // A goal set while the run was live is on the row, not on the copy the run started with.
+  const goalId =
+    run.goalId ??
+    (await deps.prisma.run
+      .findUnique({ where: { id: run.id }, select: { goalId: true } })
+      .then((row) => row?.goalId ?? null)
+      .catch(() => null));
+  if (!goalId) return;
+  await deps.jobs
+    .enqueue(goalCheckJob(goalId, run.id))
+    .catch((error) => getLogger().error("goal.check enqueue failed", error));
+}
+
 /**
  * Records a failed run and tells whoever waits on it: the steering continuation, the bot that
  * delegated the request, and the owner's finish notification.
@@ -12704,6 +12812,7 @@ async function failRun(
       .enqueue(runContinueJob(failed.continuationRunId))
       .catch((error) => getLogger().error("steering continuation enqueue", error));
   }
+  await enqueueGoalCheck(deps, run);
   if (run.trigger === "bot_message") {
     await returnBotMessageOutcome(
       deps,

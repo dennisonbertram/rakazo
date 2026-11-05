@@ -17,6 +17,7 @@ export const RUN_TRIGGERS = [
   "created",
   "tickets",
   "mcp",
+  "goal",
 ] as const;
 export const RunTriggerSchema = z.enum(RUN_TRIGGERS);
 export type RunTrigger = z.infer<typeof RunTriggerSchema>;

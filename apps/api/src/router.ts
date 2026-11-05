@@ -243,6 +243,7 @@ import {
   messagingProviderBlocksBot,
   newRunUnattended,
   nextCronDateAcrossStrict,
+  parseGoalCommand,
   stableJsonText,
   withAppDirectory,
 } from "@rakazo/core";
@@ -685,6 +686,7 @@ import {
   shouldForwardPeerThreadEvent,
 } from "./thread-message-pages.js";
 import {
+  clearThreadGoal,
   markThreadUnreadFrom,
   reactToThreadMessage,
   resolveThreadTarget,
@@ -3577,7 +3579,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
         }
       }),
       send: authed.threads.send.handler(async ({ context, input }) => {
-        if ((await modelSetup(deps, context.actor)).needsModel) {
+        // `/goal` and `/goal clear` start no run, so they work before a model is connected.
+        const goalKind = input.replyToMessageId ? null : parseGoalCommand(input.text ?? "")?.kind;
+        const startsRun = goalKind !== "show" && goalKind !== "clear";
+        if (startsRun && (await modelSetup(deps, context.actor)).needsModel) {
           throw new ORPCError("BAD_REQUEST", { message: "Connect a model to start a run." });
         }
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
@@ -3608,6 +3613,12 @@ export function createRouter(deps: RouterDeps): AppRouter {
       stop: authed.threads.stop.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         await stopThreadRuns(deps, context.actor, target);
+        return { ok: true as const };
+      }),
+      clearGoal: authed.threads.clearGoal.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new IsolationError();
+        await clearThreadGoal(deps, context.actor, target);
         return { ok: true as const };
       }),
       clear: authed.threads.clear.handler(async ({ context, input }) => {

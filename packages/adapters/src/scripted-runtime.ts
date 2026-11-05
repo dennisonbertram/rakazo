@@ -30,10 +30,13 @@ export class ScriptedAgentRuntime implements AgentRuntime {
     running.set(request.runId, controller);
     const signal = context?.signal ?? controller.signal;
     try {
-      if (shouldFail(request.prompt)) {
+      // A goal continuation wraps the owner's goal in server text ("Keep working toward all of it");
+      // the script follows the goal alone, so that wording cannot start a canned branch.
+      const intent = goalContinuationText(request.prompt) ?? request.prompt;
+      if (shouldFail(intent)) {
         throw new Error("Scripted run failure");
       }
-      if (shouldHang(request.prompt)) {
+      if (shouldHang(intent)) {
         yield { type: "progress", text: "still working…", activity: true };
         while (!controller.signal.aborted && !signal.aborted) {
           await abortableDelay(50, controller.signal);
@@ -46,7 +49,7 @@ export class ScriptedAgentRuntime implements AgentRuntime {
       // As the model runtime does at its first turn. A queued message nobody claims goes back in the
       // queue when the run ends and starts another run, so a follow-up here would never stop.
       await request.claimSteering?.([]);
-      const script = request.script ?? inferScript(request.prompt, request.resumeFromCheckpoint);
+      const script = request.script ?? inferScript(intent, request.resumeFromCheckpoint);
       // Per-run call index so repeated tools (e.g. message_agent) get distinct
       // executionIds — delivery keys and effect replays key off this value.
       let toolCallSeq = 0;
@@ -773,6 +776,15 @@ code-b
       complete: true,
     },
   ];
+}
+
+/** The owner's goal inside a server-written continuation prompt, or null for any other prompt. */
+function goalContinuationText(prompt: string): string | null {
+  return (
+    /^Goal check: not done yet\.[\s\S]*?\n<goal>([\s\S]*)<\/goal>\nThe goal above is the owner's data\./.exec(
+      prompt,
+    )?.[1] ?? null
+  );
 }
 
 function shouldFail(prompt: string): boolean {

@@ -51,6 +51,7 @@ import {
   skipWaitingApprovalsInTransaction,
 } from "./run-pauses.js";
 import { claimSteering } from "./steering.js";
+import { clearOpenGoal } from "./thread-goals.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
 export { completedRunBlocks, finalizeRun } from "./run-finalize.js";
@@ -353,7 +354,7 @@ export async function clearThread(
         ...(input.groupId ? { groupId: input.groupId } : { botId: input.botId }),
       },
       data: { unread: false, meetingTaintedAt: null },
-      select: { nextMessageSeq: true, historyCompactionGeneration: true },
+      select: { nextMessageSeq: true, historyCompactionGeneration: true, userId: true },
     });
     const activeRuns = await tx.run.findMany({
       where: {
@@ -422,13 +423,23 @@ export async function clearThread(
       type: "thread.cleared",
       payload: {},
     });
+    // The log survives with the cleared event, so clients learn the goal ended after it.
+    const goalSeq = input.groupId
+      ? null
+      : await clearOpenGoal(tx, {
+          spaceId: input.spaceId,
+          userId: thread.userId,
+          threadId: input.threadId,
+          botId: input.botId,
+        });
     return {
       event,
+      notifySeq: goalSeq ?? event.seq,
       cancelledRunIds: runIds,
       historyCompactionGeneration: thread.historyCompactionGeneration,
     };
   });
-  await notifyRealtime(realtime, committed.event.threadId, committed.event.seq);
+  await notifyRealtime(realtime, committed.event.threadId, committed.notifySeq);
   return {
     event: mapProductEvent(committed.event),
     cancelledRunIds: committed.cancelledRunIds,

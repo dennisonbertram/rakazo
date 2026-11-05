@@ -574,6 +574,7 @@ model Space {
   routines                    Routine[]
   routineWatchStates          RoutineWatchState[]
   scratchpadItems             ScratchpadItem[]
+  threadGoals                 ThreadGoal[]
   taughtSkills                TaughtSkill[]
   agentSkills                 AgentSkill[]
   mailSearches                MailSearch[]
@@ -916,6 +917,7 @@ model Bot {
   appControlSnapshots    AppControlSnapshot[]
   routines               Routine[]
   scratchpadItems        ScratchpadItem[]
+  threadGoals            ThreadGoal[]
   taughtSkills           TaughtSkill[]
   memoryDocuments        MemoryDocument[]
   pages                  BotPage[]
@@ -1049,6 +1051,7 @@ model Thread {
   tasks                       Task[]
   runs                        Run[]
   routines                    Routine[]
+  goals                       ThreadGoal[]
 
   @@index([spaceId])
   @@map("threads")
@@ -1173,6 +1176,11 @@ model Run {
   usageRecords         UsageRecord[]
   steeringMessages     SteeringMessage[]
   externalMessage      ExternalMessage?
+  /// The thread goal this run works toward, while one is active. Cleared when the goal is deleted.
+  goalId               String?
+  goal                 ThreadGoal?       @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  /// What a goal run's tool calls returned, for the goal check: [{ id, tool, args, ok, result }], at most 24 KB.
+  goalEvidence         Json?
 
   @@unique([spaceId, clientNonce])
   @@index([status, leaseExpiresAt])
@@ -1186,6 +1194,7 @@ model Run {
   @@index([sourceMessageId])
   @@index([threadId, status, createdAt])
   @@index([routineId])
+  @@index([goalId])
   @@map("runs")
 }
 
@@ -4925,4 +4934,36 @@ model PipelineImportRow {
   @@unique([importId, position])
   @@index([importId, state, position])
   @@map("pipeline_import_rows")
+}
+
+/// What the owner asked a bot to keep working toward in its own thread (`/goal`). At most one is
+/// open (active or paused) per thread; the partial unique index thread_goals_one_open_key is in SQL.
+model ThreadGoal {
+  id               String    @id @default(cuid())
+  spaceId          String
+  space            Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId           String
+  threadId         String
+  thread           Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  botId            String
+  bot              Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  text             String
+  /// active | paused | met | blocked | stopped | cleared
+  status           String
+  /// runs | time | spend | stalled | owner | check_failed | model_error
+  stopReason       String?
+  continuations    Int       @default(0)
+  stalls           Int       @default(0)
+  lastCheckedRunId String?
+  /// { verdict, reason, evidence, next }
+  lastVerdict      Json?
+  /// Reset when a paused goal resumes.
+  startedAt        DateTime  @default(now())
+  endedAt          DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  runs             Run[]
+
+  @@index([threadId, status])
+  @@map("thread_goals")
 }
