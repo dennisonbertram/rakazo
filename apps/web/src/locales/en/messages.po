@@ -1212,6 +1212,10 @@ msgstr "Add skill"
 msgid "Add speech to text"
 msgstr "Add speech to text"
 
+#: src/pages/CompanyContext.tsx
+msgid "Add the first section"
+msgstr "Add the first section"
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add the header name."
 msgstr "Add the header name."
@@ -8457,6 +8461,10 @@ msgstr "New page {n}"
 msgid "New password"
 msgstr "New password"
 
+#: src/pages/CompanyContext.tsx
+msgid "New section"
+msgstr "New section"
+
 #: src/pages/shell/bot-picker.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "New space"
@@ -12664,6 +12672,10 @@ msgstr "Start import"
 msgid "Start recording"
 msgstr "Start recording"
 
+#: src/pages/CompanyContext.tsx
+msgid "Start with one product or topic."
+msgstr "Start with one product or topic."
+
 #: src/pages/ActivityList.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Starting"
@@ -14514,6 +14526,10 @@ msgstr "What did Devin do this week?"
 msgid "What did we spend last month?"
 msgstr "What did we spend last month?"
 
+#: src/pages/CompanyContext.tsx
+msgid "What is it?"
+msgstr "What is it?"
+
 #: src/lib/finance-agent.ts
 msgid "What is our runway?"
 msgstr "What is our runway?"
@@ -14529,6 +14545,10 @@ msgstr "What needs my reply today?"
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "What result will you demonstrate?"
 msgstr "What result will you demonstrate?"
+
+#: src/pages/CompanyContext.tsx
+msgid "What should every agent know?"
+msgstr "What should every agent know?"
 
 #: src/pages/Shell.tsx
 msgid "What should I do first this week?"

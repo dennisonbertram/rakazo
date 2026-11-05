@@ -41,6 +41,7 @@ export const BUILTIN_TOOL_NAMES = [
   "add_mcp_server",
   "remember",
   "save_shared_memory",
+  "company_context_lookup",
   "web_search",
   "web_fetch",
   "mail_search",

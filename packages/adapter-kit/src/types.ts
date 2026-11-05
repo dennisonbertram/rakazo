@@ -324,7 +324,7 @@ export interface ConnectorCapabilities {
 export type ConnectorCatalogItem = Omit<ConnectionCatalogItem, "description" | "category">;
 
 export interface MemoryReadRequest {
-  scope: "bot" | "user";
+  scope: "bot" | "user" | "company";
   botId?: string;
   path?: string;
 }
@@ -341,7 +341,8 @@ export interface MemorySnapshot {
 
 export interface MemorySearchRequest {
   query: string;
-  scope: "bot" | "user" | "all";
+  /** "all" means bot and user memory; company context is searched only by naming it. */
+  scope: "bot" | "user" | "company" | "all";
   botId?: string;
 }
 
@@ -356,7 +357,7 @@ export const MEMORY_REVISION_CONFLICT_ERROR =
   "Shared memory changed since it was read. Read the latest version and save again.";
 
 export interface MemoryCommitRequest {
-  scope: "bot" | "user";
+  scope: "bot" | "user" | "company";
   botId?: string;
   path: string;
   content: string;

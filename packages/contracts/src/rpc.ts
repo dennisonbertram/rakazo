@@ -139,6 +139,8 @@ import {
   BotSchema,
   BotSectionSchema,
   CapabilityInstallSchema,
+  CompanyContextRevisionSchema,
+  CompanyContextSectionSchema,
   ComputerModeSchema,
   ComputerReleaseReasonSchema,
   ComputerStatusSchema,
@@ -956,6 +958,29 @@ export const appContract = {
       .input(z.object({ defaultMemoryScope: MemoryScopeSchema }))
       .output(SpaceMemoryConfigSchema),
     disconnectProvider: oc.output(z.object({ ok: z.literal(true) })),
+  },
+  companyContext: {
+    list: oc.output(z.array(CompanyContextSectionSchema)),
+    /** Creates a section (no id) or replaces one's text. CONFLICT when the revision moved or the name is taken. */
+    save: oc
+      .input(
+        z.object({
+          id: Id.optional(),
+          title: z.string(),
+          text: z.string(),
+          expectedRevision: z.number().int().optional(),
+        }),
+      )
+      .output(CompanyContextSectionSchema),
+    history: oc.input(z.object({ id: Id })).output(z.array(CompanyContextRevisionSchema)),
+    /** Saves an old revision's text as a new revision. */
+    restore: oc
+      .input(z.object({ id: Id, revision: z.number().int(), expectedRevision: z.number().int() }))
+      .output(CompanyContextSectionSchema),
+    /** Deletes a section and its history, only if it is still at `revision`. */
+    remove: oc
+      .input(z.object({ id: Id, revision: z.number().int() }))
+      .output(z.object({ ok: z.literal(true) })),
   },
   pages: {
     get: oc.input(BotPageGetInputSchema).output(BotPageSchema.nullable()),

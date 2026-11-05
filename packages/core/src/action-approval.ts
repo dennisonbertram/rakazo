@@ -483,6 +483,7 @@ export function buildApprovalTable(
  */
 const OWN_STATE_RESULT_TOOLS = new Set([
   "ask_user",
+  "company_context_lookup",
   "attach_file",
   "end_call",
   "list_fleet",
