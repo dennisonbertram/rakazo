@@ -1181,6 +1181,11 @@ model Run {
   goal                 ThreadGoal?       @relation(fields: [goalId], references: [id], onDelete: SetNull)
   /// What a goal run's tool calls returned, for the goal check: [{ id, tool, args, ok, result }], at most 24 KB.
   goalEvidence         Json?
+  // Restriction markers, written the moment they are set so a continuation reads them here and
+  // not from the capped tool log (which trims). readOutsideContent: a tool result that can carry
+  // outside text entered the run. readDesktop: the run listed or read a desktop app.
+  readOutsideContent   Boolean           @default(false)
+  readDesktop          Boolean           @default(false)
 
   @@unique([spaceId, clientNonce])
   @@index([status, leaseExpiresAt])
