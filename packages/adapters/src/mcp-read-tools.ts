@@ -66,8 +66,8 @@ export const MCP_WRITE_TOOLS = {
 
 /** Arguments of the bot schema that an outside client may not set (gated categories, proofs, hand-offs). */
 const MCP_DROPPED_ARGS: Record<string, readonly string[]> = {
-  scratchpad_add: ["category", "channel", "forAgent", "scheduledFor", "target"],
-  scratchpad_update: ["category", "channel", "scheduledFor", "target", "proof"],
+  scratchpad_add: ["category", "channel", "forAgent", "scheduledFor", "target", "items"],
+  scratchpad_update: ["category", "channel", "scheduledFor", "target", "proof", "itemIds"],
   scratchpad_complete: ["proof"],
 };
 
@@ -95,7 +95,12 @@ function mcpSchema(name: string, schema: Schema): Schema {
       botId: { type: "string", description: "The id of an agent from agents_list." },
       ...properties,
     },
-    required: ["botId", ...((schema.required as string[] | undefined) ?? [])],
+    // The bot tools leave these optional for their list forms, which outside clients do not get.
+    required: [
+      "botId",
+      ...(name === "scratchpad_add" ? ["title"] : name === "scratchpad_update" ? ["itemId"] : []),
+      ...((schema.required as string[] | undefined) ?? []),
+    ],
   };
 }
 
