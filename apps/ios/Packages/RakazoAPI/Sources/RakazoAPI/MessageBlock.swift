@@ -29,6 +29,7 @@ public struct MessageBlock: Codable, Sendable {
     case channelMessage
     case botMessageSent
     case botMessageReceived
+    case goal
     case unknown(String)
 
     public init(rawValue: String) {
@@ -60,6 +61,7 @@ public struct MessageBlock: Codable, Sendable {
       case "channel_message": self = .channelMessage
       case "bot_message_sent": self = .botMessageSent
       case "bot_message_received": self = .botMessageReceived
+      case "goal": self = .goal
       default: self = .unknown(rawValue)
       }
     }
@@ -93,6 +95,7 @@ public struct MessageBlock: Codable, Sendable {
       case .channelMessage: "channel_message"
       case .botMessageSent: "bot_message_sent"
       case .botMessageReceived: "bot_message_received"
+      case .goal: "goal"
       case .unknown(let rawValue): rawValue
       }
     }
