@@ -3,6 +3,8 @@ import RakazoAPI
 
 public enum RPCError: LocalizedError, Sendable, Equatable {
   case server(code: String, status: Int, message: String)
+  /// A status line answered through the error channel (`data.goalReply`), not a failure.
+  case goalReply(String)
   case notSupported
   case unauthorized
   case spaceRejected
@@ -12,7 +14,7 @@ public enum RPCError: LocalizedError, Sendable, Equatable {
 
   public var errorDescription: String? {
     switch self {
-    case .server(_, _, let message): message
+    case .server(_, _, let message), .goalReply(let message): message
     case .notSupported: "Update your server to use this."
     case .unauthorized: "Your session is no longer valid."
     case .spaceRejected: "That space is no longer available."
@@ -69,6 +71,9 @@ public struct RPCClient: Sendable {
       throw RPCError.notSupported
     default:
       let payload = try? JSONDecoder().decode(RPCErrorEnvelope.self, from: response.body).json
+      if let payload, case .object(let data)? = payload.data, data["goalReply"] == .bool(true) {
+        throw RPCError.goalReply(payload.message)
+      }
       throw RPCError.server(
         code: payload?.code ?? "UNKNOWN", status: response.statusCode,
         message: payload?.message ?? "Couldn’t continue. Try again.")

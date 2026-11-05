@@ -174,6 +174,22 @@ describe("thread composer isolation", () => {
     expect(container.querySelector('[data-testid="mention-picker"]')).toBeNull();
   });
 
+  it("offers Goal in a bot chat and inserts the command instead of dispatching it", () => {
+    type("/");
+    press("Goal");
+    expect(props.onSlashAction).not.toHaveBeenCalled();
+    expect(composer.current!.snapshot().promptText).toBe("/goal");
+    expect(container.querySelector("input")!.value).toBe("/goal ");
+  });
+
+  it("hides Goal in a group chat and still dispatches the settings actions", () => {
+    render({ botId: undefined });
+    type("/");
+    expect(container.querySelector('button[aria-label="Goal"]')).toBeNull();
+    press("Settings");
+    expect(props.onSlashAction).toHaveBeenCalledWith("chat-settings");
+  });
+
   it("ranks prefix, word-start and substring mention matches ahead of kind order", () => {
     render({
       composerMentionTargets: [
