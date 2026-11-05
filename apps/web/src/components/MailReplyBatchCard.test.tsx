@@ -28,15 +28,18 @@ vi.mock("@rakazo/ui-web", () => {
     ),
     Checkbox: ({
       checked,
+      indeterminate,
       onCheckedChange,
       ...props
     }: {
       checked?: boolean;
+      indeterminate?: boolean;
       onCheckedChange?: (value: boolean) => void;
     } & ComponentProps<"input">) => (
       <input
         type="checkbox"
         {...props}
+        data-indeterminate={indeterminate ? "" : undefined}
         checked={checked}
         onChange={(event) => onCheckedChange?.(event.target.checked)}
       />
@@ -637,4 +640,82 @@ it("falls back to the plain card when the rows cannot be read", async () => {
     await vi.advanceTimersByTimeAsync(0);
   });
   expect(host.textContent).toBe("fallback card");
+});
+
+describe("select all", () => {
+  const selectAll = () => host.querySelector("#message-1-select-all") as HTMLInputElement | null;
+  const ticks = () =>
+    [...host.querySelectorAll('input[aria-label^="Include"]')] as HTMLInputElement[];
+  const twelve = () => [
+    ...Array.from({ length: 9 }, (_, i) => row(`r${i}`, { startsUnticked: true })),
+    row("sent", { flags: ["already_sent"], startsUnticked: true }),
+    row("dupe", { flags: ["duplicate_email"], startsUnticked: true }),
+    row("held", { state: "not_sent", startsUnticked: true }),
+  ];
+
+  it("ticks every eligible row, hidden ones too, and skips flagged and held rows", async () => {
+    await render(batch(twelve()));
+    expect(items()).toHaveLength(8);
+    await click(selectAll() ?? undefined);
+    await click(buttonMatching(/Review all/));
+    expect(items()).toHaveLength(12);
+    expect(selectAll()?.checked).toBe(true);
+    expect(buttonMatching(/Send selected/)?.textContent).toContain("(9)");
+    const unticked = ticks()
+      .filter((el) => !el.checked)
+      .map((el) => el.getAttribute("aria-label"));
+    expect(unticked).toEqual([
+      "Include reply to sent@customer.example.test",
+      "Include reply to dupe@customer.example.test",
+      "Include reply to held@customer.example.test",
+    ]);
+  });
+
+  it("is indeterminate when some are ticked, and a click ticks the rest", async () => {
+    await render(batch(threeRows()));
+    expect(ticks().map((el) => el.checked)).toEqual([false, true, true]);
+    expect(selectAll()?.checked).toBe(false);
+    expect(selectAll()?.hasAttribute("data-indeterminate")).toBe(true);
+    await click(selectAll() ?? undefined);
+    expect(ticks().map((el) => el.checked)).toEqual([true, true, true]);
+    expect(selectAll()?.checked).toBe(true);
+  });
+
+  it("clears every row when everything eligible is ticked", async () => {
+    await render(batch([row("a"), row("b"), row("c", { flags: ["has_link"] })]));
+    expect(selectAll()?.checked).toBe(true);
+    await click(selectAll() ?? undefined);
+    expect(ticks().map((el) => el.checked)).toEqual([false, false, false]);
+    expect(selectAll()?.checked).toBe(false);
+    expect(selectAll()?.hasAttribute("data-indeterminate")).toBe(false);
+    await click(selectAll() ?? undefined);
+    expect(ticks().map((el) => el.checked)).toEqual([true, true, true]);
+  });
+
+  it("is hidden with one row, a closed card, or no eligible row", async () => {
+    await render(batch([row("a")]));
+    expect(selectAll()).toBeNull();
+    await render(batch([row("a"), row("b")]), block({ status: "answered", answer: "send" }));
+    expect(selectAll()).toBeNull();
+    await render(batch([row("a"), row("b")]), block(), false);
+    expect(selectAll()).toBeNull();
+    await render(
+      batch([
+        row("a", { flags: ["already_sent"], startsUnticked: true }),
+        row("b", { flags: ["duplicate_email"], startsUnticked: true }),
+      ]),
+    );
+    expect(selectAll()).toBeNull();
+  });
+
+  it("sends exactly the ticked rows, collapsed ones included", async () => {
+    await render(batch(twelve()));
+    await click(selectAll() ?? undefined);
+    await click(buttonMatching(/Review all/));
+    await pressSend(/Send selected/);
+    const sentIds = rpc.threads.sendMailBatch.mock.calls[0]?.[0].rows.map(
+      (r: { itemId: string }) => r.itemId,
+    );
+    expect(sentIds).toEqual(Array.from({ length: 9 }, (_, i) => `r${i}`));
+  });
 });
