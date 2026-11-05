@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "./client.js";
 import { createDb } from "./client.js";
+import { saveContact } from "./contacts.js";
 import {
   databaseUrls,
   describeRowSecurity,
@@ -8,12 +9,14 @@ import {
   provisionRuntimeRole,
   RUNTIME_ROLE,
 } from "./database-access.js";
+import { saveProspect } from "./fundraising.js";
 import {
   drainUnscopedDatabaseAccess,
   ROW_SECURITY_MODELS,
   runAsSystem,
   runAsTenant,
 } from "./row-security.js";
+import { IsolationError } from "./scope.js";
 
 // Needs DATABASE_URL as the runtime login and DATABASE_MIGRATION_URL as the
 // owner, as `pnpm test:integration` provides after `pnpm db:migrate`.
@@ -824,6 +827,20 @@ describePostgres("row-level security (PostgreSQL)", () => {
     }
     // With no context a query sees nothing.
     for (const rows of await seen()) expect(rows).toEqual([]);
+    // The one writer works as the runtime login, inside the tenant only.
+    const scope = { spaceId: a.spaceId, userId: a.userId };
+    const saved = await runAsTenant(a, () =>
+      saveContact(db, scope, { name: "Sample Tenant", kind: "prospect", stage: "intro" }),
+    );
+    expect(saved.pipelineRecord?.status).toBe("intro_requested");
+    await expect(
+      runAsTenant(b, () =>
+        saveProspect(db, { spaceId: b.spaceId, userId: b.userId }, { id: saved.id }),
+      ),
+    ).rejects.toBeInstanceOf(IsolationError);
+    await expect(
+      runAsTenant(b, () => saveProspect(db, scope, { id: saved.id, stage: "passed" })),
+    ).rejects.toBeInstanceOf(IsolationError);
     drainUnscopedDatabaseAccess();
   });
 

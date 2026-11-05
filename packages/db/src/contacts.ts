@@ -306,7 +306,12 @@ export async function deleteContact(prisma: WriteDb, actor: Scope, id: string): 
       data: { roundId: null },
     });
     const { count: deleted } = await tx.contact.deleteMany({ where: { id, ...scope } });
-    if (record) await promoteNextPerson(tx, record.id);
+    if (record) {
+      await promoteNextPerson(tx, record.id);
+      // With nobody left there is no one for Mercury's SAFE to attach to.
+      if ((await tx.pipelineRecordPerson.count({ where: { recordId: record.id } })) === 0)
+        await savePipelineRecord(tx, scope, record.id, { waitingSince: null });
+    }
     return deleted;
   });
   if (count === 0) throw new IsolationError("Contact not found");

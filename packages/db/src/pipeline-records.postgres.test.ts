@@ -493,6 +493,22 @@ describePostgres("pipeline records (PostgreSQL)", () => {
       expect(rows.prospects.map((r) => r.id)).toEqual([back.id]);
     });
 
+    it("stops waiting for Mercury when the last person is deleted", async () => {
+      const owner = scopeOf(5, spaceA);
+      const p = await saveContact(prisma, owner, {
+        name: "Sample Waiter",
+        email: "waiter@example.test",
+        kind: "prospect",
+      });
+      const record = await recordOf(owner, p.id);
+      await markWaiting(prisma, owner, p.id);
+      await deleteContact(prisma, owner, p.id);
+      const row = (await getFundraisingOverview(prisma, owner)).prospects.find(
+        (r) => r.id === record.id,
+      );
+      expect(row?.mercurySentAt).toBeNull();
+    });
+
     it("promotes the next person when the primary is deleted", async () => {
       const owner = scopeOf(5, spaceB);
       const p = await saveContact(prisma, owner, { name: "Sample Primary", kind: "prospect" });
