@@ -555,6 +555,17 @@ import {
   setIntegrationAgentWrites,
   setIntegrationExclusive,
 } from "./integration-agent.js";
+import {
+  ensureSourceAgent,
+  listCapabilities,
+  provisionMissingSourceAgents,
+  provisionSourceAgent,
+  renameSource,
+  setSourceAgentAccess,
+  setSourceAllAgents,
+  setSourceExclusive,
+  setSourceWrites,
+} from "./source-agent.js";
 import { searchIntegrationCatalog } from "./integration-catalog.js";
 import {
   deliverPortalLinks,
@@ -1731,6 +1742,18 @@ export function createRouter(deps: RouterDeps): AppRouter {
       bot,
       computerContext(actor, bot.id, "archive"),
     );
+  };
+  const sourceAgentDeps = (actor: Actor) => ({
+    prisma: deps.prisma,
+    repos,
+    archiveBot: (botId: string) => archiveActorBot(actor, botId),
+  });
+  const oneCapability = async (actor: Actor, id: string) => {
+    const found = (await listCapabilities(sourceAgentDeps(actor), actor)).find(
+      (entry) => entry.id === id,
+    );
+    if (!found) throw new ORPCError("NOT_FOUND", { message: "Source not found" });
+    return found;
   };
   /**
    * Creates a server's integration agent and, in one step, makes the server exclusive to it and
@@ -5821,20 +5844,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
     },
     capabilities: {
       list: authed.capabilities.list.handler(async ({ context }) => {
-        const rows = await deps.prisma.capabilityInstall.findMany({
-          where: { spaceId: context.actor.spaceId, userId: context.actor.userId },
-        });
-        return rows.map((row) => ({
-          id: row.id,
-          kind: row.kind as "skill" | "plugin" | "mcp" | "api" | "connection",
-          name: row.name,
-          source: row.source,
-          version: row.version,
-          digest: row.digest,
-          secretConfigured: Boolean(row.secretId),
-          config: row.config as Record<string, unknown>,
-          createdAt: row.createdAt.toISOString(),
-        }));
+        const agentDeps = sourceAgentDeps(context.actor);
+        // Sources connected before they had agents get theirs here, once; best effort.
+        await provisionMissingSourceAgents(agentDeps, context.actor).catch(() => undefined);
+        return listCapabilities(agentDeps, context.actor);
       }),
       catalogSearch: authed.capabilities.catalogSearch.handler(async ({ context, input }) => {
         const baseUrl =
@@ -5965,19 +5978,13 @@ export function createRouter(deps: RouterDeps): AppRouter {
             },
           });
         });
-        return {
-          id: row.id,
-          kind: row.kind as "skill" | "plugin" | "mcp" | "api" | "connection",
-          name: row.name,
-          source: row.source,
-          version: row.version,
-          digest: row.digest,
-          secretConfigured: Boolean(row.secretId),
-          config: row.config as Record<string, unknown>,
-          createdAt: row.createdAt.toISOString(),
-        };
+        // The source gets its own agent, private to it; a failure leaves Create agent as the repair.
+        if (row.kind === "mcp" || row.kind === "api" || row.kind === "graphql")
+          await provisionSourceAgent(sourceAgentDeps(context.actor), context.actor, row.id);
+        return oneCapability(context.actor, row.id);
       }),
       remove: authed.capabilities.remove.handler(async ({ context, input }) => {
+        let agentToArchive: string | null = null;
         await deps.prisma.$transaction(async (tx) => {
           const existing = await tx.capabilityInstall.findFirst({
             where: {
@@ -5987,6 +5994,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             },
           });
           if (!existing) return;
+          agentToArchive = existing.agentBotId;
           await tx.capabilityInstall.delete({ where: { id: existing.id } });
           if (existing.secretId) {
             const shared = await tx.capabilityInstall.count({
@@ -6003,7 +6011,40 @@ export function createRouter(deps: RouterDeps): AppRouter {
             }
           }
         });
+        // A source's own agent goes with it, archived once the removal committed.
+        if (agentToArchive)
+          await archiveActorBot(context.actor, agentToArchive).catch((error) =>
+            getLogger().error("source agent archive failed", error),
+          );
         return { ok: true as const };
+      }),
+      createAgent: authed.capabilities.createAgent.handler(async ({ context, input }) => {
+        const { bot } = await ensureSourceAgent(
+          sourceAgentDeps(context.actor),
+          context.actor,
+          input.id,
+        );
+        return { botId: bot.id };
+      }),
+      rename: authed.capabilities.rename.handler(async ({ context, input }) => {
+        await renameSource(deps.prisma, context.actor, input.id, input.name);
+        return oneCapability(context.actor, input.id);
+      }),
+      setWrites: authed.capabilities.setWrites.handler(async ({ context, input }) => {
+        await setSourceWrites(deps.prisma, context.actor, input.id, input.enabled);
+        return oneCapability(context.actor, input.id);
+      }),
+      setExclusive: authed.capabilities.setExclusive.handler(async ({ context, input }) => {
+        await setSourceExclusive(deps.prisma, context.actor, input.id, input.exclusive);
+        return oneCapability(context.actor, input.id);
+      }),
+      setAllAgents: authed.capabilities.setAllAgents.handler(async ({ context, input }) => {
+        await setSourceAllAgents(deps.prisma, context.actor, input.id, input.on);
+        return oneCapability(context.actor, input.id);
+      }),
+      setAgentAccess: authed.capabilities.setAgentAccess.handler(async ({ context, input }) => {
+        await setSourceAgentAccess(deps.prisma, context.actor, input);
+        return oneCapability(context.actor, input.id);
       }),
     },
     integrationAgents: {

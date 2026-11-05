@@ -7,6 +7,7 @@ import {
   deniedConnectionIds,
   effectiveAccessByConnection,
   nonOwnerMayWrite,
+  sourceAccessFor,
 } from "./connection-access.js";
 
 const row = (
@@ -425,5 +426,63 @@ describe("nonOwnerMayWrite", () => {
     expect(
       nonOwnerMayWrite({ writesEnabled: true, botAccess: grant(true) }, { audience: "internal" }),
     ).toBe(true);
+  });
+});
+
+describe("sourceAccessFor", () => {
+  const source = {
+    agentBotId: "owner",
+    allAgents: false,
+    writesEnabled: false,
+    botAccess: [] as { botId: string; canWrite: boolean }[],
+  };
+  const bot = (id: string, extra: { audience?: string; firewall?: boolean } = {}) => ({
+    id,
+    ...extra,
+  });
+
+  it("gives a new source to its own agent alone, read-only until changes are on", () => {
+    expect(sourceAccessFor(source, bot("owner"))).toEqual({ read: true, write: false });
+    expect(sourceAccessFor(source, bot("other"))).toEqual({ read: false, write: false });
+    expect(sourceAccessFor({ ...source, writesEnabled: true }, bot("owner"))).toEqual({
+      read: true,
+      write: true,
+    });
+  });
+
+  it("lets a granted agent read, and change only with its own grant and the source's switch", () => {
+    const granted = { ...source, botAccess: [{ botId: "friend", canWrite: false }] };
+    expect(sourceAccessFor(granted, bot("friend"))).toEqual({ read: true, write: false });
+    const writer = {
+      ...source,
+      writesEnabled: true,
+      botAccess: [
+        { botId: "friend", canWrite: true },
+        { botId: "reader", canWrite: false },
+      ],
+    };
+    expect(sourceAccessFor(writer, bot("friend")).write).toBe(true);
+    expect(sourceAccessFor(writer, bot("reader")).write).toBe(false);
+    expect(
+      sourceAccessFor({ ...writer, writesEnabled: false }, bot("friend")),
+    ).toEqual({ read: true, write: false });
+  });
+
+  it("opens an all-agents source to every internal agent and changes follow the switch", () => {
+    const open = { ...source, allAgents: true, writesEnabled: true };
+    expect(sourceAccessFor(open, bot("anyone"))).toEqual({ read: true, write: true });
+    expect(sourceAccessFor({ ...open, writesEnabled: false }, bot("anyone"))).toEqual({
+      read: true,
+      write: false,
+    });
+  });
+
+  it("gives an external or firewalled agent nothing, even its own source", () => {
+    const open = { ...source, allAgents: true, writesEnabled: true };
+    const granted = { ...open, botAccess: [{ botId: "x", canWrite: true }] };
+    for (const flag of [{ audience: "external" }, { firewall: true }]) {
+      expect(sourceAccessFor(granted, bot("x", flag))).toEqual({ read: false, write: false });
+      expect(sourceAccessFor(granted, bot("owner", flag))).toEqual({ read: false, write: false });
+    }
   });
 });

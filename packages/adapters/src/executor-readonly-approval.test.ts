@@ -269,7 +269,10 @@ function fixture({
   groupId = null as string | null,
   ticketAuthor = null as string | null,
   otherGrants = 0,
+  sources = [] as { id: string; agentBotId: string | null }[],
 }: {
+  /** Directly connected sources, keyed by the agent they belong to. */
+  sources?: { id: string; agentBotId: string | null }[];
   /** The bot's Firewall switch at the start of the run. */
   firewall?: boolean;
   /** Other agents in the space with Firewall on. */
@@ -549,6 +552,14 @@ function fixture({
               }
             : null,
       ),
+    },
+    capabilityInstall: {
+      count: vi.fn(
+        async ({ where }: { where: { id: string; agentBotId: string } }) =>
+          sources.filter((source) => source.id === where.id && source.agentBotId === where.agentBotId)
+            .length,
+      ),
+      findMany: vi.fn(async () => []),
     },
     mcpServer: {
       findMany: vi.fn(
@@ -2828,6 +2839,39 @@ describe("connected app integration agent tools", () => {
       const f = run([row(true, false)]);
       await f.run();
       expect(f.offeredTools).not.toContain(ownTool.name);
+    });
+  });
+
+  describe("a directly connected source's changes", () => {
+    const sourceWrite: ConnectorTool = {
+      name: "add_contact",
+      description: "Add a contact",
+      inputSchema: { type: "object", properties: {} },
+      readOnly: false,
+      route: { connectorId: "installed", resourceId: "src-1", toolName: "add_contact" },
+    };
+    const allow = [{ effect: "always_allow", matchKind: "tool", matchValue: "add_contact" }] as const;
+    const run = (agentBotId: string) =>
+      fixture({
+        name: sourceWrite.name,
+        spawnKey: null,
+        rules: [...allow],
+        route: sourceWrite.route,
+        sources: [{ id: "src-1", agentBotId }],
+        availableTools: [sourceWrite],
+      });
+
+    it("asks a fresh approval of an agent that does not own the source, despite a saved Allow rule", async () => {
+      const f = run("agent-x");
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.execute).not.toHaveBeenCalled();
+    });
+
+    it("lets the owning agent's saved Allow rule apply", async () => {
+      const f = run("bot-1");
+      await f.run();
+      expect(f.execute).toHaveBeenCalledOnce();
     });
   });
 

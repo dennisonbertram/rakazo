@@ -2503,12 +2503,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       },
                     }));
                 }
-                const tools = await deps.connector!.discoverTools(
-                  context,
-                  financeOnly ? ["mcp"] : undefined,
-                );
-                const visible = financeOnly
-                  ? tools.filter((tool) => tool.route?.connectorId === "mcp")
+                // An integration agent also reaches the directly connected sources it may use.
+                const onlyConnectors = integrationAgent
+                  ? ["mcp", "installed"]
+                  : financeOnly
+                    ? ["mcp"]
+                    : undefined;
+                const tools = await deps.connector!.discoverTools(context, onlyConnectors);
+                const visible = onlyConnectors
+                  ? tools.filter((tool) => onlyConnectors.includes(tool.route?.connectorId ?? ""))
                   : tools;
                 return visible.filter((tool) => {
                   if (tool.readOnly === true) return true;
@@ -3742,22 +3745,36 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
               select: { id: true },
             }),
-            deps.prisma.mcpServer.findMany({
-              where: {
-                ...(integrationAgent ? { id: integrationServerId } : {}),
-                spaceId: run.spaceId,
-                userId: run.userId,
-                agentBotId: bot.id,
-              },
-              select: { id: true },
-            }),
+            Promise.all([
+              deps.prisma.mcpServer.findMany({
+                where: {
+                  ...(integrationAgent ? { id: integrationServerId } : {}),
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  agentBotId: bot.id,
+                },
+                select: { id: true },
+              }),
+              // A directly connected source whose own agent this is.
+              integrationAgent
+                ? deps.prisma.capabilityInstall.findMany({
+                    where: {
+                      id: integrationServerId,
+                      spaceId: run.spaceId,
+                      userId: run.userId,
+                      agentBotId: bot.id,
+                    },
+                    select: { id: true },
+                  })
+                : Promise.resolve([]),
+            ]).then(([servers, sources]) => [...servers, ...sources]),
           ]);
           integrationPeerRun = Boolean(sender && linked.length > 0);
           if (sender) for (const server of linked) peerServerIds.add(server.id);
           if (integrationPeerRun) {
             // Lazy-catalog search and execute list every assigned server, so scope the connector.
             context.mcpServerIds = [...peerServerIds];
-            peerDiscovered = await deps.connector!.discoverTools(context, ["mcp"]);
+            peerDiscovered = await deps.connector!.discoverTools(context, ["mcp", "installed"]);
           }
         }
         if (appAgentIdentity && run.trigger === "bot_message" && peerMessage?.fromBotId) {
@@ -3782,7 +3799,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   tool.name !== GTM_POST_TOOL &&
                   !builtinAgentTools.some((builtin) => builtin.name === tool.name) &&
                   (!integrationPeerRun ||
-                    (tool.route?.connectorId === "mcp" &&
+                    ((tool.route?.connectorId === "mcp" || tool.route?.connectorId === "installed") &&
                       (!tool.route.resourceId || peerServerIds.has(tool.route.resourceId)))) &&
                   (!connectedAppPeerRun || tool.route?.connectionId === appAgentConnection?.id),
               )
@@ -5247,6 +5264,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
             if (!viaConnector || appAgentIdentity || declaredReadOnly === true) return false;
             const route = callRoute ?? connectorCall.route;
             if (!route?.connectorId) return false;
+            // A directly connected source belongs to its own agent: a change by any other agent
+            // always asks, whatever saved rule matches.
+            if (route.connectorId === "installed") {
+              if (!route.resourceId) return false;
+              const owned = await deps.prisma.capabilityInstall.count({
+                where: {
+                  id: route.resourceId,
+                  spaceId: run.spaceId,
+                  userId: run.userId,
+                  agentBotId: bot.id,
+                },
+              });
+              return owned === 0;
+            }
             const rows = (await connectionRowsStored()).filter(
               (row) =>
                 row.status === "connected" &&
