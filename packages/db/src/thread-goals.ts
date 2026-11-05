@@ -8,6 +8,7 @@ import {
   newRunExternalTaint,
   newRunUnattended,
   parseGoalEvidence,
+  toolResultTaintsRun,
 } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "./client.js";
 import { appendEventInTransaction } from "./events.js";
@@ -123,6 +124,13 @@ export async function loadGoalToCheck(
 ) {
   const goal = await prisma.threadGoal.findFirst({ where: { id: input.goalId, status: "active" } });
   if (!goal || goal.lastCheckedRunId === input.runId) return null;
+  // A newer run supersedes this one, so there is nothing left to judge.
+  const newest = await prisma.run.findFirst({
+    where: { goalId: goal.id, spaceId: goal.spaceId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true },
+  });
+  if (newest?.id !== input.runId) return null;
   const run = await prisma.run.findFirst({
     where: {
       id: input.runId,
@@ -184,13 +192,41 @@ export async function loadGoalCheckInput(prisma: PrismaClient, goal: GoalRow, ju
   };
 }
 
-/** Cost of the goal's runs since it last started, plus the goal checks recorded against them. A null cost counts as 0. */
+/**
+ * The goal's runs and every run they caused, in the goal's Space: sub-agents (a message in the
+ * sub-agent's thread written by the parent run), group handoffs (the run's source message came from
+ * the parent run) and bot messages (the received message answers a message the parent run wrote).
+ * Bounded at depth 5 and 300 runs.
+ */
+async function goalRunTreeIds(prisma: Pick<PrismaClient, "$queryRaw">, goal: GoalRow) {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    WITH RECURSIVE tree(id, depth) AS (
+      SELECT r.id, 0 FROM runs r WHERE r."goalId" = ${goal.id} AND r."spaceId" = ${goal.spaceId}
+      UNION
+      SELECT child.id, tree.depth + 1
+      FROM tree
+      JOIN LATERAL (
+        SELECT r.id FROM runs r JOIN messages m ON m.id = r."sourceMessageId"
+          WHERE m."runId" = tree.id AND r."spaceId" = ${goal.spaceId}
+        UNION
+        SELECT r.id FROM messages o
+          JOIN messages i ON i.blocks @> jsonb_build_array(jsonb_build_object('returnToMessageId', o.id))
+          JOIN runs r ON r."sourceMessageId" = i.id
+          WHERE o."runId" = tree.id AND r."spaceId" = ${goal.spaceId}
+        UNION
+        SELECT r.id FROM runs r JOIN messages m ON m."threadId" = r."threadId"
+          WHERE r.trigger = 'spawn' AND m."runId" = tree.id AND m.role = 'user'
+            AND r."spaceId" = ${goal.spaceId}
+      ) child ON true
+      WHERE tree.depth < 5
+    )
+    SELECT DISTINCT id FROM tree LIMIT 300`;
+  return rows.map((row) => row.id);
+}
+
+/** Cost of the goal's runs and the runs they caused since it last started, plus the goal checks recorded against them. A null cost counts as 0. */
 export async function goalSpendUsd(prisma: PrismaClient, goal: GoalRow): Promise<number> {
-  const runs = await prisma.run.findMany({
-    where: { goalId: goal.id, spaceId: goal.spaceId },
-    select: { id: true },
-  });
-  const ids = runs.map((run) => run.id);
+  const ids = await goalRunTreeIds(prisma, goal);
   if (ids.length === 0) return 0;
   const total = await prisma.usageRecord.aggregate({
     _sum: { costUsd: true },
@@ -208,16 +244,25 @@ const lockThread = (tx: Prisma.TransactionClient, threadId: string) =>
   tx.$queryRaw`SELECT id FROM threads WHERE id = ${threadId} FOR UPDATE`;
 
 /**
- * Under the thread lock that send, finalize and stop use: the goal is still active, this run is not
- * judged yet and no run is live. Anything else means another worker or the owner got there first.
+ * Under the thread lock that send, finalize and stop use: the goal is still active at the version
+ * the check read, the judged run is the newest run of the goal (and not judged yet), and no run is
+ * live. Anything else means a newer run, the owner or another worker got there first, and the
+ * check's result is dropped.
  */
 async function checkStillOpen(
   tx: Prisma.TransactionClient,
-  input: { goalId: string; runId: string; threadId: string },
+  input: { goalId: string; runId: string; threadId: string; version: Date },
 ) {
   await lockThread(tx, input.threadId);
   const goal = await tx.threadGoal.findFirst({ where: { id: input.goalId, status: "active" } });
   if (!goal || goal.lastCheckedRunId === input.runId) return null;
+  if (goal.updatedAt.getTime() !== input.version.getTime()) return null;
+  const newest = await tx.run.findFirst({
+    where: { goalId: goal.id, spaceId: goal.spaceId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true },
+  });
+  if (newest?.id !== input.runId) return null;
   if (await threadHasLiveRun(tx, goal)) return null;
   return goal;
 }
@@ -225,7 +270,13 @@ async function checkStillOpen(
 /** Pauses an active goal without a verdict: its last run was cancelled, or the check cannot run. */
 export async function pauseGoalAfterCheck(
   prisma: PrismaClient,
-  input: { goalId: string; runId: string; stopReason: "owner" | "check_failed" | "model_error" },
+  input: {
+    goalId: string;
+    runId: string;
+    /** The goal's `updatedAt` as the check read it. */
+    version: Date;
+    stopReason: "owner" | "check_failed" | "model_error";
+  },
 ) {
   const found = await prisma.threadGoal.findUnique({
     where: { id: input.goalId },
@@ -259,6 +310,10 @@ export async function commitGoalVerdict(
   input: {
     goalId: string;
     judged: { id: string; failed: boolean; madeProgress: boolean };
+    /** The goal's `updatedAt` as the check read it; a changed goal drops the verdict. */
+    version: Date;
+    /** The runs whose evidence the check read; the continuation inherits their restrictions. */
+    readRunIds?: string[];
     verdict: GoalVerdict;
     /** The judged run failed because the model connection cannot run: the goal ends, whatever the verdict. */
     modelError?: boolean;
@@ -278,6 +333,7 @@ export async function commitGoalVerdict(
       goalId: input.goalId,
       runId: input.judged.id,
       threadId: found.threadId,
+      version: input.version,
     });
     if (!goal) return { kind: "skipped" } as const;
     const step: GoalStep = input.modelError
@@ -310,6 +366,22 @@ export async function commitGoalVerdict(
           thinkingLevel: true,
         },
       });
+      // The check read these runs' tool results, which outside content can shape, so the
+      // continuation keeps the strictest restriction of any of them. Whether a run read
+      // outside content lives only in memory, so a result from a tool that taints a run counts.
+      const read = await tx.run.findMany({
+        where: {
+          id: { in: [input.judged.id, ...(input.readRunIds ?? [])] },
+          goalId: goal.id,
+          spaceId: goal.spaceId,
+        },
+        select: { unattended: true, externalTaint: true, goalEvidence: true },
+      });
+      const sawOutsideContent = read.some(
+        (run) =>
+          run.externalTaint ||
+          parseGoalEvidence(run.goalEvidence).some((entry) => toolResultTaintsRun(entry.tool)),
+      );
       const row = await tx.threadGoal.update({
         where: { id: goal.id },
         data: { ...common, continuations: { increment: 1 } },
@@ -320,11 +392,7 @@ export async function commitGoalVerdict(
           botId: goal.botId,
           threadId: goal.threadId,
           userId: goal.userId,
-          prompt: goalContinuationPrompt({
-            reason: input.verdict.reason,
-            next: input.verdict.next || "Keep working.",
-            text: goal.text,
-          }),
+          prompt: goalContinuationPrompt({ reason: input.verdict.reason, text: goal.text }),
           status: "queued",
         },
       });
@@ -337,8 +405,8 @@ export async function commitGoalVerdict(
           userId: goal.userId,
           status: "queued",
           trigger: "goal",
-          unattended: newRunUnattended({ trigger: "goal" }),
-          externalTaint: newRunExternalTaint({ trigger: "goal" }),
+          unattended: newRunUnattended({ trigger: "goal" }) || read.some((run) => run.unattended),
+          externalTaint: newRunExternalTaint({ trigger: "goal" }) || sawOutsideContent,
           goalId: goal.id,
           // A model the owner pinned for the run stays pinned; otherwise the bot's own connection is resolved when it runs, as for a message.
           ...(judged.modelPinned

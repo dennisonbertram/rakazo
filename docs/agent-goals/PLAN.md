@@ -235,7 +235,7 @@ All limits are checked inside the `goal.check` transaction. Every one ends the g
 
 ### 3.8 Data model and migration
 
-The migration is `20261231000058_thread_goals`, or the next free number.
+The migrations are `20261231000059_thread_goals` and `20261231000060_run_goal_evidence`.
 
 ```prisma
 model ThreadGoal {

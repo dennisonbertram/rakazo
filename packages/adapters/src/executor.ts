@@ -313,6 +313,7 @@ import {
   autoReviewTimeoutMs,
   deploymentAutoReviewDefault,
   isAutoReviewCheckerConfigured,
+  redactNestedReviewValue,
   redactToolArgsForReview,
   resolveAutoReviewChecker,
   resolveAutoReviewProviderKind,
@@ -4695,9 +4696,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           result: unknown,
           thrown?: unknown,
         ) => {
+          // Redact the values before JSON escapes them: a secret with a quote or backslash no
+          // longer matches once serialized.
           const show = (value: unknown) => {
             try {
-              return redactSecrets(JSON.stringify(value) ?? "", runSecrets);
+              const json = JSON.stringify(value);
+              return json === undefined
+                ? ""
+                : JSON.stringify(redactNestedReviewValue(JSON.parse(json), runSecrets));
             } catch {
               return "[unserializable]";
             }
@@ -4719,6 +4725,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
             )
             .catch((error: unknown) => getLogger().warn("goal evidence write failed", { error }));
         };
+        // The owner can set a goal while this run is live; the send path then points the run's row
+        // at it. Read the row before each call so Auto Review, evidence and the end-of-run goal
+        // check follow the row, not the copy read when the run started.
+        const refreshGoalId = async () => {
+          if (run.goalId) return;
+          try {
+            const row = await deps.prisma.run.findUnique({
+              where: { id: runId },
+              select: { goalId: true },
+            });
+            if (row?.goalId) run.goalId = row.goalId;
+          } catch (error) {
+            getLogger().warn("goal id refresh failed", { error });
+          }
+        };
         const applyTool = async (
           name: string,
           args: Record<string, unknown>,
@@ -4726,6 +4747,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           route?: unknown,
           observer?: AgentToolExecutionObserver,
         ) => {
+          await refreshGoalId();
           try {
             const result = await applyToolCall(name, args, executionId, route, observer);
             if (run.goalId && !isToolPauseResult(result)) recordGoalEvidence(name, args, result);
@@ -12655,9 +12677,16 @@ type RunRow = NonNullable<Awaited<ReturnType<ExecutorDeps["prisma"]["run"]["find
 
 /** Best effort, like the compaction enqueue: the reconciler finds an ended goal run nobody checked. */
 async function enqueueGoalCheck(deps: ExecutorDeps, run: { id: string; goalId: string | null }) {
-  if (!run.goalId) return;
+  // A goal set while the run was live is on the row, not on the copy the run started with.
+  const goalId =
+    run.goalId ??
+    (await deps.prisma.run
+      .findUnique({ where: { id: run.id }, select: { goalId: true } })
+      .then((row) => row?.goalId ?? null)
+      .catch(() => null));
+  if (!goalId) return;
   await deps.jobs
-    .enqueue(goalCheckJob(run.goalId, run.id))
+    .enqueue(goalCheckJob(goalId, run.id))
     .catch((error) => getLogger().error("goal.check enqueue failed", error));
 }
 

@@ -187,6 +187,8 @@ export async function runGoalCheck(
   const target = await loadGoalToCheck(deps.prisma, payload);
   if (!target) return;
   const { goal, run } = target;
+  // The goal as this check read it: a pause, resume or newer run before the write drops the result.
+  const version = goal.updatedAt;
   const announce = (result: { threadId: string; seq: number } | null) =>
     result
       ? deps.events.notify(result.threadId, result.seq).catch((error) => {
@@ -201,6 +203,7 @@ export async function runGoalCheck(
         await pauseGoalAfterCheck(deps.prisma, {
           goalId: goal.id,
           runId: run.id,
+          version,
           stopReason: "owner",
         }),
       );
@@ -211,6 +214,7 @@ export async function runGoalCheck(
   if (await threadHasLiveRun(deps.prisma, goal)) return;
 
   const now = () => deps.now?.() ?? new Date();
+  let readRunIds: string[] = [];
   const judgedEvidence = parseGoalEvidence(run.goalEvidence);
   const judged = {
     id: run.id,
@@ -225,6 +229,8 @@ export async function runGoalCheck(
     const outcome = await commitGoalVerdict(deps.prisma, {
       goalId: goal.id,
       judged,
+      version,
+      readRunIds,
       verdict,
       modelError: extra.modelError,
       spendUsd: await goalSpendUsd(deps.prisma, goal),
@@ -279,10 +285,16 @@ export async function runGoalCheck(
 
   const pause = async (stopReason: "check_failed") =>
     announce(
-      await pauseGoalAfterCheck(deps.prisma, { goalId: goal.id, runId: run.id, stopReason }),
+      await pauseGoalAfterCheck(deps.prisma, {
+        goalId: goal.id,
+        runId: run.id,
+        version,
+        stopReason,
+      }),
     );
 
   const input = await loadGoalCheckInput(deps.prisma, goal, run.id);
+  readRunIds = input.runs.map((listed) => listed.id);
   const evidenceIds = goalCheckEvidenceIds(input.runs);
   const known = new Set(evidenceIds);
   const evidenceText: Record<string, string> = {};
