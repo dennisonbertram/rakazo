@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { MailAccountSummary, MailApproval, MailEdits } from "@rakazo/contracts";
-import { isClosedApprovalAnswer } from "@rakazo/core";
+import { isClosedApprovalAnswer, SKIPPED_APPROVAL_ANSWER } from "@rakazo/core";
 import {
   Button,
   cn,
@@ -281,6 +281,8 @@ export function MailApprovalCard({
       )
     ) : mail.outcome === "unknown" ? (
       <Trans>Unknown</Trans>
+    ) : answer === SKIPPED_APPROVAL_ANSWER ? (
+      <Trans>Skipped</Trans>
     ) : isClosedApprovalAnswer(answer) ? (
       // The server closed this card (replaced by a newer one, or its run failed): never sent.
       <Trans>Not sent</Trans>

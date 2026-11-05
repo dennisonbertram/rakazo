@@ -43,7 +43,6 @@ import {
   DEFAULT_BOT_COLOR,
   inferAttachmentMimeType,
   isActive,
-  isApprovalAskBlock,
   isRunTerminalEvent,
   latestAnswerableAskMessageId,
   matchesArtifactQuery,
@@ -236,11 +235,7 @@ import {
   rightPanelStorageKey,
   writeRightPanelState,
 } from "../lib/right-panel-state";
-import {
-  needsAnswerLabel,
-  rosterStatusChanged,
-  waitingForApprovalLabel,
-} from "../lib/roster-status";
+import { rosterStatusChanged, waitingForApprovalLabel } from "../lib/roster-status";
 import type { MissingBotSeen } from "../lib/route-bot";
 import { resolveRouteBot, shouldClearMissingBot, useGiveUpOnMissingBot } from "../lib/route-bot";
 import { rpc, selectedSpaceId, selectSpace } from "../lib/rpc";
@@ -2780,13 +2775,6 @@ export function ShellPage() {
     () => ownerOnlyCredentialAskMessageIds(activeSnapshot, userId),
     [activeSnapshot, userId],
   );
-  const waitingOnApproval = Boolean(
-    activeSnapshot?.delegatePending?.length ||
-      (answerableAskMessageId &&
-        activeSnapshot?.messages
-          .find((message) => message.id === answerableAskMessageId)
-          ?.blocks.some((block) => block.kind === "ask" && isApprovalAskBlock(block))),
-  );
   const workingRuns = currentRuns.filter((run) =>
     ["running", "queued", "leased"].includes(run.status),
   );
@@ -4731,11 +4719,7 @@ export function ShellPage() {
               attachmentNotice={attachmentNotice}
               onDismissAttachmentNotice={() => setAttachmentNotice(null)}
               placeholder={
-                activeSnapshot?.delegatePending?.length
-                  ? waitingForApprovalLabel()
-                  : waitingOnApproval
-                    ? needsAnswerLabel()
-                    : undefined
+                activeSnapshot?.delegatePending?.length ? waitingForApprovalLabel() : undefined
               }
               sendError={sendError}
               runError={displayedRunError}

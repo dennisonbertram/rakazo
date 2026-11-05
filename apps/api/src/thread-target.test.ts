@@ -1462,86 +1462,116 @@ describe("sendThreadMessage", () => {
     );
   });
 
-  it("still requires the card for a pending approval ask", async () => {
-    const tx = {
-      externalEffect: { findMany: vi.fn(async () => []) },
-      thread: {
-        update: vi.fn().mockResolvedValue({ nextMessageSeq: 2 }),
-      },
-      message: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        count: vi.fn().mockResolvedValue(2),
-        create: vi.fn().mockResolvedValue({
-          id: "msg-1",
-          threadId: "thread-1",
-          seq: 1,
-          role: "user",
-          blocks: [{ kind: "text", text: "allow" }],
-          botId: null,
-          replyToMessageId: null,
-          runId: null,
-          createdAt: new Date(),
-        }),
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: "ask-1",
-            blocks: [
-              {
-                kind: "ask",
-                approvalEffectId: "effect-1",
-                text: "Review before writing",
-                status: "pending",
-                actions: [
-                  { id: "allow", label: "Allow once" },
-                  { id: "deny", label: "Deny" },
-                ],
-              },
-            ],
-          },
-        ]),
-        update: vi.fn(),
-      },
-      run: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([{ id: "run-waiting", taskId: "task-1", status: "waiting_input" }]),
-      },
-      steeringMessage: { create: vi.fn() },
-      event: { create: vi.fn() },
-      task: { create: vi.fn() },
+  describe("a message sent while approval cards wait", () => {
+    const approvalCard = {
+      kind: "ask",
+      approvalEffectId: "effect-1",
+      text: "Send an email?",
+      status: "pending",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "deny", label: "Deny" },
+      ],
     };
-    const prisma = {
-      message: { findUnique: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
-      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
-    } as unknown as PrismaClient;
-    const actor = { spaceId: "workspace-1", userId: "user-1" } as Actor;
-    const target = {
-      kind: "bot",
-      botId: "bot-1",
-      threadId: "thread-1",
-      bot: { computer: null },
-    } as ThreadTarget;
+    const secretCard = { kind: "ask", text: "Paste the key", status: "pending", input: "secret" };
+    const setup = (card: unknown) => {
+      const tx = {
+        externalEffect: { findMany: vi.fn(async () => []), updateMany: vi.fn() },
+        $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+        thread: {
+          update: vi.fn(async ({ data }: { data: { nextMessageSeq?: unknown } }) =>
+            data.nextMessageSeq ? { nextMessageSeq: 2 } : { nextEventSeq: 3 },
+          ),
+        },
+        message: {
+          findFirst: vi.fn().mockResolvedValue(null),
+          count: vi.fn().mockResolvedValue(2),
+          create: vi.fn().mockResolvedValue({
+            id: "msg-1",
+            threadId: "thread-1",
+            seq: 1,
+            role: "user",
+            blocks: [{ kind: "text", text: "never mind, do it later" }],
+            botId: null,
+            replyToMessageId: null,
+            runId: null,
+            createdAt: new Date(),
+          }),
+          findMany: vi.fn().mockResolvedValue([{ id: "ask-1", blocks: [card] }]),
+          update: vi.fn(),
+        },
+        run: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: "run-waiting",
+              taskId: "task-1",
+              status: "waiting_input",
+              trigger: "user",
+            },
+          ]),
+          findFirst: vi.fn().mockResolvedValue({ botId: "bot-1" }),
+          findUnique: vi.fn().mockResolvedValue({ status: "queued" }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        steeringMessage: { create: vi.fn() },
+        event: { create: vi.fn().mockResolvedValue({ seq: 2, threadId: "thread-1" }) },
+        task: { create: vi.fn(), updateMany: vi.fn() },
+        approvalRule: { upsert: vi.fn(), create: vi.fn() },
+      };
+      const prisma = {
+        message: { findUnique: vi.fn().mockResolvedValue(null) },
+        run: { findFirst: vi.fn().mockResolvedValue(null) },
+        $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+      } as unknown as PrismaClient;
+      const enqueue = vi.fn().mockResolvedValue(undefined);
+      const send = () =>
+        sendThreadMessage(
+          {
+            prisma,
+            events: { notify: vi.fn().mockResolvedValue(undefined) } as never,
+            jobs: { enqueue } as never,
+          },
+          { spaceId: "workspace-1", userId: "user-1" } as Actor,
+          {
+            kind: "bot",
+            botId: "bot-1",
+            threadId: "thread-1",
+            bot: { computer: null },
+          } as ThreadTarget,
+          { text: "never mind, do it later", clientNonce: "nonce-1" },
+        );
+      return { tx, enqueue, send };
+    };
 
-    await expect(
-      sendThreadMessage(
-        {
-          prisma,
-          events: { notify: vi.fn() } as never,
-          jobs: { enqueue: vi.fn() } as never,
-        },
-        actor,
-        target,
-        {
-          text: "allow",
-          clientNonce: "nonce-1",
-        },
-      ),
-    ).rejects.toMatchObject({
-      code: "CONFLICT",
-      message: "Answer the pending ask first.",
+    it("skips the card as a decline, resumes the run and hands it the message", async () => {
+      const { tx, enqueue, send } = setup(approvalCard);
+      await expect(send()).resolves.toMatchObject({ runId: "run-waiting" });
+      expect(tx.externalEffect.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: "denied" }) }),
+      );
+      expect(tx.message.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { blocks: [expect.objectContaining({ status: "answered", answer: "skipped" })] },
+        }),
+      );
+      expect(tx.approvalRule.upsert).not.toHaveBeenCalled();
+      expect(tx.steeringMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ runId: "run-waiting" }),
+      });
+      expect(enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "run.continue", payload: { runId: "run-waiting" } }),
+      );
     });
-    expect(tx.steeringMessage.create).not.toHaveBeenCalled();
+
+    it("still refuses while a secret request is open", async () => {
+      const { tx, send } = setup(secretCard);
+      await expect(send()).rejects.toMatchObject({
+        code: "CONFLICT",
+        message: "Answer the pending ask first.",
+      });
+      expect(tx.externalEffect.updateMany).not.toHaveBeenCalled();
+      expect(tx.steeringMessage.create).not.toHaveBeenCalled();
+    });
   });
 
   it("waits for the creation intro instead of starting a second run", async () => {
