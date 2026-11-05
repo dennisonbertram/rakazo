@@ -11148,6 +11148,7 @@ async function assertRoutineModel(
 
 const routineInclude = {
   watchState: true,
+  connectionPause: { select: { pausedUntil: true } },
   taughtSkill: { select: { id: true, name: true } },
 } as const;
 
@@ -11196,10 +11197,12 @@ function mapRoutine(
       lastChangedAt: Date | null;
       pausedReason: string | null;
     } | null;
+    connectionPause?: { pausedUntil: Date } | null;
     createdAt: Date;
   },
   lastRunFailed = false,
 ): Routine {
+  const creditPaused = (row.connectionPause?.pausedUntil.getTime() ?? 0) > Date.now();
   const watch = WatchSpecSchema.safeParse(row.watch);
   return {
     id: row.id,
@@ -11228,7 +11231,9 @@ function mapRoutine(
       nextRunAt: row.nextRunAt?.toISOString() ?? null,
       lastCheckedAt: row.watchState?.lastCheckedAt?.toISOString() ?? null,
       lastChangedAt: row.watchState?.lastChangedAt?.toISOString() ?? null,
-      pausedReason: (row.watchState?.pausedReason as WatchPausedReason | null) ?? null,
+      pausedReason:
+        (row.watchState?.pausedReason as WatchPausedReason | null) ??
+        (creditPaused ? "credit" : null),
       lastRunFailed,
     },
     createdAt: row.createdAt.toISOString(),

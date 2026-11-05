@@ -10360,6 +10360,10 @@ msgid "Paused · {0} of {1} min saved"
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
+msgid "Paused: model connection out of credit"
+msgstr "일시중지됨: 모델 연결의 크레딧 소진"
+
+#: src/pages/RoutineEditor.tsx
 msgid "Paused: no access"
 msgstr ""
 

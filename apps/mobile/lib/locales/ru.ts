@@ -990,6 +990,8 @@ export const RU_MESSAGES: Record<string, string> = {
   "Last ran": "Последний запуск",
   Next: "Следующий",
   "Paused: no access": "Приостановлено: нет доступа",
+  "Paused: model connection out of credit":
+    "Приостановлено: на подключении к модели закончился кредит",
   "Paused: the page changes too often": "Приостановлено: страница меняется слишком часто",
   "Paused: the page could not be checked": "Приостановлено: не удалось проверить страницу",
   "Paused: too many checks today": "Приостановлено: сегодня слишком много проверок",

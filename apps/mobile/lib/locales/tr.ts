@@ -939,6 +939,7 @@ export const TR_MESSAGES: Record<string, string> = {
   "Last ran": "Son çalışma",
   Next: "Sonraki",
   "Paused: no access": "Duraklatıldı: erişim yok",
+  "Paused: model connection out of credit": "Duraklatıldı: model bağlantısının kredisi bitti",
   "Paused: the page changes too often": "Duraklatıldı: sayfa çok sık değişiyor",
   "Paused: the page could not be checked": "Duraklatıldı: sayfa kontrol edilemedi",
   "Paused: too many checks today": "Duraklatıldı: bugün çok fazla kontrol yapıldı",

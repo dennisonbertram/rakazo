@@ -138,3 +138,53 @@ async function updateSchedule(
     getLogger().error(logMessage, error);
   }
 }
+
+/** How long routines skip a connection whose account ran out of credit before trying it again. */
+// ponytail: fixed cool-down; count repeats and double it if hourly retries prove too noisy.
+export const CONNECTION_CREDIT_PAUSE_MS = 60 * 60_000;
+
+/** One owner's model connection in one space. */
+export type ConnectionScope = { spaceId: string; userId: string; credentialId: string };
+
+/**
+ * The provider said the connection is out of credit. Routines on it in this space skip their
+ * occurrences until the cool-down ends or a run on it gets through. Insert-or-extend in one
+ * statement, so workers that hit the same refusal at once leave one row. `routineId` names the
+ * routine whose run was refused, so its status shows the pause at once.
+ */
+export async function pauseConnectionForCredit(
+  deps: { prisma: PrismaClient },
+  scope: ConnectionScope,
+  routineId?: string | null,
+  now = new Date(),
+): Promise<void> {
+  const pausedUntil = new Date(now.getTime() + CONNECTION_CREDIT_PAUSE_MS);
+  try {
+    await deps.prisma.$executeRaw`
+      INSERT INTO model_connection_pauses ("spaceId", "userId", "credentialId", "pausedUntil", "updatedAt")
+      VALUES (${scope.spaceId}, ${scope.userId}, ${scope.credentialId}, ${pausedUntil}, ${now})
+      ON CONFLICT ("spaceId", "userId", "credentialId") DO UPDATE
+      SET "pausedUntil" = GREATEST(model_connection_pauses."pausedUntil", EXCLUDED."pausedUntil"),
+          "updatedAt" = EXCLUDED."updatedAt"`;
+    if (routineId) {
+      await deps.prisma.routine.updateMany({
+        where: { id: routineId, spaceId: scope.spaceId, userId: scope.userId },
+        data: { pausedConnectionId: scope.credentialId },
+      });
+    }
+  } catch (error) {
+    getLogger().error("model_connection.credit_pause", error);
+  }
+}
+
+/** A run on the connection got through, so its routines run again (their status clears too). */
+export async function clearConnectionPause(
+  deps: { prisma: PrismaClient },
+  scope: ConnectionScope,
+): Promise<void> {
+  try {
+    await deps.prisma.modelConnectionPause.deleteMany({ where: scope });
+  } catch (error) {
+    getLogger().error("model_connection.credit_pause_clear", error);
+  }
+}

@@ -528,6 +528,7 @@ model Member {
 }
 
 model Space {
+  modelConnectionPauses ModelConnectionPause[]
   pipelineRecords PipelineRecord[]
   pipelineImports PipelineImport[]
   artifactShares              ArtifactShare[]
@@ -738,10 +739,29 @@ model UserModelCredential {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   preferences    SpaceModelPreference[]
+  creditPauses   ModelConnectionPause[]
 
   @@unique([id, userId])
   @@index([userId, provider, updatedAt])
   @@map("user_model_credentials")
+}
+
+/// The provider said this connection's account is out of credit, so routines on it in this space
+/// skip their occurrences until `pausedUntil`. A run on the connection that gets through deletes it.
+model ModelConnectionPause {
+  spaceId      String
+  space        Space                @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId       String
+  credentialId String
+  credential   UserModelCredential  @relation(fields: [credentialId, userId], references: [id, userId], onDelete: Cascade)
+  pausedUntil  DateTime
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  routines     Routine[]
+
+  @@id([spaceId, userId, credentialId])
+  @@index([credentialId])
+  @@map("model_connection_pauses")
 }
 
 model UserVoiceCredential {
@@ -1305,6 +1325,9 @@ model Routine {
   nextRunAt       DateTime?
   /// Runs in a row the model provider refused for the account; each one spaces out the schedule.
   accountFailures Int       @default(0)
+  /// The out-of-credit connection that held this routine's last occurrence; shown while that pause lasts.
+  pausedConnectionId String?
+  connectionPause    ModelConnectionPause? @relation(fields: [spaceId, userId, pausedConnectionId], references: [spaceId, userId, credentialId], onDelete: SetNull)
   /// Server adds silent-reply guidance; a quiet run that says nothing shows "Nothing to report".
   quiet           Boolean   @default(false)
   /// WatchSpecSchema JSON ({ kind: "page", url, intervalMinutes }) or null.

@@ -145,3 +145,17 @@ export function isTransientModelError(error: unknown): boolean {
     )
   );
 }
+
+/**
+ * The provider says the account has no credit left: HTTP 402 Payment Required (OpenRouter and
+ * most gateways), OpenAI's `insufficient_quota` code (sent with 429), or a 400/402/403 whose
+ * message states the balance is exhausted (Anthropic and others; see isAccountExhaustion). Status
+ * and code come from structured fields when the runtime keeps them; runtimes that pass only a
+ * message are read for the same status and code, and the wording check is the fallback.
+ */
+export function isOutOfCredit(error: unknown): boolean {
+  const { text, statuses } = errorFacts(error);
+  if (statuses.has(401)) return false;
+  if (statuses.has(402) || /\binsufficient_quota\b/.test(text)) return true;
+  return isAccountExhaustion(error);
+}
