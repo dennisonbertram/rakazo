@@ -73,6 +73,17 @@ export function CompanyContext() {
       }
     } catch (cause) {
       fail(cause);
+      // Keep the typed text but start from the latest revision, so the next save is not rejected
+      // again for the same old one.
+      if (draft.id) {
+        try {
+          const latest = (await rpc.companyContext.list()).find((s) => s.id === draft.id);
+          if (latest) setDraft((current) => current && { ...current, revision: latest.revision });
+          list.reload();
+        } catch {
+          // The error above stays; a later save fails the same way.
+        }
+      }
     } finally {
       setSaving(false);
     }

@@ -114,3 +114,22 @@ it("saves an edit against the revision it opened, and shows a conflict", async (
   // The draft stays open so nothing typed is lost.
   expect(container.querySelector('textarea[aria-label="What is it?"]')).not.toBeNull();
 });
+
+it("retries a conflicted save against the latest revision, keeping the typed text", async () => {
+  await show([acme], "/app/company?view=context&section=acme-widget");
+  await act(async () => button("Edit")!.click());
+  rpcMock.companyContext.save.mockRejectedValueOnce(
+    new Error("This section changed since it was opened"),
+  );
+  rpcMock.companyContext.save.mockResolvedValue({ ...acme, revision: 4 });
+  await type('textarea[aria-label="What is it?"]', "Changed.");
+  rpcMock.companyContext.list.mockResolvedValue([{ ...acme, revision: 3 }]);
+  await act(async () => button("Save")!.click());
+  await act(async () => button("Save")!.click());
+  expect(rpcMock.companyContext.save).toHaveBeenLastCalledWith({
+    id: "doc_acme",
+    title: "Acme Widget",
+    text: "Changed.",
+    expectedRevision: 3,
+  });
+});
