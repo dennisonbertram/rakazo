@@ -5,7 +5,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { act, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { UNDO_SEND_MS } from "../lib/outbox";
+import { UNDO_SEND_MS, undoSend } from "../lib/outbox";
 import { MailReplyBatchCard } from "./MailReplyBatchCard";
 
 vi.mock("@lingui/core/macro", () => ({
@@ -199,7 +199,7 @@ it("posts only ticked rows, with hash and seen message, after the undo window", 
     botId: "bot-1",
     runId: "run-1",
     messageId: "message-1",
-    rows: [{ itemId: "clean", hash: row("clean").hash, seenMessageId: "m-clean" }],
+    rows: [{ itemId: "clean", hash: row("clean").hash, seenMessageId: "m-clean", flags: [] }],
   });
 });
 
@@ -213,7 +213,12 @@ it("a deliberate tick of a flagged row sends it, with the newest message as ackn
   await click(tick("flagged") as HTMLInputElement);
   await pressSend(/Send selected/);
   expect(rpc.threads.sendMailBatch.mock.calls[0]?.[0].rows).toEqual([
-    { itemId: "flagged", hash: row("flagged").hash, seenMessageId: "newer" },
+    {
+      itemId: "flagged",
+      hash: row("flagged").hash,
+      seenMessageId: "newer",
+      flags: ["new_message"],
+    },
   ]);
 });
 
@@ -272,6 +277,123 @@ it("an edit adding a recipient flags and unticks that row at once; Send waits fo
   // Ticking it again is the owner's choice and stays, until the flags change again.
   await click(tick("clean") as HTMLInputElement);
   expect(tick("clean")?.checked).toBe(true);
+});
+
+it("a press refused as stale rechecks an edited row: the new message flags and unticks it", async () => {
+  await render(batch([row("one")]));
+  await click(host.querySelector("li button") as Element);
+  await click(button("Edit"));
+  rpc.threads.previewMailBatch.mockResolvedValue({
+    rows: [{ itemId: "one", flags: [], startsUnticked: false }],
+  });
+  await type(host.querySelector("textarea") as HTMLTextAreaElement, "An edited reply");
+  await settle();
+  expect(tick("one")?.checked).toBe(true);
+  // A new email arrived: the press is refused, and the reload carries its id.
+  rpc.threads.sendMailBatch.mockRejectedValueOnce(new Error("This card changed."));
+  rpc.threads.mailBatch.mockResolvedValue(batch([row("one", { seenMessageId: "newer" })]));
+  rpc.threads.previewMailBatch.mockResolvedValue({
+    rows: [{ itemId: "one", flags: ["new_message"], startsUnticked: true }],
+  });
+  await pressSend(/Send selected/);
+  // Send stays closed until the edited row has been checked again.
+  expect(buttonMatching(/Send selected/)?.disabled).toBe(true);
+  await settle();
+  expect(items()[0]).toContain("New message");
+  expect(tick("one")?.checked).toBe(false);
+  // The deliberate tick posts the flags the owner was shown.
+  await click(tick("one") as HTMLInputElement);
+  await pressSend(/Send selected/);
+  expect(rpc.threads.sendMailBatch.mock.lastCall?.[0].rows[0]).toMatchObject({
+    seenMessageId: "newer",
+    flags: ["new_message"],
+  });
+});
+
+it("locks ticks and edits during the undo window, and Undo opens them again", async () => {
+  await render(batch(threeRows()));
+  const clean = [...host.querySelectorAll("li")].find((el) =>
+    el.textContent?.includes("clean@customer"),
+  );
+  await click(clean?.querySelector("button") as Element);
+  await click(button("Edit"));
+  expect(host.querySelector("textarea")).not.toBeNull();
+  await click(buttonMatching(/Send selected/));
+  expect(tick("clean")?.disabled).toBe(true);
+  expect(host.querySelector("textarea")).toBeNull();
+  expect(button("Done")).toBeUndefined();
+  await act(async () => undoSend());
+  expect(tick("clean")?.disabled).toBe(false);
+  expect(rpc.threads.sendMailBatch).not.toHaveBeenCalled();
+});
+
+it("an open row shows what another tab sent, with its real result, not the local edit", async () => {
+  await render(batch([row("one")]));
+  await click(host.querySelector("li button") as Element);
+  await click(button("Edit"));
+  rpc.threads.previewMailBatch.mockResolvedValue({
+    rows: [{ itemId: "one", flags: [], startsUnticked: false }],
+  });
+  await type(host.querySelector("textarea") as HTMLTextAreaElement, "My local edit");
+  await settle();
+  rpc.threads.mailBatch.mockResolvedValue(
+    batch(
+      [
+        row("one", {
+          body: "What the other tab sent",
+          hash: "z".repeat(64),
+          state: "not_sent",
+          retryable: true,
+        }),
+      ],
+      "completed",
+    ),
+  );
+  await act(async () => {
+    root.render(
+      <StrictMode>
+        <MailReplyBatchCard
+          block={block({
+            status: "answered",
+            answer: "send",
+            mailBatch: { count: 1, sent: 0, failed: 1, unknown: 0, settled: true },
+          })}
+          botId="bot-1"
+          message={{ id: "message-1", runId: "run-1" }}
+          canAnswer
+          onAnswer={onAnswer}
+          onOpenComposer={onOpenComposer}
+          fallback={<div>fallback card</div>}
+        />
+      </StrictMode>,
+    );
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  const opened = host.querySelector("[data-testid=mail-approval-card]") as HTMLElement;
+  expect(opened.textContent).toContain("What the other tab sent");
+  expect(opened.textContent).toContain("This email was not sent");
+  expect(host.textContent).not.toContain("My local edit");
+  expect(host.querySelector("textarea")).toBeNull();
+});
+
+it("a row already taken to the composer can be opened again", async () => {
+  const draft = {
+    connectionId: "c1",
+    account: "a@example.test",
+    to: [],
+    cc: [],
+    bcc: [],
+    subject: "s",
+    body: "b",
+  };
+  rpc.threads.mailBatchToComposer.mockResolvedValue(draft);
+  await render(
+    batch([row("gone", { state: "composer" })], "completed"),
+    block({ status: "answered", answer: "send" }),
+  );
+  await click(host.querySelector("li button") as Element);
+  await click(button("Open in composer"));
+  expect(onOpenComposer).toHaveBeenCalledWith(draft);
 });
 
 it("reviews hidden ticked rows before sending a large batch", async () => {

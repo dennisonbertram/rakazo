@@ -270,6 +270,8 @@ export const MailBatchPressRowSchema = z.object({
   itemId: Id,
   hash: z.string().length(64),
   seenMessageId: z.string().max(500).nullable(),
+  /** The flags the card showed for this row, edits included. The server recomputes them. */
+  flags: z.array(MailReplyFlagSchema),
   edits: MailEditsSchema.omit({ account: true, send: true }).optional(),
 });
 export type MailBatchPressRow = z.infer<typeof MailBatchPressRowSchema>;

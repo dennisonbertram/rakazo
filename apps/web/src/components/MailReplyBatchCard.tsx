@@ -212,12 +212,20 @@ export function MailReplyBatchCard({
   const edits = useMemo(
     () =>
       rows.flatMap((row) => {
+        // Once a row left review, what the server holds is what is true, not a local edit.
+        if (row.state !== "reviewing") return [];
         const changed = changedFields(row, edited[row.itemId]);
         return Object.keys(changed).length ? [{ itemId: row.itemId, edits: changed }] : [];
       }),
     [rows, edited],
   );
-  const editsKey = JSON.stringify(edits);
+  // What the server knows of an edited row is part of the check: a new message means a new check.
+  const editsKey = JSON.stringify(
+    edits.map(({ itemId, edits: changed }) => {
+      const row = rows.find((candidate) => candidate.itemId === itemId);
+      return [itemId, changed, row?.seenMessageId, row?.flags];
+    }),
+  );
 
   // Editing recomputes flags on the server, so an edit adding a recipient unticks that row at once.
   useEffect(() => {
@@ -265,17 +273,19 @@ export function MailReplyBatchCard({
     };
   }, [editsKey, ids, applyFlags]);
 
-  // A flag the server found since the last read (a new message) unticks an unedited row too.
+  // A flag the server found since the last read (a new message) unticks a row. An edited row gets
+  // its flags from the check above, which runs again when this read changes it.
   useEffect(() => {
+    const isEdited = new Set(edits.map((edit) => edit.itemId));
     applyFlags(
       rows
-        .filter((row) => !edited[row.itemId] && row.state === "reviewing")
+        .filter((row) => !isEdited.has(row.itemId) && row.state === "reviewing")
         .map((row) => ({
           itemId: row.itemId,
           flags: { flags: row.flags, startsUnticked: row.startsUnticked },
         })),
     );
-  }, [rows, edited, applyFlags]);
+  }, [rows, edits, applyFlags]);
 
   const reviewing = block.status !== "answered" && canAnswer;
   const list = useCappedRows(rows, { phone: CAP, desktop: CAP });
@@ -320,6 +330,8 @@ export function MailReplyBatchCard({
             itemId: row.itemId,
             hash: row.hash,
             seenMessageId: row.seenMessageId,
+            // What this card showed; the server refuses a row with a flag not in this list.
+            flags: previews[row.itemId]?.flags ?? row.flags,
             ...(Object.keys(changed).length ? { edits: changed } : {}),
           };
         }),
@@ -408,8 +420,9 @@ export function MailReplyBatchCard({
       </div>
       <ul>
         {list.rows.map((row) => {
-          const fields = edited[row.itemId] ?? fieldsOf(row);
-          const flags = previews[row.itemId]?.flags ?? row.flags;
+          const inReview = row.state === "reviewing";
+          const fields = (inReview ? edited[row.itemId] : undefined) ?? fieldsOf(row);
+          const flags = (inReview ? previews[row.itemId]?.flags : undefined) ?? row.flags;
           const [first = "", ...others] = [fields.to, fields.cc, fields.bcc].flatMap(addressesOf);
           const isOpen = open === row.itemId;
           const mail: MailApproval = {
@@ -420,6 +433,13 @@ export function MailReplyBatchCard({
             subject: fields.subject,
             body: fields.body,
             reply: true,
+            ...(row.state === "sent"
+              ? { outcome: "sent" as const }
+              : row.state === "not_sent"
+                ? { outcome: "failed" as const }
+                : row.state === "unknown"
+                  ? { outcome: "unknown" as const }
+                  : {}),
           };
           return (
             <li key={row.itemId} className="border-t border-border">
@@ -428,6 +448,7 @@ export function MailReplyBatchCard({
                   <Checkbox
                     className="mt-0.5"
                     checked={ticks.has(row.itemId)}
+                    disabled={busy}
                     aria-label={t`Include reply to ${first}`}
                     onCheckedChange={(value) =>
                       setTicks((current) => {
@@ -468,20 +489,21 @@ export function MailReplyBatchCard({
                       ))}
                     </div>
                   ) : null}
-                  {/* Its header and buttons are this card's. The key keeps edits when the rows reload. */}
+                  {/* Its header and buttons are this card's. The key keeps edits when the rows reload,
+                      and starts again from the server's text when another tab changed the row. */}
                   <MailApprovalCard
-                    key={row.itemId}
+                    key={`${row.itemId}:${row.hash}`}
                     mail={mail}
-                    status="pending"
+                    status={reviewing && inReview ? "pending" : "answered"}
                     canAnswer={reviewing}
                     onAnswer={async () => undefined}
-                    embedded={{ editing: editing && reviewing }}
+                    embedded={{ editing: editing && reviewing && !busy }}
                     onFieldsChange={(next) =>
                       setEdited((current) => ({ ...current, [row.itemId]: next }))
                     }
                   />
                   <div className="flex flex-wrap gap-2 px-2 pt-2">
-                    {reviewing ? (
+                    {reviewing && !busy ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -492,7 +514,8 @@ export function MailReplyBatchCard({
                         {editing ? <Trans>Done</Trans> : <Trans>Edit</Trans>}
                       </Button>
                     ) : null}
-                    {row.state === "not_sent" && row.retryable && onOpenComposer ? (
+                    {((row.state === "not_sent" && row.retryable) || row.state === "composer") &&
+                    onOpenComposer ? (
                       <Button variant="outline" size="sm" onClick={() => void toComposer(row)}>
                         <Trans>Open in composer</Trans>
                       </Button>

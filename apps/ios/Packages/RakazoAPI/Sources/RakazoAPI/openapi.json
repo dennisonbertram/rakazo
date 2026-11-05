@@ -146353,6 +146353,20 @@
               }
             ]
           },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "not_on_thread",
+                "new_message",
+                "important_sender",
+                "no_reply_address",
+                "no_reply_needed",
+                "has_link"
+              ]
+            }
+          },
           "edits": {
             "type": "object",
             "properties": {
@@ -146383,7 +146397,8 @@
         "required": [
           "itemId",
           "hash",
-          "seenMessageId"
+          "seenMessageId",
+          "flags"
         ]
       },
       "RpcThreadsStopInputSchema0": {

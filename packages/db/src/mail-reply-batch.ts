@@ -419,6 +419,8 @@ export async function moveMailReplyRowToComposer(
     const row = await tx.mailReplyItem.findFirst({
       where: { ...scope, effectId: input.effectId, id: input.itemId },
     });
+    // Already moved: the first response may have been lost, so the same row comes back.
+    if (row?.dispatch === "composer") return row;
     if (!row || (row.dispatch !== "claimed" && row.dispatch !== "held")) return null;
     if (row.error === MAIL_REPLY_HASH_HOLD) return null;
     const record = await tx.composeSend.findUnique({

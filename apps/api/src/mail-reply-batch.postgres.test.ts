@@ -212,10 +212,24 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
   const read = (c: Card, who: Actor = f.a) => readMailBatch(rpcDeps(), who, target(), c.ids);
   const pressRows = async (c: Card, ticked: number[], edits: Record<number, object> = {}) => {
     const { rows } = await read(c);
-    return ticked.map((index) => ({
+    // What the card shows: the flags of each row as it stands with its edits.
+    const shown = await Promise.all(
+      ticked.map(async (index) =>
+        edits[index]
+          ? (
+              await previewMailBatch(rpcDeps(), f.a, target(), {
+                ...c.ids,
+                rows: [{ itemId: rows[index]!.itemId, edits: edits[index] as never }],
+              })
+            ).rows[0]!.flags
+          : rows[index]!.flags,
+      ),
+    );
+    return ticked.map((index, position) => ({
       itemId: rows[index]!.itemId,
       hash: rows[index]!.hash,
       seenMessageId: rows[index]!.seenMessageId,
+      flags: shown[position]!,
       ...(edits[index] ? { edits: edits[index] } : {}),
     }));
   };
@@ -645,6 +659,34 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect((await rowsOf(c))[0]?.seenMessageId).toBe("t1-m2");
       await work(c);
       expect(sent()).toHaveLength(1);
+    });
+
+    it("rejects a press for a row whose flags the client was not shown", async () => {
+      const c = await card(["t1"]);
+      const [row] = await pressRows(c, [0]);
+      await cacheInbound("t1", "t1-m2", new Date());
+      // The right acknowledgement, from a client that never showed New message.
+      await expect(
+        sendMailBatch(rpcDeps(), f.a, target(), {
+          ...c.ids,
+          rows: [{ ...row!, seenMessageId: "t1-m2", flags: [] }],
+        }),
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+      expect((await effectOf(c)).status).toBe("intended");
+      await press(c, [0]);
+      expect((await effectOf(c)).status).toBe("executing");
+    });
+
+    it("rejects an edit whose new flag the client was not shown", async () => {
+      const c = await card(["t1"]);
+      const [row] = await pressRows(c, [0]);
+      await expect(
+        sendMailBatch(rpcDeps(), f.a, target(), {
+          ...c.ids,
+          rows: [{ ...row!, edits: { cc: "new@elsewhere.example.test" } }],
+        }),
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+      expect((await effectOf(c)).status).toBe("intended");
     });
 
     it("refuses while sending is off for the bot or the deployment", async () => {
@@ -1273,11 +1315,20 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect(sent()).toEqual([]);
     });
 
-    it("a second press and a race with Retry move the row once", async () => {
+    it("a lost response can be fetched again, and the row stays out of Retry", async () => {
       const c = await failed();
       const [row] = await rowsOf(c);
-      await open(c, row!.id);
-      await expect(open(c, row!.id)).rejects.toMatchObject({ code: "CONFLICT" });
+      const first = await open(c, row!.id);
+      expect(await open(c, row!.id)).toEqual(first);
+      expect((await rowsOf(c))[0]?.dispatch).toBe("composer");
+      const [read1] = (await read(c)).rows;
+      expect(
+        await retryMailBatch(rpcDeps(), f.a, target(), {
+          ...c.ids,
+          rows: [{ itemId: row!.id, seenMessageId: read1!.seenMessageId }],
+        }),
+      ).toBe(0);
+      await expect(open(c, row!.id, f.b)).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
 
     it("is refused for a sent row, a hash hold, before settlement, and for another user", async () => {

@@ -117,7 +117,9 @@ export function MailApprovalCard({
   const [ownEditing, setEditing] = useState(initialEditing);
   const editing = embedded ? embedded.editing : ownEditing;
   const outcomeNeedsAttention = mail.outcome === "failed" || mail.outcome === "unknown";
-  const [open, setOpen] = useState(status !== "answered" || outcomeNeedsAttention);
+  const [open, setOpen] = useState(
+    status !== "answered" || outcomeNeedsAttention || Boolean(embedded),
+  );
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -150,8 +152,8 @@ export function MailApprovalCard({
 
   // A finished card folds up to its header, unless the person still has something to do with it.
   useEffect(() => {
-    if (answered) setOpen(outcomeNeedsAttention);
-  }, [answered, outcomeNeedsAttention]);
+    if (answered && !embedded) setOpen(outcomeNeedsAttention);
+  }, [answered, outcomeNeedsAttention, embedded]);
 
   // Answering from this card removes the button that had focus; keep it on the card's header.
   useEffect(() => {

@@ -267,6 +267,25 @@ export async function sendMailBatch(
     }
     return { itemId: row.id, hash: posted.hash, seenMessageId: posted.seenMessageId, final };
   });
+  // A row with a flag the client never showed was not reviewed as it stands: the owner's tick and
+  // acknowledgement were for something else. Checked as it will be sent, edits included.
+  const finalFlags = await mailReplyFlags(
+    deps.prisma,
+    scope,
+    rows.map((row) => {
+      const storedRow = stored.find((candidate) => candidate.id === row.itemId)!;
+      return { ...storedRow, ...row.final, seenMessageId: row.seenMessageId };
+    }),
+  );
+  input.rows.forEach((posted, index) => {
+    const stale = (finalFlags[index]?.flags ?? []).filter(
+      (flag) => flag !== "new_message" && !posted.flags.includes(flag),
+    );
+    const storedRow = stored.find((candidate) => candidate.id === posted.itemId)!;
+    const unseenMessage =
+      storedRow.seenMessageId !== posted.seenMessageId && !posted.flags.includes("new_message");
+    if (stale.length > 0 || unseenMessage) throw new ORPCError("CONFLICT", { message: CHANGED });
+  });
   const accepted = await deps.events.acceptMailReplyBatch({
     spaceId: actor.spaceId,
     threadId: target.threadId,
