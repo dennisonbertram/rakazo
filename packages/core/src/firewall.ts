@@ -52,7 +52,6 @@ export const FIREWALL_ASK_TOOLS: ReadonlySet<string> = new Set([
   "web_fetch",
   "save_memory",
   "remember",
-  "save_shared_memory",
   "skill_create",
   "skill_update",
   "schedule_create",

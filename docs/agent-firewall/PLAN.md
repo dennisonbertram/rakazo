@@ -119,9 +119,11 @@ Review never judges it and no saved Allow lifts it; `noAlwaysAllow` set):
 - Any connector read other than mail, and any connector, calendar, Drive, Data room or ticket write.
 - Mail reads outside the support scope.
 - `web_fetch` to any other host or with a query string.
-- `save_memory`, `remember`, `save_shared_memory`, `skill_create`, `skill_update`,
+- `save_memory`, `remember`, `skill_create`, `skill_update`,
   `schedule_create`, `schedule_update`, `watch_create`.
 - `message_bot` to an owner-chosen target; the card shows the full text.
+- Memory is its own only: the prompt holds the agent's bot memory, never the user's shared documents,
+  and `save_shared_memory` is not offered. Semantic recall and save use the isolated scope.
 
 **Not on either list** (so never offered), for clarity: spawning and delegation
 (`CARTA_BLOCKED_DELEGATION_TOOLS`, `run_subagent`, cloud agents), `update_bot`, `add_mcp_server`,
