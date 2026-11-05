@@ -12,10 +12,11 @@ export async function loadAgentMemoryContext(
   botId: string,
   context: AdapterContext,
   maxBytes = MAX_AGENT_MEMORY_BYTES,
+  includeUser = true,
 ): Promise<string | undefined> {
   const [botMemory, userMemory] = await Promise.all([
     memory.read({ scope: "bot", botId }, context),
-    memory.read({ scope: "user" }, context),
+    includeUser ? memory.read({ scope: "user" }, context) : { documents: [] },
   ]);
   const documents: ScopedMemoryDocument[] = [
     ...botMemory.documents.map((document) => ({ ...document, scope: "bot" as const })),
