@@ -791,6 +791,16 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "company_context_lookup",
+    description:
+      "Look up a product, company, project or person in the company context the owner wrote. Returns up to two matching sections with their links, or none.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string", description: "The name to look up." } },
+      required: ["name"],
+    },
+  },
+  {
     name: "web_search",
     description:
       "Search the public web. Returns titles, URLs, and snippets. Use when you need current information or links; follow with web_fetch to read a page. Does not need a computer.",

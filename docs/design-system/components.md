@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 338 of 338
-- Web and shared components: 859
+- Web and shared component files with stories: 339 of 339
+- Web and shared components: 860
 - Mobile components: 153 in 102 files, mobile — native story pending
 - SwiftUI views: 140 in 76 files, native story pending
 
@@ -113,7 +113,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | NotificationSettingsSection | [apps/web/src/components/NotificationSettings.tsx](../../apps/web/src/components/NotificationSettings.tsx) | [NotificationSettings.stories.tsx](../../apps/web/src/components/NotificationSettings.stories.tsx) | web |
 | PageAgentIntro | [apps/web/src/components/PageAgentIntro.tsx](../../apps/web/src/components/PageAgentIntro.tsx) | [PageAgentIntro.stories.tsx](../../apps/web/src/components/PageAgentIntro.stories.tsx) | web |
 | PageAgentsRow | [apps/web/src/components/PageAgentsRow.tsx](../../apps/web/src/components/PageAgentsRow.tsx) | [PageAgentsRow.stories.tsx](../../apps/web/src/components/PageAgentsRow.stories.tsx) | web |
-| PageEmptyState | [apps/web/src/components/PageEmptyState.tsx](../../apps/web/src/components/PageEmptyState.tsx) | [PageEmptyState.stories.tsx](../../apps/web/src/components/PageEmptyState.stories.tsx), [CompanyContext.stories.tsx](../../apps/web/src/pages/CompanyContext.stories.tsx) | web |
+| PageEmptyState | [apps/web/src/components/PageEmptyState.tsx](../../apps/web/src/components/PageEmptyState.tsx) | [PageEmptyState.stories.tsx](../../apps/web/src/components/PageEmptyState.stories.tsx) | web |
 | PageNavButton, PageHeader | [apps/web/src/components/PageHeader.tsx](../../apps/web/src/components/PageHeader.tsx) | [PageHeader.stories.tsx](../../apps/web/src/components/PageHeader.stories.tsx), [ui.stories.tsx](../../apps/web/src/components/finance/ui.stories.tsx), [CrmPipeline.stories.tsx](../../apps/web/src/pages/CrmPipeline.stories.tsx) | web |
 | PasskeySettings, PasskeyList | [apps/web/src/components/PasskeySettings.tsx](../../apps/web/src/components/PasskeySettings.tsx) | [PasskeySettings.stories.tsx](../../apps/web/src/components/PasskeySettings.stories.tsx) | web |
 | PdfViewer | [apps/web/src/components/PdfViewer.tsx](../../apps/web/src/components/PdfViewer.tsx) | [PdfViewer.stories.tsx](../../apps/web/src/components/PdfViewer.stories.tsx) | web |
@@ -364,8 +364,9 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | BotContextMenu | [apps/web/src/pages/BotContextMenu.tsx](../../apps/web/src/pages/BotContextMenu.tsx) | [BotContextMenu.stories.tsx](../../apps/web/src/pages/BotContextMenu.stories.tsx) | web |
 | BotPageView | [apps/web/src/pages/BotPageView.tsx](../../apps/web/src/pages/BotPageView.tsx) | [BotPageView.stories.tsx](../../apps/web/src/pages/BotPageView.stories.tsx) | web |
 | CalendarPage | [apps/web/src/pages/Calendar.tsx](../../apps/web/src/pages/Calendar.tsx) | [Calendar.stories.tsx](../../apps/web/src/pages/Calendar.stories.tsx) | web |
-| CompanyPage, EventList | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx) | web |
+| CompanyPage, EventList | [apps/web/src/pages/Company.tsx](../../apps/web/src/pages/Company.tsx) | [Company.stories.tsx](../../apps/web/src/pages/Company.stories.tsx), [CompanyContext.stories.tsx](../../apps/web/src/pages/CompanyContext.stories.tsx) | web |
 | CompanyCalendar | [apps/web/src/pages/CompanyCalendar.tsx](../../apps/web/src/pages/CompanyCalendar.tsx) | [CompanyCalendar.stories.tsx](../../apps/web/src/pages/CompanyCalendar.stories.tsx) | web |
+| CompanyContext | [apps/web/src/pages/CompanyContext.tsx](../../apps/web/src/pages/CompanyContext.tsx) | [CompanyContext.stories.tsx](../../apps/web/src/pages/CompanyContext.stories.tsx) | web |
 | CompanyFactDetail | [apps/web/src/pages/CompanyFactDetail.tsx](../../apps/web/src/pages/CompanyFactDetail.tsx) | [CompanyFactDetail.stories.tsx](../../apps/web/src/pages/CompanyFactDetail.stories.tsx) | web |
 | CompanyHistory | [apps/web/src/pages/CompanyHistory.tsx](../../apps/web/src/pages/CompanyHistory.tsx) | [CompanyHistory.stories.tsx](../../apps/web/src/pages/CompanyHistory.stories.tsx) | web |
 | CompanyImportPage | [apps/web/src/pages/CompanyImport.tsx](../../apps/web/src/pages/CompanyImport.tsx) | [CompanyImport.stories.tsx](../../apps/web/src/pages/CompanyImport.stories.tsx) | web |

@@ -717,6 +717,10 @@ describe("planActionGate with block and unattended runs", () => {
 });
 
 describe("unattendedToolRequiresApproval", () => {
+  it("lets a scheduled run read the owner's company context without a card", () => {
+    expect(unattendedToolRequiresApproval(true, "company_context_lookup", false)).toBe(false);
+  });
+
   it("never asks for an attended run", () => {
     expect(unattendedToolRequiresApproval(false, "shell", false)).toBe(false);
     expect(unattendedToolRequiresApproval(false, "github_create_issue", true)).toBe(false);
