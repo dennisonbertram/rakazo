@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 339 of 339
-- Web and shared components: 860
+- Web and shared component files with stories: 340 of 340
+- Web and shared components: 861
 - Mobile components: 153 in 102 files, mobile — native story pending
 - SwiftUI views: 140 in 76 files, native story pending
 
