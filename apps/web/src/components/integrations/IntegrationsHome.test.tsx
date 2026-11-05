@@ -406,6 +406,25 @@ it("hides the Treg tile once the token preset source is installed", async () => 
   expect(container.querySelector('[aria-label="Connect Treg"]')).toBeNull();
 });
 
+it("links a source to its page and to its agent", async () => {
+  const source = {
+    id: "src1",
+    kind: "api",
+    name: "Contacts API",
+    source: "https://api.example.test/v1",
+    version: null,
+    digest: null,
+    secretConfigured: false,
+    config: {},
+    createdAt: "2026-01-01T00:00:00.000Z",
+    agentBotId: "bot_contacts",
+    usableBotIds: [],
+  } as IntegrationsData["sources"][number];
+  await show({ ...data(true, false), sources: [source] });
+  expect(container.querySelector("a[href='/app/integrations/source/src1']")).not.toBeNull();
+  expect(container.querySelector("a[href='/app/bot_contacts']")?.textContent).toBe("Open agent");
+});
+
 it("opens the X tile with the client ID fields and no server URL", async () => {
   await show(data(true, false));
   const connect = container.querySelector<HTMLButtonElement>('[aria-label="Connect X"]');

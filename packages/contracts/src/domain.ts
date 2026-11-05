@@ -1041,6 +1041,14 @@ export const CapabilityInstallSchema = z.object({
   secretConfigured: z.boolean(),
   config: z.record(z.string(), z.unknown()),
   createdAt: z.string(),
+  /** Tool sources (MCP, API, GraphQL) only: the source's own agent and who else may use it. */
+  agentBotId: Id.nullable().optional(),
+  allAgents: z.boolean().optional(),
+  agentShared: z.boolean().optional(),
+  writesEnabled: z.boolean().optional(),
+  /** Agents that can really use the source, and the ones among them allowed to make changes. */
+  usableBotIds: z.array(Id).optional(),
+  writeBotIds: z.array(Id).optional(),
 });
 export type CapabilityInstall = z.infer<typeof CapabilityInstallSchema>;
 

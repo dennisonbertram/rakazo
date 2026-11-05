@@ -374,7 +374,12 @@ export const isIntegrationAgentWrite = (
       { name: route.toolName ?? "", annotations: { readOnlyHint: readOnly } },
       integrationPresetForEndpoint(route.endpoint),
     );
-  return Boolean(route?.connectionId) && route?.connectorId !== "mcp" && readOnly !== true;
+  // A connected-app account or a directly connected source: every change shows the full call.
+  return (
+    (Boolean(route?.connectionId) || route?.connectorId === "installed") &&
+    route?.connectorId !== "mcp" &&
+    readOnly !== true
+  );
 };
 
 /** Whether a mail_send call carries the whole message (no draftId shortcut). */

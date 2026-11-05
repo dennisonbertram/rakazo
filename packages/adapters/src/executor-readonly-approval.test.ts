@@ -269,8 +269,11 @@ function fixture({
   groupId = null as string | null,
   ticketAuthor = null as string | null,
   otherGrants = 0,
+  sources = [] as { id: string; agentBotId: string | null }[],
   scriptedRuntime = false,
 }: {
+  /** Directly connected sources, keyed by the agent they belong to. */
+  sources?: { id: string; agentBotId: string | null }[];
   /** The runtime says it is the scripted one. */
   scriptedRuntime?: boolean;
   /** The bot's Firewall switch at the start of the run. */
@@ -553,6 +556,15 @@ function fixture({
               }
             : null,
       ),
+    },
+    capabilityInstall: {
+      count: vi.fn(
+        async ({ where }: { where: { id: string; agentBotId: string } }) =>
+          sources.filter(
+            (source) => source.id === where.id && source.agentBotId === where.agentBotId,
+          ).length,
+      ),
+      findMany: vi.fn(async () => []),
     },
     mcpServer: {
       findMany: vi.fn(
@@ -2847,6 +2859,41 @@ describe("connected app integration agent tools", () => {
     });
   });
 
+  describe("a directly connected source's changes", () => {
+    const sourceWrite: ConnectorTool = {
+      name: "add_contact",
+      description: "Add a contact",
+      inputSchema: { type: "object", properties: {} },
+      readOnly: false,
+      route: { connectorId: "installed", resourceId: "src-1", toolName: "add_contact" },
+    };
+    const allow = [
+      { effect: "always_allow", matchKind: "tool", matchValue: "add_contact" },
+    ] as const;
+    const run = (agentBotId: string) =>
+      fixture({
+        name: sourceWrite.name,
+        spawnKey: null,
+        rules: [...allow],
+        route: sourceWrite.route,
+        sources: [{ id: "src-1", agentBotId }],
+        availableTools: [sourceWrite],
+      });
+
+    it("asks a fresh approval of an agent that does not own the source, despite a saved Allow rule", async () => {
+      const f = run("agent-x");
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.execute).not.toHaveBeenCalled();
+    });
+
+    it("lets the owning agent's saved Allow rule apply", async () => {
+      const f = run("bot-1");
+      await f.run();
+      expect(f.execute).toHaveBeenCalledOnce();
+    });
+  });
+
   it("blocks an ordinary bot write if the account becomes agent-linked after discovery", async () => {
     const ordinary = connection({ agentBotId: null });
     const f = fixture({
@@ -3416,6 +3463,24 @@ describe("integration agent asked by another bot", () => {
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     expect(f.execute).not.toHaveBeenCalled();
     // Once the user approves, the resolved tool reaches the connector.
+    f.effects[0]!.status = "approved";
+    await f.run();
+    expect(f.execute).toHaveBeenCalledOnce();
+  });
+
+  it("resolves a catalog wrapper to a directly connected source's tool for a peer", async () => {
+    const f = fixture({
+      catalog: true,
+      name: "add_contact",
+      readOnly: false,
+      trigger: "bot_message",
+      spawnKey: agentKey,
+      peer: { senderInScope: true, linked: true },
+      route: { connectorId: "installed", resourceId: "server-1", toolName: "add_contact" },
+    });
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    // Once the user approves, the resolved source tool reaches the connector.
     f.effects[0]!.status = "approved";
     await f.run();
     expect(f.execute).toHaveBeenCalledOnce();

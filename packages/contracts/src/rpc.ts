@@ -1300,6 +1300,29 @@ export const appContract = {
       )
       .output(CapabilityInstallSchema),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Idempotent: returns the source's agent, creating it when the install could not. */
+    createAgent: oc.input(z.object({ id: Id })).output(z.object({ botId: Id })),
+    rename: oc
+      .input(z.object({ id: Id, name: z.string().trim().min(1).max(120) }))
+      .output(CapabilityInstallSchema),
+    setWrites: oc.input(z.object({ id: Id, enabled: z.boolean() })).output(CapabilityInstallSchema),
+    /** Only the source's agent may use it, or others may be added one by one. */
+    setExclusive: oc
+      .input(z.object({ id: Id, exclusive: z.boolean() }))
+      .output(CapabilityInstallSchema),
+    /** All (every internal agent, later ones too) or None (only the source's own agent). */
+    setAllAgents: oc.input(z.object({ id: Id, on: z.boolean() })).output(CapabilityInstallSchema),
+    /** One agent's switch and "Allow changes"; the server changes only that agent's grant. */
+    setAgentAccess: oc
+      .input(
+        z.object({
+          id: Id,
+          botId: Id,
+          on: z.boolean(),
+          canWrite: z.boolean().optional(),
+        }),
+      )
+      .output(CapabilityInstallSchema),
   },
   integrationAgents: {
     /** Idempotent: returns the server's agent bot, creating it on first call. */
