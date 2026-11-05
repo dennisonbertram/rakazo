@@ -6111,20 +6111,36 @@ export function createRunExecutor(deps: ExecutorDeps) {
             throw uncertainEffectError(name);
           };
 
-          // The card names the From account the send will use, even when the agent named none.
-          const approvalMailAccount = async () => {
-            if (name !== "mail_send" && name !== "mail_draft") return undefined;
-            if (!deps.mail || !mailEnabled) return undefined;
-            const accounts = await mailAccounts();
-            // With one account the From line would say nothing new.
-            if (accounts.length < 2) return undefined;
+          // The card names the From account the send will use, even when the agent named none. Only
+          // accounts this agent may change count: with one, it is the From and nobody is asked; with
+          // several and none inferred, the card offers exactly those.
+          const approvalMailAccount = async (): Promise<{
+            account?: string;
+            choices?: { connectionId: string; label: string; address?: string }[];
+          }> => {
+            if (name !== "mail_send" && name !== "mail_draft") return {};
+            if (!deps.mail || !mailEnabled) return {};
+            const accounts = await accountsAllowedNow(mailAccounts(), name);
+            if (accounts.length === 0) return {};
+            if (accounts.length === 1) {
+              // With one account in the whole mailbox list the From line would say nothing new.
+              const all = await ownerMailAccounts().catch(() => accounts);
+              return all.length > 1 ? { account: accountName(accounts[0]!) } : {};
+            }
             const inferred = await inferMailAccount(
               deps.prisma,
               { spaceId: run.spaceId, userId: bot.userId },
               accounts,
               args,
             ).catch(() => undefined);
-            return inferred ? accountName(inferred) : undefined;
+            if (inferred) return { account: accountName(inferred) };
+            return {
+              choices: accounts.map((account) => ({
+                connectionId: account.id,
+                label: account.label,
+                ...(account.address ? { address: account.address } : {}),
+              })),
+            };
           };
 
           // The recipient and account behind a money request's ids, read with the same server's own
@@ -6202,8 +6218,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
               noAlwaysAllow,
               routineAlways: routineAllowable,
               serviceName: callRoute?.serverName,
-              mailAccount:
-                meetingTaintedCall || externalTaintedCall ? undefined : await approvalMailAccount(),
+              ...(meetingTaintedCall || externalTaintedCall
+                ? {}
+                : await approvalMailAccount().then(({ account, choices }) => ({
+                    mailAccount: account,
+                    mailChoices: choices,
+                  }))),
               imessage: imessageCard,
               schedule: scheduleCard,
               moneyNames,

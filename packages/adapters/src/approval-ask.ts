@@ -56,6 +56,7 @@ export function buildApprovalAskBlock(
     noAlwaysAllow?: boolean;
     /** The From account the mail call will use when it named none (see inferMailAccount). */
     mailAccount?: string;
+    mailChoices?: NonNullable<MailApproval["choices"]>;
     /** The MCP server's display name, so the title says which service runs the tool. */
     serviceName?: string;
     /** Who an imessage_send goes to, resolved from the call (a thread id alone names no one). */
@@ -185,6 +186,7 @@ export function buildApprovalAskBlock(
         ? { ...args, account: options.mailAccount }
         : args,
       secrets,
+      options?.mailChoices,
     ),
     approvalReason: options?.approvalReason,
     ...(fetchSite ? { site: fetchSite } : {}),
@@ -770,6 +772,7 @@ function mailApproval(
   toolName: string,
   args: Record<string, unknown>,
   secrets: string[],
+  choices?: MailApproval["choices"],
 ): MailApproval | undefined {
   if (toolName !== "mail_draft" && toolName !== "mail_send") return undefined;
   const text = (value: unknown) => (typeof value === "string" ? redactSecrets(value, secrets) : "");
@@ -780,6 +783,7 @@ function mailApproval(
     ...(typeof args.account === "string" && args.account
       ? { account: redactSecrets(args.account, secrets) }
       : {}),
+    ...(choices?.length ? { choices } : {}),
     to: strings(args.to).map((item) => redactSecrets(item, secrets)),
     cc: strings(args.cc).map((item) => redactSecrets(item, secrets)),
     bcc: strings(args.bcc).map((item) => redactSecrets(item, secrets)),

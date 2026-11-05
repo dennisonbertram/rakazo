@@ -13,6 +13,33 @@ const stored = {
   body: "Old text.",
 };
 
+const bot = {
+  id: "bot-1",
+  userId: "user-1",
+  spawnKey: null,
+  audience: "internal",
+  firewall: false,
+  archivedAt: null,
+  disabledBuiltinTools: [],
+};
+/** Gmail accounts as the access rules read them: open to every agent, limited to bot-1, or to nobody. */
+const accessRow = (id: string, access: "open" | "bot-1" | "none") => ({
+  id,
+  connectorId: "google",
+  provider: "gmail",
+  status: "connected",
+  allAgents: access === "open",
+  writesEnabled: false,
+  agentBotId: null,
+  privateByDefault: true,
+  botAccess: access === "bot-1" ? [{ botId: "bot-1", canWrite: false }] : [],
+  agentBot: null,
+});
+const accessPrisma = (rows: ReturnType<typeof accessRow>[]) => ({
+  bot: { findFirst: async () => bot },
+  connection: { findMany: async () => rows },
+});
+
 /** A stand-in for the database's atomic claim: only one answer moves an "intended" effect. */
 function setup(
   options: {
@@ -54,6 +81,7 @@ function setup(
     mailWritesDisabled: options.write === false,
     mail: { listAccounts: async () => [{ id: "conn-1", address: "me@example.test" }] },
     prisma: {
+      ...accessPrisma([accessRow("conn-1", "open"), accessRow("conn-2", "open")]),
       cachedMailMessage: { findFirst: async () => null },
       composeSend: {
         findUnique: async () => ({ threadId: "gt-1", providerMessageId: "gm-1", draftId: "d-1" }),
@@ -61,7 +89,7 @@ function setup(
       run: {
         findFirst: async (args: { where: { userId: string } }) =>
           args.where.userId === "user-1"
-            ? { bot: { disabledBuiltinTools: options.disabledTools ?? [] } }
+            ? { botId: "bot-1", bot: { disabledBuiltinTools: options.disabledTools ?? [] } }
             : null,
       },
     },
@@ -135,6 +163,8 @@ describe("answerEditedMailApproval", () => {
         ],
       },
       prisma: {
+        ...accessPrisma([accessRow("conn-1", "open"), accessRow("conn-2", "open")]),
+        run: { findFirst: async () => ({ botId: "bot-1", bot: { disabledBuiltinTools: [] } }) },
         cachedMailMessage: {
           findMany: async () => [{ connectionId: "conn-2" }],
           findFirst: async () => ({ id: "cached-1" }),
@@ -389,5 +419,42 @@ describe("answerEditedMailApproval", () => {
     const t = setup({ request: { ...stored, account: "other@example.test" } });
     expect(await code(t.edit())).toBe("BAD_REQUEST");
     expect(t.effect.status).toBe("intended");
+  });
+
+  describe("an account the agent has no access to", () => {
+    const { account: _named, ...unnamed } = stored;
+    const twoAccounts = async () => [
+      { id: "conn-1", address: "hello@example.test" },
+      { id: "conn-2", address: "other@example.test" },
+    ];
+    /** conn-1 is open to bot-1 only; conn-2 is the owner's other mailbox, with no access for any agent. */
+    const limited = (request: object) => {
+      const t = setup({ request });
+      Object.assign(t.deps, { mail: { listAccounts: twoAccounts } });
+      Object.assign(
+        t.deps.prisma,
+        accessPrisma([accessRow("conn-1", "bot-1"), accessRow("conn-2", "none")]),
+      );
+      return t;
+    };
+
+    it("refuses a card answer that picks it, claiming and sending nothing", async () => {
+      const t = limited(unnamed);
+      expect(await code(t.edit({ account: "conn-2" }))).toBe("BAD_REQUEST");
+      expect(t.effect.status).toBe("intended");
+      expect(t.compose.send).not.toHaveBeenCalled();
+    });
+
+    it("refuses it when the agent named it", async () => {
+      const t = limited({ ...stored, account: "other@example.test" });
+      expect(await code(t.edit({ subject: "Monday" }))).toBe("BAD_REQUEST");
+      expect(t.compose.send).not.toHaveBeenCalled();
+    });
+
+    it("still sends from the account it does have", async () => {
+      const t = limited(unnamed);
+      await t.edit({ account: "conn-1" });
+      expect(t.sent[0]).toMatchObject({ connectionId: "conn-1" });
+    });
   });
 });
