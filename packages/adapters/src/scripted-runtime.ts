@@ -319,6 +319,15 @@ export function inferScript(
       },
     ];
   }
+  if (lower.includes("history search card")) {
+    return [
+      {
+        assistant: "i will look through this chat.",
+        toolCalls: [{ name: "search_history", args: { query: "history" } }],
+        complete: true,
+      },
+    ];
+  }
   if (lower.includes("fetch approval card")) {
     return [
       {
