@@ -46,6 +46,7 @@ import {
   IsolationError,
   lockOwnedGroup,
   settleApprovalsOfEndedRuns,
+  skipWaitingApprovalsInTransaction,
   touchGroupUpdatedAt,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -881,47 +882,58 @@ export async function sendThreadMessage(
         const waitingRuns = allWaiting.filter((run) => !sendingRunIds.has(run.id));
         if (waitingRuns.length && !activeRuns.some(steersUserMessage)) {
           const answerText = input.text?.trim();
-          if (!answerText) {
-            throw new ORPCError("CONFLICT", {
-              message: "Answer the pending ask first.",
-            });
-          }
+          // Approval cards are moved past, not answered by text: each is skipped as a decline and
+          // its run resumes with this message as steering. A question takes the text as its answer;
+          // a secret request refuses the send.
+          const answered = [];
           for (const run of waitingRuns) {
-            const answered = await answerWaitingRunWithTextInTransaction(tx, {
+            const skipped = await skipWaitingApprovalsInTransaction(tx, {
               spaceId: actor.spaceId,
               threadId: target.threadId,
               runId: run.id,
-              answeredByUserId: actor.userId,
-              answer: answerText,
             });
-            if (!answered) {
+            if (skipped) {
+              run.status = "queued";
+              continue;
+            }
+            const result =
+              answerText &&
+              (await answerWaitingRunWithTextInTransaction(tx, {
+                spaceId: actor.spaceId,
+                threadId: target.threadId,
+                runId: run.id,
+                answeredByUserId: actor.userId,
+                answer: answerText,
+              }));
+            if (!result) {
               throw new ORPCError("CONFLICT", {
                 message: "Answer the pending ask first.",
               });
             }
+            answered.push({ ...run, status: "queued" });
           }
-          const answered = waitingRuns.map((run) => ({ ...run, status: "queued" }));
           const primary = answered[0];
-          if (!primary) throw new IsolationError();
-          await tx.message.update({ where: { id: message.id }, data: { runId: primary.id } });
-          const event = await appendEventInTransaction(tx, {
-            spaceId: actor.spaceId,
-            threadId: target.threadId,
-            botId: target.botId,
-            type: "thread.message.created",
-            runId: primary.id,
-            payload: {
-              messageId: message.id,
-              role: "user",
-              blocks,
-              callId,
-              runIds: answered.map((run) => run.id),
-              replyToMessageId,
-              replyQuote,
-              replyPreview,
-            },
-          });
-          return { message, runs: answered, eventSeq: event.seq };
+          if (primary) {
+            await tx.message.update({ where: { id: message.id }, data: { runId: primary.id } });
+            const event = await appendEventInTransaction(tx, {
+              spaceId: actor.spaceId,
+              threadId: target.threadId,
+              botId: target.botId,
+              type: "thread.message.created",
+              runId: primary.id,
+              payload: {
+                messageId: message.id,
+                role: "user",
+                blocks,
+                callId,
+                runIds: answered.map((run) => run.id),
+                replyToMessageId,
+                replyQuote,
+                replyPreview,
+              },
+            });
+            return { message, runs: answered, eventSeq: event.seq };
+          }
         }
         if (
           activeRuns.some(
@@ -1061,29 +1073,36 @@ export async function sendThreadMessage(
       for (const run of activeRuns) {
         if (run.status === "waiting_input") {
           if (conversationalBotIds.has(run.botId)) continue;
-          const answerText = input.text?.trim();
-          if (!answerText) {
-            throw new ORPCError("CONFLICT", {
-              message: "Answer the pending ask first.",
-            });
-          }
-          const answered = await answerWaitingRunWithTextInTransaction(tx, {
+          // Approval cards are skipped as a decline and the run takes this message as steering.
+          const skipped = await skipWaitingApprovalsInTransaction(tx, {
             spaceId: actor.spaceId,
             threadId: target.threadId,
             runId: run.id,
-            answeredByUserId: actor.userId,
-            answer: answerText,
           });
-          if (!answered) {
-            throw new ORPCError("CONFLICT", {
-              message: "Answer the pending ask first.",
-            });
+          if (skipped) {
+            run.status = "queued";
+          } else {
+            const answerText = input.text?.trim();
+            const answered =
+              answerText &&
+              (await answerWaitingRunWithTextInTransaction(tx, {
+                spaceId: actor.spaceId,
+                threadId: target.threadId,
+                runId: run.id,
+                answeredByUserId: actor.userId,
+                answer: answerText,
+              }));
+            if (!answered) {
+              throw new ORPCError("CONFLICT", {
+                message: "Answer the pending ask first.",
+              });
+            }
+            const queuedRun = { ...run, status: "queued" };
+            const queuedForBot = answeredByBotId.get(run.botId);
+            if (queuedForBot) queuedForBot.push(queuedRun);
+            else answeredByBotId.set(run.botId, [queuedRun]);
+            continue;
           }
-          const queuedRun = { ...run, status: "queued" };
-          const queuedForBot = answeredByBotId.get(run.botId);
-          if (queuedForBot) queuedForBot.push(queuedRun);
-          else answeredByBotId.set(run.botId, [queuedRun]);
-          continue;
         }
         if (!STEERABLE_RUN_STATUSES.has(run.status)) {
           throw new ORPCError("CONFLICT", {

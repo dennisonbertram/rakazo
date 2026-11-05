@@ -69,6 +69,7 @@ const bot: Bot = {
   externalMessageTargets: [],
   externalComputerTools: false,
   firewall: false,
+  proactivity: "medium",
   webhookConfigured: false,
   spawnKey: null,
   runPhase: null,

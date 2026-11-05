@@ -13,6 +13,7 @@ struct BotSettingsScreen: View {
   @State private var speak = false
   @State private var pinned = false
   @State private var sectionID: String?
+  @State private var proactivity = "medium"
   @State private var busy = false
   @State private var error: String?
   @State private var confirmDiscard = false
@@ -33,7 +34,7 @@ struct BotSettingsScreen: View {
     let dirty =
       ManageClient.clean(name) != bot.name || role != bot.title
       || color.caseInsensitiveCompare(bot.color ?? "") != .orderedSame
-      || speak != bot.autoSpeak || pinned != bot.pinned || sectionID != bot.sectionId
+      || speak != bot.autoSpeak || proactivity != bot.proactivity || pinned != bot.pinned || sectionID != bot.sectionId
     return Form {
       Section {
         TextField("Name", text: $name).accessibilityIdentifier("botName")
@@ -47,6 +48,19 @@ struct BotSettingsScreen: View {
             Text("None").tag(String?.none)
             ForEach(sections) { Text($0.name).tag(Optional($0.id)) }
           }
+        }
+      }
+      if !(bot.spawnKey?.hasPrefix("voice-agent") ?? false) {
+        Section {
+          Picker("Proactive", selection: $proactivity) {
+            Text("Low").tag("low")
+            Text("Medium").tag("medium")
+            Text("High").tag("high")
+          }
+          .disabled(bot.restricted)
+          .accessibilityIdentifier("botProactivity")
+        } footer: {
+          if bot.restricted { Text("Not used by firewalled or external agents") }
         }
       }
       Section("Voice") {
@@ -105,6 +119,7 @@ struct BotSettingsScreen: View {
       speak = bot.autoSpeak
       pinned = bot.pinned
       sectionID = bot.sectionId
+      proactivity = bot.proactivity
       state = .loaded(bot)
       sections = (try? await ManageClient.agents(app: app).botSections) ?? []
       let model = AgentAccessModel(
@@ -127,6 +142,7 @@ struct BotSettingsScreen: View {
     if color.caseInsensitiveCompare(bot.color ?? "") != .orderedSame { input.color = color }
     if speak != bot.autoSpeak { input.autoSpeak = speak }
     if pinned != bot.pinned { input.pinned = pinned }
+    if proactivity != bot.proactivity { input.proactivity = proactivity }
     if sectionID != bot.sectionId {
       input.sectionId = sectionID
       input.clearSection = sectionID == nil

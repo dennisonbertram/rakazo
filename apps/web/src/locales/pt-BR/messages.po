@@ -531,6 +531,10 @@ msgstr ""
 msgid "{count} read tools"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "{count} replies"
+msgstr ""
+
 #: src/pages/Fundraising.tsx
 msgid "{count} SAFEs are signed and unpaid."
 msgstr ""
@@ -6726,6 +6730,7 @@ msgstr "Ocultar transcrição"
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "High"
 msgstr "Alto"
 
@@ -7695,6 +7700,7 @@ msgstr ""
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Low"
 msgstr "Baixo"
 
@@ -7946,6 +7952,7 @@ msgid "MCP endpoint"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Medium"
 msgstr "Médio"
 
@@ -9298,6 +9305,10 @@ msgstr ""
 msgid "Not tagged. Praci can't read your documents."
 msgstr ""
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Not used by firewalled or external agents"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Not used yet"
 msgstr ""
@@ -10388,6 +10399,10 @@ msgstr ""
 
 #: src/components/fundraising/SafeDialog.tsx
 msgid "Pro rata side letter"
+msgstr ""
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Proactive"
 msgstr ""
 
 #: src/components/data-room/ProcessingStrip.tsx

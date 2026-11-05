@@ -22,6 +22,7 @@ import {
   sendUserMessage,
   setApprovalWaitsFor,
   setMailApprovalOutcome,
+  skipWaitingApprovalsInTransaction,
 } from "./events.js";
 import { RunHistoryWriteError } from "./messages.js";
 import { AnswerTooLongError } from "./run-secrets.js";
@@ -1055,6 +1056,84 @@ describe("pauseRunForTakeover", () => {
         }),
       }),
     );
+  });
+});
+
+describe("skipWaitingApprovalsInTransaction", () => {
+  const approval = (id: string) => ({
+    kind: "ask",
+    approvalEffectId: id,
+    text: "Send an email?",
+    status: "pending",
+    actions: [
+      { id: "allow", label: "Allow once" },
+      { id: "always", label: "Always allow this" },
+      { id: "deny", label: "Deny" },
+    ],
+  });
+  const txFor = (messages: Array<{ id: string; blocks: unknown[] }>) => ({
+    $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+    message: {
+      findMany: vi.fn().mockResolvedValue(messages),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    run: {
+      findFirst: vi.fn().mockResolvedValue({ botId: "bot-1" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUnique: vi.fn().mockResolvedValue({ status: "queued" }),
+    },
+    externalEffect: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    approvalRule: { upsert: vi.fn(), create: vi.fn() },
+    thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 4 }) },
+    event: {
+      create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+        ...event(data.seq),
+        type: data.type,
+      })),
+    },
+  });
+  const input = { spaceId: "workspace-1", threadId: "thread-1", runId: "run-1" };
+
+  it("closes every open approval card as skipped, denies the effects and resumes the run", async () => {
+    const tx = txFor([
+      { id: "m-2", blocks: [approval("effect-2")] },
+      { id: "m-1", blocks: [approval("effect-1")] },
+    ]);
+    await expect(skipWaitingApprovalsInTransaction(tx as never, input)).resolves.toMatchObject({
+      threadId: "thread-1",
+    });
+    expect(tx.run.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "queued" } }),
+    );
+    for (const call of tx.externalEffect.updateMany.mock.calls) {
+      expect(call[0].data.status).toBe("denied");
+      expect(call[0].data.result.note).toContain("moved on without approving");
+    }
+    expect(tx.externalEffect.updateMany).toHaveBeenCalledTimes(2);
+    expect(tx.message.update).toHaveBeenCalledTimes(2);
+    expect(tx.message.update.mock.calls[0]![0].data.blocks[0]).toMatchObject({
+      status: "answered",
+      answer: "skipped",
+    });
+    expect(tx.approvalRule.upsert).not.toHaveBeenCalled();
+  });
+
+  it("leaves a secret request, a question and a run that no longer waits alone", async () => {
+    const secret = { kind: "ask", text: "Paste the key", status: "pending", input: "secret" };
+    const question = { kind: "ask", text: "Which city?", status: "pending" };
+    for (const blocks of [[secret], [question], [approval("effect-1"), secret]]) {
+      const tx = txFor([{ id: "m-1", blocks }]);
+      await expect(skipWaitingApprovalsInTransaction(tx as never, input)).resolves.toBeNull();
+      expect(tx.run.updateMany).not.toHaveBeenCalled();
+      expect(tx.externalEffect.updateMany).not.toHaveBeenCalled();
+    }
+    const gone = txFor([{ id: "m-1", blocks: [approval("effect-1")] }]);
+    gone.run.findFirst.mockResolvedValue(null);
+    await expect(skipWaitingApprovalsInTransaction(gone as never, input)).resolves.toBeNull();
+    const raced = txFor([{ id: "m-1", blocks: [approval("effect-1")] }]);
+    raced.run.updateMany.mockResolvedValue({ count: 0 });
+    await expect(skipWaitingApprovalsInTransaction(raced as never, input)).resolves.toBeNull();
+    expect(raced.externalEffect.updateMany).not.toHaveBeenCalled();
   });
 });
 
