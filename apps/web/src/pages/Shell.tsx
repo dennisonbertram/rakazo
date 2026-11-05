@@ -343,6 +343,7 @@ import {
   RenameSpaceDialog,
 } from "./shell/dialogs";
 import { GroupIntro } from "./shell/GroupIntro";
+import { GoalLine, GoalNotice, isGoalReply, snapshotWithGoal } from "./shell/goal";
 import { TOP_BAR_HEIGHT } from "./shell/sidebar-header-row";
 import {
   activeSpaceFirst,
@@ -753,6 +754,8 @@ export function ShellPage() {
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // The server's answer to a bare /goal or /goal clear: a status line, not a failure.
+  const [goalNotice, setGoalNotice] = useState<string | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   // A message that @mentioned a group went to that group; the person stays where they wrote it.
   const [forwarded, setForwarded] = useState<{ groupId: string; threadKey: string } | null>(null);
@@ -1969,6 +1972,9 @@ export function ShellPage() {
           setPageDataRemote({ pageId, seq: event.seq });
         }
         if (event.type === "pins.updated") setPinsSeq(event.seq);
+        if (event.type === "thread.goal.updated") {
+          updateSnapshot((prev) => snapshotWithGoal(prev, event.payload));
+        }
         if (event.type === "thread.cleared") {
           expandedHistoryThread.current = null;
           pinnedAroundRef.current = null;
@@ -3305,6 +3311,7 @@ export function ShellPage() {
       sendingRef.current = true;
       setSending(true);
       setSendError(null);
+      setGoalNotice(null);
       setForwarded(null);
       // Keep the draft cleared once any part of the submission is confirmed accepted.
       let accepted = false;
@@ -3412,6 +3419,12 @@ export function ShellPage() {
         return true;
       } catch (error) {
         sentHere.current = false;
+        if (isGoalReply(error)) {
+          if (botTarget && activeBotId.current === botTarget) {
+            setGoalNotice(errorText(error, t`Failed to send message`));
+          }
+          return true;
+        }
         if (reroutedToGroup && groupTarget) {
           setSendError(errorText(error, t`Failed to send message`));
         } else if (groupTarget && activeGroupId.current === groupTarget) {
@@ -4240,6 +4253,7 @@ export function ShellPage() {
     if (keepNoticeFor.current === threadKey) keepNoticeFor.current = null;
     else setAttachmentNotice(null);
     setSendError(null);
+    setGoalNotice(null);
   }, [active?.id, clearReply, groupId, inGroup]);
 
   useEffect(() => {
@@ -4766,6 +4780,32 @@ export function ShellPage() {
               }}
               agentSkills={agentSkills}
               onSlashOpen={refreshAgentSkills}
+              goalSlot={
+                <>
+                  {!inGroup && active && activeSnapshot?.goal ? (
+                    <GoalLine
+                      goal={activeSnapshot.goal}
+                      waiting={(activeSnapshot.activeRuns ?? [activeSnapshot.run]).some(
+                        (run) => run?.status === "waiting_input",
+                      )}
+                      onClear={() => {
+                        const botId = active.id;
+                        void rpc.threads
+                          .clearGoal({ botId })
+                          .then(() =>
+                            updateSnapshot((prev) => snapshotWithGoal(prev, { goal: null })),
+                          )
+                          .catch((error: unknown) =>
+                            setSendError(errorText(error, t`Could not clear the goal`)),
+                          );
+                      }}
+                    />
+                  ) : null}
+                  {goalNotice ? (
+                    <GoalNotice message={goalNotice} onDismiss={() => setGoalNotice(null)} />
+                  ) : null}
+                </>
+              }
               sentHistory={sentHistory}
               onSlashAction={(action) => {
                 if (action === "chat-settings") {

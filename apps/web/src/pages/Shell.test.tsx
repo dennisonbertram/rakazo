@@ -464,6 +464,22 @@ describe("Composer", () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
+  it("offers Goal in the / menu and inserts the command into the draft", () => {
+    const onSend = vi.fn();
+    const onSlashAction = vi.fn();
+    const textarea = renderComposer(onSend, { onSlashAction });
+    type(textarea, "/goa");
+    const option = container?.querySelector<HTMLButtonElement>(
+      "[data-testid='slash-picker'] [role='option']",
+    );
+    expect(option?.textContent).toBe("Goal");
+    act(() => option?.click());
+    expect(textarea.value).toBe("/goal ");
+    expect(onSend).not.toHaveBeenCalled();
+    expect(onSlashAction).not.toHaveBeenCalled();
+    expect(container?.querySelector("[data-testid='slash-picker']")).toBeNull();
+  });
+
   it("clears the draft once the message is sent", async () => {
     const onSend = vi.fn().mockResolvedValue(true);
     const textarea = renderComposer(onSend);

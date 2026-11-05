@@ -3149,6 +3149,10 @@ msgstr ""
 msgid "Clear formatting"
 msgstr ""
 
+#: src/pages/shell/goal.tsx
+msgid "Clear goal"
+msgstr ""
+
 #: src/components/ListControls.tsx
 #: src/pages/DataRoom.tsx
 msgid "Clear search"
@@ -3973,6 +3977,10 @@ msgstr ""
 #: src/pages/shell/dialogs.tsx
 msgid "Could not clear conversation"
 msgstr "Não foi possível limpar a conversa"
+
+#: src/pages/Shell.tsx
+msgid "Could not clear the goal"
+msgstr ""
 
 #: src/pages/Fundraising.tsx
 msgid "Could not close the round"
@@ -5539,6 +5547,7 @@ msgstr ""
 #: src/pages/Legal.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 #: src/pages/shell/composer.tsx
+#: src/pages/shell/goal.tsx
 #: src/pages/shell/message-cards.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Dismiss"
@@ -6732,7 +6741,21 @@ msgid "Go to Praci"
 msgstr ""
 
 #: src/pages/Gtm.tsx
+#: src/pages/shell/composer.tsx
+#: src/pages/shell/goal.tsx
 msgid "Goal"
+msgstr ""
+
+#: src/pages/shell/goal.tsx
+msgid "Goal blocked"
+msgstr ""
+
+#: src/pages/shell/goal.tsx
+msgid "Goal met"
+msgstr ""
+
+#: src/pages/shell/goal.tsx
+msgid "Goal stopped"
 msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
@@ -10344,6 +10367,7 @@ msgstr ""
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
+#: src/pages/shell/goal.tsx
 msgid "Paused"
 msgstr ""
 
@@ -15171,6 +15195,7 @@ msgstr ""
 
 #: src/components/BotTodos.tsx
 #: src/pages/ActivityList.tsx
+#: src/pages/shell/goal.tsx
 msgid "Waiting on you"
 msgstr ""
 

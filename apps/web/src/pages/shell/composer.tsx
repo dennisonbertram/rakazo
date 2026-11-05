@@ -16,12 +16,23 @@ import {
   replyAttachment,
   resolveMentionPickerKey,
   SLASH_ACTIONS,
+  SLASH_INSERTS,
   serializeComposerPrompt,
   shiftSpans,
   truncateSlashDescription,
 } from "@rakazo/core";
 import { Button } from "@rakazo/ui-web";
-import { ArrowUp, AudioLines, Box, Paperclip, Plus, Settings, Square, X } from "lucide-react";
+import {
+  ArrowUp,
+  AudioLines,
+  Box,
+  Paperclip,
+  Plus,
+  Settings,
+  Square,
+  Target,
+  X,
+} from "lucide-react";
 import type { ClipboardEvent, DragEvent, ReactNode, RefObject } from "react";
 import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fileIcon } from "../../components/data-room/ItemRows";
@@ -105,6 +116,7 @@ export const Composer = memo(function Composer({
   agentSkills,
   onSlashOpen,
   onSlashAction,
+  goalSlot,
   sentHistory = [],
 }: {
   activeName?: string;
@@ -160,6 +172,8 @@ export const Composer = memo(function Composer({
   agentSkills?: AgentSkillCatalogEntry[];
   onSlashOpen?: () => void;
   onSlashAction?: (action: SlashActionId) => void;
+  /** The goal line and notice, shown above the errors. */
+  goalSlot?: ReactNode;
   /** The user's sent messages in this conversation, oldest first. */
   sentHistory?: string[];
 }) {
@@ -473,6 +487,13 @@ export const Composer = memo(function Composer({
     onSlashAction?.(action);
   }
 
+  function insertSlashText(text: string) {
+    markEdited();
+    setDraft(text);
+    setSlashQuery(null);
+    focusComposer();
+  }
+
   function removeLastChip() {
     markEdited();
     if (selectedSkill) setSelectedSkill(null);
@@ -522,12 +543,21 @@ export const Composer = memo(function Composer({
     const query = slashQuery.trim().toLowerCase();
     return SLASH_ACTIONS.filter((action) => !query || action.label.toLowerCase().includes(query));
   }, [slashQuery]);
+  // Once the command has a space after it, the arguments are free text, so the entry steps aside.
+  const slashInsertOptions = useMemo(() => {
+    if (slashQuery === null || /\s/.test(slashQuery)) return [];
+    const query = slashQuery.toLowerCase();
+    return SLASH_INSERTS.filter((insert) => insert.label.toLowerCase().includes(query));
+  }, [slashQuery]);
 
   const showSlashPicker =
     slashQuery !== null &&
     mentionQuery === null &&
-    (slashSkillOptions.length > 0 || slashActionOptions.length > 0);
-  const slashOptionCount = slashSkillOptions.length + slashActionOptions.length;
+    (slashSkillOptions.length > 0 ||
+      slashActionOptions.length > 0 ||
+      slashInsertOptions.length > 0);
+  const slashOptionCount =
+    slashSkillOptions.length + slashActionOptions.length + slashInsertOptions.length;
   const [slashHighlight, setSlashHighlight] = useState(0);
   // Each new query starts at the first option.
   useEffect(() => {
@@ -539,7 +569,9 @@ export const Composer = memo(function Composer({
     const skill = slashSkillOptions[index];
     if (skill) return insertSkill(skill);
     const action = slashActionOptions[index - slashSkillOptions.length];
-    if (action) runSlashAction(action.id);
+    if (action) return runSlashAction(action.id);
+    const insert = slashInsertOptions[index - slashSkillOptions.length - slashActionOptions.length];
+    if (insert) insertSlashText(insert.text);
   }
 
   async function send() {
@@ -752,6 +784,7 @@ export const Composer = memo(function Composer({
       <div role="status" data-testid="composer-announcement" className="sr-only">
         {replyAnnouncement}
       </div>
+      {goalSlot}
       {sendError || runError ? (
         <ComposerError
           ref={runErrorRef}
@@ -968,7 +1001,7 @@ export const Composer = memo(function Composer({
               </button>
             );
           })}
-          {slashActionOptions.length ? (
+          {slashActionOptions.length + slashInsertOptions.length ? (
             <div role="presentation" className={SLASH_SECTION_CLASS}>
               <Trans>Actions</Trans>
             </div>
@@ -993,6 +1026,28 @@ export const Composer = memo(function Composer({
               >
                 <Settings size={16} strokeWidth={1.7} className="shrink-0 text-muted-foreground" />
                 <span className="text-[14px] text-foreground">{label}</span>
+              </button>
+            );
+          })}
+          {slashInsertOptions.map((insert, insertIndex) => {
+            const index = slashSkillOptions.length + slashActionOptions.length + insertIndex;
+            return (
+              <button
+                id={`${slashListboxId}-option-${index}`}
+                key={insert.id}
+                type="button"
+                role="option"
+                aria-selected={index === activeSlashIndex}
+                aria-label={t`Goal`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => insertSlashText(insert.text)}
+                onMouseMove={() => setSlashHighlight(index)}
+                className={`flex w-full items-center gap-3 px-4 py-2.5 text-start hover:bg-accent ${
+                  index === activeSlashIndex ? SLASH_SELECTED_CLASS : ""
+                }`}
+              >
+                <Target size={16} strokeWidth={1.7} className="shrink-0 text-muted-foreground" />
+                <span className="text-[14px] text-foreground">{t`Goal`}</span>
               </button>
             );
           })}
