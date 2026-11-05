@@ -10,6 +10,7 @@ import {
 } from "@rakazo/contracts";
 import type { ClosedApprovalAnswer } from "@rakazo/core";
 import {
+  ALL_SITES_ACTION_ID,
   callIdFromClientNonce,
   closeApprovalAsks,
   isApprovalAskBlock,
@@ -438,6 +439,7 @@ async function commitAnswerRunInput(
     select: {
       botId: true,
       userId: true,
+      externalTaint: true,
       checkpoint: true,
       trigger: true,
       task: { select: { prompt: true } },
@@ -496,6 +498,31 @@ async function commitAnswerRunInput(
     }
     if (input.answer === "always") {
       if (run.userId !== input.answeredByUserId) return null;
+      approvalUserId = input.answeredByUserId;
+    }
+    // "Allow all sites" is the owner's choice for a plain agent's web_fetch: never from a webhook or
+    // tainted run, and never for a firewalled or external agent.
+    if (input.answer === ALL_SITES_ACTION_ID) {
+      const bot = await tx.bot.findFirst({
+        where: { id: run.botId, spaceId: input.spaceId },
+        select: { audience: true, firewall: true },
+      });
+      const thread = await tx.thread.findFirst({
+        where: { id: input.threadId },
+        select: { meetingTaintedAt: true },
+      });
+      if (
+        thread?.meetingTaintedAt ||
+        approvalEffect.kind !== "web_fetch" ||
+        run.userId !== input.answeredByUserId ||
+        run.trigger === "webhook" ||
+        run.externalTaint ||
+        !bot ||
+        bot.firewall ||
+        bot.audience === "external"
+      ) {
+        return null;
+      }
       approvalUserId = input.answeredByUserId;
     }
     // Only the run's owner can answer for their data.
@@ -560,7 +587,11 @@ async function commitAnswerRunInput(
   }
 
   if (approvalAsk) {
-    const allowed = (input.answer === "allow" || input.answer === "always") && !staleConsent;
+    const allowed =
+      (input.answer === "allow" ||
+        input.answer === "always" ||
+        input.answer === ALL_SITES_ACTION_ID) &&
+      !staleConsent;
     const consent = approvalEffect!.kind === AI_CONSENT_EFFECT_KIND;
     if (consent && allowed) {
       const recipientKey = consentRequest(approvalEffect!.request)!.recipientKey;
@@ -601,6 +632,16 @@ async function commitAnswerRunInput(
         where: { spaceId_userId_clientId: key },
         create: { ...key, connectionId },
         update: {},
+      });
+    }
+    if (input.answer === ALL_SITES_ACTION_ID) {
+      await setApprovalRule(tx, {
+        spaceId: input.spaceId,
+        userId: approvalUserId!,
+        botId: run.botId,
+        matchKind: "tool",
+        matchValue: "web_fetch",
+        effect: "always_allow",
       });
     }
     // "Always" on a fetch card allows that site, never every site the tool can reach.

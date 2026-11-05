@@ -4,6 +4,7 @@ import {
   ACTION_TYPES,
   actionTypeForTool,
   applyJudgeDecision,
+  botAllowsAllSites,
   buildApprovalTable,
   connectorKindFromToolName,
   connectorReadRequiresApproval,
@@ -15,6 +16,7 @@ import {
   newSiteOutcome,
   outboundSiteGate,
   planActionGate,
+  privateDataAreas,
   resolveActionApproval,
   resolveActionApprovalDetail,
   toolRequiresApproval,
@@ -995,6 +997,34 @@ describe("bot approval of contact tools (unchanged by MCP writes)", () => {
     expect(add).toMatchObject({ decision: "allow", source: "default" });
     expect(toolRequiresApproval("contacts_add", false)).toBe(false);
     expect(toolRequiresApproval("contacts_save", false)).toBe(true);
+  });
+});
+
+describe("all-sites rule and private data tools", () => {
+  const rule = (botId: string | null, matchValue = "web_fetch", effect = "always_allow") =>
+    ({ effect, matchKind: "tool", matchValue, botId }) as ActionApprovalRule;
+
+  it("reads only this bot's always_allow rule for web_fetch", () => {
+    expect(botAllowsAllSites([rule("bot-1")], "bot-1")).toBe(true);
+    expect(botAllowsAllSites([rule("bot-2")], "bot-1")).toBe(false);
+    expect(botAllowsAllSites([rule(null)], "bot-1")).toBe(false);
+    expect(botAllowsAllSites([rule("bot-1", "web_search")], "bot-1")).toBe(false);
+    expect(botAllowsAllSites([rule("bot-1", "web_fetch", "require_approval")], "bot-1")).toBe(
+      false,
+    );
+  });
+
+  it("names the private data a tool list can read, and ignores web, page and agenda tools", () => {
+    expect(privateDataAreas(["mail_search", "show_emails", "drive_read"])).toEqual([
+      "mail",
+      "Drive",
+    ]);
+    expect(privateDataAreas(["finance_overview"])).toEqual(["finance"]);
+    expect(privateDataAreas(["search_data_room"])).toEqual(["Data room"]);
+    expect(privateDataAreas(["calendar_list_events"])).toEqual(["calendar"]);
+    expect(
+      privateDataAreas(["web_fetch", "web_search", "page_write", "read_file", "calendar_agenda"]),
+    ).toEqual([]);
   });
 });
 
