@@ -630,6 +630,19 @@ async function sendDenial(
   connectionId: string,
   newEmail: boolean,
 ): Promise<"grant" | "switch" | typeof MAIL_REPLY_FIREWALL_HOLD | null> {
+  const bot = await findBotWithAccess(prisma, scope, botId);
+  if (!bot) return "grant";
+  const allowed = accountAllowedIn(bot.rows, connectionId, MAIL_REPLY_BATCH_TOOL, bot);
+  if (!allowed) return "grant";
+  const off = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+  if (off.has("mail_send") || off.has(MAIL_REPLY_BATCH_TOOL)) return "switch";
+  // The switch may have been turned on after the card: the refusal at the call has to hold here too.
+  return newEmail && (bot.firewall || bot.audience === "external")
+    ? MAIL_REPLY_FIREWALL_HOLD
+    : null;
+}
+
+async function findBotWithAccess(prisma: PrismaClient, scope: Scope, botId: string) {
   const bot = await prisma.bot.findFirst({
     where: { id: botId, ...scope },
     select: {
@@ -642,7 +655,7 @@ async function sendDenial(
       disabledBuiltinTools: true,
     },
   });
-  if (!bot || bot.archivedAt) return "grant";
+  if (!bot || bot.archivedAt) return null;
   const rows = await prisma.connection.findMany({
     where: scope,
     select: {
@@ -661,23 +674,31 @@ async function sendDenial(
       agentBot: { select: { spawnKey: true } },
     },
   });
-  const allowed = accountAllowedIn(
-    connectionRowsForAudience(
+  return {
+    ...bot,
+    rows: connectionRowsForAudience(
       rows.map((row) => withInboxAgentStandIn(row, bot)),
       bot.audience,
       bot.firewall,
     ),
-    connectionId,
-    MAIL_REPLY_BATCH_TOOL,
-    bot,
-  );
-  if (!allowed) return "grant";
-  const off = disabledBuiltinToolSet(bot.disabledBuiltinTools);
-  if (off.has("mail_send") || off.has(MAIL_REPLY_BATCH_TOOL)) return "switch";
-  // The switch may have been turned on after the card: the refusal at the call has to hold here too.
-  return newEmail && (bot.firewall || bot.audience === "external")
-    ? MAIL_REPLY_FIREWALL_HOLD
-    : null;
+  };
+}
+
+/**
+ * The accounts this bot may use for `toolName` right now, read fresh from the access rules. A card's
+ * From choices and the check of the account a person picked on it both come from here, so a stale
+ * or crafted client cannot send from a mailbox the agent has no access to.
+ */
+export async function mailAccountsUsableBy<T extends { id: string }>(
+  prisma: PrismaClient,
+  scope: Scope,
+  botId: string,
+  toolName: string,
+  accounts: T[],
+): Promise<T[]> {
+  const bot = await findBotWithAccess(prisma, scope, botId);
+  if (!bot) return [];
+  return accounts.filter((account) => accountAllowedIn(bot.rows, account.id, toolName, bot));
 }
 
 async function sendRow(

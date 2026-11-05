@@ -31,11 +31,14 @@ export const Pending: Story = {};
 /** Two mailboxes and no sender named: Send waits until the person picks one. */
 export const ChooseSender: Story = {
   args: {
-    mail: { ...mail, account: undefined },
-    accounts: [
-      { connectionId: "c1", label: "Work", address: "work@example.test" },
-      { connectionId: "c2", label: "Home", address: "home@example.test" },
-    ],
+    mail: {
+      ...mail,
+      account: undefined,
+      choices: [
+        { connectionId: "c1", label: "Work", address: "work@example.test" },
+        { connectionId: "c2", label: "Home", address: "home@example.test" },
+      ],
+    },
   },
 };
 export const WithCc: Story = {
