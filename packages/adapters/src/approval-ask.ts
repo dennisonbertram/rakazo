@@ -252,6 +252,7 @@ const MAIL_REPLY_FLAG_TEXT: Record<MailReplyFlag, string> = {
   important_sender: "Important sender",
   no_reply_address: "No-reply address",
   no_reply_needed: "You said no reply needed",
+  already_sent: "Already sent a few minutes ago",
   duplicate_email: "Possible duplicate",
   new_recipient: "New recipient",
   has_link: "Has a link",
