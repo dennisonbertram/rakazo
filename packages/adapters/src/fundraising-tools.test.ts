@@ -32,6 +32,7 @@ const row = ({ id = "c", name = "Harbor Angels", ...record }: Record<string, unk
 });
 /** The pipeline tables behind those contacts. */
 const pipelineOf = (rows: ReturnType<typeof row>[]) => ({
+  pipelineEvent: { findMany: async () => [] },
   pipelineRecord: { findMany: async () => rows.map((r) => r.pipelinePeople[0]?.record) },
   pipelineRecordPerson: {
     findMany: async () =>

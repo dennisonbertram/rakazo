@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { Contact, ContactKind, ContactLinked, ContactStage } from "@rakazo/contracts";
-import { ContactEmailSchema, ContactStageSchema } from "@rakazo/contracts";
+import type { Contact, ContactKind, ContactLinked } from "@rakazo/contracts";
+import { ContactEmailSchema } from "@rakazo/contracts";
 import {
   Button,
   Dialog,
@@ -18,7 +18,6 @@ import {
 } from "@rakazo/ui-web";
 import type { FormEvent } from "react";
 import { useRef, useState } from "react";
-import { centsFromText } from "../lib/dollars-input";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 import { ContactDeleteConfirm, hasLinks } from "./ContactDeleteConfirm";
@@ -45,15 +44,6 @@ export const contactKindNames = (): Record<ContactKind, string> => ({
   other: t`Other`,
 });
 
-export const contactStageNames = (): Record<ContactStage, string> => ({
-  target: t`Target`,
-  intro: t`Intro`,
-  meeting: t`Meeting`,
-  diligence: t`Diligence`,
-  committed: t`Committed`,
-  passed: t`Passed`,
-});
-
 export const contactAddLabels = (): Record<ContactKind, string> => ({
   investor: t`Add investor`,
   auditor: t`Add auditor`,
@@ -77,7 +67,6 @@ export function ContactDialog({
   onDeleted,
   onOpenContact,
   fromCapTable = false,
-  pipelineFields = false,
   finalFocus,
 }: {
   contact: Contact | null;
@@ -91,11 +80,6 @@ export function ContactDialog({
   onOpenContact?: (contact: Contact) => void;
   /** Opened from the Cap table, where a hint says contacts do not change Carta. */
   fromCapTable?: boolean;
-  /**
-   * Opened from the Fundraising page, whose rows have no other editor for stage, check size and
-   * next step until the Pipeline table replaces them. Saved through the record, and only if changed.
-   */
-  pipelineFields?: boolean;
   /** Where focus goes on close; a mouse click on a row leaves nothing focused to return to. */
   finalFocus?: () => HTMLElement | null | undefined;
 }) {
@@ -106,21 +90,12 @@ export function ContactDialog({
   );
   const [kind, setKind] = useState<ContactKind>(contact?.kind ?? prefill?.kind ?? "investor");
   const [notes, setNotes] = useState(contact?.notes ?? "");
-  const [stage, setStage] = useState<ContactStage>(contact?.stage ?? "target");
-  const [checkSize, setCheckSize] = useState(
-    contact?.checkSizeCents == null ? "" : String(contact.checkSizeCents / 100),
-  );
-  const [nextStep, setNextStep] = useState(contact?.nextStep ?? "");
-  const [checkSizeError, setCheckSizeError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const emailInput = useRef<HTMLInputElement>(null);
   const [confirming, setConfirming] = useState<ContactLinked | null>(null);
   const names = contactKindNames();
-  const stageNames = contactStageNames();
-  // Stage, check size and next step belong to a Fundraising row; every other page edits the person only.
-  const isProspect = pipelineFields && kind === "prospect";
 
   const typedEmail = email.trim().toLowerCase();
   const sameEmail = typedEmail
@@ -176,39 +151,21 @@ export function ContactDialog({
       emailInput.current?.focus();
       return;
     }
-    const checkSizeCents = isProspect ? centsFromText(checkSize) : null;
-    if (checkSizeCents === undefined) {
-      setCheckSizeError(t`Enter an amount`);
-      return;
-    }
-    const pipeline = { stage, checkSizeCents, nextStep: nextStep.trim() || null };
-    // Editing an email must not write the record: only a field this dialog changed goes to it.
-    const changed = contact
-      ? {
-          ...(stage === (contact.stage ?? "target") ? {} : { stage }),
-          ...(checkSizeCents === (contact.checkSizeCents ?? null) ? {} : { checkSizeCents }),
-          ...(pipeline.nextStep === (contact.nextStep ?? null)
-            ? {}
-            : { nextStep: pipeline.nextStep }),
-        }
-      : {};
-    void run(async () => {
-      const saved = await rpc.contacts.save({
-        ...(contact ? { id: contact.id } : {}),
-        name,
-        email: email.trim() || null,
-        organization: organization.trim() || null,
-        kind,
-        notes: notes.trim() || null,
-        ...(isProspect && !contact ? pipeline : {}),
-        ...(!contact && prefill?.pipelineRecordId
-          ? { pipelineRecordId: prefill.pipelineRecordId }
-          : {}),
-      });
-      return isProspect && Object.keys(changed).length > 0
-        ? rpc.fundraising.prospects.save({ id: saved.id, ...changed })
-        : saved;
-    }, onSaved);
+    void run(
+      () =>
+        rpc.contacts.save({
+          ...(contact ? { id: contact.id } : {}),
+          name,
+          email: email.trim() || null,
+          organization: organization.trim() || null,
+          kind,
+          notes: notes.trim() || null,
+          ...(!contact && prefill?.pipelineRecordId
+            ? { pipelineRecordId: prefill.pipelineRecordId }
+            : {}),
+        }),
+      onSaved,
+    );
   }
 
   // An email another contact already has is reported under the Email field, anything else at the end.
@@ -314,62 +271,6 @@ export function ContactDialog({
                 ))}
               </NativeSelect>
             </div>
-            {isProspect ? (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="contact-stage">
-                    <Trans>Stage</Trans>
-                  </Label>
-                  <NativeSelect
-                    id="contact-stage"
-                    className="w-full"
-                    value={stage}
-                    onChange={(e) => setStage(e.target.value as ContactStage)}
-                  >
-                    {ContactStageSchema.options.map((value) => (
-                      <NativeSelectOption key={value} value={value}>
-                        {stageNames[value]}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="contact-check-size">
-                    <Trans>Check size</Trans>
-                  </Label>
-                  <Input
-                    id="contact-check-size"
-                    inputMode="decimal"
-                    value={checkSize}
-                    aria-invalid={checkSizeError ? true : undefined}
-                    aria-describedby={checkSizeError ? "contact-check-size-error" : undefined}
-                    onChange={(e) => {
-                      setCheckSize(e.target.value);
-                      setCheckSizeError("");
-                    }}
-                  />
-                  {checkSizeError ? (
-                    <p
-                      id="contact-check-size-error"
-                      role="alert"
-                      className="text-sm text-destructive"
-                    >
-                      {checkSizeError}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="contact-next-step">
-                    <Trans>Next step</Trans>
-                  </Label>
-                  <Input
-                    id="contact-next-step"
-                    value={nextStep}
-                    onChange={(e) => setNextStep(e.target.value)}
-                  />
-                </div>
-              </>
-            ) : null}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="contact-notes">
                 <Trans>Notes</Trans>

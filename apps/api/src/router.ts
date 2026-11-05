@@ -326,6 +326,7 @@ import {
   listTicketComments,
   listWaitingOnYouItems,
   lockOwnedGroup,
+  logCall,
   markInvestorUpdateDelivered,
   markSafe,
   markSeen,
@@ -339,6 +340,7 @@ import {
   newestVoiceCredentialOrder,
   notSent,
   PinnedConnectionLostError,
+  PipelineInputError,
   PortalBlockedError,
   Prisma,
   ProspectEmailRequiredError,
@@ -391,6 +393,7 @@ import {
   UnshareableArtifactError,
   unassignSafe,
   unblockPortal,
+  undoCall,
   undoCapTableSource,
   unseenBotKinds,
   unseenCounts,
@@ -1448,7 +1451,11 @@ function fundraisingError(error: unknown): never {
   if (error instanceof SafeActiveError || error instanceof SafeStateError) {
     throw new ORPCError("CONFLICT", { message: error.message });
   }
-  if (error instanceof SafeCapRequiredError || error instanceof ProspectEmailRequiredError) {
+  if (
+    error instanceof SafeCapRequiredError ||
+    error instanceof ProspectEmailRequiredError ||
+    error instanceof PipelineInputError
+  ) {
     throw new ORPCError("BAD_REQUEST", { message: error.message });
   }
   if (error instanceof FundraiseRoundOpenError) {
@@ -2942,7 +2949,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
             disabledBuiltinTools: source.disabledBuiltinTools,
             audience: source.audience === "external" ? "external" : "internal",
             firewall: source.firewall,
-            proactivity: source.proactivity === "low" || source.proactivity === "high" ? source.proactivity : "medium",
+            proactivity:
+              source.proactivity === "low" || source.proactivity === "high"
+                ? source.proactivity
+                : "medium",
             externalMessageTargets: source.externalMessageTargets,
             externalComputerTools: source.externalComputerTools,
           })
@@ -9335,6 +9345,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
         ),
         notSent: authed.fundraising.prospects.notSent.handler(({ context, input }) =>
           notSent(deps.prisma, actorScope(context.actor), input.id).catch(fundraisingError),
+        ),
+      },
+      calls: {
+        log: authed.fundraising.calls.log.handler(({ context, input }) =>
+          logCall(deps.prisma, actorScope(context.actor), input).catch(fundraisingError),
+        ),
+        undo: authed.fundraising.calls.undo.handler(({ context, input }) =>
+          undoCall(deps.prisma, actorScope(context.actor), input.eventId)
+            .then(() => ({ ok: true as const }))
+            .catch(fundraisingError),
         ),
       },
       safes: {

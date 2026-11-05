@@ -268,6 +268,8 @@ import {
   FundraiseRoundSaveInputSchema,
   FundraiseRoundSchema,
   FundraisingOverviewSchema,
+  PipelineCallLogInputSchema,
+  PipelineCallLogResultSchema,
   ProspectSaveInputSchema,
   SafeAssignInputSchema,
   SafeMarkInputSchema,
@@ -2160,6 +2162,12 @@ export const appContract = {
       markWaiting: oc.input(z.object({ id: Id })).output(ContactSchema),
       /** Clears Waiting for Mercury. */
       notSent: oc.input(z.object({ id: Id })).output(ContactSchema),
+    },
+    calls: {
+      /** Adds a call to the record's timeline; moves status forward only (Spoke: before Met becomes Met). */
+      log: oc.input(PipelineCallLogInputSchema).output(PipelineCallLogResultSchema),
+      /** Removes a logged call and puts back the status and next call it changed. */
+      undo: oc.input(z.object({ eventId: Id })).output(z.object({ ok: z.literal(true) })),
     },
     safes: {
       list: oc.output(z.array(SafeSchema)),
