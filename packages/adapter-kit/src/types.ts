@@ -626,7 +626,8 @@ export type UsageOperationKind =
   | "subagent"
   | "compaction"
   | "triage"
-  | "company_import";
+  | "company_import"
+  | "goal_check";
 
 export interface ModelCallObserver {
   beforeCall(call: {
@@ -775,6 +776,8 @@ export interface BackgroundJobPayloads {
   "computer.control-expire": { computerId: string; leaseId: string };
   "skill.teaching-expire": { skillId: string };
   "history.compact": { threadId: string };
+  /** Judges a goal after the run `runId` of its thread ended. */
+  "goal.check": { goalId: string; runId: string };
   "messaging.deliver": { runId?: string };
   /** Sends due external notification deliveries; run every minute by the worker's cron. */
   "notifications.deliver": Record<string, never>;

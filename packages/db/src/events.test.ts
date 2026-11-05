@@ -107,6 +107,7 @@ describe("finalizeRun", () => {
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: { updateMany: vi.fn(async () => ({ count: 1 })) },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: { create: createEvent, deleteMany: vi.fn(async () => ({ count: 0 })) },
       steeringMessage: {
         findMany: vi.fn(async () => []),
@@ -164,6 +165,7 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "task-reply" })),
       },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: {
         create: vi.fn(async () => ({ threadId: "thread-1", seq: 0 })),
         deleteMany: vi.fn(async () => ({ count: 0 })),
@@ -234,6 +236,7 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "task-reply" })),
       },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: {
         create: vi.fn(async () => ({ threadId: "thread-1", seq: 0 })),
         deleteMany: vi.fn(async () => ({ count: 0 })),
@@ -316,6 +319,7 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "task-reply" })),
       },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: {
         create: vi.fn(async () => ({ threadId: "thread-1", seq: 0 })),
         deleteMany: vi.fn(async () => ({ count: 0 })),
@@ -4314,6 +4318,7 @@ describe("clearThread", () => {
         }),
       },
       bot: { update: vi.fn() },
+      threadGoal: { findFirst: vi.fn(async () => null) },
     };
     const prisma = {
       $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),

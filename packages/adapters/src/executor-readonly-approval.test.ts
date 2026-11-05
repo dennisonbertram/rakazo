@@ -282,7 +282,10 @@ function fixture({
   sources = [] as { id: string; agentBotId: string | null; grantedTo?: string[] }[],
   scriptedRuntime = false,
   companyDocs = [] as { path: string; content: string }[],
+  goalId = null as string | null,
 }: {
+  /** The goal the run's row points to at the start. `attachGoal` changes it while the run lives. */
+  goalId?: string | null;
   /** The owner's company context sections. */
   companyDocs?: { path: string; content: string }[];
   /** Directly connected sources, keyed by the agent they belong to. */
@@ -432,6 +435,8 @@ function fixture({
       };
     },
   );
+  const goalState = { id: goalId };
+  const jobsEnqueue = vi.fn(async () => undefined);
   const run = {
     id: "run-1",
     botId: "bot-1",
@@ -446,6 +451,7 @@ function fixture({
     externalTaint,
     routineId: routineManagedKind === undefined ? null : "routine-1",
     leaseFence: 0,
+    ...(goalId ? { goalId } : {}),
     ...(peer || sourceText !== undefined ? { sourceMessageId: "msg-1" } : {}),
   };
   const externalEffect = {
@@ -513,7 +519,11 @@ function fixture({
         bot: { notifyOnFinish: true },
         thread: { groupId: null },
       })),
-      findUnique: vi.fn(async () => run),
+      findUnique: vi.fn(async (args?: { select?: Record<string, boolean> }) =>
+        args?.select && Object.keys(args.select).join() === "goalId"
+          ? { goalId: goalState.id }
+          : run,
+      ),
       findMany: vi.fn(async () => []),
       findUniqueOrThrow: vi.fn(async () => run),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -946,7 +956,7 @@ function fixture({
         })),
       ),
     },
-    jobs: { enqueue: vi.fn(async () => undefined) },
+    jobs: { enqueue: jobsEnqueue },
     secrets,
     autoReview: autoReviewProvider,
     shutdownSignal,
@@ -977,6 +987,11 @@ function fixture({
     mailReplyRows,
     results,
     storedTaint: () => run.externalTaint,
+    jobsEnqueue,
+    /** The owner sets a goal while the run is live (the send path updates the run's row). */
+    attachGoal: (id: string) => {
+      goalState.id = id;
+    },
     setFirewall: (on: boolean) => {
       botFlags.firewall = on;
     },
@@ -8265,5 +8280,91 @@ describe("Always for this routine and Auto Review of routine reads", () => {
       expect(after.pauseRunForInput).toHaveBeenCalledOnce();
       expect(reviewMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("a run that a goal adopts while it is running", () => {
+  beforeEach(() => {
+    reviewMock.mockReset();
+  });
+  const evidenceWrites = (f: ReturnType<typeof fixture>) =>
+    (
+      f.prisma.run.updateMany.mock.calls as unknown as Array<
+        [{ data: { goalEvidence?: Array<{ id: string }> } }]
+      >
+    )
+      .map(([call]) => call.data.goalEvidence)
+      .filter((log) => log !== undefined);
+
+  it("stops using Auto Review for the next gated call", async () => {
+    reviewMock.mockResolvedValue({ decision: "pass", model: "mock" });
+    const f = fixture({
+      name: "demo_find_validator_record",
+      readOnly: false,
+      autoReview: true,
+      beforeToolCall: (index) => {
+        if (index === 1) f.attachGoal("goal-1");
+      },
+    });
+    f.setCalls([
+      { args: { id: "a" }, executionId: "call-1" },
+      { args: { id: "b" }, executionId: "call-2" },
+    ]);
+    await f.run();
+    // Only the first call, made before the goal, went to Auto Review; a goal run never uses it.
+    expect(reviewMock).toHaveBeenCalledOnce();
+    expect(f.execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("records the calls made after the goal was set, and queues the goal check when it ends", async () => {
+    const f = fixture({
+      beforeToolCall: (index) => {
+        if (index === 1) f.attachGoal("goal-1");
+      },
+    });
+    f.setCalls([
+      { args: { id: "a" }, executionId: "call-1" },
+      { args: { id: "b" }, executionId: "call-2" },
+      { args: { id: "c" }, executionId: "call-3" },
+    ]);
+    await f.run();
+    expect(
+      evidenceWrites(f)
+        .at(-1)
+        ?.map((entry) => entry.id),
+    ).toEqual(["t1", "t2"]);
+    expect(f.jobsEnqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "goal.check",
+        payload: { goalId: "goal-1", runId: "run-1" },
+      }),
+    );
+  });
+
+  it("queues nothing for a run that never had a goal", async () => {
+    const f = fixture();
+    await f.run();
+    expect(evidenceWrites(f)).toEqual([]);
+    expect(f.jobsEnqueue).not.toHaveBeenCalledWith(expect.objectContaining({ name: "goal.check" }));
+  });
+
+  it("redacts a secret that JSON would escape, in a nested result and in an error", async () => {
+    const secret = 'abc"def\\ghi';
+    const f = fixture({ goalId: "goal-1", secrets: [secret] });
+    f.execute.mockImplementationOnce(async function* () {
+      yield { type: "result" as const, data: { item: { nested: { token: `x ${secret} y` } } } };
+    });
+    f.setCalls([{ args: { id: "a" }, executionId: "call-1" }]);
+    await f.run();
+    f.execute.mockImplementationOnce(async function* () {
+      yield* [];
+      throw new Error(`bad key ${secret}`);
+    });
+    f.setCalls([{ args: { id: "b" }, executionId: "call-2" }]);
+    await f.run({ expectFailure: true }).catch(() => undefined);
+    const logs = JSON.stringify(evidenceWrites(f));
+    expect(logs).toContain("[redacted]");
+    expect(logs).not.toContain("def");
+    expect(logs).not.toContain("ghi");
   });
 });

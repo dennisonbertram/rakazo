@@ -1279,7 +1279,16 @@ export const UsageRecordSchema = z.object({
   callId: z.string().nullable().optional(),
   operationId: z.string().nullable().optional(),
   operationKind: z
-    .enum(["answer", "setup", "retrieval", "subagent", "compaction", "triage", "company_import"])
+    .enum([
+      "answer",
+      "setup",
+      "retrieval",
+      "subagent",
+      "compaction",
+      "triage",
+      "company_import",
+      "goal_check",
+    ])
     .optional(),
   parentRunId: z.string().nullable().optional(),
   agentId: z.string().nullable().optional(),
@@ -1405,6 +1414,21 @@ export const ThreadMessagePageSchema = z.object({
 });
 export type ThreadMessagePage = z.infer<typeof ThreadMessagePageSchema>;
 
+/** The open goal (active or paused) of a bot's thread; ended goals are not sent. */
+export const ThreadGoalSchema = z.object({
+  id: Id,
+  text: z.string(),
+  status: z.enum(["active", "paused", "met", "blocked", "stopped", "cleared"]),
+  stopReason: z
+    .enum(["runs", "time", "spend", "stalled", "owner", "check_failed", "model_error"])
+    .nullable(),
+  /** Why the latest check said what it said; null before the first check. */
+  lastReason: z.string().nullable(),
+  continuations: z.number().int().nonnegative(),
+  startedAt: z.string(),
+});
+export type ThreadGoal = z.infer<typeof ThreadGoalSchema>;
+
 export const ThreadSnapshotSchema = z.object({
   threadId: Id,
   cursor: z.number().int().min(-1),
@@ -1425,6 +1449,7 @@ export const ThreadSnapshotSchema = z.object({
     .array(z.object({ messageId: z.string(), id: Id, name: z.string() }))
     .optional(),
   computer: ComputerStatusSchema.optional(),
+  goal: ThreadGoalSchema.nullable().optional(),
 });
 export type ThreadSnapshot = z.infer<typeof ThreadSnapshotSchema>;
 

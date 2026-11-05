@@ -31,6 +31,7 @@ type Tenant = {
   spaceId: string;
   userId: string;
   botId: string;
+  threadId: string;
   secretId: string;
   personalSecretId: string;
 };
@@ -63,6 +64,18 @@ function rowsFor(t: Tenant, tag: string): Array<[string, Record<string, unknown>
     ],
     ["pipelineEvent", { spaceId: t.spaceId, userId: t.userId, recordId: record, kind: "note" }],
     ["pipelineImport", { spaceId: t.spaceId, userId: t.userId }],
+    [
+      "threadGoal",
+      {
+        spaceId: t.spaceId,
+        userId: t.userId,
+        threadId: t.threadId,
+        botId: t.botId,
+        text: `Goal ${tag}`,
+        // Ended, so the one-open-goal-per-thread index does not see the fixture and write rows as two.
+        status: "met",
+      },
+    ],
     [
       "botSecret",
       {
@@ -808,6 +821,25 @@ describePostgres("row-level security (PostgreSQL)", () => {
       await expect(create(), table).rejects.toThrow(/row-level security/);
     }
     // The unscoped reads and writes above are deliberate.
+    drainUnscopedDatabaseAccess();
+  });
+
+  it("keeps thread goals to their Space", async () => {
+    const seen = (t: typeof a) =>
+      runAsTenant(t, async () =>
+        (await db.threadGoal.findMany({ select: { spaceId: true } })).map((row) => row.spaceId),
+      );
+    expect(await seen(a)).toEqual([a.spaceId]);
+    expect(await seen(b)).toEqual([b.spaceId]);
+    expect(await db.threadGoal.findMany()).toEqual([]);
+    expect(
+      await runAsTenant(b, () =>
+        db.threadGoal.updateMany({ where: { threadId: a.threadId }, data: { status: "cleared" } }),
+      ),
+    ).toEqual({ count: 0 });
+    expect(
+      await runAsTenant(b, () => db.threadGoal.deleteMany({ where: { threadId: a.threadId } })),
+    ).toEqual({ count: 0 });
     drainUnscopedDatabaseAccess();
   });
 

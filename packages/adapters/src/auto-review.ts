@@ -197,7 +197,7 @@ export function redactToolArgsForReview(
   return redacted;
 }
 
-function redactNestedReviewValue(value: unknown, secrets: string[]): unknown {
+export function redactNestedReviewValue(value: unknown, secrets: string[]): unknown {
   if (typeof value === "string") return redactSecrets(value, secrets);
   if (Array.isArray(value)) {
     return value.map((item) => redactNestedReviewValue(item, secrets));

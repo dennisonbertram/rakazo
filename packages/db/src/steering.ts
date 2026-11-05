@@ -196,6 +196,15 @@ export async function createPendingSteeringRun(
     },
   });
   const trigger = origin === "app" ? "follow_up" : "messaging";
+  const goal = await tx.threadGoal.findFirst({
+    where: {
+      spaceId: input.spaceId,
+      userId: batch[0]!.userId,
+      threadId: input.threadId,
+      status: "active",
+    },
+    select: { id: true },
+  });
   const run = await tx.run.create({
     data: {
       spaceId: input.spaceId,
@@ -209,6 +218,7 @@ export async function createPendingSteeringRun(
       unattended: newRunUnattended({ trigger }),
       externalTaint: newRunExternalTaint({ trigger }),
       sourceMessageId: source.message.id,
+      goalId: goal?.id,
       ...(modelPin ?? {}),
     },
   });
