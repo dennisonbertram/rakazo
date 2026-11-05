@@ -187,6 +187,16 @@ const strings = (value: unknown) =>
 const addressesOf = (value: unknown) =>
   parseRecipients(strings(value).join(", ")).map((entry) => entry.address);
 
+/** Everyone who took part in a thread, from its synced messages. */
+export const threadParticipants = (
+  messages: { fromAddress: string | null; toAddresses: string[]; ccAddresses: string[] }[],
+) =>
+  messages.flatMap((m) => [
+    ...(m.fromAddress ? [m.fromAddress] : []),
+    ...(m.toAddresses ?? []),
+    ...(m.ccAddresses ?? []),
+  ]);
+
 /**
  * A draft is free when everyone it goes to already took part in the thread it answers and it has
  * no link. The thread is read from synced mail; a reply to a message that is not synced asks.
@@ -215,11 +225,7 @@ export async function firewallDraftIsWithinThread(
       cc: addressesOf(args.cc),
       bcc: addressesOf(args.bcc),
       body: typeof args.body === "string" ? args.body : "",
-      participants: messages.flatMap((m) => [
-        ...(m.fromAddress ? [m.fromAddress] : []),
-        ...(m.toAddresses ?? []),
-        ...(m.ccAddresses ?? []),
-      ]),
+      participants: threadParticipants(messages),
     });
   } catch {
     return false;

@@ -713,3 +713,13 @@ it("reads Not sent, not Draft not saved, when Send now failed", async () => {
   expect(header()).toContain("Not sent");
   expect(host.textContent).not.toContain("Draft not saved");
 });
+
+it("embedded in a batch row it shows the fields without its header or buttons", async () => {
+  await render({ embedded: { editing: false } });
+  expect(button("Send")).toBeUndefined();
+  expect(button("Discard")).toBeUndefined();
+  expect(button("Edit")).toBeUndefined();
+  expect(host.textContent).toContain(mail.body);
+  await render({ embedded: { editing: true } });
+  expect(host.querySelector("textarea")?.value).toBe(mail.body);
+});

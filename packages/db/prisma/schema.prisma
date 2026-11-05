@@ -75,6 +75,7 @@ model User {
   meetingHandoffs             MeetingHandoff[]
   inboxSenderFeedback         InboxSenderFeedback[]
   composeSends                ComposeSend[]
+  mailReplyItems              MailReplyItem[]
   members                     Member[]
   invitations                 Invitation[]
   modelCredentials            UserModelCredential[]
@@ -578,6 +579,7 @@ model Space {
   meetingHandoffs             MeetingHandoff[]
   inboxSenderFeedback         InboxSenderFeedback[]
   composeSends                ComposeSend[]
+  mailReplyItems              MailReplyItem[]
   capabilities                CapabilityInstall[]
   memoryDocuments             MemoryDocument[]
   botPages                    BotPage[]
@@ -1247,6 +1249,8 @@ model ExternalEffect {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  mailReplyItems MailReplyItem[]
+
   @@unique([idempotencyKey])
   @@index([runId, status])
   @@map("external_effects")
@@ -1563,6 +1567,7 @@ model Connection {
   dataRoomSyncState   DataRoomSyncState?
   dataRoomItems       DataRoomItem[]
   composeSends        ComposeSend[]
+  mailReplyItems      MailReplyItem[]
   /// false: only bots with a BotConnectionAccess row may use this connection's tools.
   allAgents           Boolean               @default(true)
   /// Agent-linked connection: other agents may be given access. Stays true while every other agent is off.
@@ -2804,6 +2809,46 @@ model ComposeSend {
   @@unique([spaceId, userId, clientId])
   @@index([connectionId])
   @@map("compose_sends")
+}
+
+/// One reply of a mail_reply_batch call. The ExternalEffect is the batch header; each outgoing
+/// message is built from this row, and its send state is the row's ComposeSend
+/// (clientId `agent:batch_<id>`), never a copy here.
+model MailReplyItem {
+  id               String         @id @default(cuid())
+  effectId         String
+  effect           ExternalEffect @relation(fields: [effectId], references: [id], onDelete: Cascade)
+  position         Int
+  spaceId          String
+  space            Space          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectionId     String
+  connection       Connection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  /// The provider's id of the message answered.
+  replyToId        String
+  providerThreadId String
+  to               String[]
+  cc               String[]
+  bcc              String[]
+  subject          String
+  body             String
+  /// Newest inbound message in the thread the owner has seen (at the proposal, then at the press).
+  seenMessageId    String?
+  /// Hash of the row as the owner approved it; the worker recomputes it before each attempt.
+  approvedHash     String?
+  /// "reviewing" | "skipped" | "queued" | "claimed" | "held" | "composer".
+  dispatch         String         @default("reviewing")
+  /// With "held": why, as a stable code.
+  error            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([effectId, position])
+  @@index([spaceId, userId])
+  @@index([connectionId])
+  @@index([dispatch, updatedAt])
+  @@map("mail_reply_items")
 }
 
 /// Sync throttle and in-flight claim for one mail connection.

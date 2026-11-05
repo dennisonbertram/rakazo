@@ -246,10 +246,11 @@ export function mailSendRefusal(
   args: Record<string, unknown>,
   prior: PriorMailEffect[],
   runId: string,
+  tool = "mail_send",
 ): string | undefined {
   const placeholder = `${text(args.subject)}\n${text(args.body)}`.match(PLACEHOLDER)?.[0];
   if (placeholder) {
-    return `The email still contains the placeholder ${placeholder}. Replace it with real text (sign with the user's name if you know it, or leave the signature off), then call mail_send again.`;
+    return `The email still contains the placeholder ${placeholder}. Replace it with real text (sign with the user's name if you know it, or leave the signature off), then call ${tool} again.`;
   }
   // Only this run's own earlier calls count: a later request may legitimately send a follow-up.
   for (const effect of prior) {

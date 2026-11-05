@@ -119,6 +119,7 @@ describe("selectMailTools", () => {
       "mail_get",
       "mail_grep",
       "mail_modify",
+      "mail_reply_batch",
       "mail_search",
       "mail_send",
       "show_emails",

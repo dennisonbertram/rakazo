@@ -92,6 +92,7 @@ import {
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  MAIL_REPLY_BATCH_TOOL,
   MEETING_MARK_REASON,
   MEETING_ROUTE_PROMPT_START,
   OMI_CONNECTOR_ID,
@@ -104,6 +105,7 @@ import {
 import type { ActionApprovalRule, ToolCallStreak } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
+  accountAllowedIn,
   actionTypeForTool,
   appendTextSegment,
   appendToolCallSegment,
@@ -136,6 +138,7 @@ import {
   firewallToolClass,
   formatSkillRunPrompt,
   formatSkillsCatalogInstruction,
+  GOOGLE_BUILTIN_WRITES,
   GTM_PAGE_INSTRUCTIONS,
   humanizeToolName,
   inboundRoutinePrompts,
@@ -167,6 +170,7 @@ import {
   quietRoutineGuidance,
   redactSecrets,
   renderBotDirectory,
+  resolveActionApproval,
   resolveActionApprovalDetail,
   resolveBotAddress,
   sandboxCommandTimeoutMs,
@@ -497,6 +501,8 @@ import {
   mailSendRefusal,
 } from "./mail-approval-recovery.js";
 import { threadHasProtectedSender } from "./mail-protected-senders.js";
+import type { PreparedMailReply } from "./mail-reply-batch.js";
+import { mailBatchStepSummary, prepareMailReplyBatch, priorBatchRows } from "./mail-reply-batch.js";
 import {
   accountName,
   findAccount,
@@ -3290,16 +3296,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // connector tools. A connection with an integration agent takes changes only from that
         // agent while its switch is on, and "Only this agent" stops every other bot. These read the
         // connection now, not as it was at run start, so a switch changed mid-run applies.
-        const GOOGLE_BUILTIN_WRITES = new Set([
-          "mail_draft",
-          "mail_modify",
-          "mail_send",
-          "calendar_create_event",
-          "calendar_update_event",
-          "calendar_delete_event",
-          "drive_create_file",
-          "drive_update_file",
-        ]);
         const googleBuiltinAccounts = (toolName: string): Promise<{ id: string }[]> | undefined =>
           MAIL_TOOL_NAMES.has(toolName)
             ? mailAccounts()
@@ -3334,21 +3330,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const firewalled = await firewallNow();
           return connectionRowsForAudience(await connectionRowsStored(), bot.audience, firewalled);
         };
-        // The account must exist in this space and user, be connected, be open to this bot, and for
-        // a write follow the agent rule.
-        const accountAllowedIn = (
+        const accountAllowedForBot = (
           rows: Awaited<ReturnType<typeof connectionRowsNow>>,
           accountId: string,
           toolName: string,
-        ): boolean => {
-          const row = rows.find((candidate) => candidate.id === accountId);
-          if (!row || row.status !== "connected" || deniedConnectionIds(rows).has(row.id))
-            return false;
-          if (!GOOGLE_BUILTIN_WRITES.has(toolName) || row.agentBotId === null) return true;
-          if (row.agentBotId === bot.id) return row.writesEnabled;
-          // Another agent changes it only with its own write grant, still asking before each change.
-          return nonOwnerMayWrite(row, bot);
-        };
+        ) => accountAllowedIn(rows, accountId, toolName, bot);
         const accountsAllowedNow = async <T extends { id: string }>(
           accounts: Promise<T[]> | T[],
           toolName: string,
@@ -3356,11 +3342,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const list = await accounts;
           if (list.length === 0) return list;
           const rows = await connectionRowsNow();
-          return list.filter((account) => accountAllowedIn(rows, account.id, toolName));
+          return list.filter((account) => accountAllowedForBot(rows, account.id, toolName));
         };
         // Runs right before a provider write; the caller awaits nothing between this and the write.
         const writeDenialNow = async (account: { id: string }, toolName: string) =>
-          accountAllowedIn(await connectionRowsNow(), account.id, toolName)
+          accountAllowedForBot(await connectionRowsNow(), account.id, toolName)
             ? null
             : "This connected account is no longer available for changes by this bot.";
         const googleBuiltinDenial = async (toolName: string): Promise<string | null> => {
@@ -3373,7 +3359,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           );
           if (GOOGLE_BUILTIN_WRITES.has(toolName)) {
             const rows = await connectionRowsNow();
-            const readable = all.filter((account) => accountAllowedIn(rows, account.id, "read"));
+            const readable = all.filter((account) =>
+              accountAllowedForBot(rows, account.id, "read"),
+            );
             if (readable.length > 0) {
               const nameOf = (account: { id: string }) =>
                 (account as { address?: string; label?: string }).address ??
@@ -3876,8 +3864,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // others exist, and a call to one is refused (see applyToolCall).
         const tools = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])].filter(
           (tool) =>
-            !bot.firewall ||
-            firewallToolClass(tool.name, isMailThreadAgentSpawnKey(bot.spawnKey)) !== "dropped",
+            (!bot.firewall ||
+              firewallToolClass(tool.name, isMailThreadAgentSpawnKey(bot.spawnKey)) !==
+                "dropped") &&
+            // An email's own agent answers one thread, so it has nothing to batch.
+            (tool.name !== MAIL_REPLY_BATCH_TOOL || !isMailThreadAgentSpawnKey(bot.spawnKey)),
         );
         const offeredToolNames = new Set(tools.map((tool) => tool.name));
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
@@ -3956,6 +3947,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Tool calls that land mid-sentence wait here until the narration catches up to a
         // sentence boundary, so the step chips never render in the middle of a clause.
         let pendingToolNames: string[] = [];
+        let settledMailBatchSummary: string | undefined;
         const flushPendingTools = () => {
           if (currentTextSegment) {
             messageSegments = appendTextSegment(messageSegments, currentTextSegment);
@@ -4499,6 +4491,30 @@ export function createRunExecutor(deps: ExecutorDeps) {
               error: "This stage was handed off. End the turn without more tool calls.",
             };
           }
+          if (name === MAIL_REPLY_BATCH_TOOL) {
+            // The press settled it, so this call is the one that waited: the stored result reaches
+            // the run whatever changed meanwhile (a Block, a switch, a grant). It sends nothing.
+            const stored = await deps.prisma.externalEffect.findUnique({
+              where: { idempotencyKey: approvalEffectKey(runId, name, args) },
+              select: { status: true, result: true },
+            });
+            if (stored?.status === "completed") {
+              // Attached when the turn's steps are written: this call can return before its step exists.
+              settledMailBatchSummary = mailBatchStepSummary(stored.result);
+              return stored.result as Record<string, unknown>;
+            }
+            if (stored?.status === "executing") {
+              return { error: "These replies are still being sent. Do not send them again." };
+            }
+            if (
+              !deps.mail ||
+              !mailEnabled ||
+              isMailThreadAgentSpawnKey(bot.spawnKey) ||
+              disabledBuiltinTools.has("mail_send")
+            ) {
+              return { error: `Tool ${name} is not available to this bot.` };
+            }
+          }
           // Agent firewall: the switch is read on every call, so turning it on applies to a run
           // already in progress. A tool outside the two lists is refused whatever the model was told.
           const firewalled = await firewallNow();
@@ -5010,7 +5026,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (builtinDenial) return { error: builtinDenial };
           const writeOnAgentConnection = viaConnector
             ? false
-            : await googleWriteOnAgentConnection(name, args);
+            : await googleWriteOnAgentConnection(
+                name,
+                name === MAIL_REPLY_BATCH_TOOL
+                  ? { account: args.account, replyToId: firstBatchReplyTo(args) }
+                  : args,
+              );
           // Declared effect of the operation this call dispatches (installed API method and
           // flag). Install config is immutable per route resource, so it cannot drift before
           // execute; a catalog call uses the tool it was just resolved to.
@@ -5176,7 +5197,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
           };
           // A Block rule beats every ask and every approved-but-unrun effect: no card, no effect.
-          if (approvalResolved.decision === "block") {
+          if (
+            approvalResolved.decision === "block" ||
+            // A Block saved on mail_send also stops the batch, which is the same send.
+            (name === MAIL_REPLY_BATCH_TOOL &&
+              resolveActionApproval({
+                toolName: "mail_send",
+                viaConnector,
+                rules: approvalRules,
+                botId: bot.id,
+              }) === "block")
+          ) {
             await recordDecision("block", "block");
             return { error: BLOCKED_ACTION_MESSAGE };
           }
@@ -5748,6 +5779,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return read;
           };
 
+          let preparedMailBatch: PreparedMailReply[] | undefined;
           const showApprovalCard = async () => {
             // A card for a call in a marked thread makes no lookups; it shows the raw ids.
             const moneyNames =
@@ -5768,6 +5800,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 COMPANY_TOOL_NAMES.has(name),
               integrationWriteTool,
               approvalReason: approvalCardReason,
+              mailBatch: preparedMailBatch,
               noAlwaysAllow:
                 desktopReadSearch ||
                 meetingTaintedCall ||
@@ -5928,24 +5961,58 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
           }
 
-          if (applied && !applied.duplicate && name === "mail_send") {
-            const prior = await deps.prisma.externalEffect.findMany({
+          const priorMailEffects = async (effectId: string) => [
+            ...(await deps.prisma.externalEffect.findMany({
               where: {
                 spaceId: run.spaceId,
                 kind: "mail_send",
-                id: { not: applied.effect.id },
+                id: { not: effectId },
                 run: { threadId: run.threadId },
               },
               orderBy: { createdAt: "desc" },
               take: 50,
               select: { runId: true, status: true, request: true, result: true },
-            });
+            })),
+            ...(await priorBatchRows(
+              deps.prisma,
+              { spaceId: run.spaceId, userId: bot.userId },
+              runId,
+            )),
+          ];
+          if (applied && !applied.duplicate && name === "mail_send") {
+            const prior = await priorMailEffects(applied.effect.id);
             const refusal = mailSendRefusal(args, prior, runId);
             if (refusal) {
               const result = { error: refusal };
               await completeEffect(deps, applied.effect.id, "intended", result);
               return result;
             }
+          }
+          if (applied && name === MAIL_REPLY_BATCH_TOOL && applied.effect.status === "intended") {
+            const refuse = async (error: string) => {
+              const result = { error };
+              await completeEffect(deps, applied.effect.id, "intended", result);
+              return result;
+            };
+            if (deps.mailWritesDisabled) return refuse("Sending is turned off.");
+            if (await inboxMailConsentBlock()) return refuse(MAIL_CONSENT_OFF);
+            const prepared = await prepareMailReplyBatch(
+              {
+                prisma: deps.prisma,
+                accounts: () => accountsAllowedNow(mailAccounts(), name),
+                ownerAccounts: ownerMailAccounts,
+                readableAccounts: () => accountsAllowedNow(mailAccounts(), "mail_search"),
+                scope: { spaceId: run.spaceId, userId: bot.userId, botId: bot.id },
+                runId,
+                effectId: applied.effect.id,
+                secrets: runSecrets,
+                ...(firewallMail ? { firewall: firewallMail } : {}),
+                prior: await priorMailEffects(applied.effect.id),
+              },
+              args,
+            );
+            if ("error" in prepared) return refuse(prepared.error);
+            preparedMailBatch = prepared.rows;
           }
           // Every parallel call of a denied tool resolves to the denial, not a new card.
           const askUnlessDenied = async () => {
@@ -8222,6 +8289,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
             const avatar = await resolveUpdateBotAvatar({
               color: args.color,
+              currentColor: bot.color,
               artifactId: args.artifact_id,
               useAttachedImage: args.use_attached_image,
               sourceImageArtifactIds,
@@ -9187,7 +9255,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               // An owner's private message must not steer an Elio peer run: it stays unclaimed and
               // the owner run that starts when this one finishes answers it.
               claimSteering:
-                scripted || hidePrivateVoiceHistory
+                hidePrivateVoiceHistory
                   ? undefined
                   : async (seenIds) => {
                       const steering = await deps.events.claimSteering({
@@ -9706,6 +9774,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             messageSegments = [{ kind: "text", text: NO_RESPONSE }];
           }
           flushPendingTools();
+          if (settledMailBatchSummary) {
+            messageSegments = attachToolNotes(messageSegments, MAIL_REPLY_BATCH_TOOL, {
+              lines: [],
+              summary: settledMailBatchSummary,
+            });
+          }
           // Only routine runs are instructed to emit NO_RESPONSE. Other
           // allowSilentEmpty wakes (FYI, messaging) may finish truly empty.
           const silentReply = runAllowsSilentEmpty(run.trigger)
@@ -10396,6 +10470,7 @@ const OWNER_PEER_WRITE_TOOLS = new Set([
   "mail_draft",
   "mail_modify",
   "mail_send",
+  "mail_reply_batch",
   "calendar_create_event",
   "calendar_update_event",
   "calendar_delete_event",
@@ -10577,6 +10652,8 @@ export function selectBuiltinToolsForRun(options: {
   ).filter(
     (tool) =>
       !disabled.has(tool.name) &&
+      // Turning off sending for a bot covers the batch too.
+      (tool.name !== MAIL_REPLY_BATCH_TOOL || !disabled.has("mail_send")) &&
       (options.audience !== "external" ||
         externalBotMayUseBuiltin(tool.name, options.externalComputerTools === true)) &&
       (options.appControlEnabled || !APP_CONTROL_TOOL_NAMES.has(tool.name)) &&
@@ -11938,6 +12015,11 @@ export const MAIL_CONSENT_DECLINED =
 /** What the Inbox agent is told when AI data sharing for mail is off. */
 export const MAIL_CONSENT_OFF =
   "The user has not allowed mail to be shared with the AI model, so mail cannot be read or changed. Tell them you need their permission first, and do not send them to another page.";
+
+const firstBatchReplyTo = (args: Record<string, unknown>) =>
+  Array.isArray(args.replies)
+    ? (args.replies[0] as { replyToId?: unknown } | undefined)?.replyToId
+    : undefined;
 
 /**
  * Puts how an approved mail_send or mail_draft ended on its card, so "Send" never reads as sent
