@@ -95,6 +95,7 @@ describe("contact tools", () => {
       kind: "investor",
       notes: null,
       bot: null,
+      pipelinePeople: [],
       createdAt: new Date(0),
       updatedAt: new Date(0),
     };
@@ -412,6 +413,7 @@ describe("contact tools", () => {
       organization: null,
       kind: "investor",
       notes: null,
+      pipelinePeople: [],
       createdAt: new Date(0),
       updatedAt: new Date(0),
     };
@@ -424,6 +426,7 @@ describe("contact tools", () => {
     const tx = {
       $queryRaw: vi.fn(async () => [{ email: row.email, kind: row.kind }]),
       contact: { update, findUniqueOrThrow },
+      pipelineRecordPerson: { findFirst: vi.fn(async () => null) },
       investorPortalToken: { deleteMany: vi.fn() },
       portalSession: { deleteMany: vi.fn() },
       investorShare: { deleteMany: vi.fn() },

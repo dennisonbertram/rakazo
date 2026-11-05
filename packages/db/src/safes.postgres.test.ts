@@ -270,6 +270,13 @@ describePostgres("safes (PostgreSQL)", () => {
     const safeOf = async (externalId: string, scope: typeof mine = mine) =>
       prisma.safe.findFirstOrThrow({ where: { ...scope, source: "mercury", externalId } });
     const contactRow = (id: string) => prisma.contact.findUniqueOrThrow({ where: { id } });
+    const waitingOf = async (contactId: string) =>
+      (
+        await prisma.pipelineRecordPerson.findFirstOrThrow({
+          where: { contactId },
+          include: { record: true },
+        })
+      ).record;
     const pipeline = async () =>
       (await getFundraisingOverview(prisma, mine)).prospects.map((p) => p.id);
     const pending = async () => (await getFundraisingOverview(prisma, mine)).pendingCents;
@@ -354,7 +361,7 @@ describePostgres("safes (PostgreSQL)", () => {
       const p = await person("clears@example.test");
       await markWaiting(prisma, mine, p.id);
       await sync(mercury("m-clears", { investorEmail: "clears@example.test" }));
-      expect((await contactRow(p.id)).mercurySentAt).toBeNull();
+      expect((await waitingOf(p.id)).waitingSince).toBeNull();
     });
 
     it("counts a canceled or expired Mercury SAFE as zero and returns the prospect to the pipeline", async () => {
@@ -479,7 +486,7 @@ describePostgres("safes (PostgreSQL)", () => {
       const before = (await listSafes(prisma, mine)).length;
       await prisma.mcpServer.delete({ where: { id: server.id } });
       expect((await listSafes(prisma, mine)).length).toBe(before);
-      expect((await contactRow(p.id)).mercurySentAt).not.toBeNull();
+      expect((await waitingOf(p.id)).waitingSince).not.toBeNull();
       await sync(mercury("m-server", { investorEmail: "nobody-server@example.test" }));
       expect((await listSafes(prisma, mine)).length).toBe(before);
     });

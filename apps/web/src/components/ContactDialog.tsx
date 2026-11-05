@@ -75,6 +75,7 @@ export function ContactDialog({
   onDeleted,
   onOpenContact,
   fromCapTable = false,
+  pipelineFields = false,
   finalFocus,
 }: {
   contact: Contact | null;
@@ -88,6 +89,11 @@ export function ContactDialog({
   onOpenContact?: (contact: Contact) => void;
   /** Opened from the Cap table, where a hint says contacts do not change Carta. */
   fromCapTable?: boolean;
+  /**
+   * Opened from the Fundraising page, whose rows have no other editor for stage, check size and
+   * next step until the Pipeline table replaces them. Saved through the record, and only if changed.
+   */
+  pipelineFields?: boolean;
   /** Where focus goes on close; a mouse click on a row leaves nothing focused to return to. */
   finalFocus?: () => HTMLElement | null | undefined;
 }) {
@@ -111,8 +117,8 @@ export function ContactDialog({
   const [confirming, setConfirming] = useState<ContactLinked | null>(null);
   const names = contactKindNames();
   const stageNames = contactStageNames();
-  // Stage, check size and next step belong to a prospect; the dialog is shared with the Contacts page.
-  const isProspect = kind === "prospect";
+  // Stage, check size and next step belong to a Fundraising row; every other page edits the person only.
+  const isProspect = pipelineFields && kind === "prospect";
 
   const typedEmail = email.trim().toLowerCase();
   const sameEmail = typedEmail
@@ -173,19 +179,31 @@ export function ContactDialog({
       setCheckSizeError(t`Enter an amount`);
       return;
     }
-    void run(
-      () =>
-        rpc.contacts.save({
-          ...(contact ? { id: contact.id } : {}),
-          name,
-          email: email.trim() || null,
-          organization: organization.trim() || null,
-          kind,
-          notes: notes.trim() || null,
-          ...(isProspect ? { stage, checkSizeCents, nextStep: nextStep.trim() || null } : {}),
-        }),
-      onSaved,
-    );
+    const pipeline = { stage, checkSizeCents, nextStep: nextStep.trim() || null };
+    // Editing an email must not write the record: only a field this dialog changed goes to it.
+    const changed = contact
+      ? {
+          ...(stage === (contact.stage ?? "target") ? {} : { stage }),
+          ...(checkSizeCents === (contact.checkSizeCents ?? null) ? {} : { checkSizeCents }),
+          ...(pipeline.nextStep === (contact.nextStep ?? null)
+            ? {}
+            : { nextStep: pipeline.nextStep }),
+        }
+      : {};
+    void run(async () => {
+      const saved = await rpc.contacts.save({
+        ...(contact ? { id: contact.id } : {}),
+        name,
+        email: email.trim() || null,
+        organization: organization.trim() || null,
+        kind,
+        notes: notes.trim() || null,
+        ...(isProspect && !contact ? pipeline : {}),
+      });
+      return isProspect && Object.keys(changed).length > 0
+        ? rpc.fundraising.prospects.save({ id: saved.id, ...changed })
+        : saved;
+    }, onSaved);
   }
 
   // An email another contact already has is reported under the Email field, anything else at the end.

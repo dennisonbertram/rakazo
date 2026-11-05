@@ -1,10 +1,12 @@
 import type { Safe, SafeMarkInput, SafeSaveInput } from "@rakazo/contracts";
 import { isActiveSafe, matchDeposit, safeStatus } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "./client.js";
+import type { PipelineDb } from "./pipeline-records.js";
+import { FUNDRAISING_PIPELINE, recordOfContact, savePipelineRecord } from "./pipeline-records.js";
 import { IsolationError } from "./scope.js";
 
 type Scope = { spaceId: string; userId: string };
-type Db = Pick<PrismaClient, "safe" | "contact" | "fundraiseRound" | "$transaction">;
+type Db = PipelineDb & Pick<PrismaClient, "safe" | "$transaction">;
 type SyncDb = Db & Pick<PrismaClient, "financeTransaction">;
 /** Only space and user: callers may pass a whole actor, which must not reach a Prisma query. */
 const ownerOf = ({ spaceId, userId }: Scope): Scope => ({ spaceId, userId });
@@ -264,10 +266,13 @@ export async function writeMercurySafes(
       }
       const match = fields.investorEmail
         ? (
-            await tx.$queryRaw<{ id: string; roundId: string | null }[]>`
-              SELECT id, "roundId" FROM contacts
-              WHERE "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId}
-                AND kind = 'prospect' AND lower(btrim(email)) = ${fields.investorEmail}
+            await tx.$queryRaw<{ id: string; recordId: string | null; roundId: string | null }[]>`
+              SELECT c.id, r.id AS "recordId", r."roundId" FROM contacts c
+              LEFT JOIN pipeline_record_people p
+                ON p."contactId" = c.id AND p.pipeline = ${FUNDRAISING_PIPELINE}
+              LEFT JOIN pipeline_records r ON r.id = p."recordId"
+              WHERE c."spaceId" = ${scope.spaceId} AND c."userId" = ${scope.userId}
+                AND c.kind = 'prospect' AND lower(btrim(c.email)) = ${fields.investorEmail}
               LIMIT 1`
           )[0]
         : undefined;
@@ -281,11 +286,8 @@ export async function writeMercurySafes(
           roundId: match?.roundId ?? null,
         },
       });
-      if (match)
-        await tx.contact.updateMany({
-          where: { id: match.id, ...scope },
-          data: { mercurySentAt: null },
-        });
+      if (match?.recordId)
+        await savePipelineRecord(tx, scope, match.recordId, { waitingSince: null });
     }
     // A prospect whose Mercury SAFE is signed or paid is an investor, and stays one.
     const attached = await tx.safe.findMany({
@@ -356,15 +358,14 @@ export async function assignSafe(
     const full = await tx.contact.findFirstOrThrow({ where: { id: contactId, ...scope } });
     if (full.kind !== "prospect" && full.kind !== "investor")
       throw new SafeStateError("Choose a prospect or an investor.");
+    const record = await recordOfContact(tx, scope, contactId);
+    // An investor who signed before records existed has no record; the round stays on the contact.
     const { count } = await tx.safe.updateMany({
       where: { id, ...scope, contactId: null },
-      data: { contactId, roundId: full.roundId },
+      data: { contactId, roundId: record ? record.roundId : full.roundId },
     });
     if (count === 0) throw new SafeStateError("This SAFE already has a contact.");
-    await tx.contact.updateMany({
-      where: { id: contactId, ...scope },
-      data: { mercurySentAt: null },
-    });
+    if (record) await savePipelineRecord(tx, scope, record.id, { waitingSince: null });
     const signed = toSafe(await tx.safe.findFirstOrThrow({ where: { id, ...scope } })).status;
     if (signed === "signed" || signed === "funded")
       await tx.contact.updateMany({

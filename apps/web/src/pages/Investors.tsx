@@ -13,7 +13,7 @@ import type {
   PortalLink,
   Safe,
 } from "@rakazo/contracts";
-import { ContactStageSchema, isCartaEndpoint } from "@rakazo/contracts";
+import { isCartaEndpoint } from "@rakazo/contracts";
 import { capTableMath, countedSafes, equityRaisedUsd, isSafeSecurity } from "@rakazo/core";
 import {
   AlertDialog,
@@ -58,7 +58,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
 import { ContactDeleteConfirm, hasLinks } from "../components/ContactDeleteConfirm";
 import type { ContactPrefill as Prefill } from "../components/ContactDialog";
-import { ContactDialog, contactStageNames } from "../components/ContactDialog";
+import { ContactDialog } from "../components/ContactDialog";
 import { CopyLinkDialog } from "../components/CopyLinkDialog";
 import type { SaveResult } from "../components/cap-table/CapTableEditor";
 import { CapTableEditor } from "../components/cap-table/CapTableEditor";
@@ -104,7 +104,7 @@ const parseTab = (value: string | null): ContactTab =>
   CONTACT_TABS.find((tab) => tab === value) ?? "investor";
 
 /** The Contacts section's sorts; name ascending is the default. */
-const CONTACT_SORTS = ["name", "organization", "stage", "check"] as const;
+const CONTACT_SORTS = ["name", "organization", "check"] as const;
 
 /** The page sections, one tab each; the first is the default. */
 const SECTIONS = ["cap-table", "updates", "contacts"] as const;
@@ -1090,11 +1090,7 @@ export function InvestorsPage({
       : [];
 
   const needle = query.trim().toLowerCase();
-  const stage = ContactStageSchema.safeParse(list.param("stage")).data;
   const ofTab = allContacts.filter((c) => c.kind === tab);
-  const stagesUsed = ContactStageSchema.options.filter((value) =>
-    ofTab.some((c) => c.stage === value),
-  );
   const hasCheck = ofTab.some((c) => c.checkSizeCents != null);
   const { field: sortField, dir: sortDir } = list.sort;
   const sortKey = (c: Contact) =>
@@ -1102,17 +1098,12 @@ export function InvestorsPage({
       ? c.name
       : sortField === "organization"
         ? c.organization || null
-        : sortField === "stage"
-          ? c.stage
-            ? ContactStageSchema.options.indexOf(c.stage)
-            : null
-          : (c.checkSizeCents ?? null);
+        : (c.checkSizeCents ?? null);
   const shown = sortBy(
     ofTab.filter(
       (c) =>
-        (!stage || c.stage === stage) &&
-        (!needle ||
-          [c.name, c.organization, c.email].some((text) => text?.toLowerCase().includes(needle))),
+        !needle ||
+        [c.name, c.organization, c.email].some((text) => text?.toLowerCase().includes(needle)),
     ),
     sortKey,
     sortDir,
@@ -1120,14 +1111,9 @@ export function InvestorsPage({
   const sortNames: Record<(typeof CONTACT_SORTS)[number], string> = {
     name: t`Name`,
     organization: t`Organization`,
-    stage: t`Stage`,
     check: t`Check size`,
   };
-  const sortFields = CONTACT_SORTS.filter(
-    (f) =>
-      f === "name" || f === "organization" || (f === "stage" ? stagesUsed.length > 0 : hasCheck),
-  );
-  const stageNames = contactStageNames();
+  const sortFields = CONTACT_SORTS.filter((f) => f === "name" || f === "organization" || hasCheck);
   const tabNames: Record<ContactTab, string> = {
     investor: t`SAFEs and funds`,
     board: t`Board`,
@@ -1583,14 +1569,6 @@ export function InvestorsPage({
                           label={t`Search`}
                           name="contact-search"
                         />
-                        {stagesUsed.length > 0 ? (
-                          <PickFilter
-                            label={t`Stage`}
-                            value={stage}
-                            options={stagesUsed.map((value) => [value, stageNames[value]])}
-                            onChange={(next) => list.setParam("stage", next)}
-                          />
-                        ) : null}
                         <SortControl
                           fields={sortFields.map((f) => [f, sortNames[f]])}
                           field={sortField}
@@ -1616,16 +1594,12 @@ export function InvestorsPage({
                       ))}
                     </div>
                   ) : shown.length === 0 ? (
-                    needle || stage ? (
+                    needle ? (
                       <div className="flex flex-col items-center gap-3 py-10 text-center">
                         <p className="text-sm text-muted-foreground">
                           <Trans>No matches</Trans>
                         </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => list.clear("q", "stage")}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => list.clear("q")}>
                           <Trans>Clear filters</Trans>
                         </Button>
                       </div>

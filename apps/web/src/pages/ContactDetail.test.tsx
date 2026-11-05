@@ -136,6 +136,28 @@ it("shows the sections that have rows, and opens a mail", async () => {
   expect(document.querySelector("[data-testid=message]")?.textContent).toBe("m1");
 });
 
+it("links to Fundraising in place of the old pipeline fields", async () => {
+  detail.mockResolvedValue({
+    ...empty,
+    contact: {
+      ...empty.contact,
+      kind: "prospect",
+      stage: "intro",
+      checkSizeCents: 2_500_000,
+      nextStep: "Send the deck",
+      pipelineRecord: { id: "r1", name: "Sample Street Capital", status: "intro_made" },
+    },
+  });
+  await show();
+  const link = [...container.querySelectorAll("a")].find((a) =>
+    a.textContent?.includes("Fundraising:"),
+  );
+  expect(link?.textContent).toBe("Fundraising: Sample Street Capital · Intro made");
+  expect(link?.getAttribute("href")).toBe("/app/fundraising");
+  for (const word of ["Stage", "Check size", "Next step", "Send the deck"])
+    expect(container.textContent).not.toContain(word);
+});
+
 it("shows an error with Try again", async () => {
   detail.mockRejectedValue(new Error("Contact not found"));
   await show();

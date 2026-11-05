@@ -34,7 +34,32 @@ type Tenant = {
 
 /** One row for each protected table not covered by the main fixtures, owned by `t`. */
 function rowsFor(t: Tenant, tag: string): Array<[string, Record<string, unknown>]> {
+  const record = `rls-plr-${tag}-${t.botId}`;
+  const person = `rls-plc-${tag}-${t.botId}`;
   return [
+    [
+      "pipelineRecord",
+      {
+        id: record,
+        spaceId: t.spaceId,
+        userId: t.userId,
+        name: `Firm ${tag}`,
+        normalizedName: `firm${tag}`,
+      },
+    ],
+    ["contact", { id: person, spaceId: t.spaceId, userId: t.userId, name: `Person ${tag}` }],
+    [
+      "pipelineRecordPerson",
+      {
+        spaceId: t.spaceId,
+        userId: t.userId,
+        recordId: record,
+        contactId: person,
+        isPrimary: true,
+      },
+    ],
+    ["pipelineEvent", { spaceId: t.spaceId, userId: t.userId, recordId: record, kind: "note" }],
+    ["pipelineImport", { spaceId: t.spaceId, userId: t.userId }],
     [
       "botSecret",
       {
@@ -780,6 +805,25 @@ describePostgres("row-level security (PostgreSQL)", () => {
       await expect(create(), table).rejects.toThrow(/row-level security/);
     }
     // The unscoped reads and writes above are deliberate.
+    drainUnscopedDatabaseAccess();
+  });
+
+  it("keeps the pipeline tables to their Space under the runtime login", async () => {
+    const seen = () =>
+      Promise.all([
+        db.pipelineRecord.findMany({ select: { spaceId: true } }),
+        db.pipelineRecordPerson.findMany({ select: { spaceId: true } }),
+        db.pipelineEvent.findMany({ select: { spaceId: true } }),
+        db.pipelineImport.findMany({ select: { spaceId: true } }),
+      ]);
+    for (const tenant of [a, b]) {
+      for (const rows of await runAsTenant(tenant, seen)) {
+        expect(rows.length).toBeGreaterThan(0);
+        expect(new Set(rows.map((row) => row.spaceId))).toEqual(new Set([tenant.spaceId]));
+      }
+    }
+    // With no context a query sees nothing.
+    for (const rows of await seen()) expect(rows).toEqual([]);
     drainUnscopedDatabaseAccess();
   });
 

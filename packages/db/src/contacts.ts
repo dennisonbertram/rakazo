@@ -4,12 +4,21 @@ import type {
   ContactKind,
   ContactLinked,
   ContactSaveInput,
-  ContactStage,
 } from "@rakazo/contracts";
 import { CONTACT_DETAIL_LIMIT } from "@rakazo/contracts";
+import { isActiveSafe } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "./client.js";
 import { endPortalAccess } from "./investor-portal.js";
 import { listMeetings } from "./meetings.js";
+import type { PipelineDb } from "./pipeline-records.js";
+import {
+  ensureRecord,
+  FUNDRAISING_PIPELINE,
+  pipelineFields,
+  promoteNextPerson,
+  recordOfContact,
+  savePipelineRecord,
+} from "./pipeline-records.js";
 import { isUniqueViolation } from "./prisma-errors.js";
 import { toSafe } from "./safes.js";
 import { IsolationError } from "./scope.js";
@@ -25,25 +34,27 @@ type Scope = { spaceId: string; userId: string };
 /** Only space and user: callers may pass a whole actor, which must not reach a Prisma query. */
 const ownerOf = ({ spaceId, userId }: Scope): Scope => ({ spaceId, userId });
 type Db = Pick<PrismaClient, "contact" | "fundraiseRound" | "safe">;
-type WriteDb = Db & Pick<PrismaClient, "$transaction">;
+type WriteDb = Db & PipelineDb & Pick<PrismaClient, "$transaction">;
 
-const withBot = { bot: { select: { id: true, name: true } } } as const;
+/** What `toContact` reads besides the contact: its agent and its fundraising record. */
+export const contactInclude = {
+  bot: { select: { id: true, name: true } },
+  pipelinePeople: { where: { pipeline: FUNDRAISING_PIPELINE }, select: { record: true } },
+} as const;
 
-export const toContact = (row: Prisma.ContactGetPayload<{ include: typeof withBot }>): Contact => ({
+export const toContact = (
+  row: Prisma.ContactGetPayload<{ include: typeof contactInclude }>,
+): Contact => ({
   id: row.id,
   name: row.name,
   email: row.email,
   organization: row.organization,
   kind: row.kind as ContactKind,
   notes: row.notes,
-  stage: row.stage as ContactStage | null,
-  checkSizeCents: row.checkSizeCents == null ? null : Number(row.checkSizeCents),
-  nextStep: row.nextStep,
-  roundId: row.roundId,
+  ...pipelineFields(row.pipelinePeople[0]?.record ?? null),
   portalLinkSentAt: row.portalLinkSentAt?.toISOString() ?? null,
   portalLastSeenAt: row.portalLastSeenAt?.toISOString() ?? null,
   portalBlockedAt: row.portalBlockedAt?.toISOString() ?? null,
-  mercurySentAt: row.mercurySentAt?.toISOString() ?? null,
   addedBy: row.bot,
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString(),
@@ -68,28 +79,10 @@ export async function listContacts(
         ? { OR: [contains("name"), contains("email"), contains("organization"), contains("notes")] }
         : {}),
     },
-    include: withBot,
+    include: contactInclude,
     orderBy: [{ name: "asc" }, { id: "asc" }],
   });
   return rows.map(toContact);
-}
-
-/**
- * The round a stage save puts a prospect in: the open round for Committed (none when no round is
- * open), none for any other stage, and undefined (keep it) when the stage is not part of the save.
- */
-export async function roundIdForStage(
-  prisma: Pick<PrismaClient, "fundraiseRound">,
-  actor: Scope,
-  stage: ContactStage | null | undefined,
-): Promise<string | null | undefined> {
-  if (stage === undefined) return undefined;
-  if (stage !== "committed") return null;
-  const open = await prisma.fundraiseRound.findFirst({
-    where: { ...ownerOf(actor), closedAt: null },
-    select: { id: true },
-  });
-  return open?.id ?? null;
 }
 
 export const contactPhotoPath = (email: string) =>
@@ -116,7 +109,9 @@ export async function withContactPhotos<T extends Contact>(
 }
 
 /**
- * Updates the contact with `id`, keeping omitted fields; without `id`, creates one.
+ * Updates the contact with `id`, keeping omitted fields; without `id`, creates one. Pipeline fields
+ * go to the contact's record through `savePipelineRecord`. A contact left as kind prospect always
+ * has a record; one whose kind leaves prospect leaves the pipeline, and an empty record goes with it.
  * Throws IsolationError for an `id` that is not the user's.
  */
 async function writeContact(
@@ -125,50 +120,78 @@ async function writeContact(
   input: ContactSaveInput,
 ): Promise<Contact> {
   const scope = ownerOf(actor);
-  const { id, roundId: keepRound, ...fields } = input;
-  let roundId = await roundIdForStage(prisma, scope, fields.stage);
-  if (keepRound && fields.stage === "committed") {
+  const { id, roundId: keepRound, stage, checkSizeCents, nextStep, ...fields } = input;
+  const changes = {
+    ...(stage === undefined ? {} : { stage }),
+    ...(checkSizeCents === undefined ? {} : { amountCents: checkSizeCents }),
+    ...(nextStep === undefined ? {} : { nextStep }),
+  };
+  let keptRound: { roundId: string } | undefined;
+  if (keepRound && stage === "committed") {
     const own = await prisma.fundraiseRound.findFirst({
       where: { id: keepRound, ...scope },
       select: { id: true },
     });
     if (!own) throw new IsolationError("Round not found");
-    roundId = own.id;
+    keptRound = { roundId: own.id };
   }
-  const data = { ...fields, roundId };
-  if (!id)
-    return toContact(
-      await prisma.contact.create({ data: { ...scope, ...data }, include: withBot }),
-    );
   // The contact row is locked first, so portal exchanges and link mints queue behind a change of
   // email or kind and cannot leave a session that outlives it.
   return prisma.$transaction(async (tx) => {
-    const [before] = await tx.$queryRaw<{ email: string | null; kind: string }[]>`
-      SELECT "email", "kind" FROM "contacts"
-      WHERE "id" = ${id} AND "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId}
-      FOR UPDATE`;
-    if (!before) throw new IsolationError("Contact not found");
-    await tx.contact.update({ where: { id }, data });
-    const emailChanged = fields.email !== undefined && fields.email !== before.email;
-    const leftInvestors =
-      before.kind === "investor" && fields.kind !== undefined && fields.kind !== "investor";
-    if (emailChanged || leftInvestors) {
-      await endPortalAccess(tx, id);
-      await tx.contact.update({
-        where: { id },
-        data: { portalLinkSentAt: null, portalLastSeenAt: null },
-      });
+    let contactId: string;
+    if (!id) {
+      contactId = (await tx.contact.create({ data: { ...scope, ...fields }, select: { id: true } }))
+        .id;
+    } else {
+      contactId = id;
+      const [before] = await tx.$queryRaw<{ email: string | null; kind: string }[]>`
+        SELECT "email", "kind" FROM "contacts"
+        WHERE "id" = ${id} AND "spaceId" = ${scope.spaceId} AND "userId" = ${scope.userId}
+        FOR UPDATE`;
+      if (!before) throw new IsolationError("Contact not found");
+      await tx.contact.update({ where: { id }, data: fields });
+      const emailChanged = fields.email !== undefined && fields.email !== before.email;
+      const leftInvestors =
+        before.kind === "investor" && fields.kind !== undefined && fields.kind !== "investor";
+      if (emailChanged || leftInvestors) {
+        await endPortalAccess(tx, id);
+        await tx.contact.update({
+          where: { id },
+          data: { portalLinkSentAt: null, portalLastSeenAt: null },
+        });
+      }
+      if (leftInvestors) await tx.investorShare.deleteMany({ where: { contactId: id } });
+      if (before.kind === "prospect" && fields.kind && fields.kind !== "prospect")
+        await leavePipeline(tx, scope, id);
     }
-    if (leftInvestors) await tx.investorShare.deleteMany({ where: { contactId: id } });
-    return toContact(await tx.contact.findUniqueOrThrow({ where: { id }, include: withBot }));
+    const row = await tx.contact.findUniqueOrThrow({ where: { id: contactId } });
+    const record =
+      row.kind === "prospect"
+        ? await ensureRecord(tx, scope, row)
+        : await recordOfContact(tx, scope, contactId);
+    if (record && (Object.keys(changes).length > 0 || keptRound))
+      await savePipelineRecord(tx, scope, record.id, { ...changes, ...keptRound });
+    return toContact(
+      await tx.contact.findUniqueOrThrow({ where: { id: contactId }, include: contactInclude }),
+    );
   });
+}
+
+/** Takes a contact off its record; a record left with nobody is removed with it. */
+async function leavePipeline(db: PipelineDb, scope: Scope, contactId: string) {
+  const record = await recordOfContact(db, scope, contactId);
+  if (!record) return;
+  await db.pipelineRecordPerson.deleteMany({ where: { ...scope, contactId } });
+  await promoteNextPerson(db, record.id);
+  if ((await db.pipelineRecordPerson.count({ where: { recordId: record.id } })) === 0)
+    await db.pipelineRecord.deleteMany({ where: { id: record.id, ...scope } });
 }
 
 /** One of the user's contacts; IsolationError when it is not theirs. */
 export async function getContact(prisma: Db, actor: Scope, id: string): Promise<Contact> {
   const row = await prisma.contact.findFirst({
     where: { id, ...ownerOf(actor) },
-    include: withBot,
+    include: contactInclude,
   });
   if (!row) throw new IsolationError("Contact not found");
   return toContact(row);
@@ -272,11 +295,19 @@ export async function deleteContact(prisma: WriteDb, actor: Scope, id: string): 
   const scope = ownerOf(actor);
   // A detached Mercury SAFE counts in no round (the foreign key clears contactId only).
   const count = await prisma.$transaction(async (tx) => {
+    const record = await recordOfContact(tx, scope, id);
+    // The record stays. Its commitment leaves the round if this contact held a SAFE, which goes on
+    // counting by itself or, from Mercury, in no round.
+    const safes = await tx.safe.findMany({ where: { ...scope, contactId: id } });
+    if (record && safes.some((safe) => isActiveSafe(toSafe(safe).status)))
+      await savePipelineRecord(tx, scope, record.id, { roundId: null });
     await tx.safe.updateMany({
       where: { ...scope, contactId: id, source: "mercury" },
       data: { roundId: null },
     });
-    return (await tx.contact.deleteMany({ where: { id, ...scope } })).count;
+    const { count: deleted } = await tx.contact.deleteMany({ where: { id, ...scope } });
+    if (record) await promoteNextPerson(tx, record.id);
+    return deleted;
   });
   if (count === 0) throw new IsolationError("Contact not found");
 }
@@ -287,7 +318,7 @@ export async function deleteContact(prisma: WriteDb, actor: Scope, id: string): 
  * Safe for unattended callers. `botId` is the agent adding it, set by the caller, never from model input.
  */
 export async function addContactIfNew(
-  prisma: Db,
+  prisma: WriteDb,
   actor: Scope,
   input: Omit<ContactSaveInput, "id">,
   botId: string | null = null,
@@ -311,15 +342,27 @@ export async function addContactIfNew(
   const existing = await prisma.contact.findFirst({
     where,
     orderBy: { id: "asc" },
-    include: withBot,
+    include: contactInclude,
   });
   if (existing) return { contact: toContact(existing), created: false };
   // ponytail: only email is unique, so concurrent no-email adds can both insert a duplicate row;
   // upgrade to a unique index on lower(name) plus organization, or an advisory lock.
+  // Saved as is, so this route never carries pipeline fields.
+  const { stage: _s, checkSizeCents: _c, nextStep: _n, roundId: _r, ...fields } = input;
+  const data = { ...scope, ...fields, name, organization, botId };
   try {
-    const row = await prisma.contact.create({
-      data: { ...scope, ...input, name, organization, botId },
-      include: withBot,
+    if (input.kind !== "prospect") {
+      const row = await prisma.contact.create({ data, include: contactInclude });
+      return { contact: toContact(row), created: true };
+    }
+    // A prospect always has a record, whichever route saved it.
+    const row = await prisma.$transaction(async (tx) => {
+      const created = await tx.contact.create({ data });
+      await ensureRecord(tx, scope, created);
+      return tx.contact.findUniqueOrThrow({
+        where: { id: created.id },
+        include: contactInclude,
+      });
     });
     return { contact: toContact(row), created: true };
   } catch (error) {
@@ -327,7 +370,7 @@ export async function addContactIfNew(
     if (isUniqueViolation(error) && input.email) {
       const row = await prisma.contact.findFirst({
         where: { ...scope, email: input.email },
-        include: withBot,
+        include: contactInclude,
       });
       if (row) return { contact: toContact(row), created: false };
     }
