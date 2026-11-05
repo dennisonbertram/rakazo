@@ -2675,6 +2675,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               }),
           recallPromise,
         ]);
+        // The index is private to the owner like a tool result: a message to an external bot that
+        // repeats it is held for approval.
+        if (companyContext) privateFragments.addPrivate(companyContext);
         // A run without history still loads durable memory, open to-dos and its routine's prompt,
         // which a marked chat may have written. Held when any of them changed after the mark.
         const markedAt = (thread as { meetingTaintedAt?: Date | null }).meetingTaintedAt;

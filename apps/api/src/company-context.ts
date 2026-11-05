@@ -95,18 +95,24 @@ export async function saveCompanyContext(
   if (invalid) throw bad(invalid);
   const content = companySectionContent(input.title, input.text);
   if (!input.id) {
-    const count = await deps.prisma.memoryDocument.count({ where: own(actor) });
-    if (count >= COMPANY_SECTION_MAX_COUNT) throw bad("The page is full.");
-    const saved = await commit(
-      deps,
-      actor,
-      companySlug(input.title),
-      content,
-      0,
-      "That name is taken.",
-    );
-    return toSection({ ...saved, updatedAt: new Date() });
+    // The lock makes the count and the insert one step per user, so two creates cannot both pass.
+    return deps.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`company-context:${actor.spaceId}:${actor.userId}`}))`;
+      const count = await tx.memoryDocument.count({ where: own(actor) });
+      if (count >= COMPANY_SECTION_MAX_COUNT) throw bad("The page is full.");
+      const saved = await commit(
+        deps,
+        actor,
+        companySlug(input.title),
+        content,
+        0,
+        "That name is taken.",
+      );
+      return toSection({ ...saved, updatedAt: new Date() });
+    });
   }
+  // An update without the revision it started from would overwrite a newer save.
+  if (input.expectedRevision === undefined) throw bad("Reload the page and try again.");
   const doc = await ownDoc(deps, actor, input.id);
   const saved = await commit(deps, actor, doc.path, content, input.expectedRevision);
   return toSection({ ...saved, updatedAt: new Date() });

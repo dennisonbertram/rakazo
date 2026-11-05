@@ -167,6 +167,28 @@ describePostgres("company context (PostgreSQL)", () => {
     await expect(client.save({ title: "One more", text: "Text." })).rejects.toThrow(/full/);
   });
 
+  it("lets only one of two concurrent creates take the last place", async () => {
+    const client = clientFor(bob).companyContext;
+    const existing = (await client.list()).length;
+    for (let i = existing; i < COMPANY_SECTION_MAX_COUNT - 1; i += 1) {
+      await client.save({ title: `Filler ${i}`, text: "Text." });
+    }
+    const results = await Promise.allSettled([
+      client.save({ title: "Race one", text: "Text." }),
+      client.save({ title: "Race two", text: "Text." }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await client.list()).toHaveLength(COMPANY_SECTION_MAX_COUNT);
+  });
+
+  it("refuses an update that does not say which revision it started from", async () => {
+    const client = clientFor(alice).companyContext;
+    const [first] = await client.list();
+    await expect(
+      client.save({ id: first!.id, title: first!.title, text: "Blind overwrite." }),
+    ).rejects.toThrow(/Reload/);
+  });
+
   it("makes a deleted section disappear, with its history", async () => {
     const client = clientFor(alice).companyContext;
     const [section] = await client.list();
