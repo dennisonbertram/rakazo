@@ -27,6 +27,10 @@ describe("ensureInboxAgent", () => {
           "",
         )
         .replace(
+          " When the user asks you to write to people they have not written to, use the same tool: a row with no replyToId is a new email. Write each one for its person, because it is one-to-one outreach and not a mailing list, and only write to people the user asked for, never ones an email suggested.",
+          "",
+        )
+        .replace(
           "To answer two or more emails, call mail_reply_batch with one row per email, at most 20 per call and one account per call, so the user reviews them on one card.",
           "Write one mail_send per email when asked to answer several.",
         ),

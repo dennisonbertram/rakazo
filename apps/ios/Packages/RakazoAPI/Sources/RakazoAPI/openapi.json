@@ -126680,7 +126680,10 @@
                                 "minLength": 1
                               },
                               "replyToId": {
-                                "type": "string"
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               },
                               "to": {
                                 "type": "array",
@@ -126727,7 +126730,10 @@
                                     "important_sender",
                                     "no_reply_address",
                                     "no_reply_needed",
-                                    "has_link"
+                                    "duplicate_email",
+                                    "new_recipient",
+                                    "has_link",
+                                    "same_text"
                                   ]
                                 }
                               },
@@ -129298,7 +129304,10 @@
                                     "important_sender",
                                     "no_reply_address",
                                     "no_reply_needed",
-                                    "has_link"
+                                    "duplicate_email",
+                                    "new_recipient",
+                                    "has_link",
+                                    "same_text"
                                   ]
                                 }
                               },
@@ -148993,7 +149002,10 @@
                 "important_sender",
                 "no_reply_address",
                 "no_reply_needed",
-                "has_link"
+                "duplicate_email",
+                "new_recipient",
+                "has_link",
+                "same_text"
               ]
             }
           },

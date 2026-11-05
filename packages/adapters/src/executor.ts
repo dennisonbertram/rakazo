@@ -6401,6 +6401,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 effectId: applied.effect.id,
                 secrets: runSecrets,
                 ...(firewallMail ? { firewall: firewallMail } : {}),
+                refuseNewEmail: firewalled || bot.audience === "external" || runTainted,
+                outsideContent: runReadMeetingText || (await isOutsideContentSeen()),
                 prior: await priorMailEffects(applied.effect.id),
               },
               args,
@@ -9476,6 +9478,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     botDirectory,
                     pluginLine,
                     mailSearchGuidance: mailSkill.guidance,
+                    mailBatchOffered: offeredToolNames.has(MAIL_REPLY_BATCH_TOOL),
                     financeConnectionLine,
                     mailSortingLine,
                     mailThreadAgent: isMailThreadAgentSpawnKey(bot.spawnKey),
@@ -11371,6 +11374,10 @@ function offeredBuiltinClause(
   return builtinOffered(disabled, name) ? text : undefined;
 }
 
+/** For every agent offered mail_reply_batch, custom bots included; its instructions may not say this. */
+export const MAIL_BATCH_GUIDANCE =
+  "For two or more emails, new or replies, call mail_reply_batch once with one row per email, so the user reviews them on one card. Never call mail_send one at a time for these, including when the user says to send them all at once. Do not search again or re-verify what the user already approved in this conversation: write the rows from what was agreed and call the tool.";
+
 export const MAIL_NOTE_GUIDANCE =
   "When the user asks you to make a note or to-do, call scratchpad_add; it is linked to this email automatically. If the work belongs to another agent's area (Carta, finance, legal, data room, investors, company, GTM), set forAgent to that area so the to-do goes to that agent instead of staying here, and tell the user plainly where it went, for example \"Added to the Carta agent's to-dos.\" If the result has no addedTo, say it was added to this chat's to-dos.";
 
@@ -11755,6 +11762,8 @@ export function userTurnInstructions(parts: {
   botDirectory: string | undefined;
   pluginLine: string | undefined;
   mailSearchGuidance?: string | undefined;
+  /** mail_reply_batch is offered in this run. */
+  mailBatchOffered?: boolean;
   /** The user's connected banks, from server state; see financeConnectionLine. */
   financeConnectionLine?: string | undefined;
   /** Set while the mail sort has not finished; see MAIL_SORTING_LINE. */
@@ -11823,6 +11832,7 @@ export function userTurnInstructions(parts: {
     ),
     parts.pluginLine,
     parts.mailSearchGuidance,
+    parts.mailBatchOffered ? MAIL_BATCH_GUIDANCE : undefined,
     parts.dataRoomEnabled
       ? offeredBuiltinClause(parts.disabledBuiltinTools, "add_to_data_room", DATA_ROOM_GUIDANCE)
       : undefined,
@@ -12504,7 +12514,7 @@ export const MAIL_CONSENT_OFF =
 
 const firstBatchReplyTo = (args: Record<string, unknown>) =>
   Array.isArray(args.replies)
-    ? (args.replies[0] as { replyToId?: unknown } | undefined)?.replyToId
+    ? (args.replies as { replyToId?: unknown }[]).find((reply) => reply?.replyToId)?.replyToId
     : undefined;
 
 /**
