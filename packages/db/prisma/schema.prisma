@@ -872,6 +872,8 @@ model Bot {
   // Agent firewall: treat everything the agent reads as untrusted. Server-owned: only the owner's
   // settings API sets it; no bot tool reads or sets it.
   firewall               Boolean               @default(false)
+  // "low", "medium" (default) or "high": how far the agent goes beyond the request. Owner-only; no bot tool sets it and nothing reads it for an approval decision.
+  proactivity            String                @default("medium")
   // For an external bot: the internal bots it may message (bot ids; empty means none).
   externalMessageTargets String[]              @default([])
   // For an external bot: whether the browser and computer tools are on. Off unless the owner turns them on.

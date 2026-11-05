@@ -189,6 +189,42 @@ export const DetailPagePhone: Story = {
   ),
 };
 
+/** Phone, a long title with Back: Ask stays at the title row's end and the company sits under it. */
+export const DetailPagePhoneLongTitle: Story = {
+  decorators: [
+    (Story) => (
+      <PageNavContext.Provider value={{ open: () => undefined, claim: () => () => undefined }}>
+        <div className="px-4">
+          <FinanceChromeProvider
+            value={{
+              onAskAgent: () => undefined,
+              spaces: [
+                { id: "a", name: "Northwind Robotics" },
+                { id: "b", name: "Sample Cloud Co" },
+              ],
+              spaceId: "a",
+              onSwitchSpace: () => undefined,
+            }}
+          >
+            <Story />
+          </FinanceChromeProvider>
+        </div>
+      </PageNavContext.Provider>
+    ),
+  ],
+  render: () => (
+    <DetailPage
+      crumbs={[{ label: "Finance", to: "/finance" }, { label: "Upcoming · 30 days" }]}
+      title="Upcoming · 30 days"
+      loading={false}
+      error=""
+      onRetry={() => undefined}
+    >
+      <Section title="Summary">Body content</Section>
+    </DetailPage>
+  ),
+};
+
 export const DetailPageLoading: Story = {
   render: () => <DetailPage crumbs={crumbs} loading error="" onRetry={() => undefined} />,
 };

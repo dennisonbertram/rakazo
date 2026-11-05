@@ -143,6 +143,7 @@ enum AskOutcomeText {
     case .superseded: Text("Replaced by a newer request")
     case .expired: Text("Expired")
     case .stopped: Text("Stopped")
+    case .skipped: Text("Skipped")
     case .saved: Text("Saved")
     case .answered(let label?): Text("Answered: \(label)")
     case .answered(nil): Text("Answered")

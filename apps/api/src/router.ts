@@ -2942,6 +2942,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             disabledBuiltinTools: source.disabledBuiltinTools,
             audience: source.audience === "external" ? "external" : "internal",
             firewall: source.firewall,
+            proactivity: source.proactivity === "low" || source.proactivity === "high" ? source.proactivity : "medium",
             externalMessageTargets: source.externalMessageTargets,
             externalComputerTools: source.externalComputerTools,
           })
@@ -3195,6 +3196,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             ...(input.runsOn !== undefined ? { runsOn: input.runsOn } : {}),
             ...(input.audience !== undefined ? { audience: input.audience } : {}),
             ...(input.firewall !== undefined ? { firewall: input.firewall } : {}),
+            ...(input.proactivity !== undefined ? { proactivity: input.proactivity } : {}),
             ...(messageTargets !== undefined ? { externalMessageTargets: messageTargets } : {}),
             ...(input.externalComputerTools !== undefined
               ? { externalComputerTools: input.externalComputerTools }

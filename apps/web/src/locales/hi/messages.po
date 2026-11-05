@@ -6722,6 +6722,7 @@ msgstr "ट्रांसक्रिप्ट छिपाएँ"
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "High"
 msgstr "उच्च"
 
@@ -7687,6 +7688,7 @@ msgstr ""
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Low"
 msgstr "निम्न"
 
@@ -7938,6 +7940,7 @@ msgid "MCP endpoint"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Medium"
 msgstr "मध्यम"
 
@@ -9282,6 +9285,10 @@ msgstr ""
 msgid "Not tagged. Praci can't read your documents."
 msgstr ""
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Not used by firewalled or external agents"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Not used yet"
 msgstr ""
@@ -10368,6 +10375,10 @@ msgstr ""
 
 #: src/components/fundraising/SafeDialog.tsx
 msgid "Pro rata side letter"
+msgstr ""
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Proactive"
 msgstr ""
 
 #: src/components/data-room/ProcessingStrip.tsx

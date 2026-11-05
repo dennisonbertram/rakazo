@@ -10,6 +10,7 @@ import {
   isClosedApprovalAnswer,
   isSecretAskBlock,
   resolveAskChoice,
+  SKIPPED_APPROVAL_ANSWER,
 } from "@rakazo/core";
 import { Button, Input } from "@rakazo/ui-web";
 import { Check, ChevronDown, KeyRound, X } from "lucide-react";
@@ -36,6 +37,7 @@ function formatAnsweredState(
   // A card the server closed itself reads the same whatever kind of approval it was.
   if (approval && answer === "superseded") return t`Replaced by a newer request`;
   if (approval && answer === "expired") return t`Expired`;
+  if (approval && answer === SKIPPED_APPROVAL_ANSWER) return t`Skipped`;
   if (share && approval) return answer === "allow" ? t`Shared` : t`Not shared`;
   if (consent && approval) return answer === "allow" ? t`Allowed` : t`Not now`;
   // A typed answer is already the user's own bubble; only a chosen option is named here.
@@ -64,7 +66,12 @@ function answeredTone(
   outcome?: "created" | "cancelled",
 ): { className: string; Icon?: typeof Check } {
   if (secret || outcome === "created") return { className: "text-success" };
-  if (!approval || outcome === "cancelled" || isClosedApprovalAnswer(answer))
+  if (
+    !approval ||
+    outcome === "cancelled" ||
+    isClosedApprovalAnswer(answer) ||
+    answer === SKIPPED_APPROVAL_ANSWER
+  )
     return { className: "text-muted-foreground" };
   if (answer === "deny") return { className: "text-destructive", Icon: X };
   if (

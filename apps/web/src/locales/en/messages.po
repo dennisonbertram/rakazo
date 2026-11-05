@@ -6722,6 +6722,7 @@ msgstr "Hide transcript"
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "High"
 msgstr "High"
 
@@ -7687,6 +7688,7 @@ msgstr "Looks like spam"
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Low"
 msgstr "Low"
 
@@ -7938,6 +7940,7 @@ msgid "MCP endpoint"
 msgstr "MCP endpoint"
 
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Medium"
 msgstr "Medium"
 
@@ -9282,6 +9285,10 @@ msgstr "Not tagged. No model is set up to read documents."
 msgid "Not tagged. Praci can't read your documents."
 msgstr "Not tagged. Praci can't read your documents."
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Not used by firewalled or external agents"
+msgstr "Not used by firewalled or external agents"
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Not used yet"
 msgstr "Not used yet"
@@ -10369,6 +10376,10 @@ msgstr "Private workspace with its own bots and groups."
 #: src/components/fundraising/SafeDialog.tsx
 msgid "Pro rata side letter"
 msgstr "Pro rata side letter"
+
+#: src/pages/shell/bot-panel.tsx
+msgid "Proactive"
+msgstr "Proactive"
 
 #: src/components/data-room/ProcessingStrip.tsx
 msgid "Processing"
