@@ -1874,7 +1874,7 @@ it("shows one section per tab, keeps the tab in the URL, and falls back to Cap t
   expect(container.querySelector('section[aria-label="Contacts"]')).toBeNull();
 });
 
-it("sorts the Contacts tab by organization and stage and filters by stage", async () => {
+it("sorts the Contacts tab by organization and has no Stage filter or sort", async () => {
   rpcMock.list.mockResolvedValue([
     {
       ...contact("c1", "Ada", "investor"),
@@ -1903,11 +1903,11 @@ it("sorts the Contacts tab by organization and stage and filters by stage", asyn
   expect(names()).toEqual(["Ada", "Bo", "Cy"]);
   await show("/app/investors?tab=contacts&sort=organization");
   expect(names()).toEqual(["Bo", "Ada", "Cy"]);
-  await show("/app/investors?tab=contacts&sort=stage&dir=desc");
-  expect(names()).toEqual(["Ada", "Cy", "Bo"]);
   await show("/app/investors?tab=contacts&sort=check&dir=desc");
   expect(names()).toEqual(["Ada", "Bo", "Cy"]);
+  // An old link's stage filter no longer narrows the list.
   await show("/app/investors?tab=contacts&stage=meeting");
-  expect(names()).toEqual(["Ada", "Cy"]);
+  expect(names()).toEqual(["Ada", "Bo", "Cy"]);
+  expect(button("Stage")).toBeUndefined();
   expect(button("Sort: Name")).toBeDefined();
 });

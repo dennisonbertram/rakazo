@@ -3,21 +3,44 @@ import { describe, expect, it, vi } from "vitest";
 import { fundraisingToolFromTool, fundraisingToolsAllowed } from "./fundraising-tools.js";
 
 const scope = { spaceId: "s", userId: "u" };
-const row = (extra: Record<string, unknown>) => ({
-  id: "c",
-  name: "Harbor Angels",
+/** A contact as the overview reads it: its pipeline fields come from its record. */
+const row = ({ id = "c", name = "Harbor Angels", ...record }: Record<string, unknown>) => ({
+  id,
+  name,
   email: "h@example.test",
   organization: null,
   kind: "prospect",
   notes: null,
-  stage: "committed",
-  checkSizeCents: 5_000_000n,
-  nextStep: "Send SAFE",
-  roundId: "r1",
   bot: null,
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z"),
-  ...extra,
+  pipelinePeople: [
+    {
+      record: {
+        id: `r-${id}`,
+        name,
+        status: "committed",
+        amountCents: 5_000_000n,
+        nextStep: "Send SAFE",
+        roundId: "r1",
+        waitingSince: null,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        ...record,
+      },
+    },
+  ],
+});
+/** The pipeline tables behind those contacts. */
+const pipelineOf = (rows: ReturnType<typeof row>[]) => ({
+  pipelineRecord: { findMany: async () => rows.map((r) => r.pipelinePeople[0]?.record) },
+  pipelineRecordPerson: {
+    findMany: async () =>
+      rows.map((r) => ({
+        recordId: r.pipelinePeople[0]?.record.id,
+        contactId: r.id,
+        contact: { kind: r.kind },
+      })),
+  },
 });
 const round = (extra: Record<string, unknown>) => ({
   id: "r1",
@@ -31,10 +54,11 @@ const round = (extra: Record<string, unknown>) => ({
 describe("fundraising_read", () => {
   it("returns the open round, pending and each prospect, read with the run owner's scope", async () => {
     const roundFind = vi.fn(async () => round({}));
-    const contactFind = vi.fn(async () => [
+    const contacts = [
       row({}),
-      row({ id: "d", name: "Old Fund", roundId: "r0", checkSizeCents: null, stage: "committed" }),
-    ]);
+      row({ id: "d", name: "Old Fund", roundId: "r0", amountCents: null, status: "committed" }),
+    ];
+    const contactFind = vi.fn(async () => contacts);
     const safeFind = vi.fn(async () => [
       {
         id: "s1",
@@ -56,6 +80,7 @@ describe("fundraising_read", () => {
       fundraiseRound: { findFirst: roundFind },
       contact: { findMany: contactFind },
       safe: { findMany: safeFind },
+      ...pipelineOf(contacts),
     } as never;
     const result = await fundraisingToolFromTool("fundraising_read", { prisma, scope });
     expect(result).toEqual({
@@ -94,7 +119,7 @@ describe("fundraising_read", () => {
     expect(roundFind).toHaveBeenCalledWith({ where: { ...scope, closedAt: null } });
     expect(safeFind).toHaveBeenCalledWith(expect.objectContaining({ where: scope }));
     expect(contactFind).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { ...scope, kind: "prospect" } }),
+      expect.objectContaining({ where: expect.objectContaining(scope) }),
     );
   });
 
@@ -105,6 +130,7 @@ describe("fundraising_read", () => {
       fundraiseRound: { findFirst: find },
       contact: { findMany: async () => [row({})] },
       safe: { findMany: async () => [] },
+      ...pipelineOf([row({})]),
     } as never;
     expect(await fundraisingToolFromTool("fundraising_read", { prisma, scope })).toMatchObject({
       round: { status: "closed", closedAt: closedAt.toISOString() },
@@ -115,6 +141,7 @@ describe("fundraising_read", () => {
       fundraiseRound: { findFirst: async () => null },
       contact: { findMany: async () => [] },
       safe: { findMany: async () => [] },
+      ...pipelineOf([]),
     } as never;
     expect(await fundraisingToolFromTool("fundraising_read", { prisma: empty, scope })).toEqual({
       round: null,
@@ -129,8 +156,9 @@ describe("fundraising_read", () => {
   it("lists a prospect saved without a stage at Target", async () => {
     const prisma = {
       fundraiseRound: { findFirst: async () => null },
-      contact: { findMany: async () => [row({ stage: null, checkSizeCents: null })] },
+      contact: { findMany: async () => [{ ...row({}), pipelinePeople: [] }] },
       safe: { findMany: async () => [] },
+      ...pipelineOf([]),
     } as never;
     expect(await fundraisingToolFromTool("fundraising_read", { prisma, scope })).toMatchObject({
       prospects: [{ stage: "target" }],
@@ -260,6 +288,8 @@ describe("fundraising_prospects_save argument handling", () => {
 
   it("reports bad rows as failed with their position and saves the rest", async () => {
     const created: Record<string, unknown>[] = [];
+    const saved: Record<string, unknown>[] = [];
+    const record = { id: "rec1", status: "not_reached", interest: null };
     const tx = {
       $executeRaw: async () => 0,
       contact: {
@@ -267,10 +297,21 @@ describe("fundraising_prospects_save argument handling", () => {
         findFirst: async () => null,
         create: async ({ data }: { data: Record<string, unknown> }) => {
           created.push(data);
-          return { id: `c${created.length}` };
+          return { id: `c${created.length}`, ...data };
         },
       },
       fundraiseRound: { findFirst: async () => null },
+      pipelineRecord: {
+        findUnique: async () => null,
+        findFirst: async () => record,
+        createManyAndReturn: async () => [record],
+        updateMany: async ({ data }: { data: Record<string, unknown> }) => {
+          saved.push(data);
+          return { count: 1 };
+        },
+      },
+      pipelineRecordPerson: { findFirst: async () => null, create: async () => ({}) },
+      pipelineEvent: { create: async () => ({}) },
     };
     const prisma = { $transaction: async (run: (t: typeof tx) => unknown) => run(tx) } as never;
     const result = await fundraisingToolFromTool(
@@ -301,13 +342,17 @@ describe("fundraising_prospects_save argument handling", () => {
         name: "Harbor Angels",
         organization: "Harbor Angels",
         kind: "prospect",
-        stage: "target",
-        checkSizeCents: 25_000_000,
-        nextStep: "Wave 1",
         botId: "bot-1",
-        roundId: null,
       }),
     ]);
     expect(created[0]).not.toHaveProperty("id");
+    expect(saved).toEqual([
+      expect.objectContaining({
+        status: "not_reached",
+        amountCents: 25_000_000n,
+        nextStep: "Wave 1",
+        roundId: null,
+      }),
+    ]);
   });
 });

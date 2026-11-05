@@ -39,6 +39,7 @@ import {
   createRunExecutor,
   EXTERNAL_BOT_PROMPT,
   EXTERNAL_REQUEST_REASON,
+  MAIL_BATCH_GUIDANCE,
   MAIL_CONSENT_DECLINED,
   MAIL_CONSENT_OFF,
   MEETING_TAINT_FREE_TOOLS,
@@ -700,6 +701,7 @@ function fixture({
           connectionRows.find((row) => matchesWhere(row, where)) ?? null,
       ),
     },
+    $queryRaw: vi.fn(async () => []),
     cachedMailMessage: {
       findFirst: vi.fn(async () => ({ id: "cached-1", threadId: "thread-x" })),
       findMany: vi.fn(async () => [{ id: "cached-1" }]),
@@ -1850,6 +1852,59 @@ describe("unattended mail_modify and mail_send", () => {
       await f.run();
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     }
+  });
+});
+
+describe("the From of a mail approval card", () => {
+  const second = { id: "acct-2", address: "other@example.test" };
+  const first = { id: "acct-1", address: "hello@example.test" };
+  /** Gmail rows as the access rules read them: limited to bot-1 (granted), or to nobody (not granted). */
+  const row = (id: string, granted: boolean) => ({
+    ...mailConnectionRow(),
+    id,
+    allAgents: false,
+    privateByDefault: true,
+    botAccess: granted ? [{ botId: "bot-1", canWrite: false }] : [],
+  });
+  const cardFor = async (granted: string[]) => {
+    const f = fixture({
+      name: "mail_send",
+      builtin: true,
+      mail: { listAccounts: vi.fn(async () => [first, second]) },
+      connectionRows: [
+        row("acct-1", granted.includes("acct-1")),
+        row("acct-2", granted.includes("acct-2")),
+      ],
+    });
+    f.setCalls([
+      { args: { to: ["a@example.test"], subject: "Hi", body: "Hello" }, executionId: "call-1" },
+    ]);
+    await f.run();
+    return f;
+  };
+  const mailOf = (f: Awaited<ReturnType<typeof cardFor>>) =>
+    (
+      f.pauseRunForInput.mock.calls[0] as unknown as [
+        { blocks: { mail?: { account?: string; choices?: { connectionId: string }[] } }[] },
+      ]
+    )[0].blocks[0]?.mail;
+
+  it("is the one account the agent may use, with nothing to choose", async () => {
+    const f = await cardFor(["acct-1"]);
+    expect(mailOf(f)).toMatchObject({ account: "hello@example.test" });
+    expect(mailOf(f)?.choices).toBeUndefined();
+  });
+
+  it("offers a choice of exactly the accounts the agent may use when there are several", async () => {
+    const f = await cardFor(["acct-1", "acct-2"]);
+    expect(mailOf(f)?.account).toBeUndefined();
+    expect(mailOf(f)?.choices?.map((choice) => choice.connectionId)).toEqual(["acct-1", "acct-2"]);
+  });
+
+  it("refuses the call with no card when the agent may use none", async () => {
+    const f = await cardFor([]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: expect.any(String) });
   });
 });
 
@@ -7113,6 +7168,7 @@ describe("mail_reply_batch", () => {
     {
       providerMessageId: "m1",
       threadId: "t1",
+      subject: "One",
       connectionId: "acct-1",
       fromAddress: "sam@customer.example",
       toAddresses: ["support@us.example"],
@@ -7123,6 +7179,7 @@ describe("mail_reply_batch", () => {
     {
       providerMessageId: "m2",
       threadId: "t2",
+      subject: "Two",
       connectionId: "acct-1",
       fromAddress: "lee@customer.example",
       toAddresses: ["support@us.example"],
@@ -7224,6 +7281,74 @@ describe("mail_reply_batch", () => {
     expect(f.mailReplyRows).toEqual([]);
   });
 
+  describe("new emails", () => {
+    const newEmail = { to: ["ana@prospect.example"], subject: "Hello Ana", body: "Hi Ana" };
+    const access = {
+      connectionRows: [
+        { ...mailConnectionRow(), allAgents: false, botAccess: [{ botId: "bot-1" }] },
+      ],
+    };
+
+    it("shows a new email on the card, marked, and a clean run does not untick it", async () => {
+      const f = batchRun({}, { replies: [replies[0], newEmail] });
+      await f.run();
+      expect(card(f).text).toBe("1 new email · 1 reply");
+      expect(card(f).actions.map((action) => action.id)).toEqual(["deny"]);
+      expect(card(f).detail).toContain("New: ana@prospect.example: Hello Ana (New recipient)");
+      expect(f.mailReplyRows[1]).toMatchObject({
+        replyToId: null,
+        providerThreadId: null,
+        outsideContent: false,
+      });
+    });
+
+    it("takes the account from the first row that has a replyToId", async () => {
+      const f = batchRun({}, { replies: [newEmail, replies[0]] });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.mailReplyRows.map((row) => row.replyToId)).toEqual([null, "m1"]);
+    });
+
+    it.each([
+      ["a firewalled agent", { firewall: true, ...access }],
+      ["an external agent", { audience: "external" as const, ...access }],
+    ])("refuses %s with no card and no rows, even beside a reply", async (_label, options) => {
+      const f = batchRun(options, { replies: [replies[0], newEmail] });
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.mailReplyRows).toEqual([]);
+      expect(f.results[0]).toEqual({ error: expect.any(String) });
+    });
+
+    it("still gives a firewalled agent its replies", async () => {
+      const f = batchRun({ firewall: true, ...access });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    });
+
+    it("refuses a chained run with stored taint on a bot that is not firewalled", async () => {
+      const f = batchRun({ externalTaint: true, ...access }, { replies: [replies[0], newEmail] });
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.mailReplyRows).toEqual([]);
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("New email 2") });
+    });
+
+    it("still gives a tainted run its replies", async () => {
+      const f = batchRun({ externalTaint: true, ...access });
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      expect(f.mailReplyRows).toHaveLength(2);
+    });
+
+    it("marks a run that has read outside content the same way", async () => {
+      const f = batchRun({}, { replies: [newEmail] });
+      f.prisma.attempt.count.mockResolvedValue(2 as never);
+      await f.run();
+      expect(f.mailReplyRows[0]).toMatchObject({ outsideContent: true });
+    });
+  });
+
   describe("non-owner grants", () => {
     const linked = (botAccess: object[], writesEnabled = true) => [
       {
@@ -7270,6 +7395,21 @@ describe("mail_reply_batch", () => {
       expect(f.offeredTools).toContain("mail_reply_batch");
     });
 
+    it("tells every agent that has it, custom bots too, to use one card", async () => {
+      const f = batchRun();
+      await f.run();
+      expect(f.request()?.instructions).toContain(MAIL_BATCH_GUIDANCE);
+    });
+
+    it.each([
+      ["sending is off", { disabledBuiltinTools: ["mail_send"] }],
+      ["it is an email's own agent", { spawnKey: "mail-thread:acct-1:t1" }],
+    ])("says nothing about the card when %s", async (_label, options) => {
+      const f = batchRun(options);
+      await f.run();
+      expect(f.request()?.instructions).not.toContain(MAIL_BATCH_GUIDANCE);
+    });
+
     it("is hidden and refused when the bot's mail_send switch is off", async () => {
       const f = batchRun({ disabledBuiltinTools: ["mail_send"] });
       await f.run();
@@ -7300,9 +7440,8 @@ describe("mail_reply_batch", () => {
       await refused(batchRun({}, { replies: many }), "At most 20");
     });
 
-    it("a row without replyToId: the tool cannot start a conversation", async () => {
-      const { replyToId: _omitted, ...rest } = replies[0]!;
-      await refused(batchRun({}, { replies: [rest] }), "replyToId");
+    it("an empty replyToId is refused, never read as a new email", async () => {
+      await refused(batchRun({}, { replies: [{ ...replies[0]!, replyToId: " " }] }), "replyToId");
     });
 
     it("a replyToId that is not synced", async () => {

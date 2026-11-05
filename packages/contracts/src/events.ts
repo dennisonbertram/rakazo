@@ -169,6 +169,12 @@ export const MailApprovalSchema = z.object({
   tool: z.enum(["mail_draft", "mail_send"]),
   /** Connected account address, when the call named one. */
   account: z.string().optional(),
+  /** With no account named and several the agent may use: the accounts to choose the sender from. */
+  choices: z
+    .array(
+      z.object({ connectionId: z.string(), label: z.string(), address: z.string().optional() }),
+    )
+    .optional(),
   to: z.array(z.string()),
   cc: z.array(z.string()),
   bcc: z.array(z.string()),
@@ -212,6 +218,10 @@ export type MailEdits = z.infer<typeof MailEditsSchema>;
 export const MAIL_REPLY_BATCH_TOOL = "mail_reply_batch";
 /** Rows per call. Over this the call is refused with a message to split it. */
 export const MAX_MAIL_REPLY_BATCH = 20;
+/** A row held because its account has used its daily limit for new recipients. */
+export const MAIL_REPLY_LIMIT_HOLD = "daily_limit";
+/** A new email held because its agent became firewalled or external after the card was made. */
+export const MAIL_REPLY_FIREWALL_HOLD = "firewall";
 
 /** What a reply batch card shows at a glance; the rows come from `threads.mailBatch`. */
 export const MailBatchCountsSchema = z.object({
@@ -224,7 +234,10 @@ export const MailBatchCountsSchema = z.object({
 });
 export type MailBatchCounts = z.infer<typeof MailBatchCountsSchema>;
 
-/** Reasons to look at one reply, most serious first. All but `has_link` start the row unticked. */
+/**
+ * Reasons to look at one row, most serious first. All but the last three start the row unticked.
+ * `new_recipient` does too when the run had read outside content.
+ */
 export const MAIL_REPLY_FLAGS = [
   "not_on_thread",
   "new_message",
@@ -232,7 +245,10 @@ export const MAIL_REPLY_FLAGS = [
   "no_reply_address",
   "no_reply_needed",
   "already_sent",
+  "duplicate_email",
+  "new_recipient",
   "has_link",
+  "same_text",
 ] as const;
 export const MailReplyFlagSchema = z.enum(MAIL_REPLY_FLAGS);
 export type MailReplyFlag = z.infer<typeof MailReplyFlagSchema>;
@@ -240,7 +256,8 @@ export type MailReplyFlag = z.infer<typeof MailReplyFlagSchema>;
 /** One row of a reply batch card. Recipients are bare addresses: a display name can say anything. */
 export const MailBatchRowSchema = z.object({
   itemId: Id,
-  replyToId: z.string(),
+  /** Null for a new email, which answers nothing. */
+  replyToId: z.string().nullable(),
   to: z.array(z.string()),
   cc: z.array(z.string()),
   bcc: z.array(z.string()),
@@ -251,7 +268,7 @@ export const MailBatchRowSchema = z.object({
   /** The newest inbound message now; posting it back acknowledges it. */
   seenMessageId: z.string().nullable(),
   flags: z.array(MailReplyFlagSchema),
-  /** A row with a flag other than a link starts unticked. */
+  /** See MAIL_REPLY_FLAGS for which flags start a row unticked. */
   startsUnticked: z.boolean(),
   state: z.enum(["reviewing", "sending", "sent", "not_sent", "unknown", "skipped", "composer"]),
   /** Why a row is not sent, when it was held before any send attempt. */

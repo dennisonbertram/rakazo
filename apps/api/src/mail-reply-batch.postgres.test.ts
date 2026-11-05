@@ -2,6 +2,7 @@ import type { BackgroundJob, JobPublisher } from "@rakazo/adapter-kit";
 import type { EmulatedMessage, PreparedMailReply } from "@rakazo/adapters";
 import {
   buildApprovalAskBlock,
+  mailBatchStepSummary,
   mailReplyFlags,
   mailSendRefusal,
   parseRawMime,
@@ -18,6 +19,8 @@ import {
   createDb,
   createPendingSteeringRun,
   createThreadEvents,
+  MAX_NEW_RECIPIENT_SENDS_PER_DAY,
+  reserveNewRecipientSends,
   retryMailReplyBatch,
   runAsSystem,
   runAsTenant,
@@ -137,6 +140,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
   async function card(
     threads = ["t1", "t2", "t3"],
     args: Record<string, unknown> = argsFor(threads),
+    extra: { refuseNewEmail?: boolean; outsideContent?: boolean } = {},
   ) {
     const n = seq++;
     const task = await prisma.task.create({
@@ -162,7 +166,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
         request: args as never,
       },
     });
-    const prepared = await prepare(effect.id, run.id, args);
+    const prepared = await prepare(effect.id, run.id, args, extra);
     if ("error" in prepared) throw new Error(prepared.error);
     const message = await prisma.message.create({
       data: {
@@ -186,7 +190,12 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       ids: { runId: run.id, messageId: message.id },
     };
   }
-  const prepare = async (effectId: string, runId: string, args: Record<string, unknown>) =>
+  const prepare = async (
+    effectId: string,
+    runId: string,
+    args: Record<string, unknown>,
+    extra: { refuseNewEmail?: boolean; outsideContent?: boolean } = {},
+  ) =>
     prepareMailReplyBatch(
       {
         prisma,
@@ -204,6 +213,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
         effectId,
         secrets: [],
         prior: await priorBatchRows(prisma, scope(), runId),
+        ...extra,
       },
       args,
     );
@@ -298,7 +308,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
         const c = await card(["t1"], {
           replies: [{ ...argsFor(["t1"]).replies[0], cc: ["stranger@elsewhere.example.test"] }],
         });
-        expect(flagsOf(c.rows)).toEqual([["not_on_thread"]]);
+        expect(flagsOf(c.rows)).toEqual([["not_on_thread", "new_recipient"]]);
       });
 
       it("Not on this thread: a Cc hidden in a To entry", async () => {
@@ -310,7 +320,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
             },
           ],
         });
-        expect(flagsOf(c.rows)).toEqual([["not_on_thread"]]);
+        expect(flagsOf(c.rows)).toEqual([["not_on_thread", "new_recipient"]]);
         // The row is split, so the card shows both, bare.
         expect((await read(c)).rows[0]?.to).toEqual([
           customer("t1"),
@@ -327,7 +337,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
             },
           ],
         });
-        expect(flagsOf(c.rows)).toEqual([["not_on_thread"]]);
+        expect(flagsOf(c.rows)).toEqual([["not_on_thread", "new_recipient"]]);
       });
 
       it("New message: a newer inbound message after the proposal, and none for our own", async () => {
@@ -431,7 +441,10 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
             },
           ],
         });
-        expect(flagsOf(c.rows)).toEqual([["has_link"], ["not_on_thread", "has_link"]]);
+        expect(flagsOf(c.rows)).toEqual([
+          ["has_link"],
+          ["not_on_thread", "new_recipient", "has_link"],
+        ]);
         expect(flagsOf(c.rows).map(startsUnticked)).toEqual([false, true]);
       });
 
@@ -554,7 +567,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       });
       const [row] = (await read(c)).rows;
       expect(row?.to).toEqual(["attacker@elsewhere.example.test"]);
-      expect(row?.flags).toEqual(["not_on_thread"]);
+      expect(row?.flags).toEqual(["not_on_thread", "new_recipient"]);
       expect(row?.startsUnticked).toBe(true);
       await expect(read(c, f.b)).rejects.toMatchObject({ code: "NOT_FOUND" });
       await expect(read(c, f.c)).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -1260,7 +1273,13 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect(
         await preview(c, [{ itemId: row!.itemId, edits: { cc: "new@elsewhere.example.test" } }]),
       ).toEqual({
-        rows: [{ itemId: row!.itemId, flags: ["not_on_thread"], startsUnticked: true }],
+        rows: [
+          {
+            itemId: row!.itemId,
+            flags: ["not_on_thread", "new_recipient"],
+            startsUnticked: true,
+          },
+        ],
       });
       expect(await preview(c, [{ itemId: row!.itemId, edits: { cc: "" } }])).toEqual({
         rows: [{ itemId: row!.itemId, flags: [], startsUnticked: false }],
@@ -1649,11 +1668,24 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect(followUp).toEqual(expect.any(String));
     });
 
-    it("a message while the card still waits for the owner is refused as before", async () => {
-      const c = await card();
-      await expect(say("One more thing")).rejects.toMatchObject({ code: "CONFLICT" });
-      expect(await runStatus(c)).toBe("waiting_input");
-      expect(await prisma.steeringMessage.count({ where: { botId } })).toBe(0);
+    it("a message while the card still waits moves past it, and nothing on it can be sent", async () => {
+      const c = await card([], {
+        replies: [
+          argsFor(["t1"]).replies[0],
+          { to: ["ana@prospect.example.test"], subject: "Hi", body: "Hi Ana" },
+        ],
+      });
+      const posted = await pressRows(c, [0, 1]);
+      await say("One more thing");
+      expect(await runStatus(c)).toBe("queued");
+      expect((await effectOf(c)).status).toBe("denied");
+      await expect(
+        sendMailBatch(rpcDeps(), f.a, target(), { ...c.ids, rows: posted }),
+      ).rejects.toMatchObject({
+        code: "CONFLICT",
+      });
+      await work(c);
+      expect(sent()).toEqual([]);
     });
 
     it("Stop during sending: approved rows still send, settlement wakes nothing, the results stay", async () => {
@@ -1829,6 +1861,479 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       await work(c);
       const refusal = await prepare(c.effect.id, c.run.id, argsFor(["t1"]));
       expect(refusal).toEqual({ error: expect.stringContaining("Reply 1 (t1-m1)") });
+    });
+  });
+
+  describe("new emails", () => {
+    const address = (name: string) => `${name}@prospect.example.test`;
+    const newRow = (name: string, extra: object = {}) => ({
+      to: [address(name)],
+      subject: `Hello ${name}`,
+      body: `Hi ${name}, this was written for you.`,
+      ...extra,
+    });
+    const outreach = (...names: string[]) => ({ replies: names.map((name) => newRow(name)) });
+    const seedLimit = async (used: number) => {
+      const c = await card(["t4"]);
+      await prisma.mailReplyItem.updateMany({
+        where: { effectId: c.effect.id },
+        data: { newRecipientCount: used, newRecipientAt: new Date() },
+      });
+    };
+
+    it("stores a row with no thread, flags the new recipient and leaves it ticked", async () => {
+      const c = await card([], outreach("ana"));
+      expect((await rowsOf(c))[0]).toMatchObject({
+        replyToId: null,
+        providerThreadId: null,
+        seenMessageId: null,
+      });
+      const [row] = (await read(c)).rows;
+      expect(row).toMatchObject({
+        replyToId: null,
+        flags: ["new_recipient"],
+        startsUnticked: false,
+      });
+    });
+
+    it("mixes with replies on one card, and a replyToId that is not synced stays refused", async () => {
+      const c = await card([], {
+        replies: [argsFor(["t1"]).replies[0], newRow("ana")],
+      });
+      expect((await read(c)).rows.map((row) => row.flags)).toEqual([[], ["new_recipient"]]);
+      const bad = await prepare("unused", c.run.id, {
+        replies: [newRow("ben", { replyToId: "not-synced" })],
+      });
+      expect(bad).toEqual({ error: expect.stringContaining("not in the synced mail") });
+    });
+
+    it.each([
+      ["a to", { to: [] }],
+      ["a subject", { subject: "  " }],
+      ["a body", { body: "  " }],
+    ])("refuses a new email without %s, naming the row", async (_label, missing) => {
+      const c = await card(["t1"]);
+      const refusal = await prepare(c.effect.id, c.run.id, {
+        replies: [newRow("ana", missing)],
+      });
+      expect(refusal).toEqual({ error: expect.stringContaining("New email 1") });
+    });
+
+    it("a firewalled or external agent is refused new emails, and keeps its replies", async () => {
+      const c = await card(["t1"]);
+      const refusal = await prepare(
+        c.effect.id,
+        c.run.id,
+        { replies: [argsFor(["t2"]).replies[0], newRow("attacker")] },
+        { refuseNewEmail: true },
+      );
+      expect(refusal).toEqual({ error: expect.stringContaining("New email 2") });
+      const replies = await card(["t2"], argsFor(["t2"]), { refuseNewEmail: true });
+      expect(replies.rows).toHaveLength(1);
+    });
+
+    it("a new email from a run that read outside content starts unticked, even to someone known", async () => {
+      await f.cache(f.a, f.connA, "known-1", {
+        threadId: "known",
+        from: address("known"),
+        receivedAt: daysAgo(40),
+        signals: null,
+      });
+      const c = await card([], outreach("ana", "known"), { outsideContent: true });
+      const { rows } = await read(c);
+      expect(rows.map((row) => [row.flags, row.startsUnticked])).toEqual([
+        [["new_recipient"], true],
+        [[], true],
+      ]);
+      // An untouched reply of the same run is not made suspect by it.
+      const reply = await card(["t1"], argsFor(["t1"]), { outsideContent: true });
+      expect((await read(reply)).rows[0]?.startsUnticked).toBe(false);
+    });
+
+    it("New recipient: any address with no prior mail in that account", async () => {
+      const c = await card(["t1"], {
+        replies: [{ ...argsFor(["t1"]).replies[0], cc: ["stranger@elsewhere.example.test"] }],
+      });
+      expect(flagsOf(c.rows)).toEqual([["not_on_thread", "new_recipient"]]);
+      // Prior mail in another account does not count.
+      await f.cache(f.a, f.connA, "seen-1", {
+        threadId: "seen",
+        from: "box-a@example.test",
+        to: [address("Seen")],
+        fromSelf: true,
+        receivedAt: daysAgo(40),
+        signals: null,
+      });
+      const known = await card([], outreach("seen"));
+      expect(flagsOf(known.rows)).toEqual([[]]);
+    });
+
+    it("reuses the protected-sender and no-reply checks", async () => {
+      await prisma.contact.create({
+        data: { ...scope(), name: "Pat", email: address("pat") },
+      });
+      const c = await card([], {
+        replies: [newRow("pat"), { ...newRow("x"), to: ["no-reply@prospect.example.test"] }],
+      });
+      expect(flagsOf(c.rows)).toEqual([
+        ["important_sender", "new_recipient"],
+        ["no_reply_address", "new_recipient"],
+      ]);
+      expect((await read(c)).rows.every((row) => row.startsUnticked)).toBe(true);
+    });
+
+    it("flags the same address twice on one card, both rows, and unticks them", async () => {
+      const c = await card([], {
+        replies: [newRow("ana"), { ...newRow("ana"), subject: "Another", body: "Different" }],
+      });
+      expect(flagsOf(c.rows)).toEqual([
+        ["duplicate_email", "new_recipient"],
+        ["duplicate_email", "new_recipient"],
+      ]);
+      expect((await read(c)).rows.every((row) => row.startsUnticked)).toBe(true);
+    });
+
+    it("flags a new email to someone just emailed about it, reworded or from another account", async () => {
+      await f.cache(f.a, f.connA2, "just-1", {
+        threadId: "just",
+        from: "box-b@example.test",
+        to: [address("ana")],
+        subject: "Re: Hello ana",
+        snippet: "A different wording entirely",
+        fromSelf: true,
+        receivedAt: new Date(Date.now() - 3 * 60_000),
+        signals: null,
+      });
+      const c = await card([], outreach("ana"));
+      expect(flagsOf(c.rows)[0]).toContain("already_sent");
+      expect(startsUnticked(c.rows[0]!.flags)).toBe(true);
+      // Someone else, another subject, or an older send is not this.
+      const other = await card([], {
+        replies: [newRow("ben"), newRow("ana", { subject: "Other" })],
+      });
+      expect(flagsOf(other.rows).flat()).not.toContain("already_sent");
+      await prisma.cachedMailMessage.updateMany({
+        where: { providerMessageId: "just-1" },
+        data: { receivedAt: new Date(Date.now() - 16 * 60_000) },
+      });
+      const later = await card([], outreach("ana"));
+      expect(flagsOf(later.rows)[0]).not.toContain("already_sent");
+    });
+
+    it("flags the same subject sent recently to the same address, in mail or on another card", async () => {
+      await f.cache(f.a, f.connA, "out-1", {
+        threadId: "out",
+        from: "box-a@example.test",
+        to: [address("ana")],
+        subject: "hello ANA",
+        fromSelf: true,
+        receivedAt: daysAgo(2),
+        signals: null,
+      });
+      const fromMail = await card([], outreach("ana"));
+      expect(flagsOf(fromMail.rows)).toEqual([["duplicate_email"]]);
+
+      const first = await card([], outreach("ben"));
+      await press(first, [0]);
+      const second = await card([], outreach("ben"));
+      expect(flagsOf(second.rows)).toEqual([["duplicate_email", "new_recipient"]]);
+      // Another subject to the same person is a different email.
+      const other = await card([], { replies: [newRow("ben", { subject: "Other" })] });
+      expect(flagsOf(other.rows)).toEqual([["new_recipient"]]);
+    });
+
+    it("identical text on three new rows is a flag that keeps them ticked; two is not", async () => {
+      const same = { body: "The same words for everyone." };
+      const three = await card([], {
+        replies: ["ana", "ben", "cy"].map((name) => newRow(name, same)),
+      });
+      expect(flagsOf(three.rows)[0]).toEqual(["new_recipient", "same_text"]);
+      expect((await read(three)).rows.every((row) => !row.startsUnticked)).toBe(true);
+      const two = await card([], {
+        replies: ["dee", "eli"].map((name) => newRow(name, same)),
+      });
+      expect(flagsOf(two.rows)[0]).toEqual(["new_recipient"]);
+    });
+
+    it("sends only the ticked rows, each in a thread of its own, and reports them", async () => {
+      const c = await card([], { replies: [newRow("ana"), newRow("ben"), newRow("cy")] });
+      await press(c, [0, 2]);
+      await work(c);
+      const out = sent();
+      expect(out.map((mail) => mail.to)).toEqual([address("ana"), address("cy")]);
+      expect(new Set(out.map((mail) => mail.threadId)).size).toBe(2);
+      const raw = f.gmail.sentOf("box-a").map((draft) => parseRawMime(draft.raw));
+      expect(raw.every((mime) => !mime.header("in-reply-to"))).toBe(true);
+      expect((await read(c)).rows.map((row) => row.state)).toEqual(["sent", "skipped", "sent"]);
+      expect((await effectOf(c)).result).toMatchObject({
+        sent: 2,
+        replies: [
+          { replyToId: null, to: [address("ana")], outcome: "sent" },
+          { replyToId: null, to: [address("ben")], outcome: "skipped" },
+          { replyToId: null, to: [address("cy")], outcome: "sent" },
+        ],
+      });
+      expect(mailBatchStepSummary((await effectOf(c)).result)).toBe("Sent 2 emails");
+    });
+
+    it("an edit that clears a new email's body or subject rejects the press", async () => {
+      const c = await card([], outreach("ana"));
+      await expect(press(c, [0], { 0: { body: " " } })).rejects.toThrow(/New email 1/);
+      await expect(press(c, [0], { 0: { subject: "" } })).rejects.toThrow(/New email 1/);
+      expect((await effectOf(c)).status).toBe("intended");
+    });
+
+    it("an edit that repeats another row's address flags both rows, and the press needs that seen", async () => {
+      const c = await card([], outreach("ana", "ben"));
+      const { rows } = await read(c);
+      const edits = { to: [address("ben")] };
+      const preview = await previewMailBatch(rpcDeps(), f.a, target(), {
+        ...c.ids,
+        rows: [{ itemId: rows[0]!.itemId, edits }],
+      });
+      expect(preview.rows.map((row) => [row.itemId, row.flags, row.startsUnticked])).toEqual([
+        [rows[0]!.itemId, ["duplicate_email", "new_recipient"], true],
+        [rows[1]!.itemId, ["duplicate_email", "new_recipient"], true],
+      ]);
+      const posted = await pressRows(c, [0, 1], { 0: edits });
+      await expect(
+        sendMailBatch(rpcDeps(), f.a, target(), {
+          ...c.ids,
+          rows: posted.map((row, index) =>
+            index === 1 ? { ...row, flags: ["new_recipient"] as never } : row,
+          ),
+        }),
+      ).rejects.toThrow(/changed/);
+      await sendMailBatch(rpcDeps(), f.a, target(), {
+        ...c.ids,
+        rows: posted.map((row) => ({
+          ...row,
+          flags: ["duplicate_email", "new_recipient"] as never,
+        })),
+      });
+    });
+
+    it("double send under retry: one message however often the job and Retry run", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      f.gmail.failNext(400, { urlIncludes: "drafts/send", reason: "invalidArgument" });
+      await work(c);
+      expect(sent()).toEqual([]);
+      const { rows } = await read(c);
+      expect(rows[0]).toMatchObject({ state: "not_sent", retryable: true });
+      expect((await rowsOf(c))[0]?.newRecipientAt).toBeNull();
+
+      const retry = () =>
+        retryMailBatch(rpcDeps(), f.a, target(), {
+          ...c.ids,
+          rows: [{ itemId: rows[0]!.itemId, seenMessageId: null }],
+        });
+      expect(await retry()).toBe(1);
+      expect(await retry()).toBe(0);
+      await Promise.all([work(c), work(c)]);
+      await work(c);
+      expect(await retry()).toBe(0);
+      await work(c);
+      expect(sent().map((mail) => mail.to)).toEqual([address("ana")]);
+      expect((await read(c)).rows[0]?.state).toBe("sent");
+      expect((await rowsOf(c))[0]?.newRecipientCount).toBe(1);
+    });
+
+    const reserveAt = (c: Card, newRecipientAt: Date) =>
+      prisma.mailReplyItem.updateMany({
+        where: { effectId: c.effect.id },
+        data: { newRecipientCount: 1, newRecipientAt },
+      });
+    const dayAgo = () => new Date(Date.now() - 25 * 60 * 60_000);
+
+    it("a reservation older than the window must find room again", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY);
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await reserveAt(c, dayAgo());
+      await work(c);
+      expect(sent()).toEqual([]);
+      expect((await read(c)).rows[0]?.error).toBe("daily_limit");
+    });
+
+    it("a reservation older than the window is renewed when there is room", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await reserveAt(c, dayAgo());
+      await work(c);
+      expect(sent()).toHaveLength(1);
+      const [row] = await rowsOf(c);
+      expect(row?.newRecipientAt?.getTime()).toBeGreaterThan(Date.now() - 60_000);
+    });
+
+    it("a recovered row that a check refuses gives its place back", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await reserveAt(c, new Date());
+      await prisma.bot.update({
+        where: { id: botId },
+        data: { disabledBuiltinTools: ["mail_send"] },
+      });
+      await work(c);
+      expect((await rowsOf(c))[0]).toMatchObject({
+        dispatch: "held",
+        error: "switch",
+        newRecipientCount: 0,
+        newRecipientAt: null,
+      });
+    });
+
+    it("recovery that holds a row of a cleared thread gives its place back", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await prisma.mailReplyItem.updateMany({
+        where: { effectId: c.effect.id },
+        data: { dispatch: "claimed", newRecipientCount: 1, newRecipientAt: new Date() },
+      });
+      await prisma.message.deleteMany({ where: { runId: c.run.id, role: "bot" } });
+      await reconcile();
+      expect((await rowsOf(c))[0]).toMatchObject({
+        dispatch: "held",
+        newRecipientCount: 0,
+        newRecipientAt: null,
+      });
+    });
+
+    it("an earlier card's Bcc counts as a recent send to that address", async () => {
+      const first = await card([], {
+        replies: [newRow("cy", { subject: "Same", bcc: [address("ben")] })],
+      });
+      await press(first, [0]);
+      const second = await card([], { replies: [newRow("ben", { subject: "Same" })] });
+      expect(flagsOf(second.rows)[0]).toContain("duplicate_email");
+    });
+
+    it("an interrupted row with a reservation is not counted twice", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY - 1);
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      const [row] = await rowsOf(c);
+      expect(
+        await reserveNewRecipientSends(prisma, {
+          ...scope(),
+          itemId: row!.id,
+          connectionId: f.connA,
+          count: 1,
+        }),
+      ).toBe(true);
+      // Full now, and this row already holds its place.
+      await work(c);
+      expect(sent().map((mail) => mail.to)).toEqual([address("ana")]);
+    });
+
+    it("the limit holds across concurrent presses: only what is left goes out", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY - 2);
+      const one = await card([], outreach("a1", "a2", "a3"));
+      const two = await card([], outreach("b1", "b2", "b3"));
+      await Promise.all([press(one, [0, 1, 2]), press(two, [0, 1, 2])]);
+      await Promise.all([work(one), work(two)]);
+      expect(sent()).toHaveLength(2);
+      const rows = [...(await read(one)).rows, ...(await read(two)).rows];
+      expect(rows.filter((row) => row.state === "sent")).toHaveLength(2);
+      const held = rows.filter((row) => row.state === "not_sent");
+      expect(held).toHaveLength(4);
+      expect(held.every((row) => row.error === "daily_limit" && row.retryable)).toBe(true);
+      const used = await prisma.mailReplyItem.aggregate({
+        where: { connectionId: f.connA, newRecipientAt: { not: null } },
+        _sum: { newRecipientCount: true },
+      });
+      expect(used._sum.newRecipientCount).toBe(MAX_NEW_RECIPIENT_SENDS_PER_DAY);
+    });
+
+    it("a held row tells the agent why, and Retry sends it once the window has room", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY);
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await work(c);
+      expect(sent()).toEqual([]);
+      expect((await effectOf(c)).result).toMatchObject({
+        replies: [{ outcome: "failed", reason: "daily_limit" }],
+        note: expect.stringContaining("daily limit"),
+      });
+      const { rows } = await read(c);
+      const retry = () =>
+        retryMailBatch(rpcDeps(), f.a, target(), {
+          ...c.ids,
+          rows: [{ itemId: rows[0]!.itemId, seenMessageId: null }],
+        });
+      await retry();
+      await work(c);
+      expect(sent()).toEqual([]);
+      expect((await read(c)).rows[0]?.error).toBe("daily_limit");
+
+      // A day later the earlier sends no longer count.
+      await prisma.mailReplyItem.updateMany({
+        where: { connectionId: f.connA, newRecipientCount: MAX_NEW_RECIPIENT_SENDS_PER_DAY },
+        data: { newRecipientAt: new Date(Date.now() - 25 * 60 * 60_000) },
+      });
+      await retry();
+      await work(c);
+      expect(sent().map((mail) => mail.to)).toEqual([address("ana")]);
+    });
+
+    it("the limit never holds a reply to someone already on the thread", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY);
+      const c = await card(["t1"]);
+      await press(c, [0]);
+      await work(c);
+      expect(sent()).toHaveLength(1);
+      expect((await rowsOf(c))[0]?.newRecipientAt).toBeNull();
+    });
+
+    it("counts each new address of a row, not only the row", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY - 1);
+      const c = await card([], {
+        replies: [newRow("ana", { cc: [address("ben")] })],
+      });
+      await press(c, [0]);
+      await work(c);
+      expect(sent()).toEqual([]);
+      expect((await read(c)).rows[0]?.error).toBe("daily_limit");
+    });
+
+    it("turning Firewall on after the card holds its new emails, and its replies still go", async () => {
+      const c = await card([], { replies: [argsFor(["t1"]).replies[0], newRow("ana")] });
+      await press(c, [0, 1]);
+      await prisma.bot.update({ where: { id: botId }, data: { firewall: true } });
+      // Firewall drops "all agents", and one sibling account without a grant denies the whole app.
+      await prisma.botConnectionAccess.createMany({
+        data: (await prisma.connection.findMany({ where: scope() })).map((connection) => ({
+          botId,
+          connectionId: connection.id,
+          ...scope(),
+          canWrite: true,
+        })),
+      });
+      await work(c);
+      expect(sent().map((mail) => mail.to)).toEqual([customer("t1")]);
+      expect((await read(c)).rows[1]).toMatchObject({ state: "not_sent", error: "firewall" });
+    });
+
+    it("Open in composer on a new email has no thread to answer", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY);
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await work(c);
+      const { rows } = await read(c);
+      const draft = await mailBatchRowToComposer(rpcDeps(), f.a, target(), {
+        ...c.ids,
+        itemId: rows[0]!.itemId,
+      });
+      expect(draft.to).toEqual([address("ana")]);
+      expect(draft).not.toHaveProperty("replyToId");
+    });
+
+    it("a repeat of a sent new email in the same run is refused before any card", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await work(c);
+      const refusal = await prepare(c.effect.id, c.run.id, outreach("ana"));
+      expect(refusal).toEqual({ error: expect.stringContaining("New email 1") });
     });
   });
 });

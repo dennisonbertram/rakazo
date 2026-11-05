@@ -174,6 +174,13 @@ describePostgres("fundraising (PostgreSQL)", () => {
       Array.from({ length: count }, (_, i) => ({ firm: `Firm ${i + 1}`, ...extra }));
     const prospectsOf = (scope: typeof team) =>
       prisma.contact.findMany({ where: { ...scope, kind: "prospect" }, orderBy: { name: "asc" } });
+    const recordOf = async (contactId: string) =>
+      (
+        await prisma.pipelineRecordPerson.findFirstOrThrow({
+          where: { contactId },
+          include: { record: true },
+        })
+      ).record;
 
     it("adds 140 firms in three calls, and a second run adds nobody", async () => {
       const rows = firms(140, { nextStep: "Call, wave 1" });
@@ -193,9 +200,9 @@ describePostgres("fundraising (PostgreSQL)", () => {
 
     it("matches by email, else by normalized name, and keeps what the owner edited", async () => {
       const [fund] = await prospectsOf(team);
-      await prisma.contact.update({
-        where: { id: fund!.id },
-        data: { stage: "meeting", nextStep: "Owner note", checkSizeCents: 100n },
+      await prisma.pipelineRecord.update({
+        where: { id: (await recordOf(fund!.id)).id },
+        data: { status: "meeting_booked", nextStep: "Owner note", amountCents: 100n },
       });
       const result = await importProspects(prisma, team, [
         // Same firm in other case and punctuation: matched, stage and note kept, empty email filled.
@@ -212,19 +219,17 @@ describePostgres("fundraising (PostgreSQL)", () => {
       expect(result).toMatchObject({ added: 0, updated: 1 });
       expect(result.skipped).toHaveLength(1);
       const after = await prisma.contact.findUniqueOrThrow({ where: { id: fund!.id } });
-      expect(after).toMatchObject({
-        email: "one@example.test",
-        stage: "meeting",
+      expect(after).toMatchObject({ email: "one@example.test" });
+      expect(await recordOf(fund!.id)).toMatchObject({
+        status: "meeting_booked",
         nextStep: "Owner note",
-        checkSizeCents: 100n,
+        amountCents: 100n,
       });
       // Told to change them, the row wins.
       await importProspects(prisma, team, [{ firm: "Firm 1", nextStep: "Wave 2" }], {
         overwrite: true,
       });
-      expect((await prisma.contact.findUniqueOrThrow({ where: { id: fund!.id } })).nextStep).toBe(
-        "Wave 2",
-      );
+      expect((await recordOf(fund!.id)).nextStep).toBe("Wave 2");
     });
 
     it("attaches a Committed prospect to the open round and leaves other contacts alone", async () => {
@@ -242,10 +247,10 @@ describePostgres("fundraising (PostgreSQL)", () => {
       expect(result.skipped).toEqual([
         { row: 2, name: "Vendor Co", reason: "Already saved as vendor." },
       ]);
-      expect(
-        (await prisma.contact.findFirstOrThrow({ where: { ...team, name: "Committed Fund" } }))
-          .roundId,
-      ).toBe(round.id);
+      const committed = await prisma.contact.findFirstOrThrow({
+        where: { ...team, name: "Committed Fund" },
+      });
+      expect((await recordOf(committed.id)).roundId).toBe(round.id);
       expect(
         (await prisma.contact.findFirstOrThrow({ where: { ...team, email: "v@example.test" } }))
           .kind,
@@ -341,6 +346,9 @@ describePostgres("fundraising (PostgreSQL)", () => {
                   $executeRaw: tx.$executeRaw.bind(tx),
                   $executeRawUnsafe: tx.$executeRawUnsafe.bind(tx),
                   fundraiseRound: tx.fundraiseRound,
+                  pipelineRecord: tx.pipelineRecord,
+                  pipelineRecordPerson: tx.pipelineRecordPerson,
+                  pipelineEvent: tx.pipelineEvent,
                   contact: {
                     findMany: tx.contact.findMany.bind(tx.contact),
                     create: tx.contact.create.bind(tx.contact),
@@ -348,7 +356,7 @@ describePostgres("fundraising (PostgreSQL)", () => {
                       const row = await tx.contact.findFirst(args);
                       if (!edited) {
                         edited = true;
-                        await prisma.contact.updateMany({
+                        await prisma.pipelineRecord.updateMany({
                           where: { ...owner, name: "Edited Fund" },
                           data: { nextStep: "Owner typed this" },
                         });
@@ -366,7 +374,9 @@ describePostgres("fundraising (PostgreSQL)", () => {
         ]);
         expect(result).toMatchObject({ added: 0, updated: 0 });
         expect(result.skipped).toHaveLength(1);
-        expect((await prospectsOf(owner))[0]).toMatchObject({ nextStep: "Owner typed this" });
+        expect(await recordOf((await prospectsOf(owner))[0]!.id)).toMatchObject({
+          nextStep: "Owner typed this",
+        });
       } finally {
         await prisma.user.deleteMany({ where: { id: owner.userId } });
       }
@@ -407,6 +417,9 @@ describePostgres("fundraising (PostgreSQL)", () => {
               run({
                 $executeRaw: tx.$executeRaw.bind(tx),
                 $executeRawUnsafe: tx.$executeRawUnsafe.bind(tx),
+                pipelineRecord: tx.pipelineRecord,
+                pipelineRecordPerson: tx.pipelineRecordPerson,
+                pipelineEvent: tx.pipelineEvent,
                 contact: {
                   findMany: tx.contact.findMany.bind(tx.contact),
                   findFirst: tx.contact.findFirst.bind(tx.contact),

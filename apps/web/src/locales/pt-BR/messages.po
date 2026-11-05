@@ -583,6 +583,10 @@ msgstr ""
 msgid "{folders, plural, one {# folder} other {# folders}}"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "{fresh} new emails"
+msgstr ""
+
 #: src/pages/shell/transcript.tsx
 msgid "{from} handed off to {to}"
 msgstr ""
@@ -719,6 +723,10 @@ msgstr ""
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "{remaining} left · bot is watching, not acting"
 msgstr "{remaining} restantes · o bot está observando, não agindo"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{replies} replies"
+msgstr ""
 
 #: src/pages/finance/FinanceBurn.tsx
 msgid "{runMonths} mo"
@@ -867,6 +875,10 @@ msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "1 folder"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "1 new email"
 msgstr ""
 
 #: src/pages/Finance.tsx
@@ -4933,6 +4945,10 @@ msgstr ""
 msgid "Daily check-in"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Daily limit for new recipients reached. Retry later."
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Escuro"
@@ -6294,6 +6310,10 @@ msgstr "Finalizando conexão MCP…"
 msgid "Finishing sign-in…"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Firewall is on, so this agent can only reply."
+msgstr ""
+
 #: src/pages/finance/FinanceSpend.tsx
 msgid "First seen"
 msgstr ""
@@ -7018,6 +7038,10 @@ msgstr ""
 
 #: src/pages/CompanyImportScope.tsx
 msgid "INBOX, SENT"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Include new email to {first}"
 msgstr ""
 
 #: src/components/MailReplyBatchCard.tsx
@@ -8557,6 +8581,10 @@ msgstr ""
 msgid "New Bot"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "New email"
+msgstr ""
+
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/FolderTree.tsx
 #: src/components/data-room/ItemDialogs.tsx
@@ -8617,6 +8645,10 @@ msgstr ""
 #: src/pages/Auth.tsx
 msgid "New password"
 msgstr "Nova senha"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "New recipient"
+msgstr ""
 
 #: src/pages/CompanyContext.tsx
 msgid "New section"
@@ -10137,6 +10169,10 @@ msgstr ""
 msgid "Portal link"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Possible duplicate"
+msgstr ""
+
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Post and schedule to social accounts"
 msgstr ""
@@ -11610,6 +11646,10 @@ msgstr ""
 
 #: src/pages/CompanyReview.tsx
 msgid "Same person?"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Same text as others"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx

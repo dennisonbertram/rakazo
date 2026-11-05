@@ -56,6 +56,7 @@ export function buildApprovalAskBlock(
     noAlwaysAllow?: boolean;
     /** The From account the mail call will use when it named none (see inferMailAccount). */
     mailAccount?: string;
+    mailChoices?: NonNullable<MailApproval["choices"]>;
     /** The MCP server's display name, so the title says which service runs the tool. */
     serviceName?: string;
     /** Who an imessage_send goes to, resolved from the call (a thread id alone names no one). */
@@ -185,6 +186,7 @@ export function buildApprovalAskBlock(
         ? { ...args, account: options.mailAccount }
         : args,
       secrets,
+      options?.mailChoices,
     ),
     approvalReason: options?.approvalReason,
     ...(fetchSite ? { site: fetchSite } : {}),
@@ -241,6 +243,7 @@ export type MailBatchCardRow = {
   bcc: readonly string[];
   subject: string;
   flags: readonly MailReplyFlag[];
+  newEmail?: boolean;
 };
 
 const MAIL_REPLY_FLAG_TEXT: Record<MailReplyFlag, string> = {
@@ -250,7 +253,10 @@ const MAIL_REPLY_FLAG_TEXT: Record<MailReplyFlag, string> = {
   no_reply_address: "No-reply address",
   no_reply_needed: "You said no reply needed",
   already_sent: "Already sent a few minutes ago",
+  duplicate_email: "Possible duplicate",
+  new_recipient: "New recipient",
   has_link: "Has a link",
+  same_text: "Same text as others",
 };
 
 /**
@@ -268,12 +274,12 @@ function buildMailBatchAskBlock(
   return {
     kind: "ask",
     approvalEffectId: effectId,
-    text: rows.length === 1 ? "1 reply" : `${rows.length} replies`,
+    text: mailBatchTitle(rows),
     detail: rows
       .map((row) => {
         const to = [...bare(row.to), ...bare(row.cc), ...bare(row.bcc)].join(", ");
         const flag = row.flags[0] ? ` (${MAIL_REPLY_FLAG_TEXT[row.flags[0]]})` : "";
-        return `${to}: ${truncate(row.subject, 120)}${flag}`;
+        return `${row.newEmail ? "New: " : ""}${to}: ${truncate(row.subject, 120)}${flag}`;
       })
       .join("\n"),
     approvalReason,
@@ -281,6 +287,17 @@ function buildMailBatchAskBlock(
     status: "pending",
     actions: [{ id: "deny", label: "Discard" }],
   };
+}
+
+function mailBatchTitle(rows: readonly MailBatchCardRow[]): string {
+  const fresh = rows.filter((row) => row.newEmail).length;
+  const replies = rows.length - fresh;
+  return [
+    fresh === 1 ? "1 new email" : fresh > 1 ? `${fresh} new emails` : "",
+    replies === 1 ? "1 reply" : replies > 1 || rows.length === 0 ? `${replies} replies` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function webFetchSite(toolName: string, args: Record<string, unknown>): string | undefined {
@@ -771,6 +788,7 @@ function mailApproval(
   toolName: string,
   args: Record<string, unknown>,
   secrets: string[],
+  choices?: MailApproval["choices"],
 ): MailApproval | undefined {
   if (toolName !== "mail_draft" && toolName !== "mail_send") return undefined;
   const text = (value: unknown) => (typeof value === "string" ? redactSecrets(value, secrets) : "");
@@ -781,6 +799,7 @@ function mailApproval(
     ...(typeof args.account === "string" && args.account
       ? { account: redactSecrets(args.account, secrets) }
       : {}),
+    ...(choices?.length ? { choices } : {}),
     to: strings(args.to).map((item) => redactSecrets(item, secrets)),
     cc: strings(args.cc).map((item) => redactSecrets(item, secrets)),
     bcc: strings(args.bcc).map((item) => redactSecrets(item, secrets)),

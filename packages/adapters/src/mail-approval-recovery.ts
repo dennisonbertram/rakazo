@@ -279,6 +279,19 @@ export function sentCopyMatches(
   );
 }
 
+/** Whether a message in Sent went to any of these lowercased addresses about the same thing. */
+export function sentToSameSubject(
+  sent: { toAddresses: readonly string[]; ccAddresses: readonly string[]; subject: string },
+  mail: { recipients: readonly string[]; subject: string },
+): boolean {
+  return (
+    baseSubject(sent.subject) === baseSubject(mail.subject) &&
+    addresses([...sent.toAddresses, ...sent.ccAddresses])
+      .split(",")
+      .some((address) => mail.recipients.includes(address))
+  );
+}
+
 /**
  * Whether this mail_send repeats an email that already went out moments ago, in any run: from a
  * sent call in this conversation (exact text, right away), or from Sent (any path, once synced,

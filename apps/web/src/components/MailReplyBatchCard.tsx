@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { MailApproval, MailBatch, MailReplyFlag, MessageBlock } from "@rakazo/contracts";
+import { MAIL_REPLY_FIREWALL_HOLD, MAIL_REPLY_LIMIT_HOLD } from "@rakazo/contracts";
 import { isClosedApprovalAnswer, SKIPPED_APPROVAL_ANSWER } from "@rakazo/core";
 import { Badge, Button, Checkbox, cn } from "@rakazo/ui-web";
 import { Mail } from "lucide-react";
@@ -68,8 +69,14 @@ function flagText(flag: MailReplyFlag): string {
       return t`You said no reply needed`;
     case "already_sent":
       return t`Already sent a few minutes ago`;
+    case "duplicate_email":
+      return t`Possible duplicate`;
+    case "new_recipient":
+      return t`New recipient`;
     case "has_link":
       return t`Has a link`;
+    case "same_text":
+      return t`Same text as others`;
   }
 }
 
@@ -78,6 +85,26 @@ function FlagBadge({ flag }: { flag: MailReplyFlag }) {
     <Badge variant="secondary" className="shrink-0 bg-warning/15 text-warning">
       {flagText(flag)}
     </Badge>
+  );
+}
+
+/** Why a row was held, for the holds the owner can act on. Other holds keep the plain "Not sent". */
+function holdText(error: string | null): string | null {
+  if (error === MAIL_REPLY_LIMIT_HOLD)
+    return t`Daily limit for new recipients reached. Retry later.`;
+  if (error === MAIL_REPLY_FIREWALL_HOLD) return t`Firewall is on, so this agent can only reply.`;
+  return null;
+}
+
+function cardTitle(fresh: number, replies: number) {
+  const emails = fresh === 1 ? <Trans>1 new email</Trans> : <Trans>{fresh} new emails</Trans>;
+  const answers = replies === 1 ? <Trans>1 reply</Trans> : <Trans>{replies} replies</Trans>;
+  if (fresh === 0) return answers;
+  if (replies === 0) return emails;
+  return (
+    <>
+      {emails} · {answers}
+    </>
   );
 }
 
@@ -110,7 +137,7 @@ function RowState({ state }: { state: Row["state"] }) {
 }
 
 /**
- * One card for the several replies of a mail_reply_batch call. An open row is the real mail card.
+ * One card for the several replies and new emails of a mail_reply_batch call. An open row is the real mail card.
  * Send selected is its own request with the exact rows; Discard answers the card as usual. Flags,
  * hashes and results come from the server, and the card shows what `threads.mailBatch` reads.
  */
@@ -222,11 +249,16 @@ export function MailReplyBatchCard({
     [rows, edited],
   );
   // What the server knows of an edited row is part of the check: a new message means a new check.
+  // The check can flag other rows too, so all of them count once anything is edited.
   const editsKey = JSON.stringify(
-    edits.map(({ itemId, edits: changed }) => {
-      const row = rows.find((candidate) => candidate.itemId === itemId);
-      return [itemId, changed, row?.seenMessageId, row?.flags];
-    }),
+    edits.length === 0
+      ? []
+      : rows.map((row) => [
+          row.itemId,
+          changedFields(row, edited[row.itemId]),
+          row.seenMessageId,
+          row.flags,
+        ]),
   );
 
   // Editing recomputes flags on the server, so an edit adding a recipient unticks that row at once.
@@ -281,13 +313,15 @@ export function MailReplyBatchCard({
     const isEdited = new Set(edits.map((edit) => edit.itemId));
     applyFlags(
       rows
-        .filter((row) => !isEdited.has(row.itemId) && row.state === "reviewing")
+        .filter(
+          (row) => !isEdited.has(row.itemId) && !previews[row.itemId] && row.state === "reviewing",
+        )
         .map((row) => ({
           itemId: row.itemId,
           flags: { flags: row.flags, startsUnticked: row.startsUnticked },
         })),
     );
-  }, [rows, edits, applyFlags]);
+  }, [rows, edits, previews, applyFlags]);
 
   const reviewing = block.status !== "answered" && canAnswer;
   const list = useCappedRows(rows, { phone: CAP, desktop: CAP });
@@ -399,6 +433,7 @@ export function MailReplyBatchCard({
       results
     );
   const count = rows.length;
+  const newEmails = rows.filter((row) => row.replyToId === null).length;
 
   return (
     <div
@@ -414,7 +449,7 @@ export function MailReplyBatchCard({
         </span>
         <span className="min-w-0 flex-1 text-[15px]">
           <span className="font-medium text-foreground">
-            {count === 1 ? <Trans>1 reply</Trans> : <Trans>{count} replies</Trans>}
+            {cardTitle(newEmails, count - newEmails)}
           </span>{" "}
           <span className="text-muted-foreground">{status}</span>
           {data.account ? (
@@ -429,6 +464,8 @@ export function MailReplyBatchCard({
           const flags = (inReview ? previews[row.itemId]?.flags : undefined) ?? row.flags;
           const [first = "", ...others] = [fields.to, fields.cc, fields.bcc].flatMap(addressesOf);
           const isOpen = open === row.itemId;
+          const newEmail = row.replyToId === null;
+          const hold = row.state === "not_sent" ? holdText(row.error) : null;
           const mail: MailApproval = {
             tool: "mail_send",
             to: addressesOf(fields.to),
@@ -436,7 +473,7 @@ export function MailReplyBatchCard({
             bcc: addressesOf(fields.bcc),
             subject: fields.subject,
             body: fields.body,
-            reply: true,
+            reply: !newEmail,
             ...(row.state === "sent"
               ? { outcome: "sent" as const }
               : row.state === "not_sent"
@@ -453,7 +490,9 @@ export function MailReplyBatchCard({
                     className="mt-0.5"
                     checked={ticks.has(row.itemId)}
                     disabled={busy}
-                    aria-label={t`Include reply to ${first}`}
+                    aria-label={
+                      newEmail ? t`Include new email to ${first}` : t`Include reply to ${first}`
+                    }
                     onCheckedChange={(value) =>
                       setTicks((current) => {
                         const next = new Set(current);
@@ -474,6 +513,11 @@ export function MailReplyBatchCard({
                   className="min-w-0 flex-1 text-start"
                 >
                   <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-foreground">
+                    {newEmail ? (
+                      <Badge variant="outline" className="shrink-0">
+                        <Trans>New email</Trans>
+                      </Badge>
+                    ) : null}
                     {/* Wraps, never truncates: a cut-off address would hide the recipient being flagged. */}
                     <span className="min-w-0 break-words">{[first, ...others].join(", ")}</span>
                     {flags[0] ? <FlagBadge flag={flags[0]} /> : null}
@@ -481,6 +525,7 @@ export function MailReplyBatchCard({
                   <span className="block truncate text-[13px] text-muted-foreground">
                     {fields.subject} · {firstLine(fields.body)}
                   </span>
+                  {hold ? <span className="block text-[13px] text-destructive">{hold}</span> : null}
                 </button>
                 <RowState state={row.state} />
               </div>

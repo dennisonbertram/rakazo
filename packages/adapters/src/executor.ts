@@ -6128,20 +6128,36 @@ export function createRunExecutor(deps: ExecutorDeps) {
             throw uncertainEffectError(name);
           };
 
-          // The card names the From account the send will use, even when the agent named none.
-          const approvalMailAccount = async () => {
-            if (name !== "mail_send" && name !== "mail_draft") return undefined;
-            if (!deps.mail || !mailEnabled) return undefined;
-            const accounts = await mailAccounts();
-            // With one account the From line would say nothing new.
-            if (accounts.length < 2) return undefined;
+          // The card names the From account the send will use, even when the agent named none. Only
+          // accounts this agent may change count: with one, it is the From and nobody is asked; with
+          // several and none inferred, the card offers exactly those.
+          const approvalMailAccount = async (): Promise<{
+            account?: string;
+            choices?: { connectionId: string; label: string; address?: string }[];
+          }> => {
+            if (name !== "mail_send" && name !== "mail_draft") return {};
+            if (!deps.mail || !mailEnabled) return {};
+            const accounts = await accountsAllowedNow(mailAccounts(), name);
+            if (accounts.length === 0) return {};
+            if (accounts.length === 1) {
+              // With one account in the whole mailbox list the From line would say nothing new.
+              const all = await ownerMailAccounts().catch(() => accounts);
+              return all.length > 1 ? { account: accountName(accounts[0]!) } : {};
+            }
             const inferred = await inferMailAccount(
               deps.prisma,
               { spaceId: run.spaceId, userId: bot.userId },
               accounts,
               args,
             ).catch(() => undefined);
-            return inferred ? accountName(inferred) : undefined;
+            if (inferred) return { account: accountName(inferred) };
+            return {
+              choices: accounts.map((account) => ({
+                connectionId: account.id,
+                label: account.label,
+                ...(account.address ? { address: account.address } : {}),
+              })),
+            };
           };
 
           // The recipient and account behind a money request's ids, read with the same server's own
@@ -6219,8 +6235,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
               noAlwaysAllow,
               routineAlways: routineAllowable,
               serviceName: callRoute?.serverName,
-              mailAccount:
-                meetingTaintedCall || externalTaintedCall ? undefined : await approvalMailAccount(),
+              ...(meetingTaintedCall || externalTaintedCall
+                ? {}
+                : await approvalMailAccount().then(({ account, choices }) => ({
+                    mailAccount: account,
+                    mailChoices: choices,
+                  }))),
               imessage: imessageCard,
               schedule: scheduleCard,
               moneyNames,
@@ -6417,6 +6437,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 effectId: applied.effect.id,
                 secrets: runSecrets,
                 ...(firewallMail ? { firewall: firewallMail } : {}),
+                refuseNewEmail: firewalled || bot.audience === "external" || runTainted,
+                outsideContent: runReadMeetingText || (await isOutsideContentSeen()),
                 prior: await priorMailEffects(applied.effect.id),
               },
               args,
@@ -9492,6 +9514,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     botDirectory,
                     pluginLine,
                     mailSearchGuidance: mailSkill.guidance,
+                    mailBatchOffered: offeredToolNames.has(MAIL_REPLY_BATCH_TOOL),
                     financeConnectionLine,
                     mailSortingLine,
                     mailThreadAgent: isMailThreadAgentSpawnKey(bot.spawnKey),
@@ -11387,6 +11410,10 @@ function offeredBuiltinClause(
   return builtinOffered(disabled, name) ? text : undefined;
 }
 
+/** For every agent offered mail_reply_batch, custom bots included; its instructions may not say this. */
+export const MAIL_BATCH_GUIDANCE =
+  "For two or more emails, new or replies, call mail_reply_batch once with one row per email, so the user reviews them on one card. Never call mail_send one at a time for these, including when the user says to send them all at once. Do not search again or re-verify what the user already approved in this conversation: write the rows from what was agreed and call the tool.";
+
 export const MAIL_NOTE_GUIDANCE =
   "When the user asks you to make a note or to-do, call scratchpad_add; it is linked to this email automatically. If the work belongs to another agent's area (Carta, finance, legal, data room, investors, company, GTM), set forAgent to that area so the to-do goes to that agent instead of staying here, and tell the user plainly where it went, for example \"Added to the Carta agent's to-dos.\" If the result has no addedTo, say it was added to this chat's to-dos.";
 
@@ -11771,6 +11798,8 @@ export function userTurnInstructions(parts: {
   botDirectory: string | undefined;
   pluginLine: string | undefined;
   mailSearchGuidance?: string | undefined;
+  /** mail_reply_batch is offered in this run. */
+  mailBatchOffered?: boolean;
   /** The user's connected banks, from server state; see financeConnectionLine. */
   financeConnectionLine?: string | undefined;
   /** Set while the mail sort has not finished; see MAIL_SORTING_LINE. */
@@ -11839,6 +11868,7 @@ export function userTurnInstructions(parts: {
     ),
     parts.pluginLine,
     parts.mailSearchGuidance,
+    parts.mailBatchOffered ? MAIL_BATCH_GUIDANCE : undefined,
     parts.dataRoomEnabled
       ? offeredBuiltinClause(parts.disabledBuiltinTools, "add_to_data_room", DATA_ROOM_GUIDANCE)
       : undefined,
@@ -12520,7 +12550,7 @@ export const MAIL_CONSENT_OFF =
 
 const firstBatchReplyTo = (args: Record<string, unknown>) =>
   Array.isArray(args.replies)
-    ? (args.replies[0] as { replyToId?: unknown } | undefined)?.replyToId
+    ? (args.replies as { replyToId?: unknown }[]).find((reply) => reply?.replyToId)?.replyToId
     : undefined;
 
 /**

@@ -210,9 +210,12 @@ export function inferScript(
       },
     ];
   }
-  if (lower.includes("reply batch card to ")) {
+  if (lower.includes("reply batch card to ") || lower.includes("outreach card to ")) {
     // "reply batch card to id1,id2,id3 from a@b.test": one row per id, to a fixed test address.
     // "with stranger" puts a Cc that is on no thread on the first row.
+    // "outreach card to a@b.test,c@d.test" adds one new email per address, alone or after replies.
+    const outreach =
+      /outreach card to\s+([^\s]+)/i.exec(prompt)?.[1]?.split(",").filter(Boolean) ?? [];
     const ids =
       /reply batch card to\s+([^\s]+)/i.exec(prompt)?.[1]?.split(",").filter(Boolean) ?? [];
     const from = /\bfrom\s+([^\s,]+@[^\s,]+)/i.exec(prompt)?.[1];
@@ -225,13 +228,20 @@ export function inferScript(
             name: "mail_reply_batch",
             args: {
               ...(from ? { account: from } : {}),
-              replies: ids.map((replyToId, index) => ({
-                replyToId,
-                to: ["customer@example.test"],
-                ...(stranger && index === 0 ? { cc: ["stranger@elsewhere.example.test"] } : {}),
-                subject: `Re: thread ${index + 1}`,
-                body: `Thanks for writing. This is reply ${index + 1}.`,
-              })),
+              replies: [
+                ...ids.map((replyToId, index) => ({
+                  replyToId,
+                  to: ["customer@example.test"],
+                  ...(stranger && index === 0 ? { cc: ["stranger@elsewhere.example.test"] } : {}),
+                  subject: `Re: thread ${index + 1}`,
+                  body: `Thanks for writing. This is reply ${index + 1}.`,
+                })),
+                ...outreach.map((to) => ({
+                  to: [to],
+                  subject: `Hello from us, ${to.split("@")[0]}`,
+                  body: `Hi ${to.split("@")[0]}, I wrote this one for you.`,
+                })),
+              ],
             },
           },
         ],
@@ -240,8 +250,10 @@ export function inferScript(
     ];
   }
   if (lower.includes("send email card")) {
-    // "send email card from sales@example.test" names the account; otherwise the fixed test one.
+    // "send email card from sales@example.test" names the account; "send email card with no sender"
+    // names none; otherwise the fixed test one.
     const from = /\bfrom\s+([^\s,]+@[^\s,]+)/i.exec(prompt)?.[1];
+    const noSender = lower.includes("no sender");
     return [
       {
         assistant: "this email needs your approval.",
@@ -249,7 +261,7 @@ export function inferScript(
           {
             name: "mail_send",
             args: {
-              account: from ?? "first@example.test",
+              ...(noSender ? {} : { account: from ?? "first@example.test" }),
               to: ["Sam Rivera <sam@example.test>"],
               subject: "Offsite dates",
               body: "The 14th works for us.\nSee you then.",

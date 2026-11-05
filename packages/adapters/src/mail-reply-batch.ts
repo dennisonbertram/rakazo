@@ -4,7 +4,9 @@ import type { MailReplyFlag } from "@rakazo/contracts";
 import {
   disabledBuiltinToolSet,
   MAIL_REPLY_BATCH_TOOL,
+  MAIL_REPLY_FIREWALL_HOLD,
   MAIL_REPLY_FLAGS,
+  MAIL_REPLY_LIMIT_HOLD,
   MAX_COMPOSE_BODY,
   MAX_MAIL_REPLY_BATCH,
   MailSignalsSchema,
@@ -26,6 +28,8 @@ import {
   MAIL_REPLY_CLIENT_PREFIX,
   MAIL_REPLY_HASH_HOLD,
   mailReplyClientId,
+  releaseNewRecipientSends,
+  reserveNewRecipientSends,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { z } from "zod";
@@ -38,6 +42,7 @@ import {
   MAIL_DUPLICATE_WINDOW_MS,
   mailSendRefusal,
   sentCopyMatches,
+  sentToSameSubject,
 } from "./mail-approval-recovery.js";
 import { displayAddress, parseRecipients } from "./mail-compose.js";
 import { protectedSenders } from "./mail-protected-senders.js";
@@ -47,7 +52,8 @@ import { accountName, mailToolFromTool, resolveAccount } from "./mail-tools.js";
 type Scope = { spaceId: string; userId: string };
 
 const ReplyArgs = z.object({
-  replyToId: z.string().trim().min(1),
+  /** Without it the row is a new email. An empty id is refused, never read as a new email. */
+  replyToId: z.string().trim().min(1).optional(),
   to: z.array(z.string()),
   cc: z.array(z.string()).optional(),
   bcc: z.array(z.string()).optional(),
@@ -58,11 +64,15 @@ const BatchArgs = z.object({ account: z.string().optional(), replies: z.array(Re
 
 /** The columns the flags read of a stored or proposed row. */
 export type MailReplyFlagInput = {
+  /** Other cards' rows count as earlier sends; this card's do not. */
+  effectId?: string;
   connectionId: string;
-  providerThreadId: string;
+  /** Null for a new email. */
+  providerThreadId: string | null;
   to: readonly string[];
   cc: readonly string[];
   bcc: readonly string[];
+  subject: string;
   body: string;
   seenMessageId: string | null;
 };
@@ -72,9 +82,155 @@ const addressesOf = (entries: readonly string[]) =>
 
 const flagOrder = (flags: Set<MailReplyFlag>) => MAIL_REPLY_FLAGS.filter((flag) => flags.has(flag));
 
-/** Whether the owner must tick this row deliberately. A link informs; every other flag unticks. */
+/** These inform. Every other flag makes the owner tick the row deliberately. */
+const INFORMING_FLAGS: readonly MailReplyFlag[] = ["has_link", "new_recipient", "same_text"];
+
 export const startsUnticked = (flags: readonly MailReplyFlag[]) =>
-  flags.some((flag) => flag !== "has_link");
+  flags.some((flag) => !INFORMING_FLAGS.includes(flag));
+
+/**
+ * The same, for a stored row. A run that read outside content may have been told whom to write to,
+ * so a new email or a new address waits for a deliberate tick.
+ */
+export const rowStartsUnticked = (
+  row: { providerThreadId: string | null; outsideContent: boolean },
+  flags: readonly MailReplyFlag[],
+) =>
+  startsUnticked(flags) ||
+  (row.outsideContent && (row.providerThreadId === null || flags.includes("new_recipient")));
+
+/** What a new email cannot go without. */
+export function newEmailIsComplete(row: {
+  to: readonly string[];
+  subject: string;
+  body: string;
+}): boolean {
+  try {
+    return (
+      addressesOf(row.to).length > 0 && Boolean(row.subject.trim()) && Boolean(row.body.trim())
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** The same address and subject within this many days reads as a duplicate. */
+const RECENT_DUPLICATE_DAYS = 30;
+/** New rows with one text before it reads as a mailing, not individually written emails. */
+const SAME_TEXT_AT = 3;
+
+const safeAddresses = (entries: readonly string[]) => {
+  try {
+    return addressesOf(entries).map((address) => address.toLowerCase());
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Which of these lowercased addresses already appear in an account's synced mail, as
+ * `connectionId:address`. Only as complete as the sync, so someone known long ago can read as new,
+ * which is the cautious way to be wrong.
+ */
+// ponytail: reads the account's whole cache because addresses are not indexed; add a GIN index or a
+// per-account address table if flags show up in the timing of large mailboxes.
+async function addressesWithMail(
+  prisma: Pick<PrismaClient, "$queryRaw">,
+  scope: Scope,
+  connectionIds: string[],
+  addresses: string[],
+): Promise<Set<string>> {
+  if (addresses.length === 0) return new Set();
+  const found = await prisma.$queryRaw<{ connectionId: string; address: string }[]>`
+    SELECT m."connectionId", lower(x) AS address
+    FROM mail_messages m
+    CROSS JOIN LATERAL unnest(m."toAddresses" || m."ccAddresses" || m."fromAddress") AS x
+    WHERE m."spaceId" = ${scope.spaceId} AND m."userId" = ${scope.userId}
+      AND m."connectionId" = ANY(${connectionIds}::text[])
+      AND lower(x) = ANY(${addresses}::text[])
+    GROUP BY 1, 2`;
+  return new Set(found.map((row) => `${row.connectionId}:${row.address}`));
+}
+
+/** Per row, the new emails that repeat an address on this card or a recent send with its subject. */
+async function duplicateEmails(
+  prisma: Pick<PrismaClient, "cachedMailMessage" | "mailReplyItem">,
+  scope: Scope,
+  rows: readonly MailReplyFlagInput[],
+  recipientsOf: readonly string[][],
+): Promise<boolean[]> {
+  const fresh = rows.flatMap((row, index) =>
+    row.providerThreadId === null ? [{ row, index }] : [],
+  );
+  if (fresh.length === 0) return rows.map(() => false);
+  const onCard = new Map<string, number>();
+  for (const { index } of fresh) {
+    for (const address of new Set(recipientsOf[index])) {
+      onCard.set(address, (onCard.get(address) ?? 0) + 1);
+    }
+  }
+  const where = {
+    ...scope,
+    connectionId: { in: [...new Set(fresh.map(({ row }) => row.connectionId))] },
+    subject: { in: fresh.map(({ row }) => row.subject), mode: "insensitive" as const },
+  };
+  const cutoff = new Date(Date.now() - RECENT_DUPLICATE_DAYS * 24 * 60 * 60_000);
+  const [mail, cards] = await Promise.all([
+    prisma.cachedMailMessage.findMany({
+      where: { ...where, fromSelf: true, receivedAt: { gte: cutoff } },
+      select: { connectionId: true, subject: true, toAddresses: true, ccAddresses: true },
+    }),
+    prisma.mailReplyItem.findMany({
+      where: {
+        ...where,
+        providerThreadId: null,
+        dispatch: { in: ["queued", "claimed"] },
+        createdAt: { gte: cutoff },
+      },
+      select: { effectId: true, connectionId: true, subject: true, to: true, cc: true, bcc: true },
+    }),
+  ]);
+  const earlier = [
+    ...mail.map((message) => ({
+      effectId: undefined as string | undefined,
+      connectionId: message.connectionId,
+      subject: message.subject,
+      recipients: [...message.toAddresses, ...message.ccAddresses].map((a) => a.toLowerCase()),
+    })),
+    ...cards.map((card) => ({
+      effectId: card.effectId as string | undefined,
+      connectionId: card.connectionId,
+      subject: card.subject,
+      recipients: safeAddresses([...card.to, ...card.cc, ...card.bcc]),
+    })),
+  ];
+  return rows.map((row, index) => {
+    if (row.providerThreadId !== null) return false;
+    const recipients = recipientsOf[index] ?? [];
+    return (
+      recipients.some((address) => (onCard.get(address) ?? 0) > 1) ||
+      earlier.some(
+        (send) =>
+          send.effectId !== row.effectId &&
+          send.connectionId === row.connectionId &&
+          send.subject.toLowerCase() === row.subject.toLowerCase() &&
+          send.recipients.some((address) => recipients.includes(address)),
+      )
+    );
+  });
+}
+
+/** Rows whose text is shared by enough new rows on this card to read as a mailing. */
+function sharedText(rows: readonly MailReplyFlagInput[]): boolean[] {
+  const textOf = (row: MailReplyFlagInput) =>
+    row.providerThreadId === null ? row.body.trim().replace(/\s+/g, " ").toLowerCase() : "";
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const text = textOf(row);
+    if (text) counts.set(text, (counts.get(text) ?? 0) + 1);
+  }
+  return rows.map((row) => (counts.get(textOf(row)) ?? 0) >= SAME_TEXT_AT);
+}
 
 /**
  * Why the owner should look at each row, in the rows' order, most serious first. A flag never blocks.
@@ -83,44 +239,67 @@ export const startsUnticked = (flags: readonly MailReplyFlag[]) =>
 export async function mailReplyFlags(
   prisma: Pick<
     PrismaClient,
-    "cachedMailMessage" | "mailSenderStat" | "inboxSenderFeedback" | "contact"
+    | "$queryRaw"
+    | "cachedMailMessage"
+    | "mailSenderStat"
+    | "inboxSenderFeedback"
+    | "contact"
+    | "mailReplyItem"
   >,
   scope: Scope,
   rows: readonly MailReplyFlagInput[],
-): Promise<{ flags: MailReplyFlag[]; newestInboundId: string | null }[]> {
+): Promise<{ flags: MailReplyFlag[]; newestInboundId: string | null; newRecipients: string[] }[]> {
   if (rows.length === 0) return [];
-  const threads = await prisma.cachedMailMessage.findMany({
-    where: {
-      ...scope,
-      connectionId: { in: [...new Set(rows.map((row) => row.connectionId))] },
-      threadId: { in: [...new Set(rows.map((row) => row.providerThreadId))] },
-    },
-    orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
-    select: {
-      providerMessageId: true,
-      connectionId: true,
-      threadId: true,
-      fromAddress: true,
-      toAddresses: true,
-      ccAddresses: true,
-      fromSelf: true,
-      signals: true,
-      receivedAt: true,
-      snippet: true,
-    },
-  });
+  const connectionIds = [...new Set(rows.map((row) => row.connectionId))];
+  const threadIds = [...new Set(rows.flatMap((row) => row.providerThreadId ?? []))];
+  const threads =
+    threadIds.length === 0
+      ? []
+      : await prisma.cachedMailMessage.findMany({
+          where: { ...scope, connectionId: { in: connectionIds }, threadId: { in: threadIds } },
+          orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
+          select: {
+            providerMessageId: true,
+            connectionId: true,
+            threadId: true,
+            fromAddress: true,
+            toAddresses: true,
+            ccAddresses: true,
+            fromSelf: true,
+            signals: true,
+          },
+        });
   const threadOf = (row: MailReplyFlagInput) =>
     threads.filter(
       (message) =>
         message.connectionId === row.connectionId && message.threadId === row.providerThreadId,
     );
-  const recipientsOf = rows.map((row) => {
-    try {
-      return addressesOf([...row.to, ...row.cc, ...row.bcc]).map((a) => a.toLowerCase());
-    } catch {
-      return [];
-    }
+  const recipientsOf = rows.map((row) => safeAddresses([...row.to, ...row.cc, ...row.bcc]));
+  // Thread participants are known already, so most replies need no lookup.
+  const outsidersOf = rows.map((row, index) => {
+    const onThread = threadParticipants(threadOf(row)).map((address) => address.toLowerCase());
+    return [...new Set(recipientsOf[index])].filter((address) => !onThread.includes(address));
   });
+  const [withMail, duplicates, justSent] = await Promise.all([
+    addressesWithMail(prisma, scope, connectionIds, [...new Set(outsidersOf.flat())]),
+    duplicateEmails(prisma, scope, rows, recipientsOf),
+    prisma.cachedMailMessage.findMany({
+      where: {
+        ...scope,
+        fromSelf: true,
+        receivedAt: { gte: new Date(Date.now() - MAIL_DUPLICATE_WINDOW_MS) },
+      },
+      select: {
+        connectionId: true,
+        threadId: true,
+        toAddresses: true,
+        ccAddresses: true,
+        subject: true,
+        snippet: true,
+      },
+    }),
+  ]);
+  const shared = sharedText(rows);
   const inboundOf = (row: MailReplyFlagInput) => threadOf(row).filter((m) => !m.fromSelf);
   const sendersOf = (row: MailReplyFlagInput) =>
     inboundOf(row).flatMap((m) => (m.fromAddress ? [m.fromAddress.toLowerCase()] : []));
@@ -156,8 +335,30 @@ export async function mailReplyFlags(
     const inbound = inboundOf(row);
     const newest = inbound[0];
     const flags = new Set<MailReplyFlag>();
-    // An entry that does not parse cannot be checked, so it counts as off the thread.
-    if (
+    const newEmail = row.providerThreadId === null;
+    const newRecipients = (outsidersOf[index] ?? []).filter(
+      (address) => !withMail.has(`${row.connectionId}:${address}`),
+    );
+    if (newRecipients.length > 0) flags.add("new_recipient");
+    if (duplicates[index]) flags.add("duplicate_email");
+    if (shared[index]) flags.add("same_text");
+    // An entry that does not parse cannot be checked, so it counts as off the thread, or, on a new
+    // email, as someone new.
+    if (newEmail) {
+      if (recipients.length === 0) flags.add("new_recipient");
+      const guard = (fromAddress: string) =>
+        replyGuard({
+          fromAddress,
+          autoSubmitted: false,
+          priorContact: null,
+          messageCount: 0,
+          noReplyCount: 0,
+          protectedSender: safe.has(fromAddress),
+        });
+      if (recipients.some((address) => guard(address) === "no_reply_sender")) {
+        flags.add("no_reply_address");
+      }
+    } else if (
       recipients.length === 0 ||
       recipientsOffThread(recipients, threadParticipants(threadOf(row))).length > 0
     ) {
@@ -184,19 +385,23 @@ export async function mailReplyFlags(
       if (guard === "no_reply_sender") flags.add("no_reply_address");
       if (guard === "corrected") flags.add("no_reply_needed");
     }
-    const since = Date.now() - MAIL_DUPLICATE_WINDOW_MS;
-    if (
-      threadOf(row).some(
-        (message) =>
-          message.fromSelf &&
-          message.receivedAt.getTime() >= since &&
-          sentCopyMatches(message, row),
-      )
-    ) {
-      flags.add("already_sent");
-    }
+    // A new email has no thread and may be reworded, so someone just emailed about this subject
+    // counts, from any of the owner's accounts. A reply is compared with its thread's own sends.
+    const alreadySent = newEmail
+      ? justSent.some((message) => sentToSameSubject(message, { recipients, subject: row.subject }))
+      : justSent.some(
+          (message) =>
+            message.connectionId === row.connectionId &&
+            message.threadId === row.providerThreadId &&
+            sentCopyMatches(message, row),
+        );
+    if (alreadySent) flags.add("already_sent");
     if (bodyHasLink(row.body)) flags.add("has_link");
-    return { flags: flagOrder(flags), newestInboundId: newest?.providerMessageId ?? null };
+    return {
+      flags: flagOrder(flags),
+      newestInboundId: newest?.providerMessageId ?? null,
+      newRecipients,
+    };
   });
 }
 
@@ -247,10 +452,14 @@ export async function priorBatchRows(
 
 /** The activity line of a settled batch; undefined when the result is a refusal. */
 export function mailBatchStepSummary(result: unknown): string | undefined {
-  const replies = (result as { replies?: { outcome?: string }[] } | null)?.replies;
+  const replies = (result as { replies?: { outcome?: string; replyToId?: string | null }[] } | null)
+    ?.replies;
   if (!Array.isArray(replies)) return undefined;
   const sent = replies.filter((reply) => reply.outcome === "sent").length;
-  return sent === 1 ? "Sent 1 reply" : `Sent ${sent} replies`;
+  // A settled row with no message answered is a new email, so "replies" would be wrong.
+  const what = replies.some((reply) => reply.replyToId === null) ? "email" : "reply";
+  if (sent === 1) return `Sent 1 ${what}`;
+  return `Sent ${sent} ${what === "email" ? "emails" : "replies"}`;
 }
 
 export type PreparedMailReply = {
@@ -260,6 +469,7 @@ export type PreparedMailReply = {
   bcc: string[];
   subject: string;
   flags: MailReplyFlag[];
+  newEmail: boolean;
 };
 
 /**
@@ -274,13 +484,20 @@ export async function prepareMailReplyBatch(
     secrets: string[];
     /** Set for a firewalled agent: each thread must stay inside its support label. */
     firewall?: FirewallMailDeps;
+    /** A firewalled or external agent, or a tainted run: injected text must not choose whom it writes to. */
+    refuseNewEmail?: boolean;
+    /** The run has read outside content: see rowStartsUnticked. */
+    outsideContent?: boolean;
     prior: PriorMailEffect[];
   },
   args: Record<string, unknown>,
 ): Promise<{ rows: PreparedMailReply[]; account: MailAccount } | { error: string }> {
   const parsed = BatchArgs.safeParse(args);
   if (!parsed.success) {
-    return { error: "replies needs at least one row with replyToId, to, subject and body." };
+    return {
+      error:
+        "replies needs at least one row with to, subject and body, and replyToId unless it is a new email.",
+    };
   }
   const { replies } = parsed.data;
   if (replies.length > MAX_MAIL_REPLY_BATCH) {
@@ -291,44 +508,58 @@ export async function prepareMailReplyBatch(
   const scope = { spaceId: deps.scope.spaceId, userId: deps.scope.userId };
   const picked = await resolveAccount(deps, {
     account: parsed.data.account,
-    replyToId: replies[0]!.replyToId,
+    replyToId: replies.find((reply) => reply.replyToId)?.replyToId,
   });
   if ("error" in picked) return { error: picked.error };
   const { account } = picked;
-  const name = (index: number) => `Reply ${index + 1} (${replies[index]!.replyToId})`;
+  const name = (index: number) =>
+    replies[index]!.replyToId
+      ? `Reply ${index + 1} (${replies[index]!.replyToId})`
+      : `New email ${index + 1}`;
 
   const cached = await deps.prisma.cachedMailMessage.findMany({
     where: {
       ...scope,
       connectionId: account.id,
-      providerMessageId: { in: replies.map((reply) => reply.replyToId) },
+      providerMessageId: { in: replies.flatMap((reply) => reply.replyToId ?? []) },
     },
     select: { providerMessageId: true, threadId: true },
   });
   const threadOf = (replyToId: string) =>
     cached.find((message) => message.providerMessageId === replyToId)?.threadId;
   const seenThreads = new Map<string, number>();
-  const rows: Omit<PreparedMailReply, "id" | "flags">[] = [];
+  const rows: Omit<PreparedMailReply, "id" | "flags" | "newEmail">[] = [];
   for (const [index, reply] of replies.entries()) {
-    const threadId = threadOf(reply.replyToId);
-    if (!threadId) {
-      return { error: `${name(index)} is not in the synced mail of ${accountName(account)}.` };
-    }
-    const earlier = seenThreads.get(threadId);
-    if (earlier !== undefined) {
-      return {
-        error: `${name(index)} is in the same thread as ${name(earlier)}. Use one row per thread.`,
-      };
-    }
-    seenThreads.set(threadId, index);
-    if (deps.firewall) {
-      const decision = await firewallMailReadDecision(
-        "mail_get",
-        { account: account.address, id: reply.replyToId },
-        deps.firewall,
-      );
-      if (!decision.free) {
-        return { error: `${name(index)} is outside this agent's support label.` };
+    if (reply.replyToId) {
+      const threadId = threadOf(reply.replyToId);
+      if (!threadId) {
+        return { error: `${name(index)} is not in the synced mail of ${accountName(account)}.` };
+      }
+      const earlier = seenThreads.get(threadId);
+      if (earlier !== undefined) {
+        return {
+          error: `${name(index)} is in the same thread as ${name(earlier)}. Use one row per thread.`,
+        };
+      }
+      seenThreads.set(threadId, index);
+      if (deps.firewall) {
+        const decision = await firewallMailReadDecision(
+          "mail_get",
+          { account: account.address, id: reply.replyToId },
+          deps.firewall,
+        );
+        if (!decision.free) {
+          return { error: `${name(index)} is outside this agent's support label.` };
+        }
+      }
+    } else {
+      if (deps.refuseNewEmail) {
+        return {
+          error: `${name(index)}: new emails are not available here, only replies. Remove the row and call again.`,
+        };
+      }
+      if (!newEmailIsComplete(reply)) {
+        return { error: `${name(index)} needs a to, a subject and a body.` };
       }
     }
     const fields = [
@@ -357,26 +588,30 @@ export async function prepareMailReplyBatch(
     });
   }
 
-  const newest = await deps.prisma.cachedMailMessage.findMany({
-    where: {
-      ...scope,
-      connectionId: account.id,
-      threadId: { in: [...seenThreads.keys()] },
-      fromSelf: false,
-    },
-    orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
-    select: { providerMessageId: true, threadId: true },
-  });
+  const newest =
+    seenThreads.size === 0
+      ? []
+      : await deps.prisma.cachedMailMessage.findMany({
+          where: {
+            ...scope,
+            connectionId: account.id,
+            threadId: { in: [...seenThreads.keys()] },
+            fromSelf: false,
+          },
+          orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
+          select: { providerMessageId: true, threadId: true },
+        });
   await deps.prisma.mailReplyItem.createMany({
     data: replies.map((reply, position) => {
-      const providerThreadId = threadOf(reply.replyToId)!;
+      const providerThreadId = reply.replyToId ? threadOf(reply.replyToId)! : null;
       return {
         effectId: deps.effectId,
         position,
         ...scope,
         connectionId: account.id,
-        replyToId: reply.replyToId,
+        replyToId: reply.replyToId ?? null,
         providerThreadId,
+        outsideContent: deps.outsideContent === true,
         to: rows[position]!.to,
         cc: rows[position]!.cc,
         bcc: rows[position]!.bcc,
@@ -403,6 +638,7 @@ export async function prepareMailReplyBatch(
       bcc: row.bcc,
       subject: row.subject,
       flags: flags[index]?.flags ?? [],
+      newEmail: row.providerThreadId === null,
     })),
   };
 }
@@ -424,7 +660,21 @@ async function sendDenial(
   scope: Scope,
   botId: string,
   connectionId: string,
-): Promise<"grant" | "switch" | null> {
+  newEmail: boolean,
+): Promise<"grant" | "switch" | typeof MAIL_REPLY_FIREWALL_HOLD | null> {
+  const bot = await findBotWithAccess(prisma, scope, botId);
+  if (!bot) return "grant";
+  const allowed = accountAllowedIn(bot.rows, connectionId, MAIL_REPLY_BATCH_TOOL, bot);
+  if (!allowed) return "grant";
+  const off = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+  if (off.has("mail_send") || off.has(MAIL_REPLY_BATCH_TOOL)) return "switch";
+  // The switch may have been turned on after the card: the refusal at the call has to hold here too.
+  return newEmail && (bot.firewall || bot.audience === "external")
+    ? MAIL_REPLY_FIREWALL_HOLD
+    : null;
+}
+
+async function findBotWithAccess(prisma: PrismaClient, scope: Scope, botId: string) {
   const bot = await prisma.bot.findFirst({
     where: { id: botId, ...scope },
     select: {
@@ -437,7 +687,7 @@ async function sendDenial(
       disabledBuiltinTools: true,
     },
   });
-  if (!bot || bot.archivedAt) return "grant";
+  if (!bot || bot.archivedAt) return null;
   const rows = await prisma.connection.findMany({
     where: scope,
     select: {
@@ -456,19 +706,31 @@ async function sendDenial(
       agentBot: { select: { spawnKey: true } },
     },
   });
-  const allowed = accountAllowedIn(
-    connectionRowsForAudience(
+  return {
+    ...bot,
+    rows: connectionRowsForAudience(
       rows.map((row) => withInboxAgentStandIn(row, bot)),
       bot.audience,
       bot.firewall,
     ),
-    connectionId,
-    MAIL_REPLY_BATCH_TOOL,
-    bot,
-  );
-  if (!allowed) return "grant";
-  const off = disabledBuiltinToolSet(bot.disabledBuiltinTools);
-  return off.has("mail_send") || off.has(MAIL_REPLY_BATCH_TOOL) ? "switch" : null;
+  };
+}
+
+/**
+ * The accounts this bot may use for `toolName` right now, read fresh from the access rules. A card's
+ * From choices and the check of the account a person picked on it both come from here, so a stale
+ * or crafted client cannot send from a mailbox the agent has no access to.
+ */
+export async function mailAccountsUsableBy<T extends { id: string }>(
+  prisma: PrismaClient,
+  scope: Scope,
+  botId: string,
+  toolName: string,
+  accounts: T[],
+): Promise<T[]> {
+  const bot = await findBotWithAccess(prisma, scope, botId);
+  if (!bot) return [];
+  return accounts.filter((account) => accountAllowedIn(bot.rows, account.id, toolName, bot));
 }
 
 async function sendRow(
@@ -478,10 +740,11 @@ async function sendRow(
   botId: string,
   context: AdapterContext,
 ): Promise<void> {
+  // Every hold comes before a provider call, so a recovered row gives back any place it held.
   const hold = (error: string) =>
     deps.prisma.mailReplyItem.updateMany({
       where: { id: rowId, dispatch: "claimed" },
-      data: { dispatch: "held", error },
+      data: { dispatch: "held", error, newRecipientCount: 0, newRecipientAt: null },
     });
   const row = await deps.prisma.mailReplyItem.findFirst({ where: { id: rowId, ...scope } });
   if (!row) return;
@@ -497,7 +760,8 @@ async function sendRow(
     await hold("account");
     return;
   }
-  const denial = await sendDenial(deps.prisma, scope, botId, row.connectionId);
+  const newEmail = row.providerThreadId === null;
+  const denial = await sendDenial(deps.prisma, scope, botId, row.connectionId, newEmail);
   if (denial) {
     await hold(denial);
     return;
@@ -508,8 +772,22 @@ async function sendRow(
     return;
   }
   const message = { to: row.to, cc: row.cc, bcc: row.bcc, subject: row.subject, body: row.body };
-  if (!mailRequestIsValid("mail_send", message)) {
+  if (!mailRequestIsValid("mail_send", message) || (newEmail && !newEmailIsComplete(message))) {
     await hold("invalid");
+    return;
+  }
+  // Last of the checks, so a row refused above never takes a place in the limit.
+  const newRecipients = flagged?.newRecipients.length ?? 0;
+  if (
+    newRecipients > 0 &&
+    !(await reserveNewRecipientSends(deps.prisma, {
+      ...scope,
+      itemId: row.id,
+      connectionId: row.connectionId,
+      count: newRecipients,
+    }))
+  ) {
+    await hold(MAIL_REPLY_LIMIT_HOLD);
     return;
   }
   await mailToolFromTool(
@@ -521,7 +799,7 @@ async function sendRow(
       accounts: async () => [account],
       // Read again right before each provider write, including a provider retry.
       beforeWrite: async () =>
-        (await sendDenial(deps.prisma, scope, botId, row.connectionId))
+        (await sendDenial(deps.prisma, scope, botId, row.connectionId, newEmail))
           ? "This connected account is no longer available for changes by this bot."
           : null,
       ...(deps.mailWritesDisabled ? { writesDisabled: true } : {}),
@@ -530,12 +808,15 @@ async function sendRow(
       scope: { ...scope, botId },
     },
     context,
-    { ...message, replyToId: row.replyToId },
+    { ...message, ...(row.replyToId ? { replyToId: row.replyToId } : {}) },
   );
   const record = await deps.prisma.composeSend.findUnique({
     where: { spaceId_userId_clientId: { ...scope, clientId: mailReplyClientId(row.id) } },
-    select: { id: true },
+    select: { state: true },
   });
+  // A definite refusal did not reach anyone, so it does not count. "unknown" may have, so it does.
+  if (!record || record.state === "failed")
+    await releaseNewRecipientSends(deps.prisma, scope, row.id);
   // The send refused before it made a record (mail writes are off, for example).
   if (!record) await hold("not_sent");
 }
@@ -661,7 +942,12 @@ export async function reconcileMailReplyBatches(deps: {
       await deps.prisma.mailReplyItem.updateMany({
         where: { id: row.id, dispatch: "claimed", updatedAt: row.updatedAt },
         data: cleared
-          ? { dispatch: "held", error: MAIL_REPLY_CLEARED_HOLD }
+          ? {
+              dispatch: "held",
+              error: MAIL_REPLY_CLEARED_HOLD,
+              newRecipientCount: 0,
+              newRecipientAt: null,
+            }
           : { dispatch: "queued" },
       });
     } else if (record.state === "pending" && record.updatedAt <= cutoff) {

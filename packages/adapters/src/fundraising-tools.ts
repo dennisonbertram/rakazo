@@ -34,7 +34,14 @@ const dollars = (cents: number | null | undefined) => (cents == null ? null : ce
 type FundraisingToolDeps = {
   prisma: Pick<
     PrismaClient,
-    "$transaction" | "$executeRaw" | "contact" | "fundraiseRound" | "safe"
+    | "$transaction"
+    | "$executeRaw"
+    | "contact"
+    | "fundraiseRound"
+    | "safe"
+    | "pipelineRecord"
+    | "pipelineRecordPerson"
+    | "pipelineEvent"
   >;
   /** The agent running the tool, from the run, for "added by". */
   botId?: string;
