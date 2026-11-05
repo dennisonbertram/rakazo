@@ -773,6 +773,12 @@ export const builtinAgentTools: ConnectorTool[] = [
       properties: {
         content: { type: "string" },
         path: { type: "string" },
+        kind: {
+          type: "string",
+          enum: ["preference", "fact", "task"],
+          description:
+            "preference lasts longest, fact is the default, task or one-off detail fades in weeks.",
+        },
       },
       required: ["content"],
     },

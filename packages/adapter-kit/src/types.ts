@@ -336,6 +336,11 @@ export interface MemorySnapshot {
     content: string;
     revision: number;
     updatedAt?: string;
+    /** Fading inputs (see memory-strength.ts); absent from stores that do not track them. */
+    kind?: string;
+    useCount?: number;
+    lastUsedAt?: string;
+    pinned?: boolean;
   }>;
 }
 
@@ -363,6 +368,10 @@ export interface MemoryCommitRequest {
   content: string;
   /** When set, commit fails if the live document revision is no longer this value. */
   expectedRevision?: number;
+  /** How fast the memory fades; kept as is when omitted (new documents are facts). */
+  kind?: "preference" | "fact" | "task";
+  /** The owner wrote this by hand: the memory is pinned and never fades. */
+  byOwner?: boolean;
   sourceRunId?: string;
   sourceThreadId?: string;
 }

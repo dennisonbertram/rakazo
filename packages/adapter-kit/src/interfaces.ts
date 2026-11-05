@@ -366,6 +366,8 @@ export interface MemoryStore {
   read(request: MemoryReadRequest, context: AdapterContext): Promise<MemorySnapshot>;
   search(request: MemorySearchRequest, context: AdapterContext): Promise<MemorySearchResult[]>;
   commit(request: MemoryCommitRequest, context: AdapterContext): Promise<MemoryRevision>;
+  /** Notes that these documents were loaded into a run. Stores that do not fade memories may omit it. */
+  recordUse?(documentIds: string[], context: AdapterContext): Promise<void>;
   exportMarkdown(
     request: MemoryExportRequest,
     context: AdapterContext,
