@@ -561,6 +561,49 @@ export function newSiteOutcome(input: {
   return input.trigger === "webhook" ? "deny" : "ask";
 }
 
+/** The action id of the card button that saves a bot's "all sites" rule, and its label. */
+export const ALL_SITES_ACTION_ID = "always_bot_sites";
+export const ALL_SITES_ACTION_LABEL = "Allow all sites for this agent";
+
+/**
+ * A rule for the bot and the tool web_fetch means: this agent fetches any site without asking.
+ * The caller still refuses it for a firewalled or external agent, a tainted run, a webhook run,
+ * and a URL that repeats private data.
+ */
+export function botAllowsAllSites(rules: ActionApprovalRule[], botId: string): boolean {
+  return rules.some(
+    (rule) =>
+      rule.botId === botId &&
+      rule.effect === "always_allow" &&
+      rule.matchKind === "tool" &&
+      rule.matchValue === "web_fetch",
+  );
+}
+
+/**
+ * What private owner data a tool list can read, in a few words for a card. Not listed: shared
+ * memory and spreadsheet tools (every agent is offered them; a spreadsheet result is tracked as
+ * private text by the URL check) and calendar_agenda (the agent's own schedule).
+ */
+const PRIVATE_DATA_AREAS: ReadonlyArray<[string, RegExp]> = [
+  ["mail", /^(mail_|inbox_|show_emails$)/],
+  ["Drive", /^drive_/],
+  ["calendar", /^calendar_(?!agenda$)/],
+  ["finance", /^(finance_|cap_table_|fundraising_|investor_)/],
+  ["Data room", /^(search_data_room|read_data_room_item|add_to_data_room)$/],
+  [
+    "contacts and records",
+    /^(contacts_|legal_|audit_|meetings_|share_meeting$|imessage_|company_|desktop_app_)/,
+  ],
+];
+
+export function privateDataAreas(toolNames: Iterable<string>): string[] {
+  const names = [...toolNames];
+  return PRIVATE_DATA_AREAS.filter(([, pattern]) => names.some((name) => pattern.test(name))).map(
+    ([area]) => area,
+  );
+}
+
 export function siteAlwaysAllowed(rules: ActionApprovalRule[], site: string): boolean {
   return rules.some(
     (rule) =>
@@ -805,6 +848,8 @@ export function isApprovalAskBlock(block: {
   return (
     actionIds.has("allow") &&
     actionIds.has("deny") &&
-    [...actionIds].every((id) => id === "allow" || id === "always" || id === "deny")
+    [...actionIds].every(
+      (id) => id === "allow" || id === "always" || id === ALL_SITES_ACTION_ID || id === "deny",
+    )
   );
 }

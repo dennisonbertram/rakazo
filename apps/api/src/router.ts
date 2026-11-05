@@ -8389,7 +8389,18 @@ export function createRouter(deps: RouterDeps): AppRouter {
           spaceId: context.actor.spaceId,
           userId: context.actor.userId,
         });
-        return rows.map(approvalRuleDto);
+        // An agent's "Allow all sites" rule is listed too, so it can be removed here.
+        const allSites = await deps.prisma.actionApprovalRule.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            createdByUserId: context.actor.userId,
+            botId: { not: null },
+            matchKind: "tool",
+            matchValue: "web_fetch",
+          },
+          orderBy: { createdAt: "asc" },
+        });
+        return [...rows, ...allSites].map(approvalRuleDto);
       }),
       set: authed.approvalRules.set.handler(async ({ context, input }) => {
         // A bot rule needs a bot the caller can see.

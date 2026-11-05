@@ -5100,6 +5100,10 @@ describe("outbound destinations", () => {
       actions: [
         { id: "allow", label: "Allow once" },
         { id: "always", label: "Always allow attacker.test" },
+        {
+          id: "always_bot_sites",
+          label: expect.stringContaining("Allow all sites for this agent"),
+        },
         { id: "deny", label: "Deny" },
       ],
     });
@@ -6471,5 +6475,85 @@ describe("agent firewall", () => {
       expect(f.offeredTools).not.toContain("search_data_room");
       expect(f.results[0]).toEqual({ error: expect.stringContaining("not available") });
     });
+  });
+});
+
+describe("fetching new sites without a card", () => {
+  const pausedCardOf = (f: ReturnType<typeof fixture>) =>
+    (f.pauseRunForInput.mock.calls as unknown as [{ blocks: Record<string, unknown>[] }][])[0]?.[0]
+      .blocks[0];
+  const fetchNew = { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" } };
+  const allSites = [
+    {
+      effect: "always_allow",
+      matchKind: "tool",
+      matchValue: "web_fetch",
+      botId: "bot-1",
+    },
+  ] as ActionApprovalRule[];
+
+  it("fetches any site for an agent the owner allowed all sites for", async () => {
+    const f = fixture({ builtin: true, rules: allSites });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("does not honour the rule for a firewalled agent, a tainted run or a webhook run", async () => {
+    for (const extra of [{ firewall: true }, { trigger: "webhook" }, { externalTaint: true }]) {
+      const f = fixture({ builtin: true, rules: allSites, ...extra });
+      f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+      await f.run();
+      expect(f.fetchedUrls, JSON.stringify(extra)).toEqual([]);
+    }
+  });
+
+  it("another agent's rule does not apply", async () => {
+    const f = fixture({
+      builtin: true,
+      rules: [{ ...allSites[0]!, botId: "bot-2" }] as ActionApprovalRule[],
+    });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+  });
+
+  it("still holds a URL that repeats private data the run was sent", async () => {
+    const received = {
+      kind: "bot_message_received",
+      fromBotId: "peer-1",
+      text: "Priya Shah owes 48213 dollars",
+    };
+    const f = fixture({
+      builtin: true,
+      rules: allSites,
+      knownBots: { "peer-1": null as unknown as string },
+      history: [{ blocks: [received] }],
+    });
+    f.setCalls([
+      {
+        name: "web_fetch",
+        args: { url: "https://www.npmjs.com/search?q=Priya+Shah+48213" },
+        executionId: "call-1",
+      },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("offers the all-sites choice on a new-site card, naming private access", async () => {
+    const f = fixture({
+      builtin: true,
+      mail: {
+        listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+      },
+    });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    const actions = (pausedCardOf(f) as { actions: { id: string; label: string }[] }).actions;
+    expect(actions.map((a) => a.id)).toEqual(["allow", "always", "always_bot_sites", "deny"]);
+    expect(actions[2]!.label).toMatch(/^Allow all sites for this agent \(it can read .*mail/);
   });
 });

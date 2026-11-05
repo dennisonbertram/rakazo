@@ -112,6 +112,7 @@ import {
   attachToolNotes,
   BLOCKED_ACTION_MESSAGE,
   blocksToAgentHistoryText,
+  botAllowsAllSites,
   botMayUseConnection,
   botMessageAllowsSilence,
   botUsesConnectorTools,
@@ -119,6 +120,7 @@ import {
   CHECK_IN_MANAGED_KIND,
   callIdFromClientNonce,
   checkInInstruction,
+  checkOutbound,
   connectionAccessFilter,
   connectionRowsForAudience,
   connectorKindFromToolName,
@@ -163,6 +165,7 @@ import {
   plainRunError,
   plainTextFromMarkdown,
   planActionGate,
+  privateDataAreas,
   promptInvokesSkill,
   quietRoutineGuidance,
   redactSecrets,
@@ -3329,6 +3332,31 @@ export function createRunExecutor(deps: ExecutorDeps) {
               },
             })
             .then((rows) => rows.map((row) => withInboxAgentStandIn(row, bot)));
+        // Whether this bot may fetch a new site without asking, and what private data it can read
+        // (shown on the "Allow all sites" card). Read at each call; see the siteGate comment.
+        const standingSiteAccess = async (): Promise<{
+          standing: boolean;
+          offerAllSites: boolean;
+          privateAccess: string[];
+        }> => {
+          const none = { standing: false, offerAllSites: false, privateAccess: [] as string[] };
+          if (
+            run.trigger === "webhook" ||
+            run.externalTaint === true ||
+            externalTaint() ||
+            bot.audience === "external" ||
+            externalChain !== undefined ||
+            (await firewallNow())
+          ) {
+            return none;
+          }
+          const privateAccess = privateDataAreas(builtins.map((tool) => tool.name));
+          const rows = await connectionRowsStored();
+          const granted = rows.some((row) => row.agentBotId !== bot.id && row.botAccess.length > 0);
+          if (granted) privateAccess.push("connected apps");
+          const chosen = botAllowsAllSites(await loadApprovalRules(), bot.id);
+          return { standing: chosen, offerAllSites: true, privateAccess };
+        };
         // What the access rules see: "all agents" does not reach an external or firewalled bot.
         const connectionRowsNow = async () => {
           const firewalled = await firewallNow();
@@ -5135,7 +5163,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botId: bot.id,
           });
           const connectorTrust = connectorTrustKey(connectorCall.route, connectorKind);
-          const siteGate =
+          let siteGate =
             fetchUrl && fetchSite
               ? outboundSiteGate({
                   site: fetchSite,
@@ -5144,6 +5172,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   rules: approvalRules.filter((rule) => !rule.botId || rule.botId === bot.id),
                 })
               : "allow";
+          // A new site the agent may fetch without asking: the owner chose "Allow all sites for
+          // this agent", or the agent is a public research agent holding no private access. Never
+          // for a firewalled, external or tainted run or a webhook run, and never when the URL
+          // repeats private data this run read or was sent (an unknown record also holds it).
+          const standingSites =
+            siteGate === "new" && name === "web_fetch" && fetchUrl
+              ? await standingSiteAccess()
+              : undefined;
+          if (standingSites?.standing) {
+            const fragments = await outboundFragments();
+            if (fragments && checkOutbound({ text: fetchUrl!, fragments }).allow) {
+              siteGate = "allow";
+            }
+          }
           // Once outside content is in the run, injected text could choose a connector read's
           // arguments, so a read on a connector this run had not used yet is treated as a write.
           const connectorReadGated =
@@ -5767,6 +5809,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 (name === "company_fact_upsert" || name === "company_import_start") &&
                 COMPANY_TOOL_NAMES.has(name),
               integrationWriteTool,
+              allSites:
+                siteGate === "new" && standingSites?.offerAllSites && !standingSites.standing
+                  ? { privateAccess: standingSites.privateAccess }
+                  : undefined,
               approvalReason: approvalCardReason,
               noAlwaysAllow:
                 desktopReadSearch ||

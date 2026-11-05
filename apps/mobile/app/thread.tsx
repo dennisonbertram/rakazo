@@ -251,7 +251,8 @@ function formatApprovalAnswer(
   if (approval && outcome === "created") return t("Created");
   if (approval && outcome === "cancelled") return t("Cancelled");
   if (approval && answer === "allow") return t("Allowed once");
-  if (approval && answer === "always") return t("Always allowed");
+  if (approval && (answer === "always" || answer === "always_bot_sites"))
+    return t("Always allowed");
   if (approval && answer === "deny") return t("Denied");
   return t("Answered: {answer}", { answer: selectedAskActionLabel(answer, actions) });
 }

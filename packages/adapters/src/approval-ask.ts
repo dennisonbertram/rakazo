@@ -17,6 +17,8 @@ import {
   MAX_COMPOSE_BODY,
 } from "@rakazo/contracts";
 import {
+  ALL_SITES_ACTION_ID,
+  ALL_SITES_ACTION_LABEL,
   humanizeToolName,
   providerLabel,
   redactSecrets,
@@ -45,6 +47,8 @@ export function buildApprovalAskBlock(
     fullMail?: boolean;
     fullCompany?: boolean;
     integrationWriteTool?: string;
+    /** Offer "Allow all sites for this agent" on a new-site card; lists the private data the agent can read. */
+    allSites?: { privateAccess: string[] };
     /** Never offer "Always allow": the call asks every time (a run holding untrusted meeting text). */
     noAlwaysAllow?: boolean;
     /** The From account the mail call will use when it named none (see inferMailAccount). */
@@ -204,6 +208,16 @@ export function buildApprovalAskBlock(
                     label: fetchSite ? `Always allow ${fetchSite}` : "Always allow this tool",
                   },
                 ]),
+            ...(options?.allSites && fetchSite
+              ? [
+                  {
+                    id: ALL_SITES_ACTION_ID,
+                    label: options.allSites.privateAccess.length
+                      ? `${ALL_SITES_ACTION_LABEL} (it can read ${options.allSites.privateAccess.join(", ")})`
+                      : ALL_SITES_ACTION_LABEL,
+                  },
+                ]
+              : []),
             { id: "deny", label: "Deny" },
           ],
   };
