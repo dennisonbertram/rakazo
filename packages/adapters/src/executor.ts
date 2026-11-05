@@ -8222,6 +8222,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
             const avatar = await resolveUpdateBotAvatar({
               color: args.color,
+              currentColor: bot.color,
               artifactId: args.artifact_id,
               useAttachedImage: args.use_attached_image,
               sourceImageArtifactIds,
