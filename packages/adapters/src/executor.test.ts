@@ -49,6 +49,8 @@ import {
   selectBuiltinToolsForRun,
   settleSteeringAttachmentLoads,
   splitInboxSearchSkill,
+  TENACITY_GUIDANCE,
+  TENACITY_LIMITED_GUIDANCE,
   TRUTHFULNESS_GUIDANCE,
   threadContextForRun,
   toolCompletionAuditPayload,
@@ -2809,6 +2811,33 @@ describe("userTurnInstructions", () => {
     workspaceInstruction: "This entire computer workspace is your private home.",
     replyGuidance,
   };
+
+  it("gives an ordinary agent the full tenacity clause and untrusted-input runs only the retry part", () => {
+    const parts = {
+      ...base,
+      groupContext: undefined,
+      messagingContext: undefined,
+      redactedMemoryContext: undefined,
+      redactedScratchpadContext: undefined,
+      hasHistoricalContext: false,
+      agentEnvironmentInstruction: undefined,
+      botDirectory: undefined,
+      pluginLine: undefined,
+      agentSkillsLine: undefined,
+      taughtSkillsLine: undefined,
+    };
+    const full = userTurnInstructions({ ...parts, tenacity: "full" });
+    expect(full).toContain(TENACITY_GUIDANCE);
+    expect(full.indexOf(TENACITY_GUIDANCE)).toBeGreaterThan(full.indexOf(TRUTHFULNESS_GUIDANCE));
+    const limited = userTurnInstructions({ ...parts, tenacity: "limited" });
+    expect(limited).toContain(TENACITY_LIMITED_GUIDANCE);
+    expect(limited).not.toContain("Finish the job");
+    expect(limited).not.toContain("offer to do it");
+    expect(TENACITY_GUIDANCE).toContain(TENACITY_LIMITED_GUIDANCE.split(". ")[1] ?? "");
+    expect(userTurnInstructions({ ...parts, voiceAgent: true, tenacity: "full" }).join("")).not.toContain(
+      "Finish the job",
+    );
+  });
 
   it("adds the setup guidance after update_bot only when it is given and the tool is offered", () => {
     const parts = {

@@ -9281,16 +9281,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         // A quiet routine ("only message me if something needs me") gets the silent-reply
         // instruction from the server; users never type the NO_RESPONSE word.
-        const quietGuidance = run.routineId
-          ? (
-              await deps.prisma.routine.findUnique({
-                where: { id: run.routineId },
-                select: { quiet: true },
-              })
-            )?.quiet
-            ? quietRoutineGuidance()
-            : undefined
-          : undefined;
+        const runRoutine = run.routineId
+          ? await deps.prisma.routine.findUnique({
+              where: { id: run.routineId },
+              select: { quiet: true, managedKind: true },
+            })
+          : null;
+        const quietGuidance = runRoutine?.quiet ? quietRoutineGuidance() : undefined;
+        const runIsCheckIn = runRoutine?.managedKind === CHECK_IN_MANAGED_KIND;
 
         let fallbackModels: { provider: string; modelId: string }[] = [];
         // Backup models would receive the Legal agent's history under a consent given for another
@@ -9396,6 +9394,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         ? BOT_SETUP_GUIDANCE
                         : undefined,
                     quietGuidance,
+                    tenacity:
+                      bot.firewall === true ||
+                      run.externalTaint === true ||
+                      externalTaint() ||
+                      restrictedContext ||
+                      messagingChannelRun ||
+                      runIsCheckIn
+                        ? "limited"
+                        : "full",
                     disabledBuiltinTools: instructionDisabledTools,
                   })
                     .filter((instruction): instruction is string => Boolean(instruction))
@@ -11279,6 +11286,14 @@ export const PRESENTATION_GUIDANCE =
 export const TRUTHFULNESS_GUIDANCE =
   "Take ids, numbers, dates, durations and results from tool output or the user, never from guesswork, and do not predict how long something will take. If a tool returns nothing or fails, say so. In outbound mail, messages, searches and forms, include only what the recipient needs; do not pass along private details from memory, other mail or other people unless the user asked. Do not promise a follow-up unless something will deliver it: set up a schedule or send a notification, or say you will not follow up. Every routine prompt you write must say when to stop.";
 
+/** Persistence and initiative for an ordinary agent. A denied or skipped approval stays final. */
+export const TENACITY_GUIDANCE =
+  "Finish the job. When a tool fails or returns nothing, try a different query, tool or source before reporting back, but never repeat the same failing call more than once or twice; after two or three distinct attempts, stop and say what you tried and what would unblock you. A denied or skipped approval is final: do not retry, rephrase or work around it. Do not stop at a partial result when the next step is clear and within what was asked. Look things up instead of asking when you can find the answer yourself; ask only for a decision or for something only the user knows. When you finish, name the obvious next step and offer to do it. Doing more never means acting beyond what was asked: approvals, sending, spending and deleting still need the user's say. Use paid connectors and research tools sparingly.";
+
+/** The retry part only, for agents that handle untrusted input, messaging channels and check-ins. */
+export const TENACITY_LIMITED_GUIDANCE =
+  "When a tool fails or returns nothing, try a different query, tool or source before reporting back, but never repeat the same failing call more than once or twice; after two or three distinct attempts, say what you tried and what would unblock you. A denied or skipped approval is final: do not retry, rephrase or work around it.";
+
 function toolUsageLine(parts: {
   computerInstruction: string;
   pageBrowserAllowed: boolean;
@@ -11632,6 +11647,8 @@ export function userTurnInstructions(parts: {
   replyGuidance: string;
   /** Set while the bot is unconfigured and the user is typing in its own chat; see BOT_SETUP_GUIDANCE. */
   botSetupGuidance?: string | undefined;
+  /** "full" for an ordinary agent, "limited" for untrusted-input, channel and check-in runs. */
+  tenacity?: "full" | "limited";
   /** Added for quiet routines; follows replyGuidance. */
   quietGuidance?: string | undefined;
   disabledBuiltinTools?: ReadonlySet<string>;
@@ -11719,6 +11736,11 @@ export function userTurnInstructions(parts: {
     ),
     "Never print API keys, access tokens, or secret values. Prefer tools over claiming you already did the work.",
     TRUTHFULNESS_GUIDANCE,
+    parts.tenacity === "full"
+      ? TENACITY_GUIDANCE
+      : parts.tenacity === "limited"
+        ? TENACITY_LIMITED_GUIDANCE
+        : undefined,
     PRESENTATION_GUIDANCE,
     "Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Do not open a reply with today's date unless the user asked for it.",
     "Treat pagination cursors as opaque: copy the returned continuation value exactly, never calculate or guess it. When the tool reports no next page, stop; if a cursor is rejected, recheck the last successful result before retrying.",
