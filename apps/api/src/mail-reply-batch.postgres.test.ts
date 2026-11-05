@@ -2087,6 +2087,75 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       expect((await rowsOf(c))[0]?.newRecipientCount).toBe(1);
     });
 
+    const reserveAt = (c: Card, newRecipientAt: Date) =>
+      prisma.mailReplyItem.updateMany({
+        where: { effectId: c.effect.id },
+        data: { newRecipientCount: 1, newRecipientAt },
+      });
+    const dayAgo = () => new Date(Date.now() - 25 * 60 * 60_000);
+
+    it("a reservation older than the window must find room again", async () => {
+      await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY);
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await reserveAt(c, dayAgo());
+      await work(c);
+      expect(sent()).toEqual([]);
+      expect((await read(c)).rows[0]?.error).toBe("daily_limit");
+    });
+
+    it("a reservation older than the window is renewed when there is room", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await reserveAt(c, dayAgo());
+      await work(c);
+      expect(sent()).toHaveLength(1);
+      const [row] = await rowsOf(c);
+      expect(row?.newRecipientAt?.getTime()).toBeGreaterThan(Date.now() - 60_000);
+    });
+
+    it("a recovered row that a check refuses gives its place back", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await reserveAt(c, new Date());
+      await prisma.bot.update({
+        where: { id: botId },
+        data: { disabledBuiltinTools: ["mail_send"] },
+      });
+      await work(c);
+      expect((await rowsOf(c))[0]).toMatchObject({
+        dispatch: "held",
+        error: "switch",
+        newRecipientCount: 0,
+        newRecipientAt: null,
+      });
+    });
+
+    it("recovery that holds a row of a cleared thread gives its place back", async () => {
+      const c = await card([], outreach("ana"));
+      await press(c, [0]);
+      await prisma.mailReplyItem.updateMany({
+        where: { effectId: c.effect.id },
+        data: { dispatch: "claimed", newRecipientCount: 1, newRecipientAt: new Date() },
+      });
+      await prisma.message.deleteMany({ where: { runId: c.run.id, role: "bot" } });
+      await reconcile();
+      expect((await rowsOf(c))[0]).toMatchObject({
+        dispatch: "held",
+        newRecipientCount: 0,
+        newRecipientAt: null,
+      });
+    });
+
+    it("an earlier card's Bcc counts as a recent send to that address", async () => {
+      const first = await card([], {
+        replies: [newRow("cy", { subject: "Same", bcc: [address("ben")] })],
+      });
+      await press(first, [0]);
+      const second = await card([], { replies: [newRow("ben", { subject: "Same" })] });
+      expect(flagsOf(second.rows)[0]).toContain("duplicate_email");
+    });
+
     it("an interrupted row with a reservation is not counted twice", async () => {
       await seedLimit(MAX_NEW_RECIPIENT_SENDS_PER_DAY - 1);
       const c = await card([], outreach("ana"));

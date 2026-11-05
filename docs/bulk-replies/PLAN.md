@@ -374,8 +374,9 @@ not a measured threshold. A rolling window needs no time zone and allows no burs
   looking new once the send syncs, so sends cannot be counted back later. `newRecipientCount` and
   `newRecipientAt` on the row are the count.
 - **Concurrency.** Just before its send, the worker takes a place in one transaction under
-  `pg_advisory_xact_lock` on the account, so workers cannot overrun it. A row that holds a place keeps it,
-  so a retry is not counted twice. A definite provider refusal gives the place back; an `unknown` keeps it.
+  `pg_advisory_xact_lock` on the account, so workers cannot overrun it. A row that holds a place from
+  this window keeps it, so a retry is not counted twice; an older place must find room again. A hold or a
+  definite provider refusal gives the place back; an `unknown` keeps it.
 - **Over the limit.** The row is held as `daily_limit`. It shows its reason, the agent is told, and Retry
   failed can try it later. Not counted: `mail_send` cards and the composer.
 
@@ -393,5 +394,9 @@ not a measured threshold. A rolling window needs no time zone and allows no burs
 | "Include new email to {address}" | Accessible name of a tick | Screen readers need the difference. | Not visible. |
 | "Emails to send" | Activity line, replacing "Replies to send" | The call can now be new emails. | Same length, no new line. |
 | "New: " | Start of a row's line, older clients only | iPhone and Expo show the plain list with Discard. | Those clients have no badge. |
+
+**Choosing the tool.** Every agent offered `mail_reply_batch`, custom bots included, gets
+`MAIL_BATCH_GUIDANCE` in its instructions at run time: two or more emails go on one card, and what the
+user already approved is not researched again. The `mail_send` description points to it too.
 
 iPhone and Expo stay as the plain card with Discard, so new emails can only be sent from web and Electron.

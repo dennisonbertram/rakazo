@@ -181,7 +181,7 @@ async function duplicateEmails(
         dispatch: { in: ["queued", "claimed"] },
         createdAt: { gte: cutoff },
       },
-      select: { effectId: true, connectionId: true, subject: true, to: true, cc: true },
+      select: { effectId: true, connectionId: true, subject: true, to: true, cc: true, bcc: true },
     }),
   ]);
   const earlier = [
@@ -195,7 +195,7 @@ async function duplicateEmails(
       effectId: card.effectId as string | undefined,
       connectionId: card.connectionId,
       subject: card.subject,
-      recipients: safeAddresses([...card.to, ...card.cc]),
+      recipients: safeAddresses([...card.to, ...card.cc, ...card.bcc]),
     })),
   ];
   return rows.map((row, index) => {
@@ -687,10 +687,11 @@ async function sendRow(
   botId: string,
   context: AdapterContext,
 ): Promise<void> {
+  // Every hold comes before a provider call, so a recovered row gives back any place it held.
   const hold = (error: string) =>
     deps.prisma.mailReplyItem.updateMany({
       where: { id: rowId, dispatch: "claimed" },
-      data: { dispatch: "held", error },
+      data: { dispatch: "held", error, newRecipientCount: 0, newRecipientAt: null },
     });
   const row = await deps.prisma.mailReplyItem.findFirst({ where: { id: rowId, ...scope } });
   if (!row) return;
@@ -888,7 +889,12 @@ export async function reconcileMailReplyBatches(deps: {
       await deps.prisma.mailReplyItem.updateMany({
         where: { id: row.id, dispatch: "claimed", updatedAt: row.updatedAt },
         data: cleared
-          ? { dispatch: "held", error: MAIL_REPLY_CLEARED_HOLD }
+          ? {
+              dispatch: "held",
+              error: MAIL_REPLY_CLEARED_HOLD,
+              newRecipientCount: 0,
+              newRecipientAt: null,
+            }
           : { dispatch: "queued" },
       });
     } else if (record.state === "pending" && record.updatedAt <= cutoff) {

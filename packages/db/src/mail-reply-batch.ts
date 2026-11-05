@@ -26,8 +26,9 @@ const NEW_RECIPIENT_WINDOW_MS = 24 * 60 * 60_000;
 
 /**
  * Takes this row's place in its account's limit, right before its send. The lock makes the count and
- * the claim one step across workers. A row that already holds a place keeps it, so a retry or a
- * recovered worker is never counted twice. False means no room: nothing changed.
+ * the claim one step across workers. A row that holds a place from this window keeps it, so a retry or
+ * a recovered worker is never counted twice; an older place no longer counts, so it must find room
+ * again. False means no room: nothing changed.
  */
 export async function reserveNewRecipientSends(
   prisma: PrismaClient,
@@ -41,12 +42,13 @@ export async function reserveNewRecipientSends(
       where: { ...scope, id: input.itemId },
       select: { newRecipientAt: true },
     });
-    if (row.newRecipientAt) return true;
+    const windowStart = new Date(now.getTime() - NEW_RECIPIENT_WINDOW_MS);
+    if (row.newRecipientAt && row.newRecipientAt >= windowStart) return true;
     const used = await tx.mailReplyItem.aggregate({
       where: {
         ...scope,
         connectionId: input.connectionId,
-        newRecipientAt: { gte: new Date(now.getTime() - NEW_RECIPIENT_WINDOW_MS) },
+        newRecipientAt: { gte: windowStart },
       },
       _sum: { newRecipientCount: true },
     });

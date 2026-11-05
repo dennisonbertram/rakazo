@@ -39,6 +39,7 @@ import {
   createRunExecutor,
   EXTERNAL_BOT_PROMPT,
   EXTERNAL_REQUEST_REASON,
+  MAIL_BATCH_GUIDANCE,
   MAIL_CONSENT_DECLINED,
   MAIL_CONSENT_OFF,
   MEETING_TAINT_FREE_TOOLS,
@@ -7339,6 +7340,21 @@ describe("mail_reply_batch", () => {
       const f = batchRun();
       await f.run();
       expect(f.offeredTools).toContain("mail_reply_batch");
+    });
+
+    it("tells every agent that has it, custom bots too, to use one card", async () => {
+      const f = batchRun();
+      await f.run();
+      expect(f.request()?.instructions).toContain(MAIL_BATCH_GUIDANCE);
+    });
+
+    it.each([
+      ["sending is off", { disabledBuiltinTools: ["mail_send"] }],
+      ["it is an email's own agent", { spawnKey: "mail-thread:acct-1:t1" }],
+    ])("says nothing about the card when %s", async (_label, options) => {
+      const f = batchRun(options);
+      await f.run();
+      expect(f.request()?.instructions).not.toContain(MAIL_BATCH_GUIDANCE);
     });
 
     it("is hidden and refused when the bot's mail_send switch is off", async () => {
