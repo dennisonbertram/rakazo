@@ -105,7 +105,7 @@ import {
   VOICE_AGENT_BUILTIN_TOOLS,
   ZERNIO_READ_TOOLS,
 } from "@rakazo/contracts";
-import type { ActionApprovalRule, ToolCallStreak } from "@rakazo/core";
+import type { ActionApprovalRule, ToolCallStreak, UrlVerdict } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
   accountAllowedIn,
@@ -124,8 +124,8 @@ import {
   CALL_CLIENT_NONCE_PREFIX,
   CHECK_IN_MANAGED_KIND,
   callIdFromClientNonce,
+  checkFetchUrl,
   checkInInstruction,
-  checkOutbound,
   collectStrings,
   connectionAccessFilter,
   connectionRowsForAudience,
@@ -177,6 +177,7 @@ import {
   quietRoutineGuidance,
   redactSecrets,
   renderBotDirectory,
+  repeatsPrivateText,
   resolveActionApproval,
   resolveActionApprovalDetail,
   resolveBotAddress,
@@ -5181,8 +5182,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (await (async () => {
               if (!(await standingSiteAccess()).publicResearch) return false;
               const fragments = await outboundFragments();
-              const text = collectStrings(args).join(" ");
-              return Boolean(fragments) && checkOutbound({ text, fragments: fragments! }).allow;
+              return (
+                Boolean(fragments) &&
+                !collectStrings(args).some((text) => repeatsPrivateText(text, fragments!))
+              );
             })());
           const requiresUnattendedApproval =
             !publicResearchRead &&
@@ -5264,11 +5267,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
             siteGate === "new" && name === "web_fetch" && fetchUrl
               ? await standingSiteAccess()
               : undefined;
+          let standingHold: Extract<UrlVerdict, { verdict: "fragment" | "suspicious" }> | undefined;
           if (standingSites?.standing) {
-            const fragments = await outboundFragments();
-            if (fragments && checkOutbound({ text: fetchUrl!, fragments }).allow) {
-              siteGate = "allow";
-            }
+            const verdict = checkFetchUrl(fetchUrl!, await outboundFragments());
+            if (verdict.verdict === "clean") siteGate = "allow";
+            else standingHold = verdict;
           }
           // Once outside content is in the run, injected text could choose a connector read's
           // arguments, so a read on a connector this run had not used yet is treated as a write.
@@ -5280,7 +5283,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               connectorTrusted: (await loadTrustedConnectors()).has(connectorTrust),
             });
           const runTainted = run.externalTaint === true || externalTaint();
-          const recordDecision = async (decision: "allow" | "ask" | "block", source: string) => {
+          const recordDecision = async (
+            decision: "allow" | "ask" | "block",
+            source: string,
+            extra?: Record<string, unknown>,
+          ) => {
             try {
               await deps.events.append({
                 spaceId: run.spaceId,
@@ -5295,12 +5302,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   source,
                   unattended: run.unattended === true,
                   tainted: runTainted,
+                  ...extra,
                 },
               });
             } catch (error) {
               getLogger().warn("approval decision not recorded", { runId: run.id, error });
             }
           };
+          // Every fetch under a standing site allowance is logged with its decision, never the URL.
+          if (standingSites?.standing && fetchSite) {
+            await recordDecision(standingHold ? "ask" : "allow", "all_sites", {
+              site: fetchSite,
+              reason: standingHold?.reason ?? "clean",
+              ...(standingHold?.verdict === "suspicious"
+                ? { indicators: standingHold.indicators }
+                : {}),
+            });
+          }
           // A Block rule beats every ask and every approved-but-unrun effect: no card, no effect.
           if (
             approvalResolved.decision === "block" ||
@@ -5775,7 +5793,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ? MEETING_MARK_REASON
                   : approvalResolved.source === "require_approval" && actionType
                     ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
-                    : undefined;
+                    : standingHold
+                      ? `Held before fetching: ${standingHold.reason}.`
+                      : undefined;
           // Record each decision once; a replay of the same effect already has its event.
           if (
             !applied?.duplicate &&
