@@ -78,7 +78,8 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   // Writes to the owner's fundraising records. A spreadsheet or email the agent read is untrusted,
   // so no saved Allow rule or Auto Review may pass them.
   "fundraising_round_save",
-  "fundraising_prospects_save",
+  // One card for a whole list, applied only by the owner's press. Its card has no Allow to save.
+  "pipeline_import_review",
 ]);
 
 const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
@@ -898,12 +899,19 @@ export function isApprovalAskBlock(block: {
   pageSource?: unknown;
   /** A reply batch card offers only Discard; Send selected is its own request. */
   mailBatch?: unknown;
+  /** A list import card offers only Deny; Add is its own request. */
+  pipelineImport?: unknown;
   actions?: Array<{ id: string; label: string }>;
 }): boolean {
   if (block.kind !== "ask" || !(block.approvalEffectId || block.pageSource)) return false;
   if (!block.actions?.length) return false;
   const actionIds = new Set(block.actions.map((action) => action.id));
-  if (block.mailBatch && block.actions.every((action) => action.id === "deny")) return true;
+  if (
+    (block.mailBatch || block.pipelineImport) &&
+    block.actions.every((action) => action.id === "deny")
+  ) {
+    return true;
+  }
   return (
     actionIds.has("allow") &&
     actionIds.has("deny") &&

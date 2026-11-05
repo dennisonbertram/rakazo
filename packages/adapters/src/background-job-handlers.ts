@@ -74,6 +74,7 @@ import { runOmiSort } from "./omi-sort.js";
 import { runOmiTranscribe } from "./omi-transcribe.js";
 import { runPageRefreshTick, runPageSnapshotRetention } from "./page-source-tick.js";
 import { renderPdfPages } from "./pdf-render.js";
+import { runPipelineImport } from "./pipeline-import-tools.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
 import { describeTeachSteps } from "./teach-steps.js";
 import { expireTaughtSkillTeaching } from "./teaching-session.js";
@@ -310,6 +311,9 @@ export function createBackgroundJobHandlers(deps: {
         payload,
       );
     }),
+    "pipeline.import": asPayloadTenant((payload) =>
+      runPipelineImport({ prisma: deps.prisma, jobs: deps.jobs, events: deps.events }, payload),
+    ),
     "mail.sync": asPayloadTenant((payload) => {
       const { mail } = deps;
       if (!mail) throw new Error("Mail sync is not configured");

@@ -1,25 +1,24 @@
-import type { ProspectImportRow } from "@rakazo/contracts";
 import {
   FundraiseRoundSaveInputSchema,
   isInvestorsAgentSpawnKey,
-  PROSPECT_IMPORT_MAX,
-  ProspectImportRowSchema,
+  PIPELINE_IMPORT_REVIEW_TOOL,
+  PIPELINE_IMPORT_STAGE_TOOL,
 } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import {
   FundraiseRoundOpenError,
   getFundraisingOverview,
   IsolationError,
-  importProspects,
   saveRound,
 } from "@rakazo/db";
 import { mailToolsAllowed } from "./mail-tools.js";
 
-/** The Investors agent's read of the Fundraising page, and its one write: starting or editing the round. */
+/** The Investors agent's read of the Fundraising page, and its writes: the round, and list imports. */
 export const FUNDRAISING_TOOL_NAMES = new Set([
   "fundraising_read",
   "fundraising_round_save",
-  "fundraising_prospects_save",
+  PIPELINE_IMPORT_STAGE_TOOL,
+  PIPELINE_IMPORT_REVIEW_TOOL,
 ]);
 
 /** Only the Investors agent, on a run its owner started. */
@@ -35,7 +34,6 @@ type FundraisingToolDeps = {
   prisma: Pick<
     PrismaClient,
     | "$transaction"
-    | "$executeRaw"
     | "contact"
     | "fundraiseRound"
     | "safe"
@@ -43,8 +41,6 @@ type FundraisingToolDeps = {
     | "pipelineRecordPerson"
     | "pipelineEvent"
   >;
-  /** The agent running the tool, from the run, for "added by". */
-  botId?: string;
   /** From the run (the bot owner), never from model input. */
   scope: { spaceId: string; userId: string };
 };
@@ -96,78 +92,11 @@ async function saveRoundFromTool(
   }
 }
 
-/**
- * Adds or updates up to PROSPECT_IMPORT_MAX prospects through the db import, which dedupes and keeps
- * what the owner edited. A row is data: it is parsed against a fixed schema that names no kind, id or round.
- */
-async function saveProspectsFromTool(
-  deps: FundraisingToolDeps,
-  args: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const raw = Array.isArray(args.rows) ? args.rows : [];
-  if (raw.length === 0) return { error: "Pass rows: a list of prospects." };
-  if (raw.length > PROSPECT_IMPORT_MAX) {
-    return {
-      error: `At most ${PROSPECT_IMPORT_MAX} rows per call; you passed ${raw.length}. Split the list and call again.`,
-    };
-  }
-  const invalid: { row: number; name: string; reason: string }[] = [];
-  const valid: { row: number; value: ProspectImportRow }[] = [];
-  raw.forEach((item, index) => {
-    const r = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
-    const label = String(r.name ?? r.firm ?? "").slice(0, 200);
-    const cents = r.amountUsd == null ? null : toCents(r.amountUsd);
-    if (r.amountUsd != null && cents == null) {
-      invalid.push({
-        row: index + 1,
-        name: label,
-        reason: "amountUsd must be US dollars above zero.",
-      });
-      return;
-    }
-    const parsed = ProspectImportRowSchema.safeParse({
-      name: r.name,
-      firm: r.firm,
-      email: r.email,
-      stage: r.stage,
-      checkSizeCents: cents,
-      nextStep: r.nextStep,
-      notes: r.notes,
-    });
-    if (parsed.success) valid.push({ row: index + 1, value: parsed.data });
-    else
-      invalid.push({
-        row: index + 1,
-        name: label,
-        reason: parsed.error.issues[0]?.message ?? "Invalid row.",
-      });
-  });
-  try {
-    const result = await importProspects(
-      deps.prisma,
-      deps.scope,
-      valid.map((v) => v.value),
-      { overwrite: args.overwrite === true, botId: deps.botId },
-    );
-    const original = (list: { row: number; name: string; reason: string }[]) =>
-      list.map((item) => ({ ...item, row: valid[item.row - 1]?.row ?? item.row }));
-    return {
-      added: result.added,
-      updated: result.updated,
-      skipped: original(result.skipped),
-      failed: [...invalid, ...original(result.failed)].sort((a, b) => a.row - b.row),
-    };
-  } catch {
-    return { error: "Fundraising tool failed" };
-  }
-}
-
 export async function fundraisingToolFromTool(
   name: string,
   deps: FundraisingToolDeps,
   args: Record<string, unknown> = {},
 ): Promise<Record<string, unknown>> {
-  if (name === "fundraising_prospects_save") return saveProspectsFromTool(deps, args);
   if (name === "fundraising_round_save") return saveRoundFromTool(deps, args);
   if (name !== "fundraising_read") return { error: `Unknown fundraising tool ${name}` };
   try {

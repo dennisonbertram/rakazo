@@ -7,7 +7,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { RowEdits } from "../../lib/pipeline-rows";
 import { PipelineTable } from "./PipelineTable";
-import { manyProspects, SAMPLE_PROSPECTS } from "./pipeline-fixtures";
+import { manyProspects, prospect, SAMPLE_PROSPECTS } from "./pipeline-fixtures";
 
 vi.mock("@lingui/core/macro", () => ({
   t: (parts: TemplateStringsArray, ...values: unknown[]) =>
@@ -131,4 +131,31 @@ it("opens the row sheet with Log call as its primary action, and Send SAFE on a 
   );
   expect(labels.at(-1)).toBe("Log call");
   expect(labels).toContain("Send SAFE");
+});
+
+it("shows an imported row's Wave, Fund details and Referred by", async () => {
+  localStorage.setItem("rakazo:crm-pipeline-columns", JSON.stringify(["referredBy", "details"]));
+  // As `getFundraisingOverview` returns a row from a list import, a firm with no person included.
+  const imported = (id: string, name: string, wave: string) =>
+    prospect(id, name, {
+      group: wave,
+      referredBy: { id: "c-sam", name: "Sam Example" },
+      details: [
+        {
+          label: "Stage and check",
+          value: "Seed lead, $250K-$500K",
+          source: "list",
+          at: "2026-11-05T00:00:00.000Z",
+        },
+      ],
+    });
+  await render(
+    [imported("i1", "Peak Fund", "Wave 2"), imported("i2", "Riverside Fund", "Wave 3")],
+    "/?wave=Wave%202",
+  );
+  expect(names()).toEqual(["Peak Fund"]);
+  const row = el.querySelector("[data-testid=pipeline-table] tbody tr");
+  expect(row?.textContent).toContain("Sam Example");
+  expect(row?.textContent).toContain("Stage and check: Seed lead, $250K-$500K");
+  localStorage.removeItem("rakazo:crm-pipeline-columns");
 });
