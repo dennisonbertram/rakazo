@@ -120,6 +120,7 @@ function bot(description = "Billing"): Bot {
     externalMessageTargets: [],
     externalComputerTools: false,
     firewall: false,
+    proactivity: "medium",
     webhookConfigured: false,
     spawnKey: null,
     runPhase: null,
@@ -556,6 +557,51 @@ describe("BotSettings audience", () => {
   it("has no switch for a page or integration agent", async () => {
     await renderWith({ spawnKey: "finance-agent:user-1" });
     expect(button("bot-audience-external")).toBeNull();
+  });
+});
+
+describe("BotSettings proactive level", () => {
+  const select = () =>
+    [...container.querySelectorAll("select")].find((el) => el.id.endsWith("-proactivity"));
+  async function renderWith(overrides: Partial<Bot> = {}) {
+    await act(async () => {
+      root.render(
+        <BotSettings
+          bot={{ ...bot(), ...overrides }}
+          memoryProviderConfigured={false}
+          onSkillsChange={() => undefined}
+          onSave={onSave}
+          onExport={async () => undefined}
+          onClear={() => undefined}
+        />,
+      );
+    });
+  }
+
+  it("shows the stored level and saves a change", async () => {
+    await renderWith({ proactivity: "low" });
+    expect(select()?.value).toBe("low");
+    await act(async () => {
+      const el = select() as HTMLSelectElement;
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setter?.call(el, "high");
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ proactivity: "high" }));
+  });
+
+  it("is disabled, with a reason, for a firewalled or external agent", async () => {
+    await renderWith({ firewall: true });
+    expect(select()?.disabled).toBe(true);
+    expect(container.textContent).toContain("Not used by firewalled or external agents");
+    await renderWith({ firewall: false, audience: "external" });
+    expect(select()?.disabled).toBe(true);
+  });
+
+  it("is not shown for the voice agent", async () => {
+    await renderWith({ spawnKey: "voice-agent:user_1" });
+    expect(select()).toBeUndefined();
   });
 });
 
