@@ -80,6 +80,7 @@ export function MailApprovalCard({
   accountsStatus = "ready",
   onRetryAccounts,
   reason,
+  embedded,
 }: {
   mail: MailApproval;
   status: "pending" | "answered";
@@ -107,13 +108,18 @@ export function MailApprovalCard({
   /** Until the accounts are known, a send that names no sender cannot go out. */
   accountsStatus?: "loading" | "error" | "ready";
   onRetryAccounts?: () => void;
+  /** A row of a card that has its own header and buttons: shows only the fields. */
+  embedded?: { editing: boolean };
 }) {
   const initial = toFields(mail);
   const [fields, setFields] = useState<Fields>(initial);
   const [account, setAccount] = useState("");
-  const [editing, setEditing] = useState(initialEditing);
+  const [ownEditing, setEditing] = useState(initialEditing);
+  const editing = embedded ? embedded.editing : ownEditing;
   const outcomeNeedsAttention = mail.outcome === "failed" || mail.outcome === "unknown";
-  const [open, setOpen] = useState(status !== "answered" || outcomeNeedsAttention);
+  const [open, setOpen] = useState(
+    status !== "answered" || outcomeNeedsAttention || Boolean(embedded),
+  );
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -146,8 +152,8 @@ export function MailApprovalCard({
 
   // A finished card folds up to its header, unless the person still has something to do with it.
   useEffect(() => {
-    if (answered) setOpen(outcomeNeedsAttention);
-  }, [answered, outcomeNeedsAttention]);
+    if (answered && !embedded) setOpen(outcomeNeedsAttention);
+  }, [answered, outcomeNeedsAttention, embedded]);
 
   // Answering from this card removes the button that had focus; keep it on the card's header.
   useEffect(() => {
@@ -332,66 +338,69 @@ export function MailApprovalCard({
       className={cn(
         "@container w-160 max-w-full overflow-hidden rounded-3xl bg-muted",
         editing ? "ring-2 ring-primary" : interactive && "ring-1 ring-inset ring-border",
+        embedded && "bg-card pt-3.5",
       )}
     >
-      <div className="flex items-center gap-3 px-5 py-3.5">
-        {answered ? (
-          <>
-            <button
-              ref={toggleRef}
-              type="button"
-              aria-expanded={open}
-              onClick={() => setOpen((value) => !value)}
-              className="flex min-w-0 flex-1 items-center gap-3 text-start"
-            >
+      {embedded ? null : (
+        <div className="flex items-center gap-3 px-5 py-3.5">
+          {answered ? (
+            <>
+              <button
+                ref={toggleRef}
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen((value) => !value)}
+                className="flex min-w-0 flex-1 items-center gap-3 text-start"
+              >
+                {tile}
+                {headerText}
+                <ChevronsUpDown
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground"
+                />
+              </button>
+              {gmailUrl ? (
+                <a
+                  href={gmailUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t`Open in Gmail`}
+                  className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <ArrowUpRight aria-hidden="true" className="size-4" />
+                </a>
+              ) : null}
+            </>
+          ) : (
+            <>
               {tile}
               {headerText}
-              <ChevronsUpDown
-                aria-hidden="true"
-                className="size-4 shrink-0 text-muted-foreground"
-              />
-            </button>
-            {gmailUrl ? (
-              <a
-                href={gmailUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={t`Open in Gmail`}
-                className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                <ArrowUpRight aria-hidden="true" className="size-4" />
-              </a>
-            ) : null}
-          </>
-        ) : (
-          <>
-            {tile}
-            {headerText}
-            {interactive && !mail.locked ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full"
-                disabled={busy}
-                aria-pressed={editing}
-                onClick={() => setEditing((value) => !value)}
-              >
-                {editing ? <Trans>Done</Trans> : <Trans>Edit</Trans>}
-              </Button>
-            ) : null}
-          </>
-        )}
-        {canSendSaved ? (
-          <Button
-            size="sm"
-            className="rounded-full"
-            disabled={busy}
-            onClick={() => void submit("send")}
-          >
-            <Trans>Send</Trans>
-          </Button>
-        ) : null}
-      </div>
+              {interactive && !mail.locked ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  disabled={busy}
+                  aria-pressed={editing}
+                  onClick={() => setEditing((value) => !value)}
+                >
+                  {editing ? <Trans>Done</Trans> : <Trans>Edit</Trans>}
+                </Button>
+              ) : null}
+            </>
+          )}
+          {canSendSaved ? (
+            <Button
+              size="sm"
+              className="rounded-full"
+              disabled={busy}
+              onClick={() => void submit("send")}
+            >
+              <Trans>Send</Trans>
+            </Button>
+          ) : null}
+        </div>
+      )}
       {open ? (
         <div className="px-5 pb-5 @sm:px-6">
           <div className={cn("mt-1.5 mb-3", !shown.subject && !editing && "hidden")}>
@@ -532,7 +541,7 @@ export function MailApprovalCard({
                 <Trans>Cancel</Trans>
               </Button>
             </fieldset>
-          ) : interactive ? (
+          ) : interactive && !embedded ? (
             <>
               {reason ? <p className="pt-3 text-[13px] text-muted-foreground">{reason}</p> : null}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-4">

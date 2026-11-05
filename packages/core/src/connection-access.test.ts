@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ConnectionAccessRow } from "./connection-access.js";
 import {
+  accountAllowedIn,
   appStatus,
   botMayUseConnection,
   connectionRowsForAudience,
   deniedConnectionIds,
   effectiveAccessByConnection,
+  GOOGLE_BUILTIN_WRITES,
   nonOwnerMayWrite,
   sourceAccessFor,
 } from "./connection-access.js";
@@ -485,5 +487,54 @@ describe("sourceAccessFor", () => {
       expect(sourceAccessFor(granted, bot("x", flag))).toEqual({ read: false, write: false });
       expect(sourceAccessFor(granted, bot("owner", flag))).toEqual({ read: false, write: false });
     }
+  });
+});
+
+describe("accountAllowedIn", () => {
+  const bot = { id: "bot-1", audience: "internal" };
+  const linked = (botAccess: { botId: string; canWrite?: boolean }[], writesEnabled = true) => [
+    {
+      ...row("acct-1", "connected", false, {
+        connectorId: "google",
+        agentBotId: "owner-agent",
+        botAccess,
+      }),
+      writesEnabled,
+    },
+  ];
+
+  it("lists mail_reply_batch as a write: without this a read-only agent could write", () => {
+    expect(GOOGLE_BUILTIN_WRITES.has("mail_reply_batch")).toBe(true);
+    const readOnly = linked([{ botId: "bot-1", canWrite: false }]);
+    expect(accountAllowedIn(readOnly, "acct-1", "mail_search", bot)).toBe(true);
+    expect(accountAllowedIn(readOnly, "acct-1", "mail_reply_batch", bot)).toBe(false);
+    expect(accountAllowedIn(readOnly, "acct-1", "mail_send", bot)).toBe(false);
+  });
+
+  it("lets a non-owner write only with its own grant while changes are on", () => {
+    const write = [{ botId: "bot-1", canWrite: true }];
+    expect(accountAllowedIn(linked(write), "acct-1", "mail_reply_batch", bot)).toBe(true);
+    expect(accountAllowedIn(linked(write, false), "acct-1", "mail_reply_batch", bot)).toBe(false);
+    expect(
+      accountAllowedIn(linked(write), "acct-1", "mail_reply_batch", {
+        ...bot,
+        audience: "external",
+      }),
+    ).toBe(false);
+  });
+
+  it("lets the connection's own agent write only while changes are on", () => {
+    const own = { ...bot, id: "owner-agent" };
+    const grants = [{ botId: "owner-agent" }];
+    expect(accountAllowedIn(linked(grants), "acct-1", "mail_reply_batch", own)).toBe(true);
+    expect(accountAllowedIn(linked(grants, false), "acct-1", "mail_reply_batch", own)).toBe(false);
+  });
+
+  it("refuses an account that is gone or not connected", () => {
+    const rows = linked([{ botId: "bot-1", canWrite: true }]);
+    expect(accountAllowedIn(rows, "other", "mail_reply_batch", bot)).toBe(false);
+    expect(
+      accountAllowedIn([{ ...rows[0]!, status: "revoked" }], "acct-1", "mail_reply_batch", bot),
+    ).toBe(false);
   });
 });

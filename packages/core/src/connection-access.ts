@@ -73,6 +73,43 @@ export function nonOwnerMayWrite(
   );
 }
 
+/** Built-in Google tools that change something. Only these follow an agent-linked connection's write rule. */
+export const GOOGLE_BUILTIN_WRITES: ReadonlySet<string> = new Set([
+  "mail_draft",
+  "mail_modify",
+  "mail_send",
+  "mail_reply_batch",
+  "calendar_create_event",
+  "calendar_update_event",
+  "calendar_delete_event",
+  "drive_create_file",
+  "drive_update_file",
+]);
+
+/**
+ * Whether this bot may use the built-in Google tool on the account now. The account must exist in
+ * the rows read for this bot, be connected and be open to it; a write on an agent-linked connection
+ * also follows the agent rule. Rows are read fresh by the caller, so a changed switch applies.
+ */
+export function accountAllowedIn<
+  T extends ConnectionAccessRow & {
+    writesEnabled?: boolean;
+    botAccess: { botId: string; canWrite?: boolean }[];
+  },
+>(
+  rows: T[],
+  accountId: string,
+  toolName: string,
+  bot: { id: string; audience?: string | null },
+): boolean {
+  const row = rows.find((candidate) => candidate.id === accountId);
+  if (!row || row.status !== "connected" || deniedConnectionIds(rows).has(row.id)) return false;
+  if (!GOOGLE_BUILTIN_WRITES.has(toolName) || row.agentBotId === null) return true;
+  if (row.agentBotId === bot.id) return row.writesEnabled === true;
+  // Another agent changes it only with its own write grant, still asking before each change.
+  return nonOwnerMayWrite(row, bot);
+}
+
 /** A connection limited to chosen agents is usable only by a bot with an access row. */
 export function botMayUseConnection(row: {
   allAgents: boolean;

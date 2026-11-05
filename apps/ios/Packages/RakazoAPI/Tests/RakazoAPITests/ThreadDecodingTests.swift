@@ -78,3 +78,24 @@ func decodesPageCardBlock() throws {
   #expect(block.fields["botId"]?.stringValue == "b1")
   #expect(block.fields["pageId"]?.stringValue == "p1")
 }
+
+/// An older client has no reply batch card: it shows the plain card with Discard, and cannot send.
+@Test
+func decodesReplyBatchAskAsAPlainCardWithDiscardOnly() throws {
+  let json = #"""
+    {"kind":"ask","text":"2 replies","detail":"a@example.test: Re: one\nb@example.test: Re: two",
+     "approvalEffectId":"effect-1","status":"pending",
+     "mailBatch":{"count":2,"sent":0,"failed":0,"unknown":0},
+     "actions":[{"id":"deny","label":"Discard"}]}
+    """#
+  let ask = try JSONDecoder().decode(AskBlock.self, from: Data(json.utf8))
+  #expect(ask.text == "2 replies")
+  #expect(ask.detail?.contains("a@example.test") == true)
+  #expect(ask.actions.map(\.id) == ["deny"])
+  #expect(!ask.isMail)
+  #expect(ask.outcome == nil)
+  let pressed = json.replacingOccurrences(
+    of: #""status":"pending""#, with: #""status":"answered","answer":"send""#)
+  let answered = try JSONDecoder().decode(AskBlock.self, from: Data(pressed.utf8))
+  #expect(answered.outcome == .answered(nil))
+}

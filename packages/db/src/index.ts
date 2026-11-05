@@ -29,6 +29,7 @@ export * from "./history-retrieval.js";
 export * from "./investor-portal.js";
 export * from "./investor-updates.js";
 export * from "./legal.js";
+export * from "./mail-reply-batch.js";
 export * from "./meetings.js";
 export * from "./memory-config.js";
 export * from "./messages.js";

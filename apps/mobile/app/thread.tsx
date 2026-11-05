@@ -253,6 +253,8 @@ function formatApprovalAnswer(
   if (approval && answer === "allow") return t("Allowed once");
   if (approval && answer === "always") return t("Always allowed");
   if (approval && answer === "deny") return t("Denied");
+  // A reply batch pressed on another surface; its results are on that surface's card.
+  if (answer === "send") return t("Send selected");
   return t("Answered: {answer}", { answer: selectedAskActionLabel(answer, actions) });
 }
 

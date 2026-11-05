@@ -34,6 +34,10 @@ describe("firewallToolClass", () => {
     }
   });
 
+  it("asks on every mail_reply_batch call of a firewalled agent", () => {
+    expect(firewallToolClass("mail_reply_batch")).toBe("ask");
+  });
+
   it("keeps the lists disjoint", () => {
     for (const name of FIREWALL_FREE_TOOLS) expect(FIREWALL_ASK_TOOLS.has(name)).toBe(false);
   });

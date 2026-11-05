@@ -56,6 +56,7 @@ import { compactHistory } from "./history-compaction.js";
 import { createInboxClassifierProvider } from "./inbox-classifier-factory.js";
 import { runInboxTriage, triageReadiness } from "./inbox-triage.js";
 import { runMailAttachmentFiling } from "./mail-attachment-filing.js";
+import { runMailReplyBatch } from "./mail-reply-batch.js";
 import { runMailSyncJob, sweepMailSyncs } from "./mail-sync-job.js";
 import { expireMailSearch } from "./mail-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
@@ -294,6 +295,20 @@ export function createBackgroundJobHandlers(deps: {
     },
     "mail.search.expire": asOwner(mailSearch, async (payload) => {
       await expireMailSearch(deps.prisma, payload.searchId);
+    }),
+    "mail.reply.batch": asPayloadTenant((payload) => {
+      const { mail } = deps;
+      if (!mail) throw new Error("Mail is not configured");
+      return runMailReplyBatch(
+        {
+          prisma: deps.prisma,
+          mail,
+          jobs: deps.jobs,
+          events: deps.events,
+          mailWritesDisabled: deps.mailWritesDisabled,
+        },
+        payload,
+      );
     }),
     "mail.sync": asPayloadTenant((payload) => {
       const { mail } = deps;
