@@ -6482,7 +6482,72 @@ describe("fetching new sites without a card", () => {
   const pausedCardOf = (f: ReturnType<typeof fixture>) =>
     (f.pauseRunForInput.mock.calls as unknown as [{ blocks: Record<string, unknown>[] }][])[0]?.[0]
       .blocks[0];
-  const fetchNew = { name: "web_fetch", args: { url: "https://www.npmjs.com/package/x" } };
+  const exaKey = integrationAgentSpawnKey("srv-1");
+  const exaServer = [{ id: "srv-1", endpoint: "https://mcp.exa.ai/mcp", agentBotId: "bot-1" }];
+  const fetchNew = {
+    name: "web_fetch",
+    args: { url: "https://www.npmjs.com/package/x" },
+  };
+  const exa = (extra: Record<string, unknown> = {}) => {
+    const f = fixture({
+      builtin: true,
+      trigger: "bot_message",
+      spawnKey: exaKey,
+      mcpServers: exaServer,
+      peer: { senderInScope: true, linked: true },
+      ...extra,
+    });
+    f.setCalls([{ ...fetchNew, executionId: "call-1" }]);
+    return f;
+  };
+
+  it("lets the Exa agent fetch a new public site in a bot-to-bot run, with no card", async () => {
+    const f = exa();
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("asks when the same agent is granted Gmail", async () => {
+    const f = exa({
+      connectionRows: [
+        {
+          ...mailConnectionRow(),
+          allAgents: false,
+          botAccess: [{ botId: "bot-1" }],
+        },
+      ],
+    });
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks for an agent whose server is not on the research list", async () => {
+    const f = exa({
+      mcpServers: [
+        {
+          id: "srv-1",
+          endpoint: "https://mcp.example.com/mcp",
+          agentBotId: "bot-1",
+        },
+      ],
+    });
+    await f.run();
+    expect(f.fetchedUrls).toEqual([]);
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks when the Exa agent is firewalled, and refuses in a webhook run", async () => {
+    const firewalled = exa({ firewall: true });
+    await firewalled.run();
+    expect(firewalled.fetchedUrls).toEqual([]);
+    const webhook = exa({ trigger: "webhook" });
+    await webhook.run();
+    expect(webhook.fetchedUrls).toEqual([]);
+    expect(webhook.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
   const allSites = [
     {
       effect: "always_allow",

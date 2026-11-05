@@ -88,6 +88,7 @@ import {
   isLegalAgentSpawnKey,
   isMailAgentSpawnKey,
   isMailThreadAgentSpawnKey,
+  isPublicResearchEndpoint,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
   LEGAL_AGENT_BUILTIN_TOOLS,
@@ -3354,8 +3355,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const rows = await connectionRowsStored();
           const granted = rows.some((row) => row.agentBotId !== bot.id && row.botAccess.length > 0);
           if (granted) privateAccess.push("connected apps");
+          const owned = rows.some((row) => row.agentBotId === bot.id);
+          const servers = integrationSpawnKey
+            ? await deps.prisma.mcpServer.findMany({
+                where: { spaceId: run.spaceId, userId: bot.userId, agentBotId: bot.id },
+                select: { endpoint: true },
+              })
+            : [];
+          // ponytail: public research = every linked server is on the explicit list and the agent
+          // holds no private access; a Connection-linked app agent is not recognised yet.
+          const publicResearch =
+            servers.length > 0 &&
+            !owned &&
+            servers.every((server) => isPublicResearchEndpoint(server.endpoint)) &&
+            privateAccess.length === 0;
           const chosen = botAllowsAllSites(await loadApprovalRules(), bot.id);
-          return { standing: chosen, offerAllSites: true, privateAccess };
+          return { standing: chosen || publicResearch, offerAllSites: true, privateAccess };
         };
         // What the access rules see: "all agents" does not reach an external or firewalled bot.
         const connectionRowsNow = async () => {
