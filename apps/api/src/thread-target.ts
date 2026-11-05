@@ -860,7 +860,8 @@ export async function sendThreadMessage(
           select: { id: true, taskId: true, status: true, trigger: true },
         });
         // A run whose reply batch is sending has no question left to answer: its card is answered and
-        // it waits only for the sends. The message waits too, and is answered after that run ends.
+        // it waits only for the sends. The message waits too: that run takes it when it resumes, or a
+        // follow-up does if it ends without doing so.
         const allWaiting = activeRuns.filter((run) => run.status === "waiting_input");
         const sendingRunIds = allWaiting.length
           ? new Set(

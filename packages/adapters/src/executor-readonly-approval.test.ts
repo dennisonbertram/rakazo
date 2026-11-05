@@ -269,7 +269,10 @@ function fixture({
   groupId = null as string | null,
   ticketAuthor = null as string | null,
   otherGrants = 0,
+  scriptedRuntime = false,
 }: {
+  /** The runtime says it is the scripted one. */
+  scriptedRuntime?: boolean;
   /** The bot's Firewall switch at the start of the run. */
   firewall?: boolean;
   /** Other agents in the space with Firewall on. */
@@ -791,7 +794,7 @@ function fixture({
   const executor = createRunExecutor({
     prisma,
     mcpOAuth: { statusFor: async () => "connected" as const },
-    runtime: { describe: () => ({ capabilities: { scripted: false } }), run: runtimeRun },
+    runtime: { describe: () => ({ capabilities: { scripted: scriptedRuntime } }), run: runtimeRun },
     connector: realConnector ?? {
       discoverTools: async () =>
         availableTools ??
@@ -6635,6 +6638,12 @@ describe("mail_reply_batch", () => {
       await f.run();
       expect(f.pauseRunForInput).toHaveBeenCalledOnce();
     });
+  });
+
+  it("gives the scripted runtime the claim for queued messages", async () => {
+    const f = batchRun({ scriptedRuntime: true });
+    await f.run().catch(() => undefined);
+    expect(f.request()?.claimSteering).toEqual(expect.any(Function));
   });
 
   describe("offering", () => {

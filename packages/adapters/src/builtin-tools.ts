@@ -998,7 +998,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "mail_reply_batch",
     description:
-      "Propose separate replies to several email threads at once, each in its own thread, on one approval card. The user reviews and edits them, picks which to send, and presses Send selected; nothing goes out before that. Replies only: every row needs replyToId, and each thread can appear once. At most 20 rows per call, all from one account; for more, or for a second account, call it again after the result.",
+      "Propose separate replies to several email threads at once, each in its own thread, on one approval card. Use it instead of several mail_send calls when answering two or more emails. The user reviews and edits them, picks which to send, and presses Send selected; nothing goes out before that. Replies only: every row needs replyToId, and each thread can appear once. At most 20 rows per call, all from one account; for more, or for a second account, call it again after the result.",
     inputSchema: {
       type: "object",
       properties: {

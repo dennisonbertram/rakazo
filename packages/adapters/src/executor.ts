@@ -9254,7 +9254,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               // An owner's private message must not steer an Elio peer run: it stays unclaimed and
               // the owner run that starts when this one finishes answers it.
               claimSteering:
-                scripted || hidePrivateVoiceHistory
+                hidePrivateVoiceHistory
                   ? undefined
                   : async (seenIds) => {
                       const steering = await deps.events.claimSteering({

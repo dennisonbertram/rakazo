@@ -43,6 +43,9 @@ export class ScriptedAgentRuntime implements AgentRuntime {
         yield { type: "done", text: "stopped" };
         return;
       }
+      // As the model runtime does at its first turn. A queued message nobody claims goes back in the
+      // queue when the run ends and starts another run, so a follow-up here would never stop.
+      await request.claimSteering?.([]);
       const script = request.script ?? inferScript(request.prompt, request.resumeFromCheckpoint);
       // Per-run call index so repeated tools (e.g. message_agent) get distinct
       // executionIds — delivery keys and effect replays key off this value.

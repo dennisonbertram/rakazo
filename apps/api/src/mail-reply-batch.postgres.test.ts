@@ -1559,7 +1559,7 @@ describePostgres("mail_reply_batch (PostgreSQL)", () => {
       const pending = await prisma.steeringMessage.findMany({
         where: { botId, message: { threadId } },
       });
-      // Not claimed by the waiting run: the follow-up after it ends answers it.
+      // Not given to the waiting run: it takes the message when it resumes, or a follow-up does.
       expect(pending).toMatchObject([{ runId: null }]);
       expect(await prisma.run.count({ where: { threadId } })).toBe(1);
       await work(c);

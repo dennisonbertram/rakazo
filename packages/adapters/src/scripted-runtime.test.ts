@@ -1,5 +1,5 @@
 import type { AgentRuntimeEvent } from "@rakazo/adapter-kit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { inferScript, ScriptedAgentRuntime } from "./scripted-runtime.js";
 
 describe("inferScript ask resumes", () => {
@@ -370,5 +370,26 @@ describe("inferScript reply batch card", () => {
     const args = step?.toolCalls?.[0]?.args as { replies: { cc?: string[] }[] };
     expect(args.replies[0]?.cc).toEqual(["stranger@elsewhere.example.test"]);
     expect(args.replies[1]?.cc).toBeUndefined();
+  });
+});
+
+describe("ScriptedAgentRuntime queued messages", () => {
+  const request = (extra: object) =>
+    ({ runId: "run-1", prompt: "say hello", history: [], ...extra }) as never;
+  const drain = async (runtime: ScriptedAgentRuntime, input: never) => {
+    for await (const _event of runtime.run(input)) {
+      // The events do not matter here.
+    }
+  };
+
+  it("claims queued messages once when the run starts, so the follow-up that has them ends", async () => {
+    const claimSteering = vi.fn(async () => []);
+    await drain(new ScriptedAgentRuntime(), request({ claimSteering }));
+    expect(claimSteering).toHaveBeenCalledTimes(1);
+    expect(claimSteering).toHaveBeenCalledWith([]);
+  });
+
+  it("still runs without a claim", async () => {
+    await expect(drain(new ScriptedAgentRuntime(), request({}))).resolves.toBeUndefined();
   });
 });
