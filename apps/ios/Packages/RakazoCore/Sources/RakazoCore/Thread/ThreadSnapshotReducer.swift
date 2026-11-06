@@ -22,7 +22,7 @@ public func isThreadSnapshotEvent(_ event: ProductEvent) -> Bool {
   case "thread.cleared", "thread.progress", "thread.subagent", "thread.cloud_agent",
        "thread.delegate_pending", "agent.tool.called", "agent.tool.completed",
        "thread.message.created", "thread.message.updated", "thread.message.reaction", "run.started",
-       "run.phase", "run.waiting_input", "computer.takeover.requested":
+       "run.phase", "run.waiting_input", "computer.takeover.requested", "thread.goal.updated":
     true
   default:
     isRunTerminalEvent(type: event.type)
@@ -125,6 +125,11 @@ public func reduceThreadSnapshot(_ previous: ThreadSnapshot?, _ event: ProductEv
     prev.olderCursor = nil
     prev.run = nil
     prev.activeRuns = []
+    prev.goal = nil
+    return prev
+  case "thread.goal.updated":
+    prev.cursor = event.seq
+    prev.goal = try? event.payload["goal"]?.decode(ThreadGoal.self)
     return prev
   case "run.started":
     return reduceRunStarted(prev, event: event, runID: runID)

@@ -257,6 +257,30 @@ public struct ThreadComputer: Codable, Equatable, Sendable {
   }
 }
 
+/// The open goal (active or paused) of a bot's thread. Enum-like fields stay `String`.
+public struct ThreadGoal: Codable, Equatable, Sendable {
+  public var id: String
+  public var text: String
+  public var status: String
+  public var stopReason: String?
+  public var lastReason: String?
+  public var continuations: Int?
+  public var startedAt: String?
+
+  public init(
+    id: String, text: String, status: String = "active", stopReason: String? = nil,
+    lastReason: String? = nil, continuations: Int? = nil, startedAt: String? = nil
+  ) {
+    self.id = id
+    self.text = text
+    self.status = status
+    self.stopReason = stopReason
+    self.lastReason = lastReason
+    self.continuations = continuations
+    self.startedAt = startedAt
+  }
+}
+
 /// Output of `threads.get`. `cursor` is the highest event seq already folded in (-1 when none).
 public struct ThreadSnapshot: Codable, Equatable, Sendable {
   public var threadId: String
@@ -273,6 +297,7 @@ public struct ThreadSnapshot: Codable, Equatable, Sendable {
   public var delegatePending: [String]?
   public var delegatePendingAgents: [DelegatePendingAgent]?
   public var computer: ThreadComputer?
+  public var goal: ThreadGoal?
 
   public init(
     threadId: String,
@@ -288,7 +313,8 @@ public struct ThreadSnapshot: Codable, Equatable, Sendable {
     activeRuns: [ThreadRun]? = nil,
     delegatePending: [String]? = nil,
     delegatePendingAgents: [DelegatePendingAgent]? = nil,
-    computer: ThreadComputer? = nil
+    computer: ThreadComputer? = nil,
+    goal: ThreadGoal? = nil
   ) {
     self.threadId = threadId
     self.cursor = cursor
@@ -304,6 +330,7 @@ public struct ThreadSnapshot: Codable, Equatable, Sendable {
     self.delegatePending = delegatePending
     self.delegatePendingAgents = delegatePendingAgents
     self.computer = computer
+    self.goal = goal
   }
 
   public init(from decoder: Decoder) throws {
@@ -324,6 +351,8 @@ public struct ThreadSnapshot: Codable, Equatable, Sendable {
       [DelegatePendingAgent].self, forKey: .delegatePendingAgents
     )
     computer = try container.decodeIfPresent(ThreadComputer.self, forKey: .computer)
+    // A malformed goal must not hide the thread.
+    goal = try? container.decodeIfPresent(ThreadGoal.self, forKey: .goal)
   }
 }
 

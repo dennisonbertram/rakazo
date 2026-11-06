@@ -97,6 +97,7 @@ final class ComposerModel {
     case .bot(let id): payload.botTarget = id
     case .group(let id): payload.groupTarget = id
     }
+    SendQueue.shared.notices[originKey] = nil
     if let failure = SendQueue.shared.enqueue(payload, app) {
       notice = failure
       return
@@ -105,6 +106,18 @@ final class ComposerModel {
     attachments = []
     reply = nil
     notice = nil
+  }
+
+  /// Ends the thread's open goal. The thread's `thread.goal.updated` event removes the goal line.
+  func clearGoal(_ app: AppModel, _ model: ThreadModel) async {
+    guard case .bot(let id) = target else { return }
+    struct Input: Encodable, Sendable { var botId: String }
+    if (try? await app.call("threads/clearGoal", input: Input(botId: id)) as JSONValue) == nil {
+      notice = "Couldn’t clear the goal. Try again."
+    } else if var snapshot = model.snapshot {
+      snapshot.goal = nil
+      model.state = .loaded(snapshot)
+    }
   }
 
   /// Stops the active run. The slot returns to Stop on failure, so the run is still stoppable.

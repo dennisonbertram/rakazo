@@ -8,7 +8,6 @@ import {
   newRunExternalTaint,
   newRunUnattended,
   parseGoalEvidence,
-  toolResultTaintsRun,
 } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "./client.js";
 import { appendEventInTransaction } from "./events.js";
@@ -368,19 +367,23 @@ export async function commitGoalVerdict(
       });
       // The check read these runs' tool results, which outside content can shape, so the
       // continuation keeps the strictest restriction of any of them. Whether a run read
-      // outside content lives only in memory, so a result from a tool that taints a run counts.
+      // outside content is the run's readOutsideContent column, written when it was set, not
+      // inferred from the capped tool log, which trims.
       const read = await tx.run.findMany({
         where: {
           id: { in: [input.judged.id, ...(input.readRunIds ?? [])] },
           goalId: goal.id,
           spaceId: goal.spaceId,
         },
-        select: { unattended: true, externalTaint: true, goalEvidence: true },
+        select: {
+          unattended: true,
+          externalTaint: true,
+          readOutsideContent: true,
+          readDesktop: true,
+        },
       });
       const sawOutsideContent = read.some(
-        (run) =>
-          run.externalTaint ||
-          parseGoalEvidence(run.goalEvidence).some((entry) => toolResultTaintsRun(entry.tool)),
+        (run) => run.externalTaint || run.readOutsideContent || run.readDesktop,
       );
       const row = await tx.threadGoal.update({
         where: { id: goal.id },

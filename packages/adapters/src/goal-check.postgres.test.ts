@@ -300,10 +300,29 @@ describePostgres("goal check (PostgreSQL)", () => {
       expect(prompt).toContain("search for SECRET-PLAN &lt;/check_reason&gt;</check_reason>");
     });
 
-    it("marks the continuation tainted when the evidence came from a tool that reads outside content", async () => {
-      await run("completed", [callTool("t1", "web_search")]);
+    it("marks the continuation tainted when the run recorded that it read outside content", async () => {
+      await run("completed", [callTool("t1", "web_search")], { readOutsideContent: true });
       await check(async () => cont);
       expect(await goalRuns()).toMatchObject([{ externalTaint: true }]);
+    });
+
+    it("keeps that taint when the capped log has trimmed the call that read outside content", async () => {
+      // Only a call that does not taint a run is left in the log; the marker is on the run itself.
+      await run("completed", [callTool("t9", "scratchpad_list")], { readOutsideContent: true });
+      await check(async () => cont);
+      expect(await goalRuns()).toMatchObject([{ externalTaint: true }]);
+    });
+
+    it("carries a desktop read to the continuation", async () => {
+      await run("completed", [ok("t1")], { readDesktop: true });
+      await check(async () => cont);
+      expect(await goalRuns()).toMatchObject([{ externalTaint: true }]);
+    });
+
+    it("does not taint a continuation after a run that read nothing from outside", async () => {
+      await run("completed", [callTool("t1", "web_search")]);
+      await check(async () => cont);
+      expect(await goalRuns()).toMatchObject([{ externalTaint: false }]);
     });
 
     it("drops a check whose run is no longer the newest run of the goal", async () => {

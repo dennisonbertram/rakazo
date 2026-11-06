@@ -13,7 +13,7 @@ import {
   MAIL_ALREADY_SENT_REASON,
   MESSAGE_REACTIONS,
 } from "@rakazo/contracts";
-import type { SlashActionId, ThreadItem } from "@rakazo/core";
+import type { ThreadItem } from "@rakazo/core";
 import {
   abortableDelay,
   appendNewerThreadPage,
@@ -111,6 +111,8 @@ import { ComputerCard } from "../components/ComputerCard";
 import { ComposerReplyPreview } from "../components/composer-reply-preview";
 import { FailedSendBubble } from "../components/failed-send-bubble";
 import { GlassSurface } from "../components/glass-surface";
+import { GoalCard } from "../components/goal-card";
+import { GoalLine } from "../components/goal-line";
 import type { ImageArtifactPreviewTarget } from "../components/image-artifact-viewer";
 import { InlineImageAttachment } from "../components/inline-image-attachment";
 import { McpApprovalCard } from "../components/McpApprovalCard";
@@ -218,13 +220,21 @@ import {
   loadVerifiedIntegrationsScope,
   subscribeSessionGeneration,
 } from "../lib/session";
+import type { MobileSlashActionId } from "../lib/slash-actions";
+import { slashActionRoute } from "../lib/slash-actions";
 import {
   applyMessageJump as applyMessageJumpAction,
   commitSnap as commitSnapAction,
   showLatest as showLatestAction,
 } from "../lib/thread-actions";
 import type { SendAttempt } from "../lib/thread-feedback";
-import { confirmEchoes, subscribeDelivered, useThreadFeedback } from "../lib/thread-feedback";
+import {
+  confirmEchoes,
+  subscribeDelivered,
+  subscribeGoalReply,
+  useThreadFeedback,
+} from "../lib/thread-feedback";
+import { applyGoalEvent, goalLineState } from "../lib/thread-goal";
 import { ThreadJumpAnchor } from "../lib/thread-jump";
 import { ThreadReadOnlyContext } from "../lib/thread-read-only";
 import type { ThreadScrollAction, ThreadScrollState } from "../lib/thread-scroll";
@@ -625,6 +635,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   const [replyQuote, setReplyQuote] = useState<string | null>(null);
   const [quoteTarget, setQuoteTarget] = useState<MobileMessage | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
+  const [goalNotice, setGoalNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const preparingSend = useRef(false);
   const feedback = useThreadFeedback(threadKey, newClientId);
@@ -733,6 +744,10 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     });
   }, [inGroup, snap?.activeRuns, snap?.members, snap?.run]);
   const working = inGroup ? workingGroupBots.length > 0 : isRunWorking(currentBotStatus);
+  const goalLine = goalLineState(
+    inGroup ? null : snap?.goal,
+    snap?.activeRuns ?? (snap?.run ? [snap.run] : []),
+  );
 
   const speakFinishedReply = useCallback(() => {
     if (!botId || inGroup || !currentBot) return;
@@ -1553,6 +1568,9 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
                 }
                 commitSnap(reduceThreadSnapshot(snapRef.current, event));
               }
+              if (event.type === "thread.goal.updated") {
+                commitSnap(applyGoalEvent(snapRef.current, event));
+              }
               if (event.type === "page.updated") setHasPage(true);
               if (event.type === "pins.updated") setPinsTick((n) => n + 1);
               if (event.type === "bot.updated") {
@@ -1674,16 +1692,14 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     setError(null);
   }, [threadKey]);
 
-  function runSlashAction(action: SlashActionId) {
-    if (action === "chat-settings") {
-      if (inGroup && groupId) {
-        router.push({ pathname: "/group-settings", params: { groupId } });
-      } else if (botId) {
-        router.push({ pathname: "/bot-settings", params: { botId } });
-      }
-      return;
-    }
-    router.push({ pathname: "/account" });
+  function runSlashAction(action: MobileSlashActionId) {
+    const route = slashActionRoute(action, { inGroup, groupId, botId });
+    if (route) router.push(route as never);
+  }
+
+  function clearGoal() {
+    if (!botId) return;
+    void rpc("threads/clearGoal", { botId }).catch((err) => setError(errorText(err)));
   }
 
   async function send() {
@@ -1801,6 +1817,12 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   const afterDeliveredRef = useRef(afterDelivered);
   afterDeliveredRef.current = afterDelivered;
   useEffect(() => subscribeDelivered((attempt) => afterDeliveredRef.current(attempt)), []);
+  useEffect(() => {
+    setGoalNotice(null);
+    return subscribeGoalReply((key, text) => {
+      if (key === threadKey) setGoalNotice(text);
+    });
+  }, [threadKey]);
   useEffect(() => {
     if (snap && (snap.groupId ?? snap.botId) === threadKey) {
       confirmEchoes(
@@ -2763,6 +2785,15 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
               />
             </GlassSurface>
           ) : null}
+          {goalLine ? <GoalLine goal={goalLine} onClear={clearGoal} /> : null}
+          {goalNotice ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ color: tokens.mutedForeground, marginTop: 12, fontSize: 13 }}
+            >
+              {goalNotice}
+            </Text>
+          ) : null}
           {attachmentNotice ? (
             <Text style={{ color: tokens.warning, marginTop: 12, fontSize: 13 }}>
               {attachmentNotice}
@@ -3540,6 +3571,10 @@ const MessageBubble = memo(function MessageBubble({
       </Pressable>
     );
   }
+  const goalBlock = message.blocks.find(
+    (block): block is Extract<MessageBlock, { kind: "goal" }> => block.kind === "goal",
+  );
+  if (goalBlock) return <GoalCard block={goalBlock} />;
   if (
     isCenteredAgentEvent(message.blocks) &&
     message.blocks.every((block) => block.kind === "meta")

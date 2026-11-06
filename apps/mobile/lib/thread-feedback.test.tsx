@@ -15,6 +15,7 @@ import {
   restoreUnsentSends,
   sendWaitingMessages,
   settleComposer,
+  subscribeGoalReply,
   useThreadFeedback,
 } from "./thread-feedback";
 
@@ -336,5 +337,22 @@ describe("scoped mobile outbox", () => {
     const [send] = request.mock.calls.filter(([proc]) => proc === "threads/send");
     expect(send?.[3]).toBe("space-a");
     expect(attempt.acceptedSeq).toBe(42);
+  });
+  it("shows the server's answer to /goal as a notice, not a failed send", async () => {
+    const replies: Array<[string, string]> = [];
+    const stop = subscribeGoalReply((threadKey, text) => replies.push([threadKey, text]));
+    const attempt = feedback.sendAttempt(payload("/goal"));
+    request
+      .mockResolvedValueOnce({ id: "artifact-a" })
+      .mockRejectedValueOnce(
+        Object.assign(new Error("No goal set."), { status: 400, data: { goalReply: true } }),
+      );
+    await act(async () => {
+      await feedback.send(attempt);
+    });
+    stop();
+    expect(replies).toEqual([["bot-1", "No goal set."]]);
+    expect(notDelivered).not.toHaveBeenCalled();
+    expect(container.textContent).toBe("");
   });
 });

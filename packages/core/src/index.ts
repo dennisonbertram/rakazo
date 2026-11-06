@@ -46,6 +46,7 @@ export * from "./finance/statements.js";
 export * from "./finance/types.js";
 export * from "./finance/vendor.js";
 export * from "./firewall.js";
+export * from "./stopped-work.js";
 export * from "./format-file-size.js";
 export * from "./goal.js";
 export * from "./group-mentions.js";

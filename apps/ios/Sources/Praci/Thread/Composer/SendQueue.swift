@@ -37,6 +37,8 @@ final class SendQueue {
   private(set) var attempts: [SendAttempt] = []
   /// Accepted sends, shown until the live thread catches up to their sequence number.
   private(set) var accepted: [SendAttempt] = []
+  /// A status line the server answered a command with (`/goal`), by thread key. Not an error.
+  var notices: [String: String] = [:]
   /// True while the last try could not reach the server.
   private(set) var offline = false
 
@@ -94,6 +96,7 @@ final class SendQueue {
     scope = nil
     attempts = []
     accepted = []
+    notices = [:]
     offline = false
   }
 
@@ -186,6 +189,13 @@ final class SendQueue {
       let result: SendResult = try await app.call(
         "threads/send", input: Self.sendInput(attempt, ids))
       accept(nonce, seq: result.seq)
+      return nil
+    } catch RPCError.goalReply(let message) {
+      // The server handled the command and sent no message: show its answer and drop the draft.
+      notices[attempt.payload.originThreadKey] = message
+      attempts.removeAll { $0.clientNonce == nonce }
+      disk.forget(attempt)
+      try? disk.save(attempts)
       return nil
     } catch {
       let (outcome, message) = Self.outcome(for: error)

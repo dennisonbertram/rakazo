@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { rpc } from "./api";
 import { t } from "./i18n";
 import type { PickedAttachment } from "./pick-attachments";
+import { isGoalReply } from "./thread-goal";
 
 export type ComposerSnapshot = {
   promptText: string;
@@ -132,6 +133,7 @@ let running: Promise<void> | undefined;
 let pendingForce: boolean | null = null;
 const watchers = new Set<() => void>();
 const deliveredListeners = new Set<(attempt: SendAttempt) => void>();
+const goalReplyListeners = new Set<(threadKey: string, text: string) => void>();
 const echoes = new Map<string, Set<number>>();
 const screens = new Map<string, number>();
 export const OUTBOX_MAX_ENTRIES = 20;
@@ -205,6 +207,12 @@ export function subscribeDelivered(listener: (attempt: SendAttempt) => void) {
     deliveredListeners.delete(listener);
   };
 }
+export function subscribeGoalReply(listener: (threadKey: string, text: string) => void) {
+  goalReplyListeners.add(listener);
+  return () => {
+    goalReplyListeners.delete(listener);
+  };
+}
 export function sendWaitingMessages(force = false): Promise<void> {
   if (running) {
     pendingForce = pendingForce === true || force;
@@ -240,6 +248,14 @@ export function sendWaitingMessages(force = false): Promise<void> {
           else changed();
         } catch (error) {
           if (!inScope(attempt)) continue;
+          if (isGoalReply(error)) {
+            // The answer to a bare /goal is a status, not a failed send: nothing to retry or keep.
+            remove(attempt);
+            const text = (error as Error).message;
+            for (const listener of goalReplyListeners)
+              listener(attempt.payload.originThreadKey, text);
+            continue;
+          }
           const detail = error as { status?: number; cause?: { status?: number } } | null;
           const status = detail?.status;
           const offline = isServerUnreachable(error) || (status ?? detail?.cause?.status) === 429;
