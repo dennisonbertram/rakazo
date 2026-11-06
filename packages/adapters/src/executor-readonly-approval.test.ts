@@ -290,7 +290,13 @@ function fixture({
   scriptedRuntime = false,
   companyDocs = [] as { path: string; content: string }[],
   goalId = null as string | null,
+  fragmentKey,
+  failFragmentWrites = false,
 }: {
+  /** Keeps the run's record of what it read in run_fragments, hashed with this key. */
+  fragmentKey?: string;
+  /** The run_fragments write fails. */
+  failFragmentWrites?: boolean;
   /** The goal the run's row points to at the start. `attachGoal` changes it while the run lives. */
   goalId?: string | null;
   /** The owner's company context sections. */
@@ -512,7 +518,17 @@ function fixture({
       },
     ),
   };
+  const fragmentRows: Record<string, unknown>[] = [];
   const prisma = {
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
+    runFragment: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        if (failFragmentWrites) throw new Error("fragment write failed");
+        fragmentRows.push(data);
+        return data;
+      }),
+      findMany: vi.fn(async () => fragmentRows),
+    },
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     routine: {
       findUnique: vi.fn(async () => ({
@@ -973,6 +989,7 @@ function fixture({
     shutdownSignal,
     web,
     mail,
+    ...(fragmentKey ? { fragmentKey } : {}),
     ...(ticketBoard ? { ticketBoardEnabled: true } : {}),
     ...(messaging ? { messaging } : {}),
     ...(googleConnectors ? { connectors: {} } : {}),
@@ -982,6 +999,10 @@ function fixture({
     rules,
     web,
     fetchedUrls,
+    fragmentRows,
+    forgetFragmentRecord: () => {
+      (run as Record<string, unknown>).fragmentRecord = false;
+    },
     finalizeRun,
     events: { append: appendEvent },
     offeredTools,
@@ -4973,6 +4994,31 @@ describe("what a run read is checked before it reaches an external bot", () => {
     expect(await later.outbound!()).toBeUndefined();
   });
 
+  it("knows a resumed run's earlier reads from the stored record, and holds without it", async () => {
+    sentBotMessages.calls.length = 0;
+    const f = fixture({ name: "message_bot", builtin: true, fragmentKey: "test-key" });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "again" }, executionId: "c2" }]);
+    await f.run();
+    const later = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect(await later.outbound!()).toBeDefined();
+    // A run first claimed before records were kept has no trustworthy record.
+    f.forgetFragmentRecord();
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "third" }, executionId: "c3" }]);
+    await f.run();
+    const third = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect(await third.outbound!()).toBeUndefined();
+  });
+
+  it("does not return a tool result whose record could not be written", async () => {
+    const f = fixture({ fragmentKey: "test-key", failFragmentWrites: true });
+    f.setCalls([{ args: { id: "Total 1,250,000" }, executionId: "read-1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.results).toEqual([]);
+    expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "failed" }));
+  });
+
   it("records an internal bot's plain-text relay as private, names included", async () => {
     sentBotMessages.calls.length = 0;
     const f = fixture({
@@ -6500,10 +6546,7 @@ describe("finance reads after outside content", () => {
     // The first fetch of a new site asks; once the owner approves it, the run has read a page.
     f.effects[0]!.status = "approved";
     await f.run();
-    expect(f.effects.map((effect) => effect.kind)).toEqual([
-      "web_fetch",
-      "finance_transactions",
-    ]);
+    expect(f.effects.map((effect) => effect.kind)).toEqual(["web_fetch", "finance_transactions"]);
     expect(f.effects[1]!.status).not.toBe("approved");
   });
 
@@ -7324,6 +7367,29 @@ describe("fetching new sites without a card", () => {
     await f.run();
     expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("keeps checking fetches for repeated reads after a card was answered (a resumed run)", async () => {
+    const f = fixture({ rules: allSites, fragmentKey: "test-key" });
+    f.setCalls([
+      { name: "demo_get_item", args: { id: "Budget 1,250,000" }, executionId: "read-1" },
+    ]);
+    await f.run();
+    // Answering a card resumes the run under a later lease.
+    f.setCalls([
+      { ...fetchNew, executionId: "call-1" },
+      {
+        name: "web_fetch",
+        args: { url: "https://www.npmjs.com/package/y?q=1250000" },
+        executionId: "call-2",
+      },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    const card = (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: { approvalReason?: string }[] }][]
+    )[0]![0].blocks[0]!;
+    expect(card.approvalReason).toBe("Held before fetching: URL repeats private text.");
   });
 
   it("does not honour the rule for a firewalled agent, a tainted run or a webhook run", async () => {

@@ -1700,6 +1700,7 @@ describe("computer execution leases", () => {
     const client = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       threadGoal: { findFirst: vi.fn(async () => null) },
       thread: {
         update: vi

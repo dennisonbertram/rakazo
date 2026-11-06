@@ -358,6 +358,19 @@ describePostgres("row-level security (PostgreSQL)", () => {
         }),
       );
       keep(
+        "runFragment",
+        (await o.runFragment.create({
+          data: {
+            runId: run.id,
+            spaceId: t.spaceId,
+            userId: t.userId,
+            fence: 1,
+            keyId: "k",
+            entries: Buffer.alloc(17),
+          },
+        })) as unknown as { id: string },
+      );
+      keep(
         "routine",
         await o.routine.create({
           data: {

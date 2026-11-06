@@ -273,6 +273,7 @@ async function main() {
     mcpStdio,
     deploymentModelKey,
     deploymentModelConfigured,
+    fragmentKey: encryptionKey,
     dataDir,
     notificationEvents,
     jobs,
