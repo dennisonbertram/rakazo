@@ -811,4 +811,11 @@ describe("buildApprovalAskBlock argument summaries", () => {
     const block = ask("calendar_agenda", { from: "2026-11-09T05:00:00Z" }, undefined, "Nope/Zone");
     expect(block.detail).toBe("range: from Nov 9, 2026, 5:00 AM UTC");
   });
+
+  it("escapes Markdown and drops newlines in the recipient name", () => {
+    const block = ask("message_bot", { bot_id: "b", message: "hi" }, "Evil *bot*\n[x](http://y)");
+    expect(block.text).not.toContain("\n");
+    expect(block.text).toContain("\\*bot\\*");
+    expect(block.text).not.toContain("](");
+  });
 });

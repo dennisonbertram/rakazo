@@ -777,11 +777,7 @@ export async function resolveHtmlPageData(
     if (!latest || source.status === "pending" || source.status === "denied") continue;
     const cost = latest.bytes + HTML_ENTRY_OVERHEAD_BYTES;
     if (cost > budget) {
-      sources[name] = {
-        status: "failed",
-        fetchedAt: latest.fetchedAt.toISOString(),
-        error: "Too large to show.",
-      };
+      sources[name] = { status: "failed", fetchedAt: latest.fetchedAt.toISOString(), error: "Too large to show." };
       continue;
     }
     budget -= cost;
@@ -798,9 +794,7 @@ export async function resolveHtmlPageData(
     budget -= cost;
     chosen.push(candidate);
   }
-  const ids = [
-    ...new Set([...latestIds.map((entry) => entry.id), ...chosen.map((entry) => entry.id)]),
-  ];
+  const ids = [...new Set([...latestIds.map((entry) => entry.id), ...chosen.map((entry) => entry.id)])];
   const values = new Map(
     ids.length
       ? (
@@ -818,15 +812,11 @@ export async function resolveHtmlPageData(
   for (const candidate of chosen) {
     const target = sources[candidate.name];
     if (!target || !values.has(candidate.id)) continue;
-    (target.history ??= []).push({
-      at: candidate.at.toISOString(),
-      value: values.get(candidate.id),
-    });
+    (target.history ??= []).push({ at: candidate.at.toISOString(), value: values.get(candidate.id) });
   }
   // A history source whose entries were all dropped still says it has history, so a page can tell.
   for (const name of declaration.history) {
-    const target =
-      sources[declaration.sources.find((n) => n.toLowerCase() === name.toLowerCase()) ?? name];
+    const target = sources[declaration.sources.find((n) => n.toLowerCase() === name.toLowerCase()) ?? name];
     if (target && target.status !== "missing") target.history ??= [];
   }
   return { kind: "html", pageId: page.id, revision: page.revision, sources };

@@ -213,7 +213,11 @@ export function prepareAgentConnectionResponse(
   );
 }
 
-async function prepareResponse(prisma: PrismaClient, targetBotId: string, accept: boolean) {
+async function prepareResponse(
+  prisma: PrismaClient,
+  targetBotId: string,
+  accept: boolean,
+) {
   const pending = await prisma.agentConnection.findFirst({
     where: { targetBotId, status: "pending" },
     orderBy: { updatedAt: "desc" },

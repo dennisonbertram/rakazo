@@ -19,7 +19,10 @@ const SUB_DAILY_MS = 6 * 3_600_000;
 const MAX_OCCURRENCES_PER_ROUTINE = 100;
 const MAX_ROUTINE_ITEMS = 500;
 
-export type CalendarAgendaDeps = Pick<CalendarToolDeps, "connectors" | "google"> & {
+export type CalendarAgendaDeps = Pick<
+  CalendarToolDeps,
+  "connectors" | "google"
+> & {
   prisma: Pick<PrismaClient, "scratchpadItem" | "inboxTodo" | "routine">;
 };
 
@@ -60,9 +63,11 @@ export async function calendarAgenda(
           account.label,
         ).catch((error: unknown) => ({
           items: [] as CalendarItem[],
-          failed: error instanceof TimeoutError ? error.message : errorText(error),
+          failed:
+            error instanceof TimeoutError ? error.message : errorText(error),
         }));
-        if (result.failed) errors.push({ account: account.label, message: result.failed });
+        if (result.failed)
+          errors.push({ account: account.label, message: result.failed });
         return result.items;
       }),
     ),
@@ -122,7 +127,10 @@ export async function calendarAgenda(
         }),
   ]);
   const local = (
-    item: Pick<CalendarItem, "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId">,
+    item: Pick<
+      CalendarItem,
+      "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId"
+    >,
     start: Date,
   ): CalendarItem => ({
     ...item,
@@ -187,7 +195,10 @@ function routineItems(
   rows: RoutineRow[],
   range: { from: Date; to: Date },
   local: (
-    item: Pick<CalendarItem, "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId">,
+    item: Pick<
+      CalendarItem,
+      "id" | "kind" | "title" | "allDay" | "botId" | "botName" | "mailId"
+    >,
     start: Date,
   ) => CalendarItem,
 ): CalendarItem[] {
@@ -202,12 +213,21 @@ function routineItems(
     };
     if (isOneShotRoutineCrons(row.crons)) {
       if (row.nextRunAt >= range.from)
-        items.push(local({ ...base, id: `routine:${row.id}`, kind: "check_back" }, row.nextRunAt));
+        items.push(
+          local(
+            { ...base, id: `routine:${row.id}`, kind: "check_back" },
+            row.nextRunAt,
+          ),
+        );
       continue;
     }
     let at: Date | null = row.nextRunAt;
     let first = true;
-    for (let n = 0; at && at < range.to && n < MAX_OCCURRENCES_PER_ROUTINE; n++) {
+    for (
+      let n = 0;
+      at && at < range.to && n < MAX_OCCURRENCES_PER_ROUTINE;
+      n++
+    ) {
       if (at >= range.from)
         items.push(
           local(
@@ -244,9 +264,13 @@ async function withTimeout<T>(
 ): Promise<T> {
   const timeout = AbortSignal.timeout(ms);
   const timedOut = new Promise<never>((_, reject) =>
-    timeout.addEventListener("abort", () => reject(new TimeoutError(`Couldn't load ${label}`)), {
-      once: true,
-    }),
+    timeout.addEventListener(
+      "abort",
+      () => reject(new TimeoutError(`Couldn't load ${label}`)),
+      {
+        once: true,
+      },
+    ),
   );
   return Promise.race([
     work({ ...context, signal: AbortSignal.any([context.signal, timeout]) }),
@@ -274,7 +298,12 @@ async function accountEvents(
     );
     for (const entry of Array.isArray(listed?.items) ? listed.items : []) {
       const record = asRecord(entry);
-      if (record && record.selected === true && !record.deleted && str(record.id))
+      if (
+        record &&
+        record.selected === true &&
+        !record.deleted &&
+        str(record.id)
+      )
         calendars.push(record);
     }
     pageToken = str(listed?.nextPageToken);
@@ -322,8 +351,13 @@ function eventItem(
   const event = asRecord(raw);
   const id = str(event?.id);
   if (!event || !id || event.status === "cancelled") return null;
-  const attendees = Array.isArray(event.attendees) ? event.attendees.map(asRecord) : [];
-  if (attendees.some((a) => a?.self === true && a.responseStatus === "declined")) return null;
+  const attendees = Array.isArray(event.attendees)
+    ? event.attendees.map(asRecord)
+    : [];
+  if (
+    attendees.some((a) => a?.self === true && a.responseStatus === "declined")
+  )
+    return null;
   const when = (value: unknown) => {
     const point = asRecord(value);
     const dateTime = str(point?.dateTime);

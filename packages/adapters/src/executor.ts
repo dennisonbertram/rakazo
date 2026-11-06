@@ -2230,6 +2230,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // message that arrives while another run is active still marks the run that answers it.
         // An external bot is held by its fixed tool list instead.
         // Agent firewall: the taint is stored on the run so every chained run inherits it.
+        // Whether the mark was already on the run when it started (inherited or from its trigger),
+        // before anything in this run could set it.
+        const startedTainted = run.externalTaint === true;
         const storeExternalTaint = async () => {
           run.externalTaint = true;
           await deps.prisma.run.updateMany({
@@ -6331,7 +6334,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               ? EXTERNAL_REQUEST_REASON
               : EXTERNAL_CONTENT_RUN_TRIGGERS.has(run.trigger)
                 ? "Asked because this run started from outside Praci."
-                : run.trigger === "bot_message" && senderName
+                : run.trigger === "bot_message" && senderName && startedTainted
                   ? `Asked because ${senderName}'s message may carry outside text.`
                   : "Asked because an earlier step read outside content.";
           const approvalCardReason = repeatsSentEmail
@@ -6497,13 +6500,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
               protectedArchive ||
               agentAccountWrite ||
               COMPANY_TOOL_NAMES.has(name);
+            // The same scoped lookup message_bot uses, so either addressing form names the bot.
             const recipientBot =
-              name === "message_bot" && typeof args.bot_id === "string"
-                ? (
-                    await deps.prisma.bot.findFirst({
-                      where: { id: args.bot_id, spaceId: run.spaceId, userId: bot.userId },
-                      select: { name: true },
-                    })
+              name === "message_bot"
+                ? resolveBotAddress(
+                    await deps.prisma.bot.findMany({
+                      where: { spaceId: run.spaceId, userId: run.userId, archivedAt: null },
+                      select: { id: true, name: true, spawnKey: true },
+                    }),
+                    {
+                      botId: args.bot_id ? String(args.bot_id) : undefined,
+                      name: args.confirm_name ? String(args.confirm_name) : undefined,
+                    },
                   )?.name
                 : undefined;
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {

@@ -987,6 +987,10 @@ function fixture({
     mailReplyRows,
     results,
     storedTaint: () => run.externalTaint,
+    /** Marks the run mid-way, as the executor does after a Firewall read. */
+    markTainted: () => {
+      run.externalTaint = true;
+    },
     jobsEnqueue,
     /** The owner sets a goal while the run is live (the send path updates the run's row). */
     attachGoal: (id: string) => {
@@ -4705,6 +4709,38 @@ describe("runs that began with an external bot", () => {
         peer: { senderInScope: true, linked: false },
       });
       expect(reason).toBe("Asked because Peer's message may carry outside text.");
+    });
+
+    it("a clean bot_message run tainted mid-run does not blame the sender", async () => {
+      const f = fixture({
+        name: "web_fetch",
+        builtin: true,
+        trigger: "bot_message",
+        peer: { senderInScope: true, linked: false },
+        beforeToolCall: () => f.markTainted(),
+      });
+      f.setCalls([{ args: { url: "https://example.invalid" }, executionId: "c1" }]);
+      await f.run();
+      expect(askBlock(f).approvalReason).toBe(
+        "Asked because an earlier step read outside content.",
+      );
+    });
+
+    it("a message_bot card names the recipient by id or by name", async () => {
+      for (const args of [{ bot_id: "bot-fin" }, { confirm_name: "bot-fin" }]) {
+        const f = fixture({
+          name: "message_bot",
+          builtin: true,
+          trigger: "mcp",
+          unattended: false,
+          externalTaint: true,
+          knownBots: { "bot-fin": "" },
+        });
+        f.setCalls([{ args: { ...args, message: "hello" }, executionId: "c1" }]);
+        await f.run();
+        expect(f.pauseRunForInput).toHaveBeenCalled();
+        expect((askBlock(f) as unknown as { text: string }).text).toContain("→ bot-fin");
+      }
     });
 
     it("an earlier step that read outside content says so", async () => {

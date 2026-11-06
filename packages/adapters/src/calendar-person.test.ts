@@ -57,8 +57,6 @@ describe("personCalendarMeetings", () => {
         href: "https://cal.example.test/1",
       },
     ]);
-    expect((google.request.mock.calls[0]?.[0] as unknown as { url: string }).url).toContain(
-      "q=kevin%40acme.example.test",
-    );
+    expect((google.request.mock.calls[0]?.[0] as unknown as { url: string }).url).toContain("q=kevin%40acme.example.test");
   });
 });

@@ -123,9 +123,7 @@ describe("update_bot and the firewall flag", () => {
   it("does not offer a proactivity field, and an agent cannot raise its own level", () => {
     expect(JSON.stringify(update?.inputSchema)).not.toMatch(/proactiv/i);
     const parsed = parseUpdateBotPatch({ proactivity: "high", name: "Ada" }, "Ada");
-    expect(parsed).toEqual({
-      patch: expect.not.objectContaining({ proactivity: expect.anything() }),
-    });
+    expect(parsed).toEqual({ patch: expect.not.objectContaining({ proactivity: expect.anything() }) });
     const only = parseUpdateBotPatch({ proactivity: "high" }, "Ada");
     expect("patch" in only ? Object.keys(only.patch) : []).toEqual([]);
   });

@@ -751,7 +751,12 @@ function summaryArgs(
     const message = typeof args.message === "string" ? args.message.trim().split(/\r?\n/)[0] : "";
     return {
       ...args,
-      to: recipientBot ?? args.bot_id,
+      to: (recipientBot
+        ? sanitizeMessagingLabel(recipientBot)
+        : typeof args.bot_id === "string"
+          ? args.bot_id
+          : undefined
+      )?.replace(CARD_TITLE_ESCAPED, "\\$&"),
       message: message ? truncate(message, 200) : undefined,
     };
   }
