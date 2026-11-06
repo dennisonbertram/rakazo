@@ -6500,7 +6500,7 @@ describe("finance reads after outside content", () => {
     // The first fetch of a new site asks; once the owner approves it, the run has read a page.
     f.effects[0]!.status = "approved";
     await f.run();
-    expect(f.effects.map((effect) => effect.toolName ?? effect.kind)).toEqual([
+    expect(f.effects.map((effect) => effect.kind)).toEqual([
       "web_fetch",
       "finance_transactions",
     ]);
