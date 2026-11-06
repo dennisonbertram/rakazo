@@ -6822,6 +6822,78 @@ describe("agent firewall", () => {
       expect(card.mail).toBeDefined();
     });
 
+    it("sends a new email from a Firewall agent on a full card with no Always, after Allow", async () => {
+      const mail = {
+        ...supportMail(),
+        createDraft: vi.fn(async () => ({ draftId: "d1" })),
+        sendDraft: vi.fn(async () => ({ messageId: "sent-1", threadId: "t-new" })),
+      };
+      const f = fixture({
+        name: "mail_send",
+        builtin: true,
+        firewall: true,
+        rules: allowAll,
+        mail,
+        connectionRows: granted(),
+      });
+      Object.assign(f.prisma.composeSend, {
+        upsert: vi.fn(async () => ({ id: "cs1", state: "draft", draftId: null })),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        update: vi.fn(async () => ({})),
+      });
+      f.setCalls([
+        {
+          args: {
+            to: ["Pat Lee <pat@new.example>"],
+            subject: "Feedback?",
+            body: "See https://us.example/form",
+          },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(isApprovalPausedResult(f.results[0])).toBe(true);
+      const card = cardOf(f);
+            expect(card.detail).toContain("to: pat@new.example");
+      expect(card.detail).not.toContain("Pat Lee");
+      expect(card.detail).toContain("body: See https://us.example/form");
+      expect(card.detail).toContain("New recipient");
+      expect(card.detail).toContain("Has a link");
+      expect(card.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
+      expect(mail.sendDraft).not.toHaveBeenCalled();
+      f.effects[0]!.status = "approved";
+      await f.run();
+      expect(mail.sendDraft).toHaveBeenCalledOnce();
+    });
+
+    it("shows the full mail card to a tainted run that is not a Firewall run", async () => {
+      const f = fixture({
+        name: "mail_send",
+        builtin: true,
+        externalTaint: true,
+        mail: supportMail(),
+        connectionRows: granted(),
+      });
+      f.setCalls([
+        {
+          args: {
+            account: "support@us.example",
+            to: ["Pat Lee <pat@new.example>"],
+            subject: "Hi",
+            body: "Whole body here",
+          },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      const card = cardOf(f);
+            expect(card.detail).toContain("from: support@us.example");
+      expect(card.detail).toContain("to: pat@new.example");
+      expect(card.detail).toContain("body: Whole body here");
+      expect(card.detail).toContain("New recipient");
+      expect(card.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
+    });
+
     it("keeps the Block rule and the page-write ask", async () => {
       const f = fixture({
         name: "page_write",
@@ -7936,6 +8008,12 @@ describe("mail_reply_batch", () => {
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
       expect(f.mailReplyRows).toEqual([]);
       expect(f.results[0]).toEqual({ error: expect.any(String) });
+    });
+
+    it("tells the agent to send each new email with mail_send", async () => {
+      const f = batchRun({ firewall: true, ...access }, { replies: [replies[0], newEmail] });
+      await f.run();
+      expect(f.results[0]).toEqual({ error: expect.stringContaining("mail_send") });
     });
 
     it("still gives a firewalled agent its replies", async () => {

@@ -21,6 +21,7 @@ import {
 import {
   ALL_SITES_ACTION_ID,
   ALL_SITES_ACTION_LABEL,
+  bodyHasLink,
   humanizeToolName,
   providerLabel,
   redactSecrets,
@@ -147,7 +148,7 @@ export function buildApprovalAskBlock(
       : options?.imessage
         ? imessageSendDetail(args, options.imessage, options.reviewReason)
         : options?.fullMail
-          ? fullMailDetail(args, options.reviewReason)
+          ? fullMailDetail(args, options.reviewReason, options.mailAccount)
           : isSendMoney(toolName)
             ? moneyDetail(args, options?.moneyNames, options?.reviewReason)
             : options?.fullCompany
@@ -577,14 +578,30 @@ function imessageSendDetail(
   return lines.join("\n");
 }
 
-/** Every recipient, Bcc included, and the whole body. */
-function fullMailDetail(args: Record<string, unknown>, reviewReason?: string): string {
+/**
+ * The sending account, every recipient (Bcc included) as a bare address, the subject, the whole
+ * body, and the flags a new email earns. The model writes display names, so none is shown.
+ */
+function fullMailDetail(
+  args: Record<string, unknown>,
+  reviewReason?: string,
+  account?: string,
+): string {
   const lines = reviewReason?.trim() ? [reviewReason.trim()] : [];
+  const from = typeof args.account === "string" && args.account ? args.account : account;
+  if (from) lines.push(`from: ${from}`);
   for (const key of ["to", "cc", "bcc"]) {
-    const list = strings(args[key]);
+    const list = strings(args[key]).map((entry) => entry.match(/<([^>]+)>\s*$/)?.[1] ?? entry);
     lines.push(`${key}: ${list.length ? list.join(", ") : "(none)"}`);
   }
-  lines.push(`subject: ${String(args.subject ?? "")}`, `body: ${String(args.body ?? "")}`);
+  const body = String(args.body ?? "");
+  lines.push(`subject: ${String(args.subject ?? "")}`, `body: ${body}`);
+  const isReply = typeof args.replyToId === "string" && args.replyToId.trim() !== "";
+  const flags = [
+    ...(isReply ? [] : [MAIL_REPLY_FLAG_TEXT.new_recipient]),
+    ...(bodyHasLink(body) ? [MAIL_REPLY_FLAG_TEXT.has_link] : []),
+  ];
+  if (flags.length) lines.push(`flags: ${flags.join(", ")}`);
   return lines.join("\n");
 }
 

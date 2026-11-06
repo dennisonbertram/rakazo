@@ -3117,6 +3117,7 @@ describe("userTurnInstructions", () => {
       expect(description("search_history")).toContain("Coverage applies only");
       expect(description("pins_write")).toContain("at most 60 characters");
       expect(description("mail_reply_batch")).toContain("only the people the user asked for");
+      expect(description("mail_reply_batch")).toContain("mail_send");
       expect(description("mail_reply_batch")).toContain("can only reply");
       expect(description("message_bot")).toContain("Do not poll");
     });
