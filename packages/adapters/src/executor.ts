@@ -2235,6 +2235,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // message that arrives while another run is active still marks the run that answers it.
         // An external bot is held by its fixed tool list instead.
         // Agent firewall: the taint is stored on the run so every chained run inherits it.
+        // Whether the mark was already on the run when it started (inherited or from its trigger),
+        // before anything in this run could set it.
+        const startedTainted = run.externalTaint === true;
         const storeExternalTaint = async () => {
           run.externalTaint = true;
           await deps.prisma.run.updateMany({
@@ -6327,6 +6330,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // One plain line on the card, only for a background, tainted or rule-caused ask. A goal
           // continuation is the owner's own run, restricted after reading outside content, so
           // it never says an external bot asked.
+          // Say where the mark really came from. The stored mark has several sources (the trigger,
+          // the Firewall, an earlier run that passed it on), and only a real external chain means
+          // an external bot asked.
+          const senderName = peerMessage?.fromBotName;
+          const taintReason =
+            externalChain !== undefined
+              ? EXTERNAL_REQUEST_REASON
+              : EXTERNAL_CONTENT_RUN_TRIGGERS.has(run.trigger)
+                ? "Asked because this run started from outside Praci."
+                : run.trigger === "bot_message" && senderName && startedTainted
+                  ? `Asked because ${senderName}'s message may carry outside text.`
+                  : "Asked because an earlier step read outside content.";
           const approvalCardReason = repeatsSentEmail
             ? MAIL_ALREADY_SENT_REASON
             : firewallAskCall
@@ -6334,7 +6349,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               : requiresUnattendedApproval || mailModifyNeedsToolRule
                 ? "Asked because this ran in the background."
                 : externalTaintedCall && run.trigger !== "goal"
-                  ? EXTERNAL_REQUEST_REASON
+                  ? taintReason
                   : meetingTaintedCall && !meetingAgent
                     ? MEETING_MARK_REASON
                     : approvalResolved.source === "require_approval" && actionType
@@ -6490,11 +6505,28 @@ export function createRunExecutor(deps: ExecutorDeps) {
               protectedArchive ||
               agentAccountWrite ||
               COMPANY_TOOL_NAMES.has(name);
+            // The same scoped lookup message_bot uses, so either addressing form names the bot.
+            const recipientBot =
+              name === "message_bot"
+                ? resolveBotAddress(
+                    await deps.prisma.bot.findMany({
+                      where: { spaceId: run.spaceId, userId: run.userId, archivedAt: null },
+                      select: { id: true, name: true, spawnKey: true },
+                    }),
+                    {
+                      botId: args.bot_id ? String(args.bot_id) : undefined,
+                      name: args.confirm_name ? String(args.confirm_name) : undefined,
+                    },
+                  )?.name
+                : undefined;
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
+              recipientBot,
+              timezone: userTimezone,
               // The card's reason line already says "Requested by an external bot".
               reviewReason:
                 externalTaintedCall &&
                 run.trigger !== "goal" &&
+                externalChain !== undefined &&
                 approvalCardReason !== EXTERNAL_REQUEST_REASON
                   ? [EXTERNAL_REQUEST_REASON, reviewReason].filter(Boolean).join("\n")
                   : reviewReason,
@@ -11377,6 +11409,8 @@ const ACTION_TYPE_LABELS: Record<NonNullable<ReturnType<typeof actionTypeForTool
 };
 
 /** First line of the reason on a card for a call in a run that began with an external bot. */
+const EXTERNAL_CONTENT_RUN_TRIGGERS = new Set(["webhook", "messaging", "mcp"]);
+
 export const EXTERNAL_REQUEST_REASON = "Requested by an external bot";
 
 /** The mail reads the firewall holds to the support scope. */
