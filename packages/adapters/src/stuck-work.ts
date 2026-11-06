@@ -148,10 +148,19 @@ export async function expireSupersededRoutineRuns(
   },
   input: { routineId: string; exceptRunId: string },
 ) {
+  // Only runs started before the initiating one: a slow sweep must not close a newer run.
+  const starter = await deps.prisma.run.findUnique({
+    where: { id: input.exceptRunId },
+    select: { createdAt: true },
+  });
+  if (!starter) return;
   const older = await deps.prisma.run.findMany({
     where: {
       routineId: input.routineId,
-      id: { not: input.exceptRunId },
+      OR: [
+        { createdAt: { lt: starter.createdAt } },
+        { createdAt: starter.createdAt, id: { lt: input.exceptRunId } },
+      ],
       trigger: "routine",
       unattended: true,
       status: "waiting_input",

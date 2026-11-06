@@ -120,7 +120,15 @@ describePostgres("a new routine run closing older runs waiting on approval (Post
       });
     const card = await effect("shell", 0);
     const other = await effect("contacts_list", 1);
-    if (opts.waiting === false) return { run, card, other };
+    if (opts.waiting === false) {
+      // Dated ahead so the 24-hour reconcile in background-approval-expiry.postgres.test.ts, which
+      // scans the whole database when it runs in parallel, never sees these runs as stale.
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { updatedAt: new Date(Date.now() + 7 * 24 * 60 * 60_000) },
+      });
+      return { run, card, other };
+    }
     await createThreadEvents(prisma).pauseRunForInput({
       spaceId: ids.space,
       threadId,
@@ -141,6 +149,12 @@ describePostgres("a new routine run closing older runs waiting on approval (Post
           ],
         },
       ],
+    });
+    // Dated ahead so the 24-hour reconcile in background-approval-expiry.postgres.test.ts, which
+    // scans the whole database when it runs in parallel, never sees these runs as stale.
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { updatedAt: new Date(Date.now() + 7 * 24 * 60 * 60_000) },
     });
     return { run, card, other };
   }
@@ -185,6 +199,16 @@ describePostgres("a new routine run closing older runs waiting on approval (Post
     }
     expect(await status(running.run.id)).toBe("running");
     expect(await effectStatus(running.card.id)).toBe("intended");
+  });
+
+  it("leaves a newer waiting run alone when an older run's sweep arrives late", async () => {
+    const routineId = await routine();
+    const older = await waitingCard(routineId);
+    const newer = await waitingCard(routineId);
+    await supersede(routineId, older.run.id);
+    expect(await status(newer.run.id)).toBe("waiting_input");
+    expect(await effectStatus(newer.card.id)).toBe("intended");
+    expect(await status(older.run.id)).toBe("waiting_input");
   });
 
   it("does nothing when the expired card is answered afterwards", async () => {
