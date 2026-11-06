@@ -260,6 +260,7 @@ describePostgres("omiCloud.* (PostgreSQL)", () => {
         })),
       ),
     });
+    for (const c of many.conversationIds()) if (c.endsWith("-1")) many.listWithoutTranscript.add(c);
     const manyRegistry = createMeetingSourceRegistry({ omiCloudBaseUrl: await many.start() });
     try {
       const [bRow] = await connections(userB);
@@ -280,14 +281,18 @@ describePostgres("omiCloud.* (PostgreSQL)", () => {
         ).length;
       const stored = () =>
         prisma.meeting.count({ where: { spaceId, userId: userB, provider: "omi_cloud" } });
+      // Fallback detail calls count in the same budget: no job makes more than two.
+      let before = transcriptCalls();
       await run();
-      expect(transcriptCalls()).toBe(2);
+      expect(transcriptCalls() - before).toBeLessThanOrEqual(2);
       const first = await stored();
       expect(first).toBeGreaterThan(0);
-      await run();
-      expect(transcriptCalls()).toBeLessThanOrEqual(4);
+      for (let i = 0; i < 12; i++) {
+        before = transcriptCalls();
+        await run();
+        expect(transcriptCalls() - before).toBeLessThanOrEqual(2);
+      }
       expect(await stored()).toBeGreaterThan(first);
-      for (let i = 0; i < 8; i++) await run();
       const total = transcriptCalls();
       await run();
       expect(transcriptCalls()).toBe(total);

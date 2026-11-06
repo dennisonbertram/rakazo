@@ -60,23 +60,72 @@ describe("omi cloud source", () => {
     expect(emulator.requests).toHaveLength(4);
   });
 
-  it("keeps a long conversation that started before a short one that finished before the boundary", async () => {
-    const conv = (id: string, start: string, end: string) => ({
+  it("finds a recording uploaded late: it is ordered, cut off and windowed by created_at", async () => {
+    const conv = (id: string, start: string, end: string, createdAt: string) => ({
       id,
       title: id,
       overview: "Something was said.",
       startedAt: start,
       finishedAt: end,
-      segments: [],
+      createdAt,
+      segments: [{ text: `Words in ${id}` }],
     });
-    const { source } = await setup({
+    const { emulator, baseUrl } = await setupBase({
       conversations: [
-        conv("short", "2026-02-05T09:50:00.000Z", "2026-02-05T09:55:00.000Z"),
-        conv("long", "2026-02-05T09:00:00.000Z", "2026-02-05T10:30:00.000Z"),
+        conv(
+          "fresh",
+          "2026-02-05T09:00:00.000Z",
+          "2026-02-05T09:30:00.000Z",
+          "2026-02-05T09:30:00.000Z",
+        ),
+        // Started three days ago, uploaded just now.
+        conv(
+          "late",
+          "2026-02-02T09:00:00.000Z",
+          "2026-02-02T09:30:00.000Z",
+          "2026-02-05T08:00:00.000Z",
+        ),
+        conv(
+          "old",
+          "2026-01-20T09:00:00.000Z",
+          "2026-01-20T09:30:00.000Z",
+          "2026-01-20T09:30:00.000Z",
+        ),
       ],
     });
-    const page = await source.list({ updatedAfter: new Date("2026-02-05T10:00:00.000Z") });
-    expect(page.items.map((i) => i.externalId)).toEqual(["short", "long"]);
+    const source = createOmiCloudMeetingSource({ apiKey: KEY, baseUrl, maxTranscriptCalls: 2 });
+    const page = await source.list({ updatedAfter: new Date("2026-02-05T00:00:00.000Z") });
+    expect(page.items.map((i) => i.externalId)).toEqual(["fresh", "late"]);
+    expect(page.nextCursor).toBeUndefined();
+    // Its day window is the day it was created (Feb 5), where Omi filters it.
+    await source.get("late", { includeTranscript: true });
+    expect(emulator.requests.at(-1)?.query).toContain("start_date=2026-02-05T00%3A00%3A00.000Z");
+  });
+
+  it("stops a run before a detail fallback that would spend more than the budget", async () => {
+    const conv = (id: string, hour: number) => ({
+      id,
+      title: id,
+      overview: "Something was said.",
+      startedAt: `2026-02-05T0${hour}:00:00.000Z`,
+      finishedAt: `2026-02-05T0${hour}:30:00.000Z`,
+      segments: [{ text: `Words in ${id}` }],
+    });
+    const { emulator, baseUrl } = await setupBase({
+      conversations: [conv("x1", 1), conv("x2", 2)],
+    });
+    emulator.listWithoutTranscript.add("x1");
+    emulator.listWithoutTranscript.add("x2");
+    const source = createOmiCloudMeetingSource({ apiKey: KEY, baseUrl, maxTranscriptCalls: 1 });
+    await source.list({});
+    // The window call spends the one call, and the list left x2 without a transcript.
+    await expect(source.get("x2", { includeTranscript: true })).rejects.toMatchObject({
+      kind: "budget",
+    });
+    expect(
+      emulator.requests.filter((r) => r.query.includes("include_transcript=true")),
+    ).toHaveLength(1);
+    expect(source.canGet?.("x1")).toBe(false);
   });
 
   it("gives a conversation a new version when its overview changes, and the same one when not", async () => {

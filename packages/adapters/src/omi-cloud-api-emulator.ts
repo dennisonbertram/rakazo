@@ -2,6 +2,8 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { OmiCloudSegment } from "@rakazo/contracts";
 
+const createdOf = (c: { createdAt?: string; finishedAt: string }) => c.createdAt ?? c.finishedAt;
+
 export interface OmiEmulatorConversation {
   id: string;
   title: string;
@@ -9,6 +11,8 @@ export interface OmiEmulatorConversation {
   actionItems?: string[];
   startedAt: string;
   finishedAt: string;
+  /** When Omi stored it (a late upload is created long after it started). Default: finishedAt. */
+  createdAt?: string;
   segments: OmiCloudSegment[];
 }
 
@@ -80,7 +84,7 @@ export interface OmiCloudApiEmulatorOptions {
 /**
  * Offline stand-in for the Omi Developer API endpoints the sync uses: conversations list (cursor
  * paging through `x-omi-next-cursor` and `x-omi-has-more`), conversation detail with
- * `include_transcript`, and an empty memories list. Encodes what the S0 probe saw. Newest first.
+ * `include_transcript`, and an empty memories list. Encodes what the S0 probe saw. Newest created first, as Omi orders and filters.
  */
 export class OmiCloudApiEmulator {
   readonly apiKey: string;
@@ -104,8 +108,12 @@ export class OmiCloudApiEmulator {
     this.maxPageSize = options.maxPageSize ?? 25;
     this.port = options.port ?? 0;
     this.conversations = [...(options.conversations ?? omiEmulatorConversations())].sort(
-      (a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.id.localeCompare(a.id),
+      (a, b) => Date.parse(createdOf(b)) - Date.parse(createdOf(a)) || b.id.localeCompare(a.id),
     );
+  }
+
+  conversationIds() {
+    return this.conversations.map((c) => c.id);
   }
 
   /** Starts listening on 127.0.0.1 and returns the base URL (no path). */
@@ -129,7 +137,7 @@ export class OmiCloudApiEmulator {
   private shape(c: OmiEmulatorConversation, withTranscript: boolean) {
     return {
       id: c.id,
-      created_at: c.finishedAt,
+      created_at: createdOf(c),
       started_at: c.startedAt,
       finished_at: c.finishedAt,
       structured: {
@@ -173,8 +181,8 @@ export class OmiCloudApiEmulator {
       if (Number.isNaN(from) || Number.isNaN(to)) return [400, { detail: "bad date" }];
       const inWindow = this.conversations.filter(
         (c) =>
-          (from === undefined || Date.parse(c.startedAt) >= from) &&
-          (to === undefined || Date.parse(c.startedAt) <= to),
+          (from === undefined || Date.parse(createdOf(c)) >= from) &&
+          (to === undefined || Date.parse(createdOf(c)) <= to),
       );
       // Transcripts and date windows page by offset; the plain list pages by cursor.
       const byOffset = withTranscript || from !== undefined || q.has("offset");

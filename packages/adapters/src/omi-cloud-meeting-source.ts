@@ -24,7 +24,7 @@ export interface OmiCloudMeetingSourceOptions {
 
 const PAGE_SIZE = 25;
 const DAY_MS = 86_400_000;
-/** Omi lists by start time; a long or late-processed conversation can sit this far past the boundary. */
+/** Omi lists by created_at; a conversation can sit this far past the boundary. */
 const LIST_OVERLAP_MS = 24 * 3_600_000;
 /** Shorter conversations are background noise; they cost a digest call each. */
 const MIN_DURATION_MS = 2 * 60_000;
@@ -81,6 +81,10 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
     if (!result.success) throw new MeetingSourceError("mapping", "Unexpected Omi response");
     return result.data;
   };
+
+  /** Omi orders and filters its list by created_at; started_at only when that is missing. */
+  const createdOf = (c: z.infer<typeof OmiCloudConversationSchema>) =>
+    ms(c.created_at) ?? ms(c.started_at) ?? updatedOf(c);
 
   const updatedOf = (c: z.infer<typeof OmiCloudConversationSchema>) => {
     const t = ms(c.finished_at) ?? ms(c.started_at) ?? ms(c.created_at);
@@ -222,21 +226,22 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
       if (hasMore && (!next || next === filter.cursor))
         throw new MeetingSourceError("mapping", "Omi paging did not advance");
       const items = [];
-      // Omi orders by start time, newest first (S0 probe). The walk ends at a conversation that
-      // started more than a day before the boundary, so a long conversation near it is re-listed.
+      // Omi orders by created_at, newest first. The walk ends at a conversation created more than
+      // a day before the boundary, so a recording uploaded late is still found.
       const boundary = (filter.updatedAfter ?? filter.createdAfter)?.getTime();
       const cutoff = boundary === undefined ? undefined : boundary - LIST_OVERLAP_MS;
       let pastBoundary = false;
       for (const c of parse(ListPage, body)) {
         const updated = updatedOf(c);
         const started = ms(c.started_at) ?? ms(c.created_at) ?? updated;
-        if (cutoff !== undefined && started < cutoff) {
+        const created = createdOf(c);
+        if (cutoff !== undefined && created < cutoff) {
           pastBoundary = true;
           continue;
         }
         const finished = ms(c.finished_at);
         if (finished !== undefined && finished - started < MIN_DURATION_MS) continue;
-        dayOf.set(c.id, Math.floor(started / DAY_MS) * DAY_MS);
+        dayOf.set(c.id, Math.floor(created / DAY_MS) * DAY_MS);
         items.push({
           externalId: c.id,
           updatedAt: new Date(updated).toISOString(),
@@ -259,6 +264,8 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
       }
       const cached = transcripts.get(externalId) ?? (await fromWindow(externalId));
       if (cached) return toMeeting(cached, true);
+      if (transcriptCalls >= (options.maxTranscriptCalls ?? Infinity))
+        throw new MeetingSourceError("budget", "Omi transcript budget spent for this run");
       transcriptCalls++;
       const { body } = await request(detailPath(externalId), { include_transcript: "true" });
       return toMeeting(parse(OmiCloudConversationSchema, body), true);

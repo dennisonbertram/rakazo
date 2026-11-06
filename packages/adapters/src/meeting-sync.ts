@@ -118,6 +118,8 @@ export async function runMeetingSyncPass(
       } catch (error) {
         // Gone between the list and the read; nothing to store.
         if (error instanceof MeetingSourceError && error.kind === "not_found") continue;
+        if (error instanceof MeetingSourceError && error.kind === "budget")
+          return { done: false, lostClaim: false, fetched };
         throw error;
       }
       deps.signal?.throwIfAborted();

@@ -372,13 +372,26 @@ export function OmiPage({
   const cloudSyncing = cloud?.status === "connected" && !cloud.syncedThrough;
   useEffect(() => {
     if (!cloudSyncing) return;
+    const controller = new AbortController();
+    let pending = false;
     const timer = setInterval(() => {
+      // One request at a time: a slow answer is not stacked under the next tick.
+      if (pending) return;
+      pending = true;
       void rpc.omiCloud
-        .status()
-        .then((next) => setCloud(next ?? null))
-        .catch(() => undefined);
+        .status(undefined, { signal: controller.signal })
+        .then((next) => {
+          if (!controller.signal.aborted) setCloud(next ?? null);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          pending = false;
+        });
     }, CLOUD_POLL_MS);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      controller.abort();
+    };
   }, [cloudSyncing]);
 
   async function deleteAll() {
