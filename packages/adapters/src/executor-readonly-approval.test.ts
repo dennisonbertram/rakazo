@@ -6476,6 +6476,45 @@ describe("background runs inside Praci", () => {
   });
 });
 
+describe("finance reads after outside content", () => {
+  const finance = {
+    name: "finance_overview",
+    builtin: true,
+    bank: true,
+    spawnKey: financeAgentSpawnKey("user-1"),
+    trigger: "routine",
+    unattended: true,
+    routineManagedKind: "custom",
+  } as const;
+
+  it("asks for finance_transactions after a web_fetch in the same run", async () => {
+    const f = fixture({
+      ...finance,
+      rules: [{ effect: "always_allow", matchKind: "tool", matchValue: "web_fetch" }],
+    });
+    f.setCalls([
+      { name: "web_fetch", args: { url: "https://example.invalid" }, executionId: "c0" },
+      { name: "finance_transactions", args: {}, executionId: "c1" },
+    ]);
+    await f.run();
+    // The first fetch of a new site asks; once the owner approves it, the run has read a page.
+    f.effects[0]!.status = "approved";
+    await f.run();
+    expect(f.effects.map((effect) => effect.toolName ?? effect.kind)).toEqual([
+      "web_fetch",
+      "finance_transactions",
+    ]);
+    expect(f.effects[1]!.status).not.toBe("approved");
+  });
+
+  it("asks for finance_overview when the run starts with an inherited mark", async () => {
+    const f = fixture({ ...finance, readOutsideContent: true });
+    f.setCalls([{ args: {}, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+});
+
 describe("agent firewall", () => {
   beforeEach(() => {
     sentBotMessages.calls.length = 0;

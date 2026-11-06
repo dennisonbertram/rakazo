@@ -5619,16 +5619,24 @@ export function createRunExecutor(deps: ExecutorDeps) {
             bot.audience !== "external" &&
             !runReadMeetingText &&
             !(await isOutsideContentSeen());
+          // The finance reads are on the unattended safe list, but a run that has read outside
+          // content (a page, mail, or an inherited mark) could send the figures out: it asks.
+          const financeAfterOutside =
+            run.unattended === true &&
+            !viaConnector &&
+            FINANCE_TOOL_NAMES.has(name) &&
+            (await isOutsideContentSeen());
           const requiresUnattendedApproval =
-            !publicResearchRead &&
-            !ownBotRelay &&
-            unattendedToolRequiresApproval(
-              run.unattended,
-              name,
-              viaConnector,
-              declaredReadOnly,
-              policyArgs,
-            );
+            financeAfterOutside ||
+            (!publicResearchRead &&
+              !ownBotRelay &&
+              unattendedToolRequiresApproval(
+                run.unattended,
+                name,
+                viaConnector,
+                declaredReadOnly,
+                policyArgs,
+              ));
           const connectorKind = connectorKindFromToolName(
             name,
             connectedPlugins.map((plugin) => plugin.provider),
