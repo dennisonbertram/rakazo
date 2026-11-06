@@ -123,7 +123,11 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "web_fetch",
   "web_search",
   // Write only inside Rakazo (the owner's own notifications, pages, pins and files).
+  // message_user posts a short update into the run's own thread; show_emails renders the owner's
+  // own cached mail in their chat and returns no mail text to the run.
   "notify_user",
+  "message_user",
+  "show_emails",
   "create_ui_artifact",
   "render_ui",
   "attach_file",
@@ -290,7 +294,6 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
  * judge them instead of asking. Nothing here writes, sends or reaches the network.
  */
 export const ROUTINE_AUTO_REVIEW_READ_TOOLS: ReadonlySet<string> = new Set([
-  "show_emails",
   "finance_overview",
   "finance_breakdown",
   "finance_transactions",
