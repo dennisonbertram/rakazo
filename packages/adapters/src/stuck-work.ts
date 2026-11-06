@@ -23,6 +23,20 @@ import {
 import { getLogger } from "@rakazo/logging";
 import { notifyThreadEvent } from "./run-notification.js";
 
+const STUCK_CANDIDATE_SELECT = {
+  id: true,
+  status: true,
+  updatedAt: true,
+  spaceId: true,
+  threadId: true,
+  botId: true,
+  userId: true,
+  taskId: true,
+  unattended: true,
+  bot: { select: { name: true, notifyOnFinish: true } },
+  thread: { select: { groupId: true } },
+} as const;
+
 type StuckCursor = { at: Date; id: string };
 
 type StuckCandidate = {
@@ -80,19 +94,7 @@ export async function reconcileStuckWork(deps: {
     },
     orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
     take: deps.batchSize,
-    select: {
-      id: true,
-      status: true,
-      updatedAt: true,
-      spaceId: true,
-      threadId: true,
-      botId: true,
-      userId: true,
-      taskId: true,
-      unattended: true,
-      bot: { select: { name: true, notifyOnFinish: true } },
-      thread: { select: { groupId: true } },
-    },
+    select: STUCK_CANDIDATE_SELECT,
   });
 
   const due = runs.flatMap((run) => {
@@ -129,6 +131,40 @@ export async function reconcileStuckWork(deps: {
   const last = runs.at(-1);
   if (runs.length < deps.batchSize || !last || !(last.updatedAt instanceof Date)) return undefined;
   return { at: last.updatedAt, id: last.id };
+}
+
+/**
+ * A new run of a routine closes the routine's earlier background runs that are still waiting on
+ * an approval: their cards show "Expired" and their pending effects can never run, so a late
+ * answer cannot resume a stale run. Runs that are running, attended or waiting for a takeover stay.
+ */
+export async function expireSupersededRoutineRuns(
+  deps: {
+    prisma: PrismaClient;
+    jobs: JobPublisher;
+    events?: ThreadEvents;
+    notificationEvents?: NotificationEvents;
+    now: Date;
+  },
+  input: { routineId: string; exceptRunId: string },
+) {
+  const older = await deps.prisma.run.findMany({
+    where: {
+      routineId: input.routineId,
+      id: { not: input.exceptRunId },
+      trigger: "routine",
+      unattended: true,
+      status: "waiting_input",
+    },
+    select: STUCK_CANDIDATE_SELECT,
+  });
+  for (const run of older) {
+    try {
+      await expireOne(deps, { ...run, status: "waiting_input" });
+    } catch (error) {
+      getLogger().error("routine supersede", error);
+    }
+  }
 }
 
 function readyStuckRun(
