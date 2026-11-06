@@ -369,7 +369,7 @@ export function AskCard({
                 <div key={action.id} className="flex flex-wrap items-baseline gap-x-2 px-1 pt-1">
                   <Button
                     variant="link"
-                    className="h-auto p-0"
+                    className="h-auto min-w-0 shrink whitespace-normal p-0 text-start"
                     disabled={submitting || settling}
                     onClick={() => void submitAnswer(action.id)}
                   >
