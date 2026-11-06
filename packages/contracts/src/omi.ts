@@ -56,3 +56,35 @@ export const OmiSegmentsListInputSchema = z.object({
     .optional(),
 });
 export const OmiSegmentMoveInputSchema = z.object({ segmentId: Id, kind: OmiKind });
+
+/** Omi's Developer API; keys look like `omi_dev_...`. */
+export const OMI_CLOUD_API_BASE_URL = "https://api.omi.me";
+
+/** Connection.connectorId for an Omi Developer API key; the meeting provider is `omi_cloud`. */
+export const OMI_CLOUD_CONNECTOR_ID = "omi-cloud";
+export const OMI_CLOUD_PROVIDER = "omi_cloud";
+
+/** Omi MCP keys do not work on the REST API. */
+export const isOmiMcpKey = (key: string) => key.startsWith("omi_mcp_");
+
+/** One transcript segment of an Omi conversation. Extra fields are allowed. */
+export const OmiCloudSegmentSchema = z.object({
+  text: z.string(),
+  speaker: z.string().nullish(),
+  is_user: z.boolean().nullish(),
+  /** Seconds from the start of the conversation. */
+  start: z.number().nullish(),
+  end: z.number().nullish(),
+});
+export type OmiCloudSegment = z.infer<typeof OmiCloudSegmentSchema>;
+
+/** One conversation from `GET /v1/dev/user/conversations`. Extra fields are allowed. */
+export const OmiCloudConversationSchema = z.object({
+  id: z.string().min(1),
+  created_at: z.string().nullish(),
+  started_at: z.string().nullish(),
+  finished_at: z.string().nullish(),
+  structured: z.object({ title: z.string().nullish(), overview: z.string().nullish() }).nullish(),
+  transcript_segments: z.array(OmiCloudSegmentSchema).nullish(),
+});
+export type OmiCloudConversation = z.infer<typeof OmiCloudConversationSchema>;

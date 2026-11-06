@@ -126,6 +126,8 @@ export * from "./gmail-push.js";
 export * from "./google-contact-photos.js";
 export * from "./granola-api-emulator.js";
 export * from "./granola-meeting-source.js";
+export * from "./omi-cloud-api-emulator.js";
+export * from "./omi-cloud-meeting-source.js";
 export * from "./graphql-connectors.js";
 export * from "./group-handoff.js";
 export { resolveZernioApiKey } from "./gtm-posting.js";

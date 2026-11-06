@@ -22,7 +22,7 @@ const RUN_BUDGET_MS = 120_000;
 const MIN_INTERVAL_MS = 60_000;
 /** The scheduler queues a source whose sync state has been idle this long. */
 export const MEETINGS_SYNC_INTERVAL_MS = 5 * 60_000;
-const CHAIN_DELAY_MS = 1_000;
+export const CHAIN_DELAY_MS = 1_000;
 const MIN_RATE_LIMIT_DELAY_MS = 60_000;
 const PAGES_PER_RUN = 2;
 /** Stored as `Rate limited until <ISO time>`; an agent refresh waits for that time. */
@@ -44,7 +44,12 @@ export interface MeetingSourceInput extends Scope {
  */
 export type MeetingSourceRegistry = Record<
   string,
-  { connectorId?: string; create(input: MeetingSourceInput, signal: AbortSignal): MeetingSource }
+  {
+    connectorId?: string;
+    /** Wait before the next chained run; slower for providers with hourly limits. */
+    chainDelayMs?: number;
+    create(input: MeetingSourceInput, signal: AbortSignal): MeetingSource;
+  }
 >;
 
 export interface MeetingSyncJobDeps {
@@ -141,6 +146,7 @@ export async function runMeetingSyncJob(
   const ref = refOf(payload);
   const entry = deps.registry[payload.provider];
   if (!ref || !entry) return;
+  const chainDelay = entry.chainDelayMs ?? CHAIN_DELAY_MS;
   const resolved = await resolveInput(deps, payload, ref, entry);
   if (!resolved) return;
   const { input, secretId } = resolved;
@@ -196,7 +202,7 @@ export async function runMeetingSyncJob(
     if (signal.aborted) {
       // The run's time is up. Whatever was in flight is dropped; the pass continues next run.
       await release();
-      await deps.jobs.enqueue(meetingsSyncJob(payload, new Date(Date.now() + CHAIN_DELAY_MS)));
+      await deps.jobs.enqueue(meetingsSyncJob(payload, new Date(Date.now() + chainDelay)));
       return;
     }
     if (!(error instanceof MeetingSourceError)) {
@@ -226,8 +232,7 @@ export async function runMeetingSyncJob(
       error: retryAt ? `${RATE_LIMITED}${retryAt.toISOString()}` : error.message.slice(0, 200),
     });
   }
-  if (more)
-    await deps.jobs.enqueue(meetingsSyncJob(payload, new Date(Date.now() + CHAIN_DELAY_MS)));
+  if (more) await deps.jobs.enqueue(meetingsSyncJob(payload, new Date(Date.now() + chainDelay)));
   else if (retryAt) await deps.jobs.enqueue(meetingsSyncJob(payload, retryAt));
 }
 
