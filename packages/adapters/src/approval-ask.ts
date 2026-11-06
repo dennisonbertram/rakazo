@@ -44,6 +44,8 @@ export function buildApprovalAskBlock(
   secrets: string[],
   options?: {
     reviewReason?: string;
+    /** The name of the bot a message_bot call goes to (its id alone names no one). */
+    recipientBot?: string;
     /** One plain sentence under the card: the call asked because of a background run or a rule. */
     approvalReason?: string;
     fullMail?: boolean;
@@ -119,12 +121,13 @@ export function buildApprovalAskBlock(
   const shareTarget =
     options?.shareTarget &&
     sanitizeMessagingLabel(options.shareTarget).replace(CARD_TITLE_ESCAPED, "\\$&");
+  const shown = summaryArgs(toolName, args, options?.recipientBot);
   const summary =
     (shareTarget ? `sharing a meeting with ${shareTarget}` : undefined) ??
     options?.schedule?.summary ??
     describeApprovalAction(
       toolName,
-      options?.imessage ? { ...args, to: options.imessage.recipient } : args,
+      options?.imessage ? { ...args, to: options.imessage.recipient } : shown,
       options?.serviceName,
       options?.moneyNames,
     );
@@ -154,7 +157,7 @@ export function buildApprovalAskBlock(
                     args,
                     options.reviewReason,
                   )
-                : formatApprovalDetail(toolName, args, options?.reviewReason);
+                : formatApprovalDetail(toolName, shown, options?.reviewReason);
   const safeDetail = detail ? redactSecrets(detail, secrets) : undefined;
   return {
     kind: "ask",
@@ -719,7 +722,7 @@ function formatApprovalDetail(
       ? ["name", "email", "organization", "kind", "notes"]
       : SITE_GATED_TOOLS.has(toolName)
         ? ["url"]
-        : ["collection", "title", "to", "subject", "amount", "body"]);
+        : ["collection", "title", "to", "subject", "amount", "body", "message", "range"]);
   for (const key of keys) {
     const value = args[key];
     if (value == null || value === "") continue;
@@ -730,8 +733,53 @@ function formatApprovalDetail(
   return lines.join("\n");
 }
 
+const CALENDAR_READS = new Set(["calendar_agenda", "calendar_list_events"]);
+
+/**
+ * What the card shows of a call: message_bot as recipient name plus the first line of the message,
+ * a calendar read as one readable range (its `to` is a time, not a recipient).
+ */
+function summaryArgs(
+  toolName: string,
+  args: Record<string, unknown>,
+  recipientBot?: string,
+): Record<string, unknown> {
+  if (toolName === "message_bot") {
+    const message = typeof args.message === "string" ? args.message.trim().split(/\r?\n/)[0] : "";
+    return {
+      ...args,
+      to: recipientBot ?? args.bot_id,
+      message: message ? truncate(message, 200) : undefined,
+    };
+  }
+  if (CALENDAR_READS.has(toolName)) {
+    const [from, to] =
+      toolName === "calendar_agenda" ? [args.from, args.to] : [args.timeMin, args.timeMax];
+    const { from: _f, to: _t, timeMin: _a, timeMax: _b, ...rest } = args;
+    const part = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+    const f = part(from);
+    const t = part(to);
+    const range =
+      f && t
+        ? `${readableTime(f)} to ${readableTime(t)}`
+        : f
+          ? `from ${readableTime(f)}`
+          : t
+            ? `until ${readableTime(t)}`
+            : undefined;
+    return { ...rest, range };
+  }
+  return args;
+}
+
+function readableTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC`;
+}
+
 function pickScopeLabel(args: Record<string, unknown>): string | undefined {
-  for (const key of ["to", "title", "collection", "subject", "amount"]) {
+  for (const key of ["to", "title", "collection", "subject", "amount", "range"]) {
     const value = args[key];
     if (value == null || value === "") continue;
     return key === "amount" ? formatAmount(value, args.currency) : String(value);

@@ -345,7 +345,11 @@ describePostgres("meeting follow-up filing (PostgreSQL)", () => {
     );
     expect(classifier.calls).toEqual([]);
     const after = await prisma.dataRoomItem.findUniqueOrThrow({ where: { id: item.id } });
-    expect(after).toMatchObject({ status: "indexing", docType: "note", tags: ["meeting", "other"] });
+    expect(after).toMatchObject({
+      status: "indexing",
+      docType: "note",
+      tags: ["meeting", "other"],
+    });
   });
 
   it("a delete that lands between the job's load and its filing leaves no note", async () => {

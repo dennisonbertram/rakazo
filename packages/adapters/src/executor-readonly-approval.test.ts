@@ -4681,6 +4681,45 @@ describe("runs that began with an external bot", () => {
     expect(JSON.stringify(card)).not.toContain(EXTERNAL_REQUEST_REASON);
   });
 
+  describe("the reason names the real origin of the taint", () => {
+    const reasonFor = async (options: Parameters<typeof fixture>[0]) => {
+      const f = fixture({ name: "web_fetch", builtin: true, ...options });
+      f.setCalls([{ args: { url: "https://example.invalid" }, executionId: "c1" }]);
+      await f.run();
+      expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+      return askBlock(f).approvalReason;
+    };
+
+    it("a messaging or mcp trigger says the run started outside Praci", async () => {
+      for (const trigger of ["messaging", "mcp"]) {
+        expect(await reasonFor({ trigger, unattended: false, externalTaint: true })).toBe(
+          "Asked because this run started from outside Praci.",
+        );
+      }
+    });
+
+    it("a bot_message run that inherited taint names the sender, not an external bot", async () => {
+      const reason = await reasonFor({
+        trigger: "bot_message",
+        externalTaint: true,
+        peer: { senderInScope: true, linked: false },
+      });
+      expect(reason).toBe("Asked because Peer's message may carry outside text.");
+    });
+
+    it("an earlier step that read outside content says so", async () => {
+      expect(await reasonFor({ trigger: "user", externalTaint: true })).toBe(
+        "Asked because an earlier step read outside content.",
+      );
+    });
+
+    it("a real external chain still says an external bot asked", async () => {
+      expect(await reasonFor({ history: [{ blocks: [marked] }], externalTaint: true })).toBe(
+        EXTERNAL_REQUEST_REASON,
+      );
+    });
+  });
+
   it("the same call in an unmarked run does not ask", async () => {
     const f = fixture({ name: "mail_search", builtin: true, mail: mailStub() });
     f.setCalls([mailCall]);
@@ -8389,7 +8428,11 @@ describe("a run that a goal adopts while it is running", () => {
   it("keeps the log for a run that never had a goal, but queues no goal check", async () => {
     const f = fixture();
     await f.run();
-    expect(evidenceWrites(f).at(-1)?.map((entry) => entry.id)).toEqual(["t1"]);
+    expect(
+      evidenceWrites(f)
+        .at(-1)
+        ?.map((entry) => entry.id),
+    ).toEqual(["t1"]);
     expect(f.jobsEnqueue).not.toHaveBeenCalledWith(expect.objectContaining({ name: "goal.check" }));
   });
 

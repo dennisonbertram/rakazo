@@ -83,14 +83,17 @@ describePostgres("HTML pages (PostgreSQL)", () => {
       await prisma.$disconnect();
       await db.pool.end();
     };
-    await prisma.user.create({ data: { id: userId, name: userId, email: `${userId}@example.test` } });
+    await prisma.user.create({
+      data: { id: userId, name: userId, email: `${userId}@example.test` },
+    });
     await prisma.organization.create({
       data: { id: organizationId, name: "PH Org", slug: organizationId, createdAt: new Date() },
     });
     await prisma.space.create({
       data: { id: spaceId, organizationId, name: "General", isDefault: true },
     });
-    botId = (await prisma.bot.create({ data: { spaceId, userId, name: "Chief", color: "blue" } })).id;
+    botId = (await prisma.bot.create({ data: { spaceId, userId, name: "Chief", color: "blue" } }))
+      .id;
     otherBotId = (
       await prisma.bot.create({ data: { spaceId, userId, name: "Other", color: "red" } })
     ).id;
@@ -187,7 +190,13 @@ describePostgres("HTML pages (PostgreSQL)", () => {
     const data = await resolvePageData({ prisma }, { spaceId }, await htmlPage());
     expect(data).toMatchObject({ kind: "html", pageId: htmlId });
     if (!("sources" in data)) throw new Error("expected an html page");
-    expect(Object.keys(data.sources).sort()).toEqual(["Broken", "Elsewhere", "Ghost", "Held", "cash"]);
+    expect(Object.keys(data.sources).sort()).toEqual([
+      "Broken",
+      "Elsewhere",
+      "Ghost",
+      "Held",
+      "cash",
+    ]);
     expect(data.sources.cash).toMatchObject({ status: "ok", value: { balance: 2 } });
     expect(data.sources.cash?.history).toBeUndefined();
     expect(data.sources.Ghost).toEqual({ status: "missing", fetchedAt: null });
@@ -202,7 +211,10 @@ describePostgres("HTML pages (PostgreSQL)", () => {
     await writeHtml(head("Cash, Secret", "Cash"));
     const data = await resolvePageData({ prisma }, { spaceId }, await htmlPage());
     if (!("sources" in data)) throw new Error("expected an html page");
-    expect(data.sources.Cash?.history?.map((h) => h.value)).toEqual([{ balance: 2 }, { balance: 1 }]);
+    expect(data.sources.Cash?.history?.map((h) => h.value)).toEqual([
+      { balance: 2 },
+      { balance: 1 },
+    ]);
     expect(data.sources.Secret?.history).toBeUndefined();
 
     const big = await source(htmlId, "Big");

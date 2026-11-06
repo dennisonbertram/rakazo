@@ -751,3 +751,44 @@ describe("mail_reply_batch card", () => {
     );
   });
 });
+
+describe("buildApprovalAskBlock argument summaries", () => {
+  const ask = (tool: string, args: Record<string, unknown>, recipientBot?: string) => {
+    const block = buildApprovalAskBlock("e1", tool, args, [], { recipientBot });
+    if (block.kind !== "ask") throw new Error("expected ask block");
+    return block;
+  };
+
+  it("message_bot names the recipient bot and the first line of the message", () => {
+    const block = ask(
+      "message_bot",
+      { bot_id: "bot-9", message: "What is on my calendar?\nSecond line stays out" },
+      "Inbox agent",
+    );
+    expect(block.text).toBe("Review before Message bot → Inbox agent");
+    expect(block.detail).toContain("to: Inbox agent");
+    expect(block.detail).toContain("message: What is on my calendar?");
+    expect(block.detail).not.toContain("Second line");
+  });
+
+  it("message_bot truncates a long first line", () => {
+    const block = ask("message_bot", { bot_id: "b", message: "x".repeat(500) }, "Inbox agent");
+    expect(block.detail).toContain(`message: ${"x".repeat(200)}…`);
+    expect(block.detail).not.toContain("x".repeat(201));
+  });
+
+  it("calendar reads show the range, not a recipient", () => {
+    const agenda = ask("calendar_agenda", {
+      from: "2026-11-09T00:00:00Z",
+      to: "2026-11-16T00:00:00Z",
+    });
+    expect(agenda.text).not.toMatch(/→ 2026/);
+    expect(agenda.detail).toBe("range: Nov 9, 2026, 12:00 AM UTC to Nov 16, 2026, 12:00 AM UTC");
+    expect(agenda.detail).not.toContain("to: 2026");
+    const list = ask("calendar_list_events", {
+      timeMin: "2026-11-09T09:00:00Z",
+      timeMax: "2026-11-09T17:00:00Z",
+    });
+    expect(list.detail).toBe("range: Nov 9, 2026, 9:00 AM UTC to Nov 9, 2026, 5:00 PM UTC");
+  });
+});

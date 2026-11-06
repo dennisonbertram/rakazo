@@ -26,10 +26,7 @@ const accountB = {
   label: "Personal",
 };
 
-function setup(
-  google: (url: string, ref: string) => unknown,
-  extraRoutines: unknown[] = [],
-) {
+function setup(google: (url: string, ref: string) => unknown, extraRoutines: unknown[] = []) {
   const prisma = {
     scratchpadItem: {
       findMany: vi.fn().mockResolvedValue([
@@ -75,13 +72,7 @@ function setup(
     },
   };
   const request = vi.fn(
-    async ({
-      account,
-      url,
-    }: {
-      account: { providerRef: string };
-      url: string;
-    }) => ({
+    async ({ account, url }: { account: { providerRef: string }; url: string }) => ({
       status: 200,
       data: google(url, account.providerRef),
     }),
@@ -152,9 +143,7 @@ describe("calendarAgenda", () => {
       account: "Work",
       botId: null,
     });
-    expect(result.items.find((i) => i.title === "Sign form")?.mailId).toBe(
-      "m1",
-    );
+    expect(result.items.find((i) => i.title === "Sign form")?.mailId).toBe("m1");
     expect(result.items.find((i) => i.title === "Send deck")).toMatchObject({
       botId: "bot-1",
       botName: "Chief",
@@ -167,9 +156,7 @@ describe("calendarAgenda", () => {
     );
     await calendarAgenda(deps, scope, range, { accounts: [accountA], context });
     const urls = request.mock.calls.map(([call]) => call.url);
-    expect(urls.some((u) => u.includes("/calendars/primary/events"))).toBe(
-      true,
-    );
+    expect(urls.some((u) => u.includes("/calendars/primary/events"))).toBe(true);
     expect(urls.some((u) => u.includes("hidden"))).toBe(false);
   });
 
@@ -209,9 +196,7 @@ describe("calendarAgenda", () => {
   it("scopes every query to the space and user, in range, skipping watches", async () => {
     const { deps, prisma } = setup(() => ({}));
     await calendarAgenda(deps, scope, range, null);
-    expect(
-      prisma.scratchpadItem.findMany.mock.calls[0]?.[0].where,
-    ).toMatchObject({
+    expect(prisma.scratchpadItem.findMany.mock.calls[0]?.[0].where).toMatchObject({
       ...scope,
       status: { in: ["open", "parked"] },
       dueAt: { gte: range.from, lt: range.to },
@@ -226,9 +211,7 @@ describe("calendarAgenda", () => {
       managedKind: null,
       nextRunAt: { not: null, lt: range.to },
     });
-    expect(
-      prisma.routine.findMany.mock.calls[0]?.[0].where.watch,
-    ).toBeDefined();
+    expect(prisma.routine.findMany.mock.calls[0]?.[0].where.watch).toBeDefined();
   });
 
   it("returns the local items without waiting for a hanging Google account, then reports it", async () => {
@@ -246,9 +229,7 @@ describe("calendarAgenda", () => {
       accountTimeoutMs: 20,
     });
     expect(remote.items).toEqual([]);
-    expect(remote.errors).toEqual([
-      { account: "Work", message: "Couldn't load Work" },
-    ]);
+    expect(remote.errors).toEqual([{ account: "Work", message: "Couldn't load Work" }]);
   });
 
   it("follows calendarList pages", async () => {
@@ -292,9 +273,7 @@ describe("calendarAgenda", () => {
   });
 
   it("keeps a routine whose stored next run is before the range", async () => {
-    const items = await run(
-      routineRow({ nextRunAt: new Date("2026-10-30T12:00:00Z") }),
-    );
+    const items = await run(routineRow({ nextRunAt: new Date("2026-10-30T12:00:00Z") }));
     expect(items.length).toBeGreaterThan(0);
     expect(items.every((i) => i.start >= range.from.toISOString())).toBe(true);
   });
@@ -305,9 +284,7 @@ describe("calendarAgenda", () => {
 
   it("leaves a check-back as one item with a plain id", async () => {
     const items = await run(routineRow({ crons: [ONCE_ROUTINE_CRON] }));
-    expect(items.map((i) => [i.id, i.kind])).toEqual([
-      ["routine:r9", "check_back"],
-    ]);
+    expect(items.map((i) => [i.id, i.kind])).toEqual([["routine:r9", "check_back"]]);
   });
 
   it("follows event pages", async () => {
