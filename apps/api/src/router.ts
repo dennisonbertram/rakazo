@@ -67,6 +67,7 @@ import {
   enqueueTakeoverContinuation,
   ensureComputerWorkspaceLayout,
   expireComputerControl,
+  expireSupersededRoutineRuns,
   findBotShareEffect,
   findInvestorsAgent,
   findPageSourceApproval,
@@ -5595,6 +5596,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
         await deps.jobs.enqueue(runContinueJob(run.id)).catch((error) => {
           getLogger().error("routine testRun enqueue", error);
         });
+        await expireSupersededRoutineRuns(
+          { ...deps, now: new Date() },
+          { routineId: routine.id, exceptRunId: run.id },
+        ).catch(() => undefined);
         return { runId: run.id };
       }),
     },
