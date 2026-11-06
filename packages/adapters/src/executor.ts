@@ -180,6 +180,7 @@ import {
   parseSkillMd,
   plainRunError,
   plainTextFromMarkdown,
+  backgroundAutoReviewAllowed,
   planActionGate,
   privateDataAreas,
   promptInvokesSkill,
@@ -315,6 +316,7 @@ import {
 import type { AutoReviewChecker } from "./auto-review.js";
 import {
   autoReviewTimeoutMs,
+  BACKGROUND_REVIEW_TIMEOUT_MS,
   deploymentAutoReviewDefault,
   isAutoReviewCheckerConfigured,
   redactNestedReviewValue,
@@ -3525,12 +3527,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const buildReviewProvider = async (
           injected: AutoReviewProvider | undefined,
           checker: AutoReviewChecker | null | undefined,
+          timeoutMs = autoReviewTimeoutMs(),
         ): Promise<AutoReviewProvider> => {
           let provider = injected;
           if (!provider) {
             const kind = resolveAutoReviewProviderKind();
             if (kind === "jev" || kind === "scripted") {
-              provider = createAutoReviewProvider(kind);
+              provider = createAutoReviewProvider(kind, { timeoutMs });
             } else {
               const reviewCredential = await findModelCredential(
                 deps.prisma,
@@ -3581,7 +3584,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   userId: run.userId,
                   botId: bot.id,
                   threadId: thread.id,
-                  timeoutMs: autoReviewTimeoutMs(),
+                  timeoutMs,
                 },
               });
             }
@@ -4109,8 +4112,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             userId: run.userId,
             botId: bot.id,
           })) as ActionApprovalRule[];
-        let autoReviewPreferencePromise: Promise<boolean> | undefined;
-        const loadAutoReviewPreference = () => {
+        let autoReviewPreferencePromise:
+          | Promise<{ enabled: boolean; background: boolean }>
+          | undefined;
+        const loadAutoReviewPreferences = () => {
           autoReviewPreferencePromise ??= deps.prisma.actionAutoReviewPreference
             .findUnique({
               where: {
@@ -4119,11 +4124,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   userId: run.userId,
                 },
               },
-              select: { enabled: true },
+              select: { enabled: true, background: true },
             })
-            .then((row) => row?.enabled ?? deploymentAutoReviewDefault());
+            .then((row) => ({
+              enabled: row?.enabled ?? deploymentAutoReviewDefault(),
+              background: row?.background ?? false,
+            }));
           return autoReviewPreferencePromise;
         };
+        const loadAutoReviewPreference = async () => (await loadAutoReviewPreferences()).enabled;
         // The intro turn confirms how a bot read its own role before anyone hands it
         // real work — it must not be able to act on that reading (shell, computer,
         // scheduling, spawning another bot, ...) before the user has assigned any task.
@@ -6077,8 +6086,36 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ROUTINE_AUTO_REVIEW_READ_TOOLS.has(name) &&
             !outsideSeen &&
             !routineLifted;
+          // "Also in background runs": a call that asks only because the run is unattended may be
+          // judged when nothing outside is in the run and the owner's own words say what it is for.
+          const backgroundReview =
+            run.unattended === true &&
+            requiresUnattendedApproval &&
+            !otherMandatory &&
+            !routineLifted &&
+            !routineReviewRead &&
+            !run.goalId &&
+            (await (async () => {
+              const prefs = await loadAutoReviewPreferences();
+              if (!prefs.enabled || !prefs.background) return false;
+              return backgroundAutoReviewAllowed({
+                enabled: true,
+                trigger: run.trigger,
+                tainted: runTainted,
+                outsideContentSeen: await isOutsideContentSeen(),
+                meetingMarked: runReadMeetingText,
+                firewalled: await firewallNow(),
+                externalBot: bot.audience === "external",
+                ownerWords: await loadOwnerWords(),
+                toolName: name,
+                viaConnector,
+                connectorKind,
+                readOnly: declaredReadOnly,
+              });
+            })());
+          const unattendedJudge = routineReviewRead || backgroundReview;
           const requiresMandatoryApproval =
-            (requiresUnattendedApproval && !routineLifted && !routineReviewRead) || otherMandatory;
+            (requiresUnattendedApproval && !routineLifted && !unattendedJudge) || otherMandatory;
           const gateResolved = routineLifted
             ? {
                 decision: "allow" as const,
@@ -6096,17 +6133,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : approvalResolved;
           // A goal run never uses Auto Review: nothing it does is approved by a model.
           const autoReviewPref =
-            requiresMandatoryApproval || run.goalId || (run.unattended && !routineReviewRead)
+            requiresMandatoryApproval || run.goalId || (run.unattended && !unattendedJudge)
               ? false
               : await loadAutoReviewPreference();
           const injectedReview =
-            requiresMandatoryApproval || run.goalId || (run.unattended && !routineReviewRead)
+            requiresMandatoryApproval || run.goalId || (run.unattended && !unattendedJudge)
               ? undefined
               : deps.autoReview;
           const checker =
-            requiresMandatoryApproval || run.goalId || (run.unattended && !routineReviewRead)
+            requiresMandatoryApproval || run.goalId || (run.unattended && !unattendedJudge)
               ? undefined
-              : resolveAutoReviewChecker();
+              : backgroundReview && !isAutoReviewCheckerConfigured({})
+                ? // No checker is set in the environment: judge with the model this run uses.
+                  { provider: runModelProvider, model: runModelId }
+                : resolveAutoReviewChecker();
           const checkerConfigured =
             autoReviewPref &&
             (Boolean(injectedReview) ||
@@ -6133,13 +6173,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   checkerConfigured,
                   unattended: run.unattended,
                   goalRun: Boolean(run.goalId),
-                  routineRead: routineReviewRead,
+                  routineRead: unattendedJudge,
                   newDestination: siteGate === "new",
                 });
           // A routine read runs only when the judge passes it: a saved Allow rule, no provider or
           // an error never lets it through.
           const plan =
-            routineReviewRead && plannedGate !== "judge" && plannedGate !== "block"
+            unattendedJudge && plannedGate !== "judge" && plannedGate !== "block"
               ? ("ask" as const)
               : plannedGate;
           // An unattended run has nobody to ask, and pausing would stop the whole routine: a protected
@@ -6236,10 +6276,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       toolName: name,
                       connectorKind,
                       args: redactToolArgsForReview(args, runSecrets),
-                      userTask: redactSecrets(task.prompt, runSecrets),
+                      // An unattended run's prompt may carry someone else's text; the owner's words
+                      // are all the judge sees there.
+                      userTask: redactSecrets(
+                        unattendedJudge ? await loadOwnerWords() : task.prompt,
+                        runSecrets,
+                      ),
                       botDescription,
                       matchingRules: approvalResolved.matchingRules,
                     };
+              const reviewTimeoutMs = run.unattended
+                ? BACKGROUND_REVIEW_TIMEOUT_MS
+                : autoReviewTimeoutMs();
               const reviewContext: AdapterContext = {
                 operationId: `auto-review:${runId}`,
                 traceId: `auto-review:${runId}`,
@@ -6249,10 +6297,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 runId,
                 signal: AbortSignal.any([
                   context.signal,
-                  AbortSignal.timeout(autoReviewTimeoutMs()),
+                  AbortSignal.timeout(reviewTimeoutMs),
                 ]),
               };
-              const provider = await buildReviewProvider(injectedReview, checker);
+              const provider = await buildReviewProvider(injectedReview, checker, reviewTimeoutMs);
               const judge = await provider.review(reviewRequest, reviewContext);
               if (context.signal.aborted) return;
               reviewReason = judge.reason;
@@ -6395,7 +6443,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ? "routine_allow"
                 : routineReviewRead
                   ? "routine_review"
-                  : requiresUnattendedApproval
+                  : backgroundReview
+                    ? "background_review"
+                    : requiresUnattendedApproval
                     ? "unattended"
                     : firewallAskCall
                       ? "firewall"

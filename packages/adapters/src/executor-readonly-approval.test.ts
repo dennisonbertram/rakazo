@@ -226,6 +226,7 @@ function fixture({
   rules = [] as ActionApprovalRule[],
   askText,
   autoReview = false,
+  autoReviewBackground = false,
   trigger = "user",
   unattended = trigger === "webhook",
   externalTaint = false,
@@ -381,6 +382,8 @@ function fixture({
   /** The runtime ends its turn with an ask_user question. */
   askText?: string;
   autoReview?: boolean;
+  /** The owner's "Also in background runs" switch. */
+  autoReviewBackground?: boolean;
   trigger?: string;
   /** The owner's own message that started the run, which names sites the run may fetch. */
   sourceText?: string;
@@ -807,7 +810,9 @@ function fixture({
         where?.routineId ? routineRules.map((matchValue) => ({ matchValue })) : rules,
       ),
     },
-    actionAutoReviewPreference: { findUnique: vi.fn(async () => ({ enabled: autoReview })) },
+    actionAutoReviewPreference: {
+      findUnique: vi.fn(async () => ({ enabled: autoReview, background: autoReviewBackground })),
+    },
     externalEffect,
   };
   const pauseRunForInput = vi.fn(async () => {
@@ -6500,10 +6505,7 @@ describe("finance reads after outside content", () => {
     // The first fetch of a new site asks; once the owner approves it, the run has read a page.
     f.effects[0]!.status = "approved";
     await f.run();
-    expect(f.effects.map((effect) => effect.kind)).toEqual([
-      "web_fetch",
-      "finance_transactions",
-    ]);
+    expect(f.effects.map((effect) => effect.kind)).toEqual(["web_fetch", "finance_transactions"]);
     expect(f.effects[1]!.status).not.toBe("approved");
   });
 
@@ -8506,6 +8508,65 @@ describe("Always for this routine and Auto Review of routine reads", () => {
       expect(after.pauseRunForInput).toHaveBeenCalledOnce();
       expect(reviewMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("Auto Review in background runs", () => {
+  const background = (
+    decision: "pass" | "ask" | "throw",
+    name = "page_source_list",
+    extra: Record<string, unknown> = {},
+  ) => {
+    reviewMock.mockReset();
+    if (decision === "throw") reviewMock.mockRejectedValue(new Error("down"));
+    else reviewMock.mockResolvedValue({ decision, reason: "fits", model: "mock" });
+    const f = fixture({
+      name,
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: null,
+      autoReview: true,
+      autoReviewBackground: true,
+      ...extra,
+    });
+    f.setCalls([{ args: {}, executionId: "call-1" }]);
+    return f;
+  };
+
+  it("lets the judge pass a call in a clean routine run, with the owner's words only", async () => {
+    const f = background("pass");
+    await f.run({ expectFailure: true });
+    expect(reviewMock).toHaveBeenCalledOnce();
+    expect(reviewMock.mock.calls[0]?.[0].userTask).not.toBe("");
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it.each(["ask", "throw"] as const)("keeps the card when the judge says %s", async (decision) => {
+    const f = background(decision);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("does not judge when the background switch is off", async () => {
+    const f = background("pass", "page_source_list", { autoReviewBackground: false });
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("never judges a tainted run, a webhook run or an excluded tool", async () => {
+    for (const [name, extra] of [
+      ["page_source_list", { externalTaint: true }],
+      ["page_source_list", { trigger: "webhook" }],
+      ["remember", {}],
+      ["skill_create", {}],
+    ] as const) {
+      const f = background("pass", name, extra);
+      await f.run({ expectFailure: true });
+      expect(f.pauseRunForInput, name + JSON.stringify(extra)).toHaveBeenCalled();
+    }
+    expect(reviewMock).not.toHaveBeenCalled();
   });
 });
 

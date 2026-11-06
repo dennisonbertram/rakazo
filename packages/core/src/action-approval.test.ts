@@ -4,6 +4,7 @@ import {
   ACTION_TYPES,
   actionTypeForTool,
   applyJudgeDecision,
+  backgroundAutoReviewAllowed,
   botAllowsAllSites,
   buildApprovalTable,
   connectorKindFromToolName,
@@ -1189,5 +1190,80 @@ describe("routine rules and Auto Review of routine reads", () => {
         ],
       }),
     ).toBe(true);
+  });
+});
+
+describe("backgroundAutoReviewAllowed", () => {
+  const clean = {
+    enabled: true,
+    trigger: "routine",
+    tainted: false,
+    outsideContentSeen: false,
+    meetingMarked: false,
+    firewalled: false,
+    externalBot: false,
+    ownerWords: "Summarize my cap table every Monday.",
+    toolName: "cap_table_read",
+  };
+
+  it("allows a clean run's ordinary call", () => {
+    expect(backgroundAutoReviewAllowed(clean)).toBe(true);
+    expect(
+      backgroundAutoReviewAllowed({
+        ...clean,
+        toolName: "notion_create_page",
+        viaConnector: true,
+        connectorKind: "notion",
+      }),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["background off", { enabled: false }],
+    ["webhook", { trigger: "webhook" }],
+    ["tainted run", { tainted: true }],
+    ["outside content", { outsideContentSeen: true }],
+    ["meeting mark", { meetingMarked: true }],
+    ["firewalled", { firewalled: true }],
+    ["external bot", { externalBot: true }],
+    ["empty owner words", { ownerWords: "  " }],
+  ])("never judges: %s", (_label, patch) => {
+    expect(backgroundAutoReviewAllowed({ ...clean, ...patch })).toBe(false);
+  });
+
+  it.each([
+    "schedule_create",
+    "schedule_update",
+    "schedule_cancel",
+    "skill_create",
+    "skill_update",
+    "skill_delete",
+    "remember",
+    "save_memory",
+    "save_shared_memory",
+    "forget_memory",
+    "mail_send",
+    "mail_draft",
+    "message_outside",
+    "imessage_send",
+    "calendar_create_event",
+    "calendar_delete_event",
+    "gtm_post",
+    "share_meeting",
+    "fundraising_round_save",
+  ])("never judges %s", (toolName) => {
+    expect(backgroundAutoReviewAllowed({ ...clean, toolName })).toBe(false);
+  });
+
+  it("never judges a money, message or calendar connector call", () => {
+    for (const [toolName, connectorKind] of [
+      ["stripe_create_charge", "stripe"],
+      ["slack_post_message", "slack"],
+      ["google_calendar_create_event", "googlecalendar"],
+    ] as const) {
+      expect(
+        backgroundAutoReviewAllowed({ ...clean, toolName, viaConnector: true, connectorKind }),
+      ).toBe(false);
+    }
   });
 });

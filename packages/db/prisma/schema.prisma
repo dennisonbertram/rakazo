@@ -504,6 +504,7 @@ model ActionAutoReviewPreference {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   enabled   Boolean  @default(false)
+  background Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

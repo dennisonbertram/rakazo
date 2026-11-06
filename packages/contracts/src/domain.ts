@@ -1036,9 +1036,19 @@ export type ApprovalTableRow = z.infer<typeof ApprovalTableRowSchema>;
 
 export const ActionAutoReviewSettingsSchema = z.object({
   enabled: z.boolean(),
+  /** Also judge calls in background runs that read nothing from outside. */
+  background: z.boolean(),
   checkerAvailable: z.boolean(),
 });
 export type ActionAutoReviewSettings = z.infer<typeof ActionAutoReviewSettingsSchema>;
+
+export const ActionAutoReviewRecentSchema = z.object({
+  id: z.string(),
+  tool: z.string(),
+  reason: z.string().nullable(),
+  at: z.string(),
+});
+export type ActionAutoReviewRecent = z.infer<typeof ActionAutoReviewRecentSchema>;
 
 export const CapabilityInstallSchema = z.object({
   id: Id,

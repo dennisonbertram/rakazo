@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 346 of 346
-- Web and shared components: 881
-- Mobile components: 153 in 102 files, mobile — native story pending
-- SwiftUI views: 140 in 76 files, native story pending
+- Web and shared component files with stories: 347 of 347
+- Web and shared components: 882
+- Mobile components: 155 in 104 files, mobile — native story pending
+- SwiftUI views: 141 in 77 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -80,6 +80,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | AskBotButton | [apps/web/src/components/AskBotButton.tsx](../../apps/web/src/components/AskBotButton.tsx) | [AskBotButton.stories.tsx](../../apps/web/src/components/AskBotButton.stories.tsx), [CrmPipeline.stories.tsx](../../apps/web/src/pages/CrmPipeline.stories.tsx) | web |
 | AskCard | [apps/web/src/components/AskCard.tsx](../../apps/web/src/components/AskCard.tsx) | [AskCard.stories.tsx](../../apps/web/src/components/AskCard.stories.tsx) | web |
 | AutoFileEmailSetting | [apps/web/src/components/AutoFileEmailSetting.tsx](../../apps/web/src/components/AutoFileEmailSetting.tsx) | [AutoFileEmailSetting.stories.tsx](../../apps/web/src/components/AutoFileEmailSetting.stories.tsx) | web |
+| AutoReviewSettings | [apps/web/src/components/AutoReviewSettings.tsx](../../apps/web/src/components/AutoReviewSettings.tsx) | [AutoReviewSettings.stories.tsx](../../apps/web/src/components/AutoReviewSettings.stories.tsx) | web |
 | BotAppControlSection | [apps/web/src/components/BotAppControlSection.tsx](../../apps/web/src/components/BotAppControlSection.tsx) | [BotAppControlSection.stories.tsx](../../apps/web/src/components/BotAppControlSection.stories.tsx) | web |
 | BotAudienceTag | [apps/web/src/components/BotAudienceTag.tsx](../../apps/web/src/components/BotAudienceTag.tsx) | [BotAudienceTag.stories.tsx](../../apps/web/src/components/BotAudienceTag.stories.tsx) | web |
 | BotTodos | [apps/web/src/components/BotTodos.tsx](../../apps/web/src/components/BotTodos.tsx) | [BotTodos.stories.tsx](../../apps/web/src/components/BotTodos.stories.tsx) | web |
@@ -546,6 +547,8 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | GlassSurface | [apps/mobile/components/glass-surface.ios.tsx](../../apps/mobile/components/glass-surface.ios.tsx) | mobile — native story pending | mobile |
 | GlassSurface | [apps/mobile/components/glass-surface.tsx](../../apps/mobile/components/glass-surface.tsx) | mobile — native story pending | mobile |
 | GlassTitle | [apps/mobile/components/glass-title.ios.tsx](../../apps/mobile/components/glass-title.ios.tsx) | mobile — native story pending | mobile |
+| GoalCard | [apps/mobile/components/goal-card.tsx](../../apps/mobile/components/goal-card.tsx) | mobile — native story pending | mobile |
+| GoalLine | [apps/mobile/components/goal-line.tsx](../../apps/mobile/components/goal-line.tsx) | mobile — native story pending | mobile |
 | GranolaKeyGroup | [apps/mobile/components/granola-key-group.tsx](../../apps/mobile/components/granola-key-group.tsx) | mobile — native story pending | mobile |
 | GroupAvatar | [apps/mobile/components/group-avatar.tsx](../../apps/mobile/components/group-avatar.tsx) | mobile — native story pending | mobile |
 | ZoomableImage, ImageArtifactViewer | [apps/mobile/components/image-artifact-viewer.tsx](../../apps/mobile/components/image-artifact-viewer.tsx) | mobile — native story pending | mobile |
@@ -660,6 +663,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SecretAskView | [apps/ios/Sources/Praci/Thread/Approvals/SecretAskView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/SecretAskView.swift) | native story pending | iOS |
 | ComposerView | [apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift](../../apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift) | native story pending | iOS |
 | PendingSendsView | [apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift](../../apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift) | native story pending | iOS |
+| GoalBlockView | [apps/ios/Sources/Praci/Thread/GoalViews.swift](../../apps/ios/Sources/Praci/Thread/GoalViews.swift) | native story pending | iOS |
 | MessageActions | [apps/ios/Sources/Praci/Thread/MessageActions.swift](../../apps/ios/Sources/Praci/Thread/MessageActions.swift) | native story pending | iOS |
 | MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, PageCardView, ImageBlockView, FileBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
 | ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |

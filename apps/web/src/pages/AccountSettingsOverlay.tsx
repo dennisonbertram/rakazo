@@ -24,6 +24,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import { AccountAccess } from "../components/AccountAccess";
 import { AiDataSharingSection } from "../components/AiDataSharing";
 import { ApprovalRulesSettings } from "../components/ApprovalRulesSettings";
+import { AutoReviewSettings } from "../components/AutoReviewSettings";
 import { SuccessPop } from "../components/ai/primitives";
 import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint";
 import { DataExportSection } from "../components/DataExport";
@@ -371,6 +372,9 @@ export function PrivacySettingsPanels() {
     <div className="space-y-5">
       <section className="rounded-xl border border-border px-4 py-4">
         <ApprovalRulesSettings />
+      </section>
+      <section className="rounded-xl border border-border px-4 py-4">
+        <AutoReviewSettings />
       </section>
       <MeetingRecordingSettings />
       <AiDataSharingSection />

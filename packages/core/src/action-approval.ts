@@ -329,6 +329,67 @@ export function routineAlwaysAllowable(input: {
   return type === null || !ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES.has(type);
 }
 
+/**
+ * Tools Auto Review never judges in a background run, whatever the owner switched on: they change
+ * what later runs do (schedules, skills, watches, memory), send, post or spend, or are mandatory.
+ */
+export const BACKGROUND_REVIEW_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
+  "mail_send",
+  "message_outside",
+  "message_bot",
+  "gtm_post",
+  "remember",
+  "save_memory",
+  "save_shared_memory",
+  "forget_memory",
+]);
+const BACKGROUND_REVIEW_EXCLUDED_PREFIXES = ["schedule_", "skill_", "watch_"];
+const BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES: ReadonlySet<ApprovalActionType> = new Set([
+  ...ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES,
+  "calendar_changes",
+  "use_computer",
+  "files_and_commands",
+]);
+
+/**
+ * True when Auto Review may judge a call in an unattended run: the owner turned on "Also in
+ * background runs", nothing outside is in the run, a person's own words (never a webhook, bot or
+ * channel message) say what the run is for, and the tool is not one of the excluded kinds.
+ */
+export function backgroundAutoReviewAllowed(input: {
+  enabled: boolean;
+  trigger?: string;
+  tainted: boolean;
+  outsideContentSeen: boolean;
+  meetingMarked: boolean;
+  firewalled: boolean;
+  externalBot: boolean;
+  ownerWords: string;
+  toolName: string;
+  viaConnector?: boolean;
+  connectorKind?: string;
+  readOnly?: boolean;
+}): boolean {
+  if (!input.enabled || input.trigger === "webhook") return false;
+  if (
+    input.tainted ||
+    input.outsideContentSeen ||
+    input.meetingMarked ||
+    input.firewalled ||
+    input.externalBot
+  ) {
+    return false;
+  }
+  if (!input.ownerWords.trim()) return false;
+  const name = input.toolName;
+  if (toolRequiresExplicitApproval(name) || BACKGROUND_REVIEW_EXCLUDED_TOOLS.has(name)) {
+    return false;
+  }
+  if (BACKGROUND_REVIEW_EXCLUDED_PREFIXES.some((prefix) => name.startsWith(prefix))) return false;
+  const type = actionTypeForTool(input);
+  return type === null || !BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES.has(type);
+}
+
 /** True when a tainted run may call the tool without a card. Same scratchpad rule as unattended. */
 export function externalTaintAllowsTool(toolName: string, args?: Record<string, unknown>): boolean {
   if (!EXTERNAL_TAINT_SAFE_TOOLS.has(toolName)) return false;

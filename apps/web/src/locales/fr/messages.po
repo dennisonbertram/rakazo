@@ -1671,6 +1671,10 @@ msgstr ""
 msgid "Already tidy."
 msgstr ""
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Also in background runs"
+msgstr ""
+
 #: src/components/inbox/InboxCleanup.tsx
 msgid "Also in Gmail"
 msgstr ""
@@ -2196,6 +2200,10 @@ msgstr "Autoriser"
 
 #: src/pages/shell/message-cards.tsx
 msgid "Authorize this server so bots can use its tools. A popup opens."
+msgstr ""
+
+#: src/components/AutoReviewSettings.tsx
+msgid "Auto Review"
 msgstr ""
 
 #: src/pages/legal/LegalContracts.tsx
@@ -4638,6 +4646,7 @@ msgid "Could not save the SAFE"
 msgstr ""
 
 #: src/components/AutoFileEmailSetting.tsx
+#: src/components/AutoReviewSettings.tsx
 msgid "Could not save the setting"
 msgstr ""
 
@@ -11139,6 +11148,10 @@ msgstr ""
 
 #: src/pages/McpConnectionActivity.tsx
 msgid "Recent activity"
+msgstr ""
+
+#: src/components/AutoReviewSettings.tsx
+msgid "Recently approved by Auto Review"
 msgstr ""
 
 #: src/pages/investors/UpdateEditor.tsx

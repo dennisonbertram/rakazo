@@ -17,6 +17,8 @@ import { resolveDeploymentModel } from "./deployment-model.js";
 import { LOCAL_PROVIDER_ID } from "./pi-local-provider.js";
 
 const DEFAULT_TIMEOUT_MS = 1_500;
+/** Nobody waits on an unattended run, so its judge may take longer than an attended one. */
+export const BACKGROUND_REVIEW_TIMEOUT_MS = 20_000;
 export const MAX_TASK_CHARS = 400;
 /** A new site is judged on the owner's words alone, so they get more room. */
 export const MAX_OWNER_WORDS_CHARS = 2_000;
