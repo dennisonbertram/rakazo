@@ -2,14 +2,18 @@ import { MeetingSourceError } from "@rakazo/adapter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMeetingSourceRegistry } from "./meeting-source-registry.js";
 import { CHAIN_DELAY_MS } from "./meeting-sync-job.js";
-import { OmiCloudApiEmulator } from "./omi-cloud-api-emulator.js";
+import { OmiCloudApiEmulator, omiEmulatorConversations } from "./omi-cloud-api-emulator.js";
 import { createOmiCloudMeetingSource } from "./omi-cloud-meeting-source.js";
 
 const KEY = "omi_dev_test_key";
 const open: OmiCloudApiEmulator[] = [];
 
 async function setup(options: ConstructorParameters<typeof OmiCloudApiEmulator>[0] = {}) {
-  const emulator = new OmiCloudApiEmulator({ apiKey: KEY, ...options });
+  const emulator = new OmiCloudApiEmulator({
+    apiKey: KEY,
+    conversations: omiEmulatorConversations(new Date("2026-02-05T00:00:00.000Z")),
+    ...options,
+  });
   open.push(emulator);
   const baseUrl = await emulator.start();
   return { emulator, source: createOmiCloudMeetingSource({ apiKey: KEY, baseUrl }) };

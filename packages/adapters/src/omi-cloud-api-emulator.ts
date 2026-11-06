@@ -19,14 +19,21 @@ const seg = (text: string, start: number, speaker = "SPEAKER_0", is_user = false
   end: start + 5,
 });
 
-/** Invented conversations: two real ones, one under two minutes, one with no transcript. */
-export const OMI_EMULATOR_CONVERSATIONS: OmiEmulatorConversation[] = [
+const HOUR = 3_600_000;
+const iso = (base: Date, hoursAgo: number, minutes = 0) =>
+  new Date(base.getTime() - hoursAgo * HOUR + minutes * 60_000).toISOString();
+
+/**
+ * Invented conversations, dated back from `now`: two real ones, one under two minutes and one
+ * with no transcript. The demo uses the current time so they fall inside the import window.
+ */
+export const omiEmulatorConversations = (now = new Date()): OmiEmulatorConversation[] => [
   {
     id: "omi-conv-4",
     title: "Roadmap sync",
     overview: "Agreed the Q3 roadmap order.",
-    startedAt: "2026-02-04T15:00:00.000Z",
-    finishedAt: "2026-02-04T15:20:00.000Z",
+    startedAt: iso(now, 9),
+    finishedAt: iso(now, 9, 20),
     segments: [
       seg("Let's start with the roadmap.", 0, "SPEAKER_0", true),
       seg("Sounds good.", 6, "SPEAKER_1"),
@@ -36,24 +43,24 @@ export const OMI_EMULATOR_CONVERSATIONS: OmiEmulatorConversation[] = [
     id: "omi-conv-3",
     title: "Quick hello",
     overview: "A short greeting.",
-    startedAt: "2026-02-03T12:00:00.000Z",
-    finishedAt: "2026-02-03T12:00:45.000Z",
+    startedAt: iso(now, 36),
+    finishedAt: iso(now, 36, 0.75),
     segments: [seg("Hi there.", 0)],
   },
   {
     id: "omi-conv-2",
     title: "Silent recording",
     overview: "",
-    startedAt: "2026-02-02T09:00:00.000Z",
-    finishedAt: "2026-02-02T09:10:00.000Z",
+    startedAt: iso(now, 63),
+    finishedAt: iso(now, 63, 10),
     segments: [],
   },
   {
     id: "omi-conv-1",
     title: "Hiring debrief",
     overview: "Decided to extend an offer.",
-    startedAt: "2026-02-01T10:00:00.000Z",
-    finishedAt: "2026-02-01T10:30:00.000Z",
+    startedAt: iso(now, 86),
+    finishedAt: iso(now, 86, 30),
     segments: [{ text: "I liked the second candidate." }, seg("Same here.", 12, "SPEAKER_1")],
   },
 ];
@@ -91,7 +98,7 @@ export class OmiCloudApiEmulator {
     this.apiKey = options.apiKey ?? "omi_dev_emulator_key";
     this.maxPageSize = options.maxPageSize ?? 25;
     this.port = options.port ?? 0;
-    this.conversations = [...(options.conversations ?? OMI_EMULATOR_CONVERSATIONS)].sort(
+    this.conversations = [...(options.conversations ?? omiEmulatorConversations())].sort(
       (a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.id.localeCompare(a.id),
     );
   }
