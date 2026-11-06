@@ -1,6 +1,6 @@
 import type { ThreadGoal } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
-import { GOAL_SLASH_ACTION, slashActionRoute } from "./slash-actions";
+import { slashActionRoute } from "./slash-actions";
 import { applyGoalEvent, goalLineState, isGoalReply } from "./thread-goal";
 
 const goal: ThreadGoal = {
@@ -78,7 +78,7 @@ describe("slashActionRoute", () => {
     expect(slashActionRoute("settings-general", bot)).toEqual({ pathname: "/account" });
   });
   it("does not open Account for an action it does not know", () => {
-    expect(slashActionRoute(GOAL_SLASH_ACTION.id, bot)).toBeNull();
+    expect(slashActionRoute("goal", bot)).toBeNull();
     expect(slashActionRoute("something-new" as never, bot)).toBeNull();
   });
 });

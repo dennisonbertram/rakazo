@@ -4665,6 +4665,22 @@ describe("runs that began with an external bot", () => {
     expect(JSON.stringify(card.actions)).not.toMatch(/always/i);
   });
 
+  it("a goal continuation that is restricted still asks, without saying an external bot asked", async () => {
+    const f = fixture({
+      name: "mail_search",
+      builtin: true,
+      mail: mailStub(),
+      trigger: "goal",
+      externalTaint: true,
+    });
+    f.setCalls([mailCall]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    const card = askBlock(f);
+    expect(card.approvalReason).not.toBe(EXTERNAL_REQUEST_REASON);
+    expect(JSON.stringify(card)).not.toContain(EXTERNAL_REQUEST_REASON);
+  });
+
   it("the same call in an unmarked run does not ask", async () => {
     const f = fixture({ name: "mail_search", builtin: true, mail: mailStub() });
     f.setCalls([mailCall]);
@@ -8339,6 +8355,35 @@ describe("a run that a goal adopts while it is running", () => {
         payload: { goalId: "goal-1", runId: "run-1" },
       }),
     );
+  });
+
+  it("records a call the owner approved as a success, so it counts as progress and can be cited", async () => {
+    const f = fixture({
+      goalId: "goal-1",
+      rules: [{ effect: "require_approval", matchKind: "tool", matchValue: "demo_get_item" }],
+    });
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    // The pause is not a result, so it is not evidence yet.
+    expect(evidenceWrites(f).at(-1) ?? []).toEqual([]);
+    f.effects[0]!.status = "approved";
+    f.setCalls([{ args: { id: "model-reconstructed" }, executionId: "call-2" }]);
+    await f.run();
+    const log = evidenceWrites(f).at(-1) as Array<{ tool: string; ok: boolean }> | undefined;
+    expect(log).toMatchObject([{ tool: "demo_get_item", ok: true }]);
+  });
+
+  it("records an approved web_fetch as a success too", async () => {
+    const f = fixture({ goalId: "goal-1", builtin: true, sourceText: "ada.li@example.org" });
+    f.setCalls([{ name: "web_fetch", args: { url: "https://ada.li/" }, executionId: "call-1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    f.effects[0]!.status = "approved";
+    f.setCalls([{ name: "web_fetch", args: { url: "https://ada.li/" }, executionId: "call-2" }]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://ada.li/"]);
+    const log = evidenceWrites(f).at(-1) as Array<{ tool: string; ok: boolean }> | undefined;
+    expect(log).toMatchObject([{ tool: "web_fetch", ok: true }]);
   });
 
   it("keeps the log for a run that never had a goal, but queues no goal check", async () => {

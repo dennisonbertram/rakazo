@@ -6319,14 +6319,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
             ));
           if (repeatsSentEmail) gateDecision = "ask";
           const needsApproval = gateDecision === "ask";
-          // One plain line on the card, only for a background, tainted or rule-caused ask.
+          // One plain line on the card, only for a background, tainted or rule-caused ask. A goal
+          // continuation is the owner's own run, restricted after reading outside content, so
+          // it never says an external bot asked.
           const approvalCardReason = repeatsSentEmail
             ? MAIL_ALREADY_SENT_REASON
             : firewallAskCall
               ? FIREWALL_CARD_REASON
               : requiresUnattendedApproval || mailModifyNeedsToolRule
                 ? "Asked because this ran in the background."
-                : externalTaintedCall
+                : externalTaintedCall && run.trigger !== "goal"
                   ? EXTERNAL_REQUEST_REASON
                   : meetingTaintedCall && !meetingAgent
                     ? MEETING_MARK_REASON
@@ -6486,7 +6488,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
               // The card's reason line already says "Requested by an external bot".
               reviewReason:
-                externalTaintedCall && approvalCardReason !== EXTERNAL_REQUEST_REASON
+                externalTaintedCall &&
+                run.trigger !== "goal" &&
+                approvalCardReason !== EXTERNAL_REQUEST_REASON
                   ? [EXTERNAL_REQUEST_REASON, reviewReason].filter(Boolean).join("\n")
                   : reviewReason,
               fullMail:

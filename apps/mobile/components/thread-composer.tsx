@@ -6,6 +6,7 @@ import {
   mentionChipKey,
   rankMentionOptions,
   SLASH_ACTIONS,
+  SLASH_INSERTS,
   serializeComposerPrompt,
   truncateSlashDescription,
 } from "@rakazo/core";
@@ -17,7 +18,6 @@ import { useAccentedTokens } from "../lib/bot-accent";
 import { useI18n } from "../lib/i18n";
 import { useMobileTokens, useResolvedAppearance } from "../lib/native";
 import type { MobileSlashActionId } from "../lib/slash-actions";
-import { GOAL_SLASH_ACTION } from "../lib/slash-actions";
 import type { ComposerSnapshot } from "../lib/thread-feedback";
 import { GlassSurface } from "./glass-surface";
 import { NativeSymbol } from "./native-symbol";
@@ -112,7 +112,7 @@ export function ThreadComposer({
       : [];
   const slashActionOptions =
     slashQuery !== null && mentionQuery === null
-      ? [...SLASH_ACTIONS, ...(botId ? [GOAL_SLASH_ACTION] : [])].filter((action) => {
+      ? [...SLASH_ACTIONS, ...(botId ? SLASH_INSERTS : [])].filter((action) => {
           if (!slashQueryNormalized) return true;
           const label = t(action.label);
           return (
@@ -156,8 +156,9 @@ export function ThreadComposer({
   function runSlashAction(action: MobileSlashActionId) {
     setSlashQuery(null);
     // Goal is a message the server runs, so it fills the draft; the other actions open a screen.
-    if (action === GOAL_SLASH_ACTION.id) {
-      setDraft(`/${GOAL_SLASH_ACTION.id} `);
+    const insert = SLASH_INSERTS.find((entry) => entry.id === action);
+    if (insert) {
+      setDraft(insert.text);
       return;
     }
     setDraft("");
@@ -287,8 +288,8 @@ export function ThreadComposer({
               }}
             >
               <NativeSymbol
-                ios={action.id === GOAL_SLASH_ACTION.id ? "flag" : "gearshape"}
-                android={action.id === GOAL_SLASH_ACTION.id ? "flag-outline" : "settings-outline"}
+                ios={action.id === "goal" ? "flag" : "gearshape"}
+                android={action.id === "goal" ? "flag-outline" : "settings-outline"}
                 size={16}
                 color={tokens.mutedForeground}
               />
