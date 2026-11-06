@@ -39,6 +39,8 @@ export const SourceMeetingSchema = z.object({
   /** True when the transcript was cut to MEETING_TRANSCRIPT_MAX_BYTES. */
   transcriptTruncated: z.boolean().optional(),
   updatedAt: IsoDate,
+  /** A content version for a source whose update time does not change on an edit; compared for equality. */
+  version: z.string().optional(),
   deleted: z.boolean().optional(),
 });
 export type SourceMeeting = z.infer<typeof SourceMeetingSchema>;

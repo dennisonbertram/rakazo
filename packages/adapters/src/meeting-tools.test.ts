@@ -225,6 +225,27 @@ describe("meeting tools", () => {
     ]);
   });
 
+  it("registers the agent of an Omi Developer key connection, so it gets the meeting tools", async () => {
+    const bot = {
+      id: "bot-cloud",
+      ...scope,
+      spawnKey: "integration-agent:conn-cloud",
+      archivedAt: null,
+    };
+    const prismaWith = (connectorId: string | null) =>
+      ({
+        mcpServer: { findMany: async () => [] },
+        connection: {
+          findFirst: async ({ where }: { where: { connectorId: string; agentBotId: string } }) =>
+            where.connectorId === connectorId && where.agentBotId === "bot-cloud"
+              ? { id: "conn-cloud" }
+              : null,
+        },
+      }) as never;
+    expect(await isMeetingSourceAgent(bot, { prisma: prismaWith("omi-cloud") })).toBe(true);
+    expect(await isMeetingSourceAgent(bot, { prisma: prismaWith(null) })).toBe(false);
+  });
+
   it("registers the Omi agent, with exactly the meeting reads, Data room reads and recall", async () => {
     const bot = {
       id: "bot-omi",

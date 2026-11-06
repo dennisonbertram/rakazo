@@ -7,6 +7,7 @@ import {
   isWisprFlowEndpoint,
   MEETING_TRANSCRIPT_TOOL_MAX_BYTES,
   MEETING_TRUNCATION_MARKER,
+  OMI_CLOUD_CONNECTOR_ID,
   OMI_CONNECTOR_ID,
 } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
@@ -283,6 +284,22 @@ export const omiAgent: MeetingAgentCheck = async (bot, deps) => {
   return Boolean(await omiConnectionOf(bot, deps)) && bot.archivedAt === null;
 };
 
+/** The agent of an Omi Developer key connection (a user with a pendant shares the pendant's agent). */
+const omiCloudAgent: MeetingAgentCheck = async (bot, deps) => {
+  if (!isIntegrationAgentSpawnKey(bot.spawnKey)) return false;
+  const row = await deps.prisma.connection.findFirst({
+    where: {
+      spaceId: bot.spaceId,
+      userId: bot.userId,
+      connectorId: OMI_CLOUD_CONNECTOR_ID,
+      agentBotId: bot.id,
+      status: { not: "revoked" },
+    },
+    select: { id: true },
+  });
+  return Boolean(row) && bot.archivedAt === null;
+};
+
 /** The agent of a Hex connection, found by the connection that names it. */
 export const hexAgent: MeetingAgentCheck = async (bot, deps) => {
   if (!isIntegrationAgentSpawnKey(bot.spawnKey)) return false;
@@ -321,6 +338,7 @@ const meetingAgentChecks: MeetingAgentCheck[] = [
   wisprFlowAgent,
   granolaApiAgent,
   omiAgent,
+  omiCloudAgent,
   hexAgent,
 ];
 export function registerMeetingSourceAgentCheck(check: MeetingAgentCheck) {
