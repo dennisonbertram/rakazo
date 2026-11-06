@@ -134,7 +134,11 @@ Hand test for each: `DEMO_SLOT=<n> pnpm demo:up` from the task worktree, never t
 | **S4 Memories** | `omi.memories` job, "Omi/Memories" item, `not_ready` state in `Connection.metadata`, daily scheduling, rewrite and removal. | `packages/adapter-kit/src/background-jobs.ts`, `packages/adapters/src/background-job-handlers.ts`, new `omi-memories.ts`, `omi-cloud-meeting-source.ts` (client shared with S1) | Offline tests: item created, rewritten, a removed memory disappears, `403 not ready` writes nothing and sets the state, oversize cut, item hidden from an agent without a grant. | The folder holds one item with the emulator's memories; switch the emulator to `not ready` and see the state line, with conversations still syncing. |
 | **S5 Web page** | Key section on the Omi page, status line, errors from the table, Remove (with "Delete synced data too"), Storybook states, i18n catalog. | `apps/web/src/components/integrations/OmiPage.tsx`, `OmiPage.stories.tsx`, `OmiPage.test.tsx`, `OmiPageData.test.tsx`, `omi-fixtures.ts`, locale catalogs, `docs/design-system/` via `pnpm design-system` | Component tests for each state; `node .storybook/smoke.mjs`; E2E screenshot of the page with a connected key, linked in the PR. | Use the page in the browser: connect, see meetings and memories, trigger each error from the emulator, remove. |
 
-## Open decisions for the owner
+## Owner decisions (2026-11-05)
+
+The owner chose the recommendation for all three: 90 days of history, the simple filter with no model sort, and running the S0 probe with their own key before S1 merges.
+
+### Original questions
 
 1. **D3, how far back.** Recommend 90 days. If you want all history, say so; the first import then takes days at the 25-an-hour transcript limit and runs unattended.
 2. **Noise.** Recommend the deterministic filter (discarded and under 2 minutes) with no model sort in v1. If your Omi records all day and Meetings fill up, the alternative is sorting each conversation into Meeting, Note or Trash, which needs `OmiSegment.audioItemId` to become optional.
