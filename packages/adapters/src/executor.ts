@@ -4600,6 +4600,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         };
         // A restored transcript holds earlier tool results this worker did not see.
         let outsideContentSeen =
+          run.readOutsideContent === true ||
           Boolean(turnCheckpoint) ||
           Boolean(checkpointLoadError) ||
           Boolean(stoppedNote && stoppedWork?.readOutsideContent);
@@ -5599,8 +5600,20 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 !collectStrings(args).some((text) => repeatsPrivateText(text, fragments!))
               );
             })());
+          // message_bot only reaches the owner's own bots in the same space (bot-messages.ts), and
+          // the receiving run has its own gates. It is free in the background only while nothing
+          // outside is in this run; a tainted, firewalled, external or meeting-marked run asks.
+          const ownBotRelay =
+            run.unattended === true &&
+            name === "message_bot" &&
+            run.externalTaint !== true &&
+            bot.firewall !== true &&
+            bot.audience !== "external" &&
+            !runReadMeetingText &&
+            !(await isOutsideContentSeen());
           const requiresUnattendedApproval =
             !publicResearchRead &&
+            !ownBotRelay &&
             unattendedToolRequiresApproval(
               run.unattended,
               name,

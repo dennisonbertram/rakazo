@@ -14,6 +14,7 @@ import {
   integrationAgentSpawnKey,
   MEETING_MARK_REASON,
   voiceAgentSpawnKey,
+  financeAgentSpawnKey,
 } from "@rakazo/contracts";
 import type { ActionApprovalRule } from "@rakazo/core";
 import {
@@ -27,6 +28,7 @@ import { approvalEffectKey, toolEffectIdempotencyKey } from "@rakazo/core/node/a
 import type { PreparedPipelineImport } from "@rakazo/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as AiConsentModule from "./ai-consent.js";
+import type * as FinanceToolsModule from "./finance-tools.js";
 import { DENIED_ACTION_MESSAGE, isApprovalPausedResult } from "./approval-effect.js";
 import { BlueBubblesEmulator, createEmulatedBlueBubblesPlatform } from "./bluebubbles-emulator.js";
 import type { MessageBotOptions } from "./bot-messages.js";
@@ -121,6 +123,10 @@ const triage = vi.hoisted(() => ({
   chatNeedsConsent: false,
   chatKey: "run-key",
   chatRecipientThrows: false,
+}));
+vi.mock("./finance-tools.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof FinanceToolsModule>()),
+  financeToolFromTool: async () => ({ ok: true }),
 }));
 vi.mock("./ai-consent.js", async (importOriginal) => ({
   ...(await importOriginal<typeof AiConsentModule>()),
@@ -223,6 +229,7 @@ function fixture({
   trigger = "user",
   unattended = trigger === "webhook",
   externalTaint = false,
+  readOutsideContent = false,
   routineManagedKind,
   routineRules = [] as string[],
   scratchpadItem,
@@ -386,6 +393,8 @@ function fixture({
   externalTaint?: boolean;
   /** Makes the run a routine run; the routine's managedKind. */
   routineManagedKind?: string | null;
+  /** Stored `Run.readOutsideContent`: set by a source run that read outside content. */
+  readOutsideContent?: boolean;
   /** Tools the owner chose "Always for this routine" for. */
   routineRules?: string[];
   /** The stored scratchpad item the gate looks up for scratchpad_update/complete. */
@@ -449,6 +458,7 @@ function fixture({
     // Webhook runs are created unattended; the other fixtures model an attended run.
     unattended,
     externalTaint,
+    readOutsideContent,
     routineId: routineManagedKind === undefined ? null : "routine-1",
     leaseFence: 0,
     ...(goalId ? { goalId } : {}),
@@ -610,6 +620,7 @@ function fixture({
       ),
       findMany: vi.fn(async () => []),
     },
+    financeAccount: { findFirst: vi.fn(async () => null) },
     mcpServer: {
       findMany: vi.fn(
         async ({ where }: { where?: { agentBotId?: string; enabled?: boolean } } = {}) =>
@@ -6302,6 +6313,91 @@ describe("the meeting mark follows what the run can see", () => {
     ]);
     await f.run();
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+});
+
+describe("background runs inside Praci", () => {
+  const botCall = {
+    args: { bot_id: "bot-fin", message: "cash?" },
+    executionId: "c1",
+  };
+  const background = {
+    trigger: "routine",
+    unattended: true,
+    routineManagedKind: "custom",
+  } as const;
+
+  it("lets a clean routine message the owner's own bot with no card", async () => {
+    sentBotMessages.calls.length = 0;
+    const f = fixture({ name: "message_bot", builtin: true, ...background });
+    f.setCalls([botCall]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(sentBotMessages.calls).toHaveLength(1);
+  });
+
+  it("asks once the routine has read a page", async () => {
+    const f = fixture({ name: "web_fetch", builtin: true, ...background });
+    f.setCalls([
+      {
+        name: "web_fetch",
+        args: { url: "https://example.invalid" },
+        executionId: "c0",
+      },
+      { name: "message_bot", ...botCall },
+    ]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks when the run starts with its source's outside-content mark", async () => {
+    const f = fixture({
+      name: "message_bot",
+      builtin: true,
+      readOutsideContent: true,
+      ...background,
+    });
+    f.setCalls([botCall]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks in an externally tainted routine", async () => {
+    const f = fixture({
+      name: "message_bot",
+      builtin: true,
+      externalTaint: true,
+      ...background,
+    });
+    f.setCalls([botCall]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("reads finance without a card unless the run is tainted", async () => {
+    const call = { args: {}, executionId: "c1" };
+    const clean = fixture({
+      name: "finance_overview",
+      builtin: true,
+      bank: true,
+      spawnKey: financeAgentSpawnKey("user-1"),
+      ...background,
+    });
+    clean.setCalls([call]);
+    await clean.run();
+    expect(clean.results).toEqual([{ ok: true }]);
+    expect(clean.pauseRunForInput).not.toHaveBeenCalled();
+    const tainted = fixture({
+      name: "finance_overview",
+      builtin: true,
+      bank: true,
+      spawnKey: financeAgentSpawnKey("user-1"),
+      externalTaint: true,
+      ...background,
+    });
+    tainted.setCalls([call]);
+    await tainted.run();
+    expect(tainted.pauseRunForInput).toHaveBeenCalledOnce();
   });
 });
 

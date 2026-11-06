@@ -183,7 +183,7 @@ async function ensureSpawnRun(
         "spawn",
         await tx.run.findUnique({
           where: { id: input.sourceRunId },
-          select: { unattended: true, externalTaint: true },
+          select: { unattended: true, externalTaint: true, readOutsideContent: true },
         }),
       );
       return tx.run.create({
@@ -197,6 +197,7 @@ async function ensureSpawnRun(
           trigger: "spawn",
           unattended: mode.unattended,
           externalTaint: mode.externalTaint,
+          readOutsideContent: mode.readOutsideContent,
           clientNonce,
         },
       });

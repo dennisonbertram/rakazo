@@ -750,6 +750,25 @@ describe("planActionGate with block and unattended runs", () => {
 });
 
 describe("unattendedToolRequiresApproval", () => {
+  it("lets a background run read the owner's finance records, but a tainted run still asks", () => {
+    for (const name of [
+      "finance_overview",
+      "finance_breakdown",
+      "finance_transactions",
+      "finance_recurring",
+      "finance_crypto",
+    ]) {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
+      expect(externalTaintAllowsTool(name)).toBe(false);
+      expect(ROUTINE_AUTO_REVIEW_READ_TOOLS.has(name)).toBe(false);
+    }
+  });
+
+  it("keeps message_bot asking in the gate; the executor lifts it for a clean own-bot relay", () => {
+    expect(unattendedToolRequiresApproval(true, "message_bot", false)).toBe(true);
+    expect(externalTaintAllowsTool("message_bot")).toBe(false);
+  });
+
   it("lets a scheduled run read the owner's company context without a card", () => {
     expect(unattendedToolRequiresApproval(true, "company_context_lookup", false)).toBe(false);
   });
@@ -834,8 +853,6 @@ describe("unattendedToolRequiresApproval", () => {
   });
 
   it.each([
-    "finance_overview",
-    "finance_transactions",
     "cap_table_read",
     "page_source_list",
   ])("still asks for %s in an unattended run", (name) => {
