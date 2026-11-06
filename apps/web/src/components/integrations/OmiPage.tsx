@@ -29,6 +29,7 @@ import type { IntegrationsData } from "./useIntegrations";
 /** Hours with at most one decimal: 27, 3.2. */
 const hours = (minutes: number) => Math.round(minutes / 6) / 10;
 const LONG_MIN = 120;
+const CLOUD_POLL_MS = 10_000;
 
 function StatusLine({ state }: { state: OmiSyncState }) {
   const { t } = useLingui();
@@ -367,6 +368,18 @@ export function OmiPage({
     void reload();
   }, [reload]);
   const { state, sync } = useOmiSync(status, reload);
+  // The card shows "Syncing" until the first sync finishes; ask again until it does.
+  const cloudSyncing = cloud?.status === "connected" && !cloud.syncedThrough;
+  useEffect(() => {
+    if (!cloudSyncing) return;
+    const timer = setInterval(() => {
+      void rpc.omiCloud
+        .status()
+        .then((next) => setCloud(next ?? null))
+        .catch(() => undefined);
+    }, CLOUD_POLL_MS);
+    return () => clearInterval(timer);
+  }, [cloudSyncing]);
 
   async function deleteAll() {
     setError(null);

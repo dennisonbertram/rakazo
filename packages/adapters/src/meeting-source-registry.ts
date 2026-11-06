@@ -90,8 +90,9 @@ export function createMeetingSourceRegistry(
     },
     omi_cloud: {
       connectorId: OMI_CLOUD_CONNECTOR_ID,
-      // Omi limits transcript reads to 25 an hour; two minutes between runs keeps a backfill under it.
-      chainDelayMs: 2 * 60_000,
+      // Omi limits detail reads to about 25 an hour. Four reads every 12 minutes is 20 an hour.
+      chainDelayMs: 12 * 60_000,
+      maxFetchesPerRun: 4,
       create: ({ apiKey }, signal) => {
         const base = options.fetch ?? fetch;
         if (!apiKey) throw new Error("Omi needs an API key");

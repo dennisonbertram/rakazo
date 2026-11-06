@@ -41,7 +41,8 @@ describe("omi cloud source", () => {
   it("stops paging at the createdAfter boundary", async () => {
     const { emulator, source } = await setup({ maxPageSize: 1 });
     // Newest first: conv-4 (Feb 4), conv-3 (Feb 3, too short), conv-2 (Feb 2), conv-1 (Feb 1).
-    const after = new Date("2026-02-01T23:00:00.000Z");
+    // The walk ends at a start more than 24 hours before this: before Feb 2 00:00.
+    const after = new Date("2026-02-03T00:00:00.000Z");
     let page = await source.list({ createdAfter: after });
     const ids = page.items.map((i) => i.externalId);
     while (page.nextCursor) {
@@ -51,6 +52,46 @@ describe("omi cloud source", () => {
     expect(ids).toEqual(["omi-conv-4", "omi-conv-2"]);
     // Four pages: the last is the boundary page (conv-1); nothing is requested after it.
     expect(emulator.requests).toHaveLength(4);
+  });
+
+  it("keeps a long conversation that started before a short one that finished before the boundary", async () => {
+    const conv = (id: string, start: string, end: string) => ({
+      id,
+      title: id,
+      overview: "Something was said.",
+      startedAt: start,
+      finishedAt: end,
+      segments: [],
+    });
+    const { source } = await setup({
+      conversations: [
+        conv("short", "2026-02-05T09:50:00.000Z", "2026-02-05T09:55:00.000Z"),
+        conv("long", "2026-02-05T09:00:00.000Z", "2026-02-05T10:30:00.000Z"),
+      ],
+    });
+    const page = await source.list({ updatedAfter: new Date("2026-02-05T10:00:00.000Z") });
+    expect(page.items.map((i) => i.externalId)).toEqual(["short", "long"]);
+  });
+
+  it("gives a conversation a new version when its overview changes, and the same one when not", async () => {
+    const base = {
+      id: "c",
+      title: "T",
+      overview: "First.",
+      startedAt: "2026-02-05T09:00:00.000Z",
+      finishedAt: "2026-02-05T09:30:00.000Z",
+      segments: [],
+    };
+    const versionOf = async (overview: string) => {
+      const { source } = await setup({ conversations: [{ ...base, overview }] });
+      const [item] = (await source.list({})).items;
+      const detail = await source.get("c", { includeTranscript: true });
+      expect(detail.version).toBe(item?.version);
+      return item?.version;
+    };
+    const first = await versionOf("First.");
+    expect(await versionOf("First.")).toBe(first);
+    expect(await versionOf("Edited.")).not.toBe(first);
   });
 
   it("uses the segments when they exist, with the overview as the summary", async () => {
@@ -171,7 +212,9 @@ describe("omi cloud keys", () => {
 describe("meeting source registry chain delay", () => {
   it("is slower for Omi than the default that other providers use", () => {
     const registry = createMeetingSourceRegistry();
-    expect(registry.omi_cloud?.chainDelayMs).toBe(120_000);
+    expect(registry.omi_cloud?.chainDelayMs).toBe(12 * 60_000);
+    expect(registry.omi_cloud?.maxFetchesPerRun).toBe(4);
+    expect(registry.granola?.maxFetchesPerRun).toBeUndefined();
     expect(registry.omi_cloud?.connectorId).toBe("omi-cloud");
     expect(registry.granola?.chainDelayMs).toBeUndefined();
     expect(CHAIN_DELAY_MS).toBe(1_000);

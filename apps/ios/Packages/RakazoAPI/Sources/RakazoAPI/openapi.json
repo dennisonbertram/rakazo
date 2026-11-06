@@ -149422,6 +149422,9 @@
           "updatedAt": {
             "$ref": "#/components/schemas/RpcMeetingsImportLocalInputSchema1"
           },
+          "version": {
+            "type": "string"
+          },
           "deleted": {
             "type": "boolean"
           }

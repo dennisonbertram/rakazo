@@ -120,11 +120,6 @@ export async function connectOmiCloud(
 
 async function attachAgent(deps: MeetingsDeps, actor: Actor, connectionId: string) {
   const { prisma } = deps.router;
-  const own = await prisma.connection.findFirst({
-    where: { id: connectionId, ...owner(actor) },
-    select: { agentBotId: true },
-  });
-  if (own?.agentBotId) return own.agentBotId;
   const pendant = await prisma.connection.findFirst({
     where: { ...owner(actor), connectorId: OMI_CONNECTOR_ID, status: { not: "revoked" } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -137,18 +132,34 @@ async function attachAgent(deps: MeetingsDeps, actor: Actor, connectionId: strin
       })
     : null;
   if (bot) {
-    await prisma.$transaction(async (tx) => {
-      await tx.botConnectionAccess.upsert({
-        where: { connectionId_botId: { connectionId, botId: bot.id } },
-        create: { connectionId, botId: bot.id, ...owner(actor) },
-        update: {},
+    const attached = await prisma
+      .$transaction(async (tx) => {
+        // Lock and re-read the connection, so a racing attach cannot leave a grant behind.
+        await tx.$queryRaw`SELECT id FROM connections WHERE id = ${connectionId} FOR UPDATE`;
+        const current = await tx.connection.findFirst({
+          where: { id: connectionId, ...owner(actor), status: "connected" },
+          select: { agentBotId: true },
+        });
+        if (!current) return null;
+        if (current.agentBotId) return current.agentBotId;
+        const { count } = await tx.connection.updateMany({
+          where: { id: connectionId, ...owner(actor), agentBotId: null },
+          data: { agentBotId: bot.id },
+        });
+        // Throwing rolls the grant back with it.
+        if (count !== 1) throw new Error("omi cloud agent attach lost a race");
+        await tx.botConnectionAccess.upsert({
+          where: { connectionId_botId: { connectionId, botId: bot.id } },
+          create: { connectionId, botId: bot.id, ...owner(actor) },
+          update: {},
+        });
+        return bot.id;
+      })
+      .catch((error: unknown) => {
+        getLogger().error("omiCloud.connect: agent not attached", error);
+        return null;
       });
-      await tx.connection.updateMany({
-        where: { id: connectionId, ...owner(actor), agentBotId: null },
-        data: { agentBotId: bot.id },
-      });
-    });
-    return bot.id;
+    if (attached) return attached;
   }
   await provisionConnectionAgent(deps.agent, actor, connectionId);
   return (

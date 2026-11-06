@@ -2,12 +2,14 @@ import { createRouterClient } from "@orpc/server";
 import {
   createMeetingSourceRegistry,
   OmiCloudApiEmulator,
+  omiEmulatorConversations,
   reconcileMeetingSyncs,
+  runMeetingSyncJob,
 } from "@rakazo/adapters";
 import type { Actor } from "@rakazo/contracts";
 import { OMI_CLOUD_CONNECTOR_ID } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
-import { createDb, createRepos } from "@rakazo/db";
+import { createDb } from "@rakazo/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "../../../packages/adapters/src/computer-lifecycle.js";
 import type { RouterDeps } from "./router.js";
@@ -43,7 +45,6 @@ describePostgres("omiCloud.* (PostgreSQL)", () => {
   const a = actor(userA);
   const b = actor(userB);
   const c = actor(userC);
-  const aOtherSpace = actor(userA, otherSpaceId);
 
   let prisma: PrismaClient;
   let close: () => Promise<void>;
@@ -220,5 +221,76 @@ describePostgres("omiCloud.* (PostgreSQL)", () => {
       where: { connectionId: status?.connectionId, botId: pendant.agentBotId ?? "" },
     });
     expect(access).toBe(1);
+  });
+
+  it("a reconnect keeps the connection's agent and grants nothing to the pendant's agent", async () => {
+    // A has a cloud connection with its own agent; a pendant with another agent comes later.
+    const own = await prisma.connection.findFirstOrThrow({
+      where: { spaceId, userId: userA, connectorId: OMI_CLOUD_CONNECTOR_ID },
+    });
+    expect(own.agentBotId).toBeTruthy();
+    await client(a).omi.connect({ model: "m", firmware: "f", hardware: "h", deviceId: "d" });
+    const pendant = await prisma.connection.findFirstOrThrow({
+      where: { spaceId, userId: userA, connectorId: "omi" },
+    });
+    expect(pendant.agentBotId).not.toBe(own.agentBotId);
+    await client(a).omiCloud.connect({ apiKey: KEY });
+    expect((await client(a).omiCloud.status())?.agentBotId).toBe(own.agentBotId);
+    expect(
+      await prisma.botConnectionAccess.count({
+        where: { connectionId: own.id, botId: pendant.agentBotId ?? "" },
+      }),
+    ).toBe(0);
+  });
+
+  it("reads at most four conversation details a job, continues in the next, and never re-reads unchanged ones", async () => {
+    const many = new OmiCloudApiEmulator({
+      apiKey: KEY,
+      conversations: omiEmulatorConversations().flatMap((conversation, i) =>
+        [0, 1, 2].map((n) => ({
+          ...conversation,
+          id: `${conversation.id}-${n}`,
+          startedAt: new Date(
+            Date.parse(conversation.startedAt) - (i * 3 + n) * 3_600_000,
+          ).toISOString(),
+          finishedAt: new Date(
+            Date.parse(conversation.finishedAt) - (i * 3 + n) * 3_600_000,
+          ).toISOString(),
+          overview: `Overview ${i}-${n}`,
+        })),
+      ),
+    });
+    const manyRegistry = createMeetingSourceRegistry({ omiCloudBaseUrl: await many.start() });
+    try {
+      const [bRow] = await connections(userB);
+      const run = async () => {
+        await prisma.meetingSyncState.updateMany({
+          where: { connectionId: bRow?.id },
+          data: { lastSyncedAt: new Date(Date.now() - 10 * 60_000) },
+        });
+        await runMeetingSyncJob(
+          { prisma, jobs, secrets: secrets as never, registry: manyRegistry },
+          { spaceId, userId: userB, provider: "omi_cloud", connectionId: bRow?.id } as never,
+        );
+      };
+      const details = () =>
+        many.requests.filter((r) => /\/conversations\/[^/]+$/.test(r.path)).length;
+      const stored = () =>
+        prisma.meeting.count({ where: { spaceId, userId: userB, provider: "omi_cloud" } });
+      await run();
+      expect(details()).toBe(4);
+      expect(await stored()).toBe(4);
+      await run();
+      // 12 listed, 6 of them 45 s or empty are hidden or dropped; what remains is read in turn.
+      const after2 = details();
+      expect(after2).toBeGreaterThan(4);
+      expect(after2 - 4).toBeLessThanOrEqual(4);
+      for (let i = 0; i < 5; i++) await run();
+      const total = details();
+      await run();
+      expect(details()).toBe(total);
+    } finally {
+      await many.stop();
+    }
   });
 });

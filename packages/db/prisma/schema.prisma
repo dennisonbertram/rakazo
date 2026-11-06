@@ -4155,6 +4155,8 @@ model Meeting {
   /// investor | customer | hiring | team | other; from the digest call.
   category          String?
   sourceUpdatedAt   DateTime
+  /// Content version from a source whose update time does not change on an edit (Omi cloud).
+  sourceVersion     String?
   /// Only for providers that report deletions.
   deletedAt         DateTime?
   createdAt         DateTime                 @default(now())

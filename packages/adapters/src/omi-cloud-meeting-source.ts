@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { MeetingSource } from "@rakazo/adapter-kit";
 import { MeetingSourceError } from "@rakazo/adapter-kit";
 import type { MeetingTranscriptLine, SourceMeeting } from "@rakazo/contracts";
@@ -17,6 +18,8 @@ export interface OmiCloudMeetingSourceOptions {
 }
 
 const PAGE_SIZE = 25;
+/** Omi lists by start time; a long or late-processed conversation can sit this far past the boundary. */
+const LIST_OVERLAP_MS = 24 * 3_600_000;
 /** Shorter conversations are background noise; they cost a digest call each. */
 const MIN_DURATION_MS = 2 * 60_000;
 
@@ -79,6 +82,24 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
     return t;
   };
 
+  const actionsOf = (c: z.infer<typeof OmiCloudConversationSchema>) =>
+    (c.structured?.action_items ?? [])
+      .map((a) => (typeof a === "string" ? a : (a.description ?? a.text ?? "")).trim())
+      .filter(Boolean);
+  /** Omi sends no edit time, so an edit is found by a change in what the list already returns. */
+  const versionOf = (c: z.infer<typeof OmiCloudConversationSchema>) =>
+    createHash("sha256")
+      .update(
+        JSON.stringify([
+          c.structured?.title ?? "",
+          c.structured?.overview?.trim() ?? "",
+          actionsOf(c),
+          c.finished_at ?? "",
+        ]),
+      )
+      .digest("hex")
+      .slice(0, 32);
+
   return {
     provider: "omi_cloud",
 
@@ -95,17 +116,25 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
       if (hasMore && (!next || next === filter.cursor))
         throw new MeetingSourceError("mapping", "Omi paging did not advance");
       const items = [];
+      // Omi orders by start time, newest first (S0 probe). The walk ends at a conversation that
+      // started more than a day before the boundary, so a long conversation near it is re-listed.
+      const boundary = (filter.updatedAfter ?? filter.createdAfter)?.getTime();
+      const cutoff = boundary === undefined ? undefined : boundary - LIST_OVERLAP_MS;
       let pastBoundary = false;
       for (const c of parse(ListPage, body)) {
         const updated = updatedOf(c);
         const started = ms(c.started_at) ?? ms(c.created_at) ?? updated;
-        // Observed in the S0 probe: Omi lists newest first, so one older item ends the walk.
-        if (filter.updatedAfter && updated <= filter.updatedAfter.getTime()) pastBoundary = true;
-        if (filter.createdAfter && started <= filter.createdAfter.getTime()) pastBoundary = true;
+        if (cutoff !== undefined && started < cutoff) {
+          pastBoundary = true;
+          continue;
+        }
         const finished = ms(c.finished_at);
         if (finished !== undefined && finished - started < MIN_DURATION_MS) continue;
-        if (pastBoundary) continue;
-        items.push({ externalId: c.id, updatedAt: new Date(updated).toISOString() });
+        items.push({
+          externalId: c.id,
+          updatedAt: new Date(updated).toISOString(),
+          version: versionOf(c),
+        });
       }
       return { items, ...(hasMore && next && !pastBoundary ? { nextCursor: next } : {}) };
     },
@@ -145,9 +174,7 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
       }
       // Omi may return no segments at all; then the overview and action items are the content.
       const overview = c.structured?.overview?.trim() ?? "";
-      const actions = (c.structured?.action_items ?? [])
-        .map((a) => (typeof a === "string" ? a : (a.description ?? a.text ?? "")).trim())
-        .filter(Boolean);
+      const actions = actionsOf(c);
       const summary =
         segments.length > 0 || actions.length === 0
           ? overview
@@ -167,6 +194,7 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
         transcript: lines && lines.length > 0 ? lines : null,
         ...(truncated ? { transcriptTruncated: true } : {}),
         updatedAt: new Date(updated).toISOString(),
+        version: versionOf(c),
         // Nothing to read at all is noise: stored hidden, so it is not fetched again at this update.
         ...(includeTranscript && segments.length === 0 && !summary ? { deleted: true } : {}),
       };
