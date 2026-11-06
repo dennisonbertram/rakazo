@@ -232,7 +232,7 @@ export const NewSiteWithAllSites: Story = {
       actions: [
         { id: "allow", label: "Allow once" },
         { id: "always", label: "Always allow npmjs.com" },
-        { id: "always_bot_sites", label: "Allow all sites for this agent (it can read mail)" },
+        { id: "always_bot_sites", label: "Allow all sites for this agent (it can read Drive, calendar, Data room, contacts and records)" },
         { id: "deny", label: "Deny" },
       ],
     }),

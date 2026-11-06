@@ -40,18 +40,42 @@ describe("newRunExternalTaint", () => {
 
 describe("chainedRunMode", () => {
   it("copies the source run", () => {
-    expect(chainedRunMode("follow_up", { unattended: false, externalTaint: false })).toEqual({
+    expect(
+      chainedRunMode("follow_up", { unattended: false, externalTaint: false }),
+    ).toEqual({
       unattended: false,
       externalTaint: false,
+      readOutsideContent: false,
     });
-    expect(chainedRunMode("spawn", { unattended: true, externalTaint: true })).toEqual({
+    expect(
+      chainedRunMode("spawn", {
+        unattended: true,
+        externalTaint: true,
+        readOutsideContent: true,
+      }),
+    ).toEqual({
       unattended: true,
       externalTaint: true,
+      readOutsideContent: true,
     });
   });
 
+  it("carries the outside-content mark alone", () => {
+    expect(
+      chainedRunMode("bot_message", {
+        unattended: true,
+        externalTaint: false,
+        readOutsideContent: true,
+      }).readOutsideContent,
+    ).toBe(true);
+  });
+
   it("fails closed when the source is unknown", () => {
-    expect(chainedRunMode("follow_up", null)).toEqual({ unattended: true, externalTaint: true });
+    expect(chainedRunMode("follow_up", null)).toEqual({
+      unattended: true,
+      externalTaint: true,
+      readOutsideContent: true,
+    });
   });
 });
 
