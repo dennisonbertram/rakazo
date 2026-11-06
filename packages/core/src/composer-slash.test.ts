@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   SLASH_ACTIONS,
+  SLASH_INSERTS,
   serializeComposerPrompt,
   truncateSlashDescription,
 } from "./composer-slash.js";
@@ -41,9 +42,12 @@ describe("truncateSlashDescription", () => {
 
 describe("SLASH_ACTIONS", () => {
   it("exposes chat and account destinations", () => {
-    expect(SLASH_ACTIONS.map((action) => action.id)).toEqual([
-      "chat-settings",
-      "settings-general",
-    ]);
+    expect(SLASH_ACTIONS.map((action) => action.id)).toEqual(["chat-settings", "settings-general"]);
+  });
+});
+
+describe("SLASH_INSERTS", () => {
+  it("offers /goal as text for the draft", () => {
+    expect(SLASH_INSERTS).toEqual([{ id: "goal", label: "Goal", text: "/goal " }]);
   });
 });
