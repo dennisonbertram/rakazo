@@ -243,7 +243,7 @@ describePostgres("omiCloud.* (PostgreSQL)", () => {
     ).toBe(0);
   });
 
-  it("reads at most four conversation details a job, continues in the next, and never re-reads unchanged ones", async () => {
+  it("makes at most two transcript calls a job, continues in the next, and never re-reads unchanged ones", async () => {
     const many = new OmiCloudApiEmulator({
       apiKey: KEY,
       conversations: omiEmulatorConversations().flatMap((conversation, i) =>
@@ -251,10 +251,10 @@ describePostgres("omiCloud.* (PostgreSQL)", () => {
           ...conversation,
           id: `${conversation.id}-${n}`,
           startedAt: new Date(
-            Date.parse(conversation.startedAt) - (i * 3 + n) * 3_600_000,
+            Date.parse(conversation.startedAt) - (i * 3 + n) * 11 * 3_600_000,
           ).toISOString(),
           finishedAt: new Date(
-            Date.parse(conversation.finishedAt) - (i * 3 + n) * 3_600_000,
+            Date.parse(conversation.finishedAt) - (i * 3 + n) * 11 * 3_600_000,
           ).toISOString(),
           overview: `Overview ${i}-${n}`,
         })),
@@ -273,22 +273,24 @@ describePostgres("omiCloud.* (PostgreSQL)", () => {
           { spaceId, userId: userB, provider: "omi_cloud", connectionId: bRow?.id } as never,
         );
       };
-      const details = () =>
-        many.requests.filter((r) => /\/conversations\/[^/]+$/.test(r.path)).length;
+      const transcriptCalls = () =>
+        many.requests.filter(
+          (r) =>
+            r.query.includes("include_transcript=true") || /conversations\/[^/]+$/.test(r.path),
+        ).length;
       const stored = () =>
         prisma.meeting.count({ where: { spaceId, userId: userB, provider: "omi_cloud" } });
       await run();
-      expect(details()).toBe(4);
-      expect(await stored()).toBe(4);
+      expect(transcriptCalls()).toBe(2);
+      const first = await stored();
+      expect(first).toBeGreaterThan(0);
       await run();
-      // 12 listed, 6 of them 45 s or empty are hidden or dropped; what remains is read in turn.
-      const after2 = details();
-      expect(after2).toBeGreaterThan(4);
-      expect(after2 - 4).toBeLessThanOrEqual(4);
-      for (let i = 0; i < 5; i++) await run();
-      const total = details();
+      expect(transcriptCalls()).toBeLessThanOrEqual(4);
+      expect(await stored()).toBeGreaterThan(first);
+      for (let i = 0; i < 8; i++) await run();
+      const total = transcriptCalls();
       await run();
-      expect(details()).toBe(total);
+      expect(transcriptCalls()).toBe(total);
     } finally {
       await many.stop();
     }

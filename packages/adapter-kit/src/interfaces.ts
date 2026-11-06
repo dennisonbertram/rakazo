@@ -833,4 +833,9 @@ export interface MeetingSource {
     nextCursor?: string;
   }>;
   get(externalId: string, options: { includeTranscript: boolean }): Promise<SourceMeeting>;
+  /**
+   * False when reading this meeting now would exceed the source's read budget for this run; the
+   * run then stops and the next one continues. Absent: no budget.
+   */
+  canGet?(externalId: string): boolean;
 }

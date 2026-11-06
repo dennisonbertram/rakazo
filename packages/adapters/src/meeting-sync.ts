@@ -40,8 +40,6 @@ export interface MeetingSyncDeps {
   jobs?: JobPublisher;
   /** Pages read in one run; a longer pass continues in the next run. */
   maxPages: number;
-  /** Detail reads in one run, for a provider with an hourly read limit; none means no cap. */
-  maxFetches?: number;
   now?: () => Date;
   signal?: AbortSignal;
   /**
@@ -98,7 +96,6 @@ export async function runMeetingSyncPass(
     };
   }
   let fetched = 0;
-  let gets = 0;
   if (!state.cursor && !(await deps.save({ cursor: JSON.stringify(pass) })))
     return { done: false, lostClaim: true, fetched };
 
@@ -113,9 +110,8 @@ export async function runMeetingSyncPass(
       deps.signal?.throwIfAborted();
       if (await alreadyHave(prisma, scope, deps.provider, item)) continue;
       // A provider with an hourly read limit stops here; the next run lists this page again.
-      if (deps.maxFetches !== undefined && gets >= deps.maxFetches)
+      if (source.canGet?.(item.externalId) === false)
         return { done: false, lostClaim: false, fetched };
-      gets++;
       let meeting: Awaited<ReturnType<MeetingSource["get"]>>;
       try {
         meeting = await source.get(item.externalId, { includeTranscript: true });

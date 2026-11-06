@@ -100,6 +100,7 @@ export const OmiCloudConversationSchema = z.object({
     })
     .nullish(),
   transcript_segments: z.array(OmiCloudSegmentSchema).nullish(),
+  transcript_included: z.boolean().nullish(),
 });
 export type OmiCloudConversation = z.infer<typeof OmiCloudConversationSchema>;
 

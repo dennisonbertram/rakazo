@@ -90,14 +90,15 @@ export function createMeetingSourceRegistry(
     },
     omi_cloud: {
       connectorId: OMI_CLOUD_CONNECTOR_ID,
-      // Omi limits detail reads to about 25 an hour. Four reads every 12 minutes is 20 an hour.
-      chainDelayMs: 12 * 60_000,
-      maxFetchesPerRun: 4,
+      // Assumed from Omi's docs (not confirmed): a list call with transcripts costs one of 25
+      // transcript reads an hour. Two such calls every 6 minutes is 20 an hour.
+      chainDelayMs: 6 * 60_000,
       create: ({ apiKey }, signal) => {
         const base = options.fetch ?? fetch;
         if (!apiKey) throw new Error("Omi needs an API key");
         return createOmiCloudMeetingSource({
           apiKey,
+          maxTranscriptCalls: 2,
           ...(options.omiCloudBaseUrl ? { baseUrl: options.omiCloudBaseUrl } : {}),
           fetch: (input, init) =>
             base(input, {

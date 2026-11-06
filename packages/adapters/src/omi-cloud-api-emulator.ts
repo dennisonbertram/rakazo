@@ -91,6 +91,8 @@ export class OmiCloudApiEmulator {
   rejectAll = false;
   /** Answer every call 503. */
   down = false;
+  /** Conversations whose list entry has no transcript even when asked for one (detail has it). */
+  readonly listWithoutTranscript = new Set<string>();
   readonly requests: Array<{ path: string; query: string; authorization: string | null }> = [];
   private server: ReturnType<typeof createServer> | undefined;
   private readonly conversations: OmiEmulatorConversation[];
@@ -163,21 +165,43 @@ export class OmiCloudApiEmulator {
     if (url.pathname === "/v1/dev/user/memories") return [200, []];
     if (url.pathname === "/v1/dev/user/conversations") {
       const limit = q.has("limit") ? Number(q.get("limit")) : 25;
+      if (!Number.isInteger(limit) || limit < 1) return [400, { detail: "bad limit" }];
+      const size = Math.min(limit, this.maxPageSize);
+      const withTranscript = q.get("include_transcript") === "true";
+      const from = q.has("start_date") ? Date.parse(q.get("start_date") ?? "") : undefined;
+      const to = q.has("end_date") ? Date.parse(q.get("end_date") ?? "") : undefined;
+      if (Number.isNaN(from) || Number.isNaN(to)) return [400, { detail: "bad date" }];
+      const inWindow = this.conversations.filter(
+        (c) =>
+          (from === undefined || Date.parse(c.startedAt) >= from) &&
+          (to === undefined || Date.parse(c.startedAt) <= to),
+      );
+      // Transcripts and date windows page by offset; the plain list pages by cursor.
+      const byOffset = withTranscript || from !== undefined || q.has("offset");
       const decoded = q.has("cursor")
         ? Buffer.from(q.get("cursor") ?? "", "base64url").toString()
         : "0";
-      const start = /^\d+$/.test(decoded) ? Number(decoded) : -1;
-      if (!Number.isInteger(limit) || limit < 1) return [400, { detail: "bad limit" }];
-      if (start < 0) return [400, { detail: "invalid cursor" }];
-      const next = start + Math.min(limit, this.maxPageSize);
-      const more = next < this.conversations.length;
+      const start = byOffset
+        ? Number(q.get("offset") ?? "0")
+        : /^\d+$/.test(decoded)
+          ? Number(decoded)
+          : -1;
+      if (!Number.isInteger(start) || start < 0) return [400, { detail: "invalid cursor" }];
+      const next = start + size;
+      const more = next < inWindow.length;
       return [
         200,
-        this.conversations.slice(start, next).map((c) => this.shape(c, false)),
+        inWindow
+          .slice(start, next)
+          .map((c) => this.shape(c, withTranscript && !this.listWithoutTranscript.has(c.id))),
         {
           "x-omi-has-more": String(more),
-          ...(more ? { "x-omi-next-cursor": Buffer.from(String(next)).toString("base64url") } : {}),
-          "x-omi-effective-limit": String(Math.min(limit, this.maxPageSize)),
+          "x-omi-effective-limit": String(size),
+          ...(more
+            ? byOffset
+              ? { "x-omi-next-offset": String(next) }
+              : { "x-omi-next-cursor": Buffer.from(String(next)).toString("base64url") }
+            : {}),
         },
       ];
     }

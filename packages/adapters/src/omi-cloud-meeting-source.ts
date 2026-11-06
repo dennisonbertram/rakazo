@@ -15,9 +15,15 @@ export interface OmiCloudMeetingSourceOptions {
   apiKey: string;
   baseUrl?: string;
   fetch?: typeof fetch;
+  /**
+   * Calls that carry transcripts (a date-window list, or a detail fallback) one run may make.
+   * Omi limits them by the hour, so the sync job's chain delay and this cap set the pace.
+   */
+  maxTranscriptCalls?: number;
 }
 
 const PAGE_SIZE = 25;
+const DAY_MS = 86_400_000;
 /** Omi lists by start time; a long or late-processed conversation can sit this far past the boundary. */
 const LIST_OVERLAP_MS = 24 * 3_600_000;
 /** Shorter conversations are background noise; they cost a digest call each. */
@@ -100,6 +106,106 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
       .digest("hex")
       .slice(0, 32);
 
+  /** The conversation as a meeting. Segments, when there are any, become the transcript. */
+  function toMeeting(
+    c: z.infer<typeof OmiCloudConversationSchema>,
+    includeTranscript: boolean,
+  ): SourceMeeting {
+    const updated = updatedOf(c);
+    const startedAt = ms(c.started_at) ?? ms(c.created_at) ?? updated;
+    const segments = (c.transcript_segments ?? []).filter((s) => s.text.trim());
+    let lines: MeetingTranscriptLine[] | null = null;
+    let truncated = false;
+    if (includeTranscript) {
+      lines = [];
+      let bytes = 0;
+      for (const s of segments) {
+        bytes += Buffer.byteLength(s.text);
+        if (bytes > MEETING_TRANSCRIPT_MAX_BYTES) {
+          lines.push({ text: MEETING_TRUNCATION_MARKER.trim() });
+          truncated = true;
+          break;
+        }
+        const speaker = s.speaker || (s.is_user ? "Me" : undefined);
+        lines.push({
+          text: s.text,
+          ...(speaker ? { speaker } : {}),
+          ...(typeof s.start === "number"
+            ? { at: new Date(startedAt + s.start * 1000).toISOString() }
+            : {}),
+        });
+      }
+    }
+    // Omi may return no segments at all; then the overview and action items are the content.
+    const overview = c.structured?.overview?.trim() ?? "";
+    const actions = actionsOf(c);
+    const summary =
+      segments.length > 0 || actions.length === 0
+        ? overview
+        : [overview, actions.map((a) => `- ${a}`).join("\n")].filter(Boolean).join("\n\n");
+    return {
+      externalId: c.id,
+      title: c.structured?.title ?? "",
+      startedAt: new Date(startedAt).toISOString(),
+      endedAt:
+        ms(c.finished_at) === undefined ? null : new Date(ms(c.finished_at) ?? 0).toISOString(),
+      attendees: [],
+      organizerEmail: null,
+      sourceUrl: null,
+      folders: [],
+      summary,
+      privateNotes: "",
+      transcript: lines && lines.length > 0 ? lines : null,
+      ...(truncated ? { transcriptTruncated: true } : {}),
+      updatedAt: new Date(updated).toISOString(),
+      version: versionOf(c),
+      // Nothing to read at all is noise: stored hidden, so it is not fetched again at this update.
+      ...(includeTranscript && segments.length === 0 && !summary ? { deleted: true } : {}),
+    };
+  }
+
+  const detailPath = (id: string) => `/v1/dev/user/conversations/${encodeURIComponent(id)}`;
+
+  // Transcripts come in bulk from a one-day list window, as Omi's pagination guidance advises.
+  // A window is read page by page (offset) only as far as the conversation being read; what a page
+  // holds is kept for the next get of the same run. ponytail: a day over 25 conversations is read
+  // from offset 0 again by the next run, which alreadyHave then skips; add resume state if needed.
+  const transcripts = new Map<string, z.infer<typeof OmiCloudConversationSchema>>();
+  const dayOf = new Map<string, number>();
+  const windows = new Map<number, { offset: number; done: boolean }>();
+  let transcriptCalls = 0;
+
+  async function fromWindow(id: string) {
+    const day = dayOf.get(id);
+    if (day === undefined) return undefined;
+    const window = windows.get(day) ?? { offset: 0, done: false };
+    windows.set(day, window);
+    while (
+      !transcripts.has(id) &&
+      !window.done &&
+      transcriptCalls < (options.maxTranscriptCalls ?? Infinity)
+    ) {
+      transcriptCalls++;
+      const { res, body } = await request("/v1/dev/user/conversations", {
+        limit: String(PAGE_SIZE),
+        include_transcript: "true",
+        start_date: new Date(day).toISOString(),
+        end_date: new Date(day + DAY_MS - 1).toISOString(),
+        offset: String(window.offset),
+      });
+      // transcript_included false: the list left this one out; the detail call fills it in.
+      for (const c of parse(ListPage, body))
+        if (c.transcript_included !== false) transcripts.set(c.id, c);
+      const nextOffset = Number(res.headers.get("x-omi-next-offset"));
+      window.done =
+        res.headers.get("x-omi-has-more") !== "true" ||
+        !Number.isInteger(nextOffset) ||
+        nextOffset <= window.offset;
+      window.offset = nextOffset;
+    }
+    return transcripts.get(id);
+  }
+
   return {
     provider: "omi_cloud",
 
@@ -130,6 +236,7 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
         }
         const finished = ms(c.finished_at);
         if (finished !== undefined && finished - started < MIN_DURATION_MS) continue;
+        dayOf.set(c.id, Math.floor(started / DAY_MS) * DAY_MS);
         items.push({
           externalId: c.id,
           updatedAt: new Date(updated).toISOString(),
@@ -139,65 +246,22 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
       return { items, ...(hasMore && next && !pastBoundary ? { nextCursor: next } : {}) };
     },
 
-    async get(externalId, { includeTranscript }): Promise<SourceMeeting> {
-      const { body } = await request(
-        `/v1/dev/user/conversations/${encodeURIComponent(externalId)}`,
-        {
-          include_transcript: String(includeTranscript),
-        },
+    canGet(externalId) {
+      return (
+        transcripts.has(externalId) || transcriptCalls < (options.maxTranscriptCalls ?? Infinity)
       );
-      const c = parse(OmiCloudConversationSchema, body);
-      const updated = updatedOf(c);
-      const startedAt = ms(c.started_at) ?? ms(c.created_at) ?? updated;
-      const segments = (c.transcript_segments ?? []).filter((s) => s.text.trim());
-      let lines: MeetingTranscriptLine[] | null = null;
-      let truncated = false;
-      if (includeTranscript) {
-        lines = [];
-        let bytes = 0;
-        for (const s of segments) {
-          bytes += Buffer.byteLength(s.text);
-          if (bytes > MEETING_TRANSCRIPT_MAX_BYTES) {
-            lines.push({ text: MEETING_TRUNCATION_MARKER.trim() });
-            truncated = true;
-            break;
-          }
-          const speaker = s.speaker || (s.is_user ? "Me" : undefined);
-          lines.push({
-            text: s.text,
-            ...(speaker ? { speaker } : {}),
-            ...(typeof s.start === "number"
-              ? { at: new Date(startedAt + s.start * 1000).toISOString() }
-              : {}),
-          });
-        }
+    },
+
+    async get(externalId, { includeTranscript }): Promise<SourceMeeting> {
+      if (!includeTranscript) {
+        const { body } = await request(detailPath(externalId), { include_transcript: "false" });
+        return toMeeting(parse(OmiCloudConversationSchema, body), false);
       }
-      // Omi may return no segments at all; then the overview and action items are the content.
-      const overview = c.structured?.overview?.trim() ?? "";
-      const actions = actionsOf(c);
-      const summary =
-        segments.length > 0 || actions.length === 0
-          ? overview
-          : [overview, actions.map((a) => `- ${a}`).join("\n")].filter(Boolean).join("\n\n");
-      return {
-        externalId: c.id,
-        title: c.structured?.title ?? "",
-        startedAt: new Date(startedAt).toISOString(),
-        endedAt:
-          ms(c.finished_at) === undefined ? null : new Date(ms(c.finished_at) ?? 0).toISOString(),
-        attendees: [],
-        organizerEmail: null,
-        sourceUrl: null,
-        folders: [],
-        summary,
-        privateNotes: "",
-        transcript: lines && lines.length > 0 ? lines : null,
-        ...(truncated ? { transcriptTruncated: true } : {}),
-        updatedAt: new Date(updated).toISOString(),
-        version: versionOf(c),
-        // Nothing to read at all is noise: stored hidden, so it is not fetched again at this update.
-        ...(includeTranscript && segments.length === 0 && !summary ? { deleted: true } : {}),
-      };
+      const cached = transcripts.get(externalId) ?? (await fromWindow(externalId));
+      if (cached) return toMeeting(cached, true);
+      transcriptCalls++;
+      const { body } = await request(detailPath(externalId), { include_transcript: "true" });
+      return toMeeting(parse(OmiCloudConversationSchema, body), true);
     },
   };
 }

@@ -8,6 +8,12 @@ import { createOmiCloudMeetingSource } from "./omi-cloud-meeting-source.js";
 const KEY = "omi_dev_test_key";
 const open: OmiCloudApiEmulator[] = [];
 
+async function setupBase(options: ConstructorParameters<typeof OmiCloudApiEmulator>[0] = {}) {
+  const emulator = new OmiCloudApiEmulator({ apiKey: KEY, ...options });
+  open.push(emulator);
+  return { emulator, baseUrl: await emulator.start() };
+}
+
 async function setup(options: ConstructorParameters<typeof OmiCloudApiEmulator>[0] = {}) {
   const emulator = new OmiCloudApiEmulator({
     apiKey: KEY,
@@ -92,6 +98,80 @@ describe("omi cloud source", () => {
     const first = await versionOf("First.");
     expect(await versionOf("First.")).toBe(first);
     expect(await versionOf("Edited.")).not.toBe(first);
+  });
+
+  describe("transcripts through date windows", () => {
+    const conv = (id: string, start: string) => ({
+      id,
+      title: id,
+      overview: `Overview of ${id}`,
+      startedAt: start,
+      finishedAt: new Date(Date.parse(start) + 20 * 60_000).toISOString(),
+      segments: [{ text: `Words in ${id}`, speaker: "SPEAKER_0", start: 0 }],
+    });
+    const days = [
+      conv("a1", "2026-02-05T09:00:00.000Z"),
+      conv("a2", "2026-02-05T11:00:00.000Z"),
+      conv("a3", "2026-02-05T13:00:00.000Z"),
+      conv("b1", "2026-02-04T09:00:00.000Z"),
+      conv("b2", "2026-02-04T11:00:00.000Z"),
+      conv("c1", "2026-02-03T09:00:00.000Z"),
+    ];
+    const windowed = (emulator: OmiCloudApiEmulator) =>
+      emulator.requests.filter(
+        (r) =>
+          r.path === "/v1/dev/user/conversations" && r.query.includes("include_transcript=true"),
+      );
+    const detail = (emulator: OmiCloudApiEmulator) =>
+      emulator.requests.filter((r) => /conversations\/[^/]+$/.test(r.path));
+
+    it("reads one list call per day for all its conversations, with no detail calls", async () => {
+      const { emulator, baseUrl } = await setupBase({ conversations: days });
+      const source = createOmiCloudMeetingSource({ apiKey: KEY, baseUrl, maxTranscriptCalls: 2 });
+      const { items } = await source.list({});
+      const got = [];
+      for (const item of items) {
+        if (source.canGet?.(item.externalId) === false) break;
+        got.push((await source.get(item.externalId, { includeTranscript: true })).externalId);
+      }
+      // Days Feb 5 and Feb 4 (2 calls); Feb 3 waits for the next run.
+      expect(got).toEqual(["a3", "a2", "a1", "b2", "b1"]);
+      expect(windowed(emulator)).toHaveLength(2);
+      expect(detail(emulator)).toHaveLength(0);
+      expect(windowed(emulator)[0]?.query).toContain("start_date=2026-02-05T00%3A00%3A00.000Z");
+      expect(source.canGet?.("c1")).toBe(false);
+    });
+
+    it("pages a day by offset when it holds more than one page", async () => {
+      const { emulator, baseUrl } = await setupBase({ conversations: days, maxPageSize: 2 });
+      const source = createOmiCloudMeetingSource({ apiKey: KEY, baseUrl, maxTranscriptCalls: 5 });
+      const items = [];
+      for (
+        let page = await source.list({});
+        ;
+        page = await source.list({ cursor: page.nextCursor })
+      ) {
+        items.push(...page.items);
+        if (!page.nextCursor) break;
+      }
+      expect(items.map((i) => i.externalId)).toContain("a1");
+      const m = await source.get("a1", { includeTranscript: true });
+      expect(m.transcript?.[0]?.text).toBe("Words in a1");
+      expect(windowed(emulator).map((r) => r.query.match(/offset=(\d+)/)?.[1])).toEqual(["0", "2"]);
+    });
+
+    it("falls back to the detail call when the list leaves a transcript out", async () => {
+      const { emulator, baseUrl } = await setupBase({ conversations: days });
+      emulator.listWithoutTranscript.add("c1");
+      const source = createOmiCloudMeetingSource({ apiKey: KEY, baseUrl, maxTranscriptCalls: 2 });
+      await source.list({});
+      const m = await source.get("c1", { includeTranscript: true });
+      expect(m.transcript?.[0]?.text).toBe("Words in c1");
+      expect(windowed(emulator)).toHaveLength(1);
+      expect(detail(emulator)).toHaveLength(1);
+      // Both calls spent the budget.
+      expect(source.canGet?.("b1")).toBe(false);
+    });
   });
 
   it("uses the segments when they exist, with the overview as the summary", async () => {
@@ -212,9 +292,7 @@ describe("omi cloud keys", () => {
 describe("meeting source registry chain delay", () => {
   it("is slower for Omi than the default that other providers use", () => {
     const registry = createMeetingSourceRegistry();
-    expect(registry.omi_cloud?.chainDelayMs).toBe(12 * 60_000);
-    expect(registry.omi_cloud?.maxFetchesPerRun).toBe(4);
-    expect(registry.granola?.maxFetchesPerRun).toBeUndefined();
+    expect(registry.omi_cloud?.chainDelayMs).toBe(6 * 60_000);
     expect(registry.omi_cloud?.connectorId).toBe("omi-cloud");
     expect(registry.granola?.chainDelayMs).toBeUndefined();
     expect(CHAIN_DELAY_MS).toBe(1_000);

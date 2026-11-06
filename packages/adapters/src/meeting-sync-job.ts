@@ -53,8 +53,6 @@ export type MeetingSourceRegistry = Record<
     connectorId?: string;
     /** Wait before the next chained run; slower for providers with hourly limits. */
     chainDelayMs?: number;
-    /** Detail reads in one run, for a provider with an hourly read limit. */
-    maxFetchesPerRun?: number;
     create(input: MeetingSourceInput, signal: AbortSignal): MeetingSource;
   }
 >;
@@ -190,7 +188,6 @@ export async function runMeetingSyncJob(
         source: entry.create(input, signal),
         jobs: deps.jobs,
         maxPages: deps.pagesPerRun ?? PAGES_PER_RUN,
-        ...(entry.maxFetchesPerRun !== undefined ? { maxFetches: entry.maxFetchesPerRun } : {}),
         signal,
         holdsClaim: async () => (await prisma.meetingSyncState.count({ where: mine })) === 1,
         save: async (patch) =>
