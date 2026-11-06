@@ -6508,6 +6508,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : undefined;
             const block = buildApprovalAskBlock(applied!.effect.id, name, args, runSecrets, {
               recipientBot,
+              timezone: userTimezone,
               // The card's reason line already says "Requested by an external bot".
               reviewReason:
                 externalTaintedCall &&

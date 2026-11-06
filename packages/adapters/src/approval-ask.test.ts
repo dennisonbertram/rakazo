@@ -753,8 +753,13 @@ describe("mail_reply_batch card", () => {
 });
 
 describe("buildApprovalAskBlock argument summaries", () => {
-  const ask = (tool: string, args: Record<string, unknown>, recipientBot?: string) => {
-    const block = buildApprovalAskBlock("e1", tool, args, [], { recipientBot });
+  const ask = (
+    tool: string,
+    args: Record<string, unknown>,
+    recipientBot?: string,
+    timezone?: string,
+  ) => {
+    const block = buildApprovalAskBlock("e1", tool, args, [], { recipientBot, timezone });
     if (block.kind !== "ask") throw new Error("expected ask block");
     return block;
   };
@@ -790,5 +795,20 @@ describe("buildApprovalAskBlock argument summaries", () => {
       timeMax: "2026-11-09T17:00:00Z",
     });
     expect(list.detail).toBe("range: Nov 9, 2026, 9:00 AM UTC to Nov 9, 2026, 5:00 PM UTC");
+  });
+
+  it("writes the range in the owner's time zone, with a short label", () => {
+    const block = ask(
+      "calendar_agenda",
+      { from: "2026-11-09T05:00:00Z", to: "2026-11-16T05:00:00Z" },
+      undefined,
+      "America/New_York",
+    );
+    expect(block.detail).toBe("range: Nov 9, 2026, 12:00 AM EST to Nov 16, 2026, 12:00 AM EST");
+  });
+
+  it("falls back to UTC for an unknown zone", () => {
+    const block = ask("calendar_agenda", { from: "2026-11-09T05:00:00Z" }, undefined, "Nope/Zone");
+    expect(block.detail).toBe("range: from Nov 9, 2026, 5:00 AM UTC");
   });
 });

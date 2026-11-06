@@ -46,6 +46,8 @@ export function buildApprovalAskBlock(
     reviewReason?: string;
     /** The name of the bot a message_bot call goes to (its id alone names no one). */
     recipientBot?: string;
+    /** The owner's IANA time zone; calendar ranges are written in it (UTC when unknown). */
+    timezone?: string | null;
     /** One plain sentence under the card: the call asked because of a background run or a rule. */
     approvalReason?: string;
     fullMail?: boolean;
@@ -121,7 +123,7 @@ export function buildApprovalAskBlock(
   const shareTarget =
     options?.shareTarget &&
     sanitizeMessagingLabel(options.shareTarget).replace(CARD_TITLE_ESCAPED, "\\$&");
-  const shown = summaryArgs(toolName, args, options?.recipientBot);
+  const shown = summaryArgs(toolName, args, options?.recipientBot, options?.timezone);
   const summary =
     (shareTarget ? `sharing a meeting with ${shareTarget}` : undefined) ??
     options?.schedule?.summary ??
@@ -743,6 +745,7 @@ function summaryArgs(
   toolName: string,
   args: Record<string, unknown>,
   recipientBot?: string,
+  timezone?: string | null,
 ): Record<string, unknown> {
   if (toolName === "message_bot") {
     const message = typeof args.message === "string" ? args.message.trim().split(/\r?\n/)[0] : "";
@@ -761,21 +764,35 @@ function summaryArgs(
     const t = part(to);
     const range =
       f && t
-        ? `${readableTime(f)} to ${readableTime(t)}`
+        ? `${readableTime(f, timezone)} to ${readableTime(t, timezone)}`
         : f
-          ? `from ${readableTime(f)}`
+          ? `from ${readableTime(f, timezone)}`
           : t
-            ? `until ${readableTime(t)}`
+            ? `until ${readableTime(t, timezone)}`
             : undefined;
     return { ...rest, range };
   }
   return args;
 }
 
-function readableTime(value: string): string {
+function readableTime(value: string, timezone?: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return `${date.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC`;
+  const format = (timeZone: string) =>
+    date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+      timeZone,
+    });
+  try {
+    return format(timezone || "UTC");
+  } catch {
+    return format("UTC");
+  }
 }
 
 function pickScopeLabel(args: Record<string, unknown>): string | undefined {
