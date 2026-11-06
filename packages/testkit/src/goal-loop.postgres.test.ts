@@ -9,6 +9,10 @@ import { discardBotIntroFromCreate } from "./discard-bot-intro.js";
 process.env.WAKEUP_DRIVER = "memory";
 process.env.SANDBOX_PROVIDER = "fake";
 process.env.AGENT_RUNTIME = "scripted";
+// A developer's model key makes the runs use that provider, which asks for AI data sharing consent
+// and stops in waiting_input. The integration harness blanks these; do the same when run alone.
+process.env.OPENROUTER_API_KEY = "";
+process.env.MODEL_API_KEY = "";
 
 const hasDb = process.env.VERIFY_DATABASE === "1" && Boolean(process.env.DATABASE_URL);
 const describeIntegration = hasDb ? describe : describe.skip;
