@@ -42,6 +42,19 @@ Recommendations are in the last column. The owner decides only D1 to D3; the res
 | D4 | Does a pendant recording win over the same stretch from the cloud? | **Yes.** It has our own transcript and audio backup. See "Both routes at once". |
 | D5 | Same Omi connection as the pendant, or a second one? | **A second `Connection` (`connectorId: "omi-cloud"`).** See "Connection and key". |
 
+
+## S0 probe results (2026-11-06, first run)
+
+Read-only probe against a real account. Structure only, no content was printed.
+
+- `GET /v1/dev/user/conversations?limit=N` returns a JSON array. Paging is by cursor: response headers `x-omi-has-more` (`true`/`false`), `x-omi-next-cursor` (opaque), `x-omi-effective-limit`. The next page is `?cursor=<value>`; an invalid cursor is `400`. Header `x-pagination-guidance` says: prefer cursor with `offset=0`, `include_transcript=false` and no folder/starred filter; use date windows for transcript reads; truncated pages are incomplete.
+- Conversation fields: `id`, `created_at`, `started_at`, `finished_at`, `structured { title, overview, emoji, category, action_items[], events[] }`, `language`, `source`, `transcript_segments` (null unless requested), `transcript_included`, `participants_included`, `participants[]`, `person_ids[]`, `geolocation`, `folder_id`, `folder_name`. No `discarded` or `deleted` field appears; discarded conversations are presumably not listed.
+- `GET /v1/dev/user/conversations/{id}` returns the same object. `/conversations/{id}/transcript` is `404`: transcripts come from `include_transcript=true` (shape still to confirm).
+- `GET /v1/dev/user/memories` returned `200` with no rows on this account.
+- Errors are `{ "detail": string }`.
+
+Consequences for S1: page the list with the cursor and `include_transcript=false`; fetch each new conversation's transcript with the detail call and `include_transcript=true`. The noise filter uses duration (`finished_at - started_at`) and an empty transcript; there is no discarded flag to read. Segment fields follow Omi's open-source `TranscriptSegment` (`text`, `speaker`, `is_user`, `start`, `end`) until the second probe confirms them.
+
 ## Design
 
 ### Connection and key
