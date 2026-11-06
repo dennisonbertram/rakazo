@@ -248,6 +248,7 @@ export * from "./spreadsheet-tools.js";
 export * from "./statements/index.js";
 export * from "./stream-chunks.js";
 export * from "./stripe-billing.js";
+export { expireSupersededRoutineRuns } from "./stuck-work.js";
 export { SupermemoryMemoryProvider } from "./supermemory-memory-provider.js";
 export * from "./task-catalog.js";
 export * from "./taught-skill-prompt.js";

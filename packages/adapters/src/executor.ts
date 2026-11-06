@@ -635,6 +635,7 @@ import {
 import { routineTimerNonce } from "./routine-coalescing.js";
 import { lateRoutineRunInstruction } from "./routine-lateness.js";
 import { notifyThreadEvent } from "./run-notification.js";
+import { expireSupersededRoutineRuns } from "./stuck-work.js";
 import {
   commitConsumedRunSecret,
   normalizeSecretAskPurpose,
@@ -1715,6 +1716,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
         throw error;
       }
+      await expireSupersededRoutineRuns(
+        { ...deps, now: new Date() },
+        { routineId: routine.id, exceptRunId: claimed.id },
+      ).catch(() => undefined);
       try {
         await deps.events.append({
           spaceId: routine.spaceId,
