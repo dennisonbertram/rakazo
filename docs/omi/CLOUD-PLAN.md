@@ -53,6 +53,16 @@ Read-only probe against a real account. Structure only, no content was printed.
 - `GET /v1/dev/user/memories` returned `200` with no rows on this account.
 - Errors are `{ "detail": string }`.
 
+### Second probe (2026-11-06, structure only)
+
+- `transcript_segments` was an empty array for every conversation sampled, on the detail call and on the list with `include_transcript=true`. Whether a missing key permission causes this is not known.
+- `structured.title`, `structured.overview` and `structured.action_items` are present.
+- A `start_date` filter works (a future date returned 0 rows).
+- The list with `include_transcript=true` pages by the `x-omi-next-offset` header, not the cursor. The source keeps transcripts on the detail call.
+- `include_discarded` is ignored; the response carries an `x-omi-ignored-query-params` header.
+
+Change to S1 from this: a conversation with no segments is kept. Its content is `structured.overview` followed by the action items as a list (in `summary`, with no transcript). When segments exist, the overview is the summary and the segments are the transcript. A conversation is dropped only if it is under 2 minutes, or if it has neither segments nor an overview.
+
 Consequences for S1: page the list with the cursor and `include_transcript=false`; fetch each new conversation's transcript with the detail call and `include_transcript=true`. The noise filter uses duration (`finished_at - started_at`) and an empty transcript; there is no discarded flag to read. Segment fields follow Omi's open-source `TranscriptSegment` (`text`, `speaker`, `is_user`, `start`, `end`) until the second probe confirms them.
 
 ## Design

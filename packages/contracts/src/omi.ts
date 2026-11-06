@@ -84,7 +84,21 @@ export const OmiCloudConversationSchema = z.object({
   created_at: z.string().nullish(),
   started_at: z.string().nullish(),
   finished_at: z.string().nullish(),
-  structured: z.object({ title: z.string().nullish(), overview: z.string().nullish() }).nullish(),
+  structured: z
+    .object({
+      title: z.string().nullish(),
+      overview: z.string().nullish(),
+      /** Strings or objects with a description; read leniently. */
+      action_items: z
+        .array(
+          z.union([
+            z.string(),
+            z.object({ description: z.string().nullish(), text: z.string().nullish() }),
+          ]),
+        )
+        .nullish(),
+    })
+    .nullish(),
   transcript_segments: z.array(OmiCloudSegmentSchema).nullish(),
 });
 export type OmiCloudConversation = z.infer<typeof OmiCloudConversationSchema>;

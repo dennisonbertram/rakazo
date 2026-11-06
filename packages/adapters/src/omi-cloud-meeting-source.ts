@@ -143,6 +143,15 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
           });
         }
       }
+      // Omi may return no segments at all; then the overview and action items are the content.
+      const overview = c.structured?.overview?.trim() ?? "";
+      const actions = (c.structured?.action_items ?? [])
+        .map((a) => (typeof a === "string" ? a : (a.description ?? a.text ?? "")).trim())
+        .filter(Boolean);
+      const summary =
+        segments.length > 0 || actions.length === 0
+          ? overview
+          : [overview, actions.map((a) => `- ${a}`).join("\n")].filter(Boolean).join("\n\n");
       return {
         externalId: c.id,
         title: c.structured?.title ?? "",
@@ -153,13 +162,13 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
         organizerEmail: null,
         sourceUrl: null,
         folders: [],
-        summary: c.structured?.overview ?? "",
+        summary,
         privateNotes: "",
-        transcript: lines,
+        transcript: lines && lines.length > 0 ? lines : null,
         ...(truncated ? { transcriptTruncated: true } : {}),
         updatedAt: new Date(updated).toISOString(),
-        // An empty transcript is noise: stored hidden, so it is not fetched again at this update.
-        ...(includeTranscript && segments.length === 0 ? { deleted: true } : {}),
+        // Nothing to read at all is noise: stored hidden, so it is not fetched again at this update.
+        ...(includeTranscript && segments.length === 0 && !summary ? { deleted: true } : {}),
       };
     },
   };

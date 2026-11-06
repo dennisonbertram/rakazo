@@ -6,6 +6,7 @@ export interface OmiEmulatorConversation {
   id: string;
   title: string;
   overview: string;
+  actionItems?: string[];
   startedAt: string;
   finishedAt: string;
   segments: OmiCloudSegment[];
@@ -24,8 +25,8 @@ const iso = (base: Date, hoursAgo: number, minutes = 0) =>
   new Date(base.getTime() - hoursAgo * HOUR + minutes * 60_000).toISOString();
 
 /**
- * Invented conversations, dated back from `now`: two real ones, one under two minutes and one
- * with no transcript. The demo uses the current time so they fall inside the import window.
+ * Invented conversations, dated back from `now`: one with segments, one with only an
+ * overview and action items, one under two minutes and one with nothing to read. The demo uses the current time so they fall inside the import window.
  */
 export const omiEmulatorConversations = (now = new Date()): OmiEmulatorConversation[] => [
   {
@@ -45,7 +46,7 @@ export const omiEmulatorConversations = (now = new Date()): OmiEmulatorConversat
     overview: "A short greeting.",
     startedAt: iso(now, 36),
     finishedAt: iso(now, 36, 0.75),
-    segments: [seg("Hi there.", 0)],
+    segments: [],
   },
   {
     id: "omi-conv-2",
@@ -59,9 +60,11 @@ export const omiEmulatorConversations = (now = new Date()): OmiEmulatorConversat
     id: "omi-conv-1",
     title: "Hiring debrief",
     overview: "Decided to extend an offer.",
+    actionItems: ["Send the offer letter", "Tell the other candidates"],
     startedAt: iso(now, 86),
     finishedAt: iso(now, 86, 30),
-    segments: [{ text: "I liked the second candidate." }, seg("Same here.", 12, "SPEAKER_1")],
+    // Like most real conversations seen so far: an overview and no segments.
+    segments: [],
   },
 ];
 
@@ -127,7 +130,16 @@ export class OmiCloudApiEmulator {
       created_at: c.finishedAt,
       started_at: c.startedAt,
       finished_at: c.finishedAt,
-      structured: { title: c.title, overview: c.overview, emoji: "", category: "other" },
+      structured: {
+        title: c.title,
+        overview: c.overview,
+        action_items: (c.actionItems ?? []).map((description) => ({
+          description,
+          completed: false,
+        })),
+        emoji: "",
+        category: "other",
+      },
       language: "en",
       source: "omi",
       transcript_segments: withTranscript ? c.segments : null,

@@ -53,29 +53,40 @@ describe("omi cloud source", () => {
     expect(emulator.requests).toHaveLength(4);
   });
 
-  it("fetches the transcript and maps title, overview, times and speakers", async () => {
+  it("uses the segments when they exist, with the overview as the summary", async () => {
     const { emulator, source } = await setup();
-    const m = await source.get("omi-conv-1", { includeTranscript: true });
+    const m = await source.get("omi-conv-4", { includeTranscript: true });
     expect(emulator.requests.at(-1)?.query).toContain("include_transcript=true");
     expect(m).toMatchObject({
-      title: "Hiring debrief",
-      summary: "Decided to extend an offer.",
-      startedAt: "2026-02-01T10:00:00.000Z",
-      endedAt: "2026-02-01T10:30:00.000Z",
+      title: "Roadmap sync",
+      summary: "Agreed the Q3 roadmap order.",
+      startedAt: "2026-02-04T15:00:00.000Z",
+      endedAt: "2026-02-04T15:20:00.000Z",
       attendees: [],
     });
-    // A segment with only text still maps; one with times gets an absolute time.
     expect(m.transcript).toEqual([
-      { text: "I liked the second candidate." },
-      { text: "Same here.", speaker: "SPEAKER_1", at: "2026-02-01T10:00:12.000Z" },
+      {
+        text: "Let's start with the roadmap.",
+        speaker: "SPEAKER_0",
+        at: "2026-02-04T15:00:00.000Z",
+      },
+      { text: "Sounds good.", speaker: "SPEAKER_1", at: "2026-02-04T15:00:06.000Z" },
     ]);
   });
 
-  it("marks a conversation with an empty transcript as deleted", async () => {
+  it("builds the content from the overview and action items when there are no segments", async () => {
     const { source } = await setup();
-    const m = await source.get("omi-conv-2", { includeTranscript: true });
-    expect(m.deleted).toBe(true);
-    expect((await source.get("omi-conv-4", { includeTranscript: true })).deleted).toBeUndefined();
+    const m = await source.get("omi-conv-1", { includeTranscript: true });
+    expect(m.deleted).toBeUndefined();
+    expect(m.transcript).toBeNull();
+    expect(m.summary).toBe(
+      "Decided to extend an offer.\n\n- Send the offer letter\n- Tell the other candidates",
+    );
+  });
+
+  it("hides a conversation with neither segments nor an overview", async () => {
+    const { source } = await setup();
+    expect((await source.get("omi-conv-2", { includeTranscript: true })).deleted).toBe(true);
   });
 
   it("maps 429 to rate_limit with Retry-After in milliseconds", async () => {
@@ -119,6 +130,7 @@ describe("omi cloud source", () => {
             started_at: "2026-02-01T10:00:00Z",
             unknown: { a: 1 },
             transcript_segments: [{ text: "hi", is_user: true, extra: 1 }],
+            structured: { action_items: ["a string item"] },
           }),
           { status: 200 },
         )) as typeof fetch,
