@@ -113,6 +113,7 @@ import type { RememberControls } from "../../lib/use-remembered-messages";
 import { useAttended } from "../../lib/use-sidebar-glance";
 import type { WorkingActivity } from "../../lib/working-activity";
 import { previewMessageText, ReplyLine, TimeSeparator } from "./chat-context";
+import { GoalBlockView } from "./goal";
 import {
   AppConnectCard,
   ArtifactImageGrid,
@@ -1769,6 +1770,7 @@ const MessageView = memo(function MessageView({
             </div>
           );
         }
+        if (block.kind === "goal") return <GoalBlockView key={i} block={block} />;
         if (block.kind === "meta") {
           return (
             <div

@@ -5,6 +5,9 @@ export const SLASH_ACTIONS = [
   { id: "settings-general" as const, label: "Settings: General" },
 ] as const;
 
+/** Entries that put a command in the draft instead of opening a screen. */
+export const SLASH_INSERTS = [{ id: "goal" as const, label: "Goal", text: "/goal " }] as const;
+
 export type SlashActionId = (typeof SLASH_ACTIONS)[number]["id"];
 
 /** Serialize composer chips + draft into the prompt text sent to the agent. */
