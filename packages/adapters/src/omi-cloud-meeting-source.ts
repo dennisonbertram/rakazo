@@ -95,17 +95,19 @@ export function createOmiCloudMeetingSource(options: OmiCloudMeetingSourceOption
       if (hasMore && (!next || next === filter.cursor))
         throw new MeetingSourceError("mapping", "Omi paging did not advance");
       const items = [];
+      let pastBoundary = false;
       for (const c of parse(ListPage, body)) {
         const updated = updatedOf(c);
         const started = ms(c.started_at) ?? ms(c.created_at) ?? updated;
+        // Observed in the S0 probe: Omi lists newest first, so one older item ends the walk.
+        if (filter.updatedAfter && updated <= filter.updatedAfter.getTime()) pastBoundary = true;
+        if (filter.createdAfter && started <= filter.createdAfter.getTime()) pastBoundary = true;
         const finished = ms(c.finished_at);
         if (finished !== undefined && finished - started < MIN_DURATION_MS) continue;
-        // ponytail: Omi has no date filter we know of, so old pages are read and dropped here.
-        if (filter.updatedAfter && updated <= filter.updatedAfter.getTime()) continue;
-        if (filter.createdAfter && started <= filter.createdAfter.getTime()) continue;
+        if (pastBoundary) continue;
         items.push({ externalId: c.id, updatedAt: new Date(updated).toISOString() });
       }
-      return { items, ...(hasMore && next ? { nextCursor: next } : {}) };
+      return { items, ...(hasMore && next && !pastBoundary ? { nextCursor: next } : {}) };
     },
 
     async get(externalId, { includeTranscript }): Promise<SourceMeeting> {

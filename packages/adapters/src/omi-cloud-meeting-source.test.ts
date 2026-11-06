@@ -34,6 +34,21 @@ describe("omi cloud source", () => {
     expect(emulator.requests[1]?.query).toContain("cursor=");
   });
 
+  it("stops paging at the createdAfter boundary", async () => {
+    const { emulator, source } = await setup({ maxPageSize: 1 });
+    // Newest first: conv-4 (Feb 4), conv-3 (Feb 3, too short), conv-2 (Feb 2), conv-1 (Feb 1).
+    const after = new Date("2026-02-01T23:00:00.000Z");
+    let page = await source.list({ createdAfter: after });
+    const ids = page.items.map((i) => i.externalId);
+    while (page.nextCursor) {
+      page = await source.list({ createdAfter: after, cursor: page.nextCursor });
+      ids.push(...page.items.map((i) => i.externalId));
+    }
+    expect(ids).toEqual(["omi-conv-4", "omi-conv-2"]);
+    // Four pages: the last is the boundary page (conv-1); nothing is requested after it.
+    expect(emulator.requests).toHaveLength(4);
+  });
+
   it("fetches the transcript and maps title, overview, times and speakers", async () => {
     const { emulator, source } = await setup();
     const m = await source.get("omi-conv-1", { includeTranscript: true });
