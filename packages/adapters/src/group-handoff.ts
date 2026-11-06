@@ -171,7 +171,7 @@ export async function handoffToGroupBot(
       "follow_up",
       await tx.run.findUnique({
         where: { id: run.id },
-        select: { unattended: true, externalTaint: true },
+        select: { unattended: true, externalTaint: true, readOutsideContent: true },
       }),
     );
     const nextRun = await tx.run.create({
@@ -185,6 +185,7 @@ export async function handoffToGroupBot(
         trigger: "follow_up",
         unattended: mode.unattended,
         externalTaint: mode.externalTaint,
+        readOutsideContent: mode.readOutsideContent,
         sourceMessageId: message.id,
       },
     });

@@ -43,10 +43,15 @@ export function newRunExternalTaint(input: {
  */
 export function chainedRunMode(
   trigger: string,
-  source: { unattended: boolean; externalTaint: boolean } | null | undefined,
-): { unattended: boolean; externalTaint: boolean } {
-  const known = source ?? { unattended: true, externalTaint: true };
+  source:
+    | { unattended: boolean; externalTaint: boolean; readOutsideContent?: boolean }
+    | null
+    | undefined,
+): { unattended: boolean; externalTaint: boolean; readOutsideContent: boolean } {
+  const known = source ?? { unattended: true, externalTaint: true, readOutsideContent: true };
   return {
+    // The receiving run starts as having read what the source read, so a relay cannot launder it.
+    readOutsideContent: known.readOutsideContent === true,
     unattended: newRunUnattended({ trigger, source: known }),
     externalTaint: newRunExternalTaint({ trigger, source: known }),
   };

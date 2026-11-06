@@ -406,7 +406,7 @@ export async function messageBot(
                 ? { in: ["completed", "failed", "cancelled"] }
                 : "running",
           },
-          select: { id: true, unattended: true, externalTaint: true },
+          select: { id: true, unattended: true, externalTaint: true, readOutsideContent: true },
         });
         if (!senderStillRunning)
           return { ok: false as const, error: "source run is no longer active" };
@@ -516,6 +516,7 @@ export async function messageBot(
             unattended: mode.unattended,
             // The message itself may come from outside even when the sender run is clean.
             externalTaint: mode.externalTaint || externalOrigin,
+            readOutsideContent: mode.readOutsideContent,
             sourceMessageId: inbound.id,
           },
           select: { id: true },
