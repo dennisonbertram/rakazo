@@ -825,8 +825,15 @@ describe("unattendedToolRequiresApproval", () => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
   });
 
+  it.each(["message_user", "show_emails"])("lets the display tool %s run unattended", (name) => {
+    expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
+  });
+
+  it("still asks for mail_send in an unattended run", () => {
+    expect(unattendedToolRequiresApproval(true, "mail_send", false)).toBe(true);
+  });
+
   it.each([
-    "show_emails",
     "finance_overview",
     "finance_transactions",
     "cap_table_read",
