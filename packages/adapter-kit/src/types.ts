@@ -1802,6 +1802,8 @@ export interface AutoReviewRequest {
    * tool results or inbound messages, so injected text cannot argue for the site.
    */
   newSite?: boolean;
+  /** An internal write of content an agent that read outside text produced; `args` holds it. */
+  untrustedContent?: boolean;
   /**
    * A fetch the deterministic exfiltration check flagged (with `newSite`, so `args` is only the
    * URL). `indicators` are kinds, lengths and short hashes, never private text. The review may

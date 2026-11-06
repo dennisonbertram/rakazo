@@ -394,6 +394,56 @@ export function backgroundAutoReviewAllowed(input: {
   return type === null || !BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES.has(type);
 }
 
+/**
+ * Internal writes of a Firewall agent that Auto Review may pass, but only after
+ * `contentHasOutboundChannel` finds nothing in the arguments. Owner decision: this lifts the
+ * Firewall plan's rule that its asks never clear without a person, for these tools only.
+ */
+export const FIREWALL_JUDGEABLE_WRITES: ReadonlySet<string> = new Set([
+  "page_edit",
+  "page_write",
+  "page_create",
+  "pins_write",
+  "remember",
+  "save_memory",
+]);
+
+const OUTBOUND_CHANNEL_PATTERNS = [
+  /https?:\/\/|\/\/[\w-]+\.[a-z]{2,}|\bwww\./i,
+  /!?\[[^\]]*\]\([^)]*\)|!\[|\]\[/,
+  /<\/?[a-z!][^>]*>/i,
+  /\b[\w-]+\.(com|org|net|io|ai|dev|app|co|me|ly|xyz|info|gg|sh)\b/i,
+];
+
+/**
+ * True when any string in the arguments holds a URL, a Markdown image or link, an HTML tag or a
+ * bare domain: each can carry data out when a page or memory is rendered or fetched. Scans every
+ * string, including keys.
+ */
+export function contentHasOutboundChannel(value: unknown): boolean {
+  if (typeof value === "string") {
+    return OUTBOUND_CHANNEL_PATTERNS.some((pattern) => pattern.test(value));
+  }
+  if (Array.isArray(value)) return value.some(contentHasOutboundChannel);
+  if (value && typeof value === "object") {
+    return Object.entries(value).some(
+      ([key, item]) => contentHasOutboundChannel(key) || contentHasOutboundChannel(item),
+    );
+  }
+  return false;
+}
+
+const FIXED_MAIL_LABELS = new Set(["TRASH", "SPAM", "DRAFT", "SENT"]);
+
+/** A mail_modify that names a delete, report or draft label is never judged. */
+export function mailModifyTouchesFixedLabel(args: Record<string, unknown>): boolean {
+  return [args.addLabels, args.removeLabels].some(
+    (list) =>
+      Array.isArray(list) &&
+      list.some((label) => typeof label === "string" && FIXED_MAIL_LABELS.has(label.toUpperCase())),
+  );
+}
+
 /** True when a tainted run may call the tool without a card. Same scratchpad rule as unattended. */
 export function externalTaintAllowsTool(toolName: string, args?: Record<string, unknown>): boolean {
   if (!EXTERNAL_TAINT_SAFE_TOOLS.has(toolName)) return false;

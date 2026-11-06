@@ -78,7 +78,7 @@ describe("autoReview router", () => {
     expect(result.body.json).toMatchObject({ enabled: false, background: false });
   });
 
-  it("lists only this user's and space's passed background calls, newest 20", async () => {
+  it("lists only this user's and space's passed calls, newest 20", async () => {
     const { call, findMany } = setup();
     const result = await call("recent");
     expect(result.body.json).toEqual([
@@ -89,7 +89,7 @@ describe("autoReview router", () => {
         where: {
           spaceId: "space-1",
           reviewDecision: "pass",
-          run: { userId: "user-1", spaceId: "space-1", unattended: true },
+          run: { userId: "user-1", spaceId: "space-1" },
         },
         orderBy: { createdAt: "desc" },
         take: 20,

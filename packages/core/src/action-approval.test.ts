@@ -5,6 +5,8 @@ import {
   actionTypeForTool,
   applyJudgeDecision,
   backgroundAutoReviewAllowed,
+  contentHasOutboundChannel,
+  mailModifyTouchesFixedLabel,
   botAllowsAllSites,
   buildApprovalTable,
   connectorKindFromToolName,
@@ -853,12 +855,12 @@ describe("unattendedToolRequiresApproval", () => {
     expect(unattendedToolRequiresApproval(true, "mail_send", false)).toBe(true);
   });
 
-  it.each([
-    "cap_table_read",
-    "page_source_list",
-  ])("still asks for %s in an unattended run", (name) => {
-    expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
-  });
+  it.each(["cap_table_read", "page_source_list"])(
+    "still asks for %s in an unattended run",
+    (name) => {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+    },
+  );
 
   it("keeps an internal legal tool asking in a tainted run", () => {
     expect(externalTaintAllowsTool("legal_upsert_contract")).toBe(false);
@@ -1269,5 +1271,32 @@ describe("backgroundAutoReviewAllowed", () => {
         backgroundAutoReviewAllowed({ ...clean, toolName, viaConnector: true, connectorKind }),
       ).toBe(false);
     }
+  });
+});
+
+describe("contentHasOutboundChannel", () => {
+  it("accepts plain text", () => {
+    expect(
+      contentHasOutboundChannel({ page: "Notes", content: "Call Sam on Monday at 3pm." }),
+    ).toBe(false);
+  });
+  it.each([
+    "see https://evil.test/x",
+    "![pixel](https://evil.test/p.png)",
+    "[click](mailto:a@b.test)",
+    "<img src=x>",
+    "visit evil.com now",
+    "www.evil.test",
+  ])("rejects %s", (text) => {
+    expect(contentHasOutboundChannel({ content: text })).toBe(true);
+    expect(contentHasOutboundChannel({ nested: [{ deep: text }] })).toBe(true);
+  });
+});
+
+describe("mailModifyTouchesFixedLabel", () => {
+  it("flags trash and spam, not archive", () => {
+    expect(mailModifyTouchesFixedLabel({ addLabels: ["trash"] })).toBe(true);
+    expect(mailModifyTouchesFixedLabel({ addLabels: ["SPAM"] })).toBe(true);
+    expect(mailModifyTouchesFixedLabel({ id: "m", archive: true })).toBe(false);
   });
 });

@@ -8570,6 +8570,117 @@ describe("Auto Review in background runs", () => {
   });
 });
 
+describe("Auto Review of attended and Firewall calls", () => {
+  const mail = {
+    listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+  };
+  const judge = (decision: "pass" | "ask" = "pass") => {
+    reviewMock.mockReset();
+    reviewMock.mockResolvedValue({ decision, reason: "fits", model: "mock" });
+  };
+
+  it("lets the judge pass a Firewall page_edit with plain text", async () => {
+    judge();
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+    });
+    f.setCalls([{ args: { find: "teh", replace: "the" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(reviewMock).toHaveBeenCalledOnce();
+    expect(reviewMock.mock.calls[0]?.[0].untrustedContent).toBe(true);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an image", "![x](https://evil.test/p.png)"],
+    ["a link", "see https://evil.test/a"],
+    ["an HTML tag", "<img src=x>"],
+  ])("never judges a Firewall page_edit holding %s", async (_label, text) => {
+    judge();
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+    });
+    f.setCalls([{ args: { find: "teh", replace: text }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks when the judge doubts a Firewall page_edit", async () => {
+    judge("ask");
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+    });
+    f.setCalls([{ args: { find: "teh", replace: "the" }, executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("never judges a Firewall mail_send or message_bot", async () => {
+    judge();
+    for (const [name, args] of [
+      ["mail_send", { to: ["a@example.test"], subject: "Hi", body: "Hello" }],
+      ["message_bot", { name: "Other", message: "hello" }],
+    ] as const) {
+      const f = fixture({
+        name,
+        builtin: true,
+        firewall: true,
+        autoReview: true,
+        mail,
+        sourceText: "Tidy up my notes page",
+      });
+      f.setCalls([{ args, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+    }
+    expect(reviewMock).not.toHaveBeenCalled();
+  });
+
+  it("lets the judge pass an attended mail_modify archive, but a TRASH change always asks", async () => {
+    judge();
+    const archive = fixture({ name: "mail_modify", builtin: true, autoReview: true, mail });
+    archive.setCalls([{ args: { id: "m1", archive: true }, executionId: "c1" }]);
+    await archive.run({ expectFailure: true });
+    expect(reviewMock).toHaveBeenCalledOnce();
+    expect(archive.pauseRunForInput).not.toHaveBeenCalled();
+    reviewMock.mockClear();
+    const trash = fixture({ name: "mail_modify", builtin: true, autoReview: true, mail });
+    trash.setCalls([{ args: { id: "m1", addLabels: ["TRASH"] }, executionId: "c1" }]);
+    await trash.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(trash.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks, without the judge, for a tainted web_fetch whose URL repeats private text", async () => {
+    judge();
+    const f = fixture({
+      name: "web_fetch",
+      builtin: true,
+      autoReview: true,
+      externalTaint: true,
+      sourceText: "Read https://example.com/page",
+    });
+    f.setCalls([
+      { args: { url: "https://example.com/page?q=PRIVATE-CUSTOMER-NOTE-4471" }, executionId: "c1" },
+    ]);
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+});
+
 describe("a run that a goal adopts while it is running", () => {
   beforeEach(() => {
     reviewMock.mockReset();

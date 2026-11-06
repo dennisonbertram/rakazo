@@ -181,6 +181,9 @@ import {
   plainRunError,
   plainTextFromMarkdown,
   backgroundAutoReviewAllowed,
+  contentHasOutboundChannel,
+  FIREWALL_JUDGEABLE_WRITES,
+  mailModifyTouchesFixedLabel,
   planActionGate,
   privateDataAreas,
   promptInvokesSkill,
@@ -317,6 +320,7 @@ import type { AutoReviewChecker } from "./auto-review.js";
 import {
   autoReviewTimeoutMs,
   BACKGROUND_REVIEW_TIMEOUT_MS,
+  RUN_MODEL_REVIEW_TIMEOUT_MS,
   deploymentAutoReviewDefault,
   isAutoReviewCheckerConfigured,
   redactNestedReviewValue,
@@ -4128,7 +4132,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             })
             .then((row) => ({
               enabled: row?.enabled ?? deploymentAutoReviewDefault(),
-              background: row?.background ?? false,
+              background: row?.background ?? true,
             }));
           return autoReviewPreferencePromise;
         };
@@ -4487,7 +4491,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let ownerWordsPromise: Promise<string> | undefined;
         const loadOwnerWords = () => {
           ownerWordsPromise ??= (async () => {
-            if (ownerStartedRun && run.sourceMessageId) {
+            // A Firewall agent's run is marked from its start, but the message the owner typed
+            // to it is still theirs.
+            const ownerTypedToFirewalled =
+              !run.unattended &&
+              (run.trigger === "user" || run.trigger === "follow_up") &&
+              (await firewallNow());
+            if ((ownerStartedRun || ownerTypedToFirewalled) && run.sourceMessageId) {
               const source = await deps.prisma.message.findUnique({
                 where: { id: run.sourceMessageId },
                 select: { role: true, blocks: true },
@@ -5904,11 +5914,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (await routineNamesNewSite(String(args.prompt ?? "")));
           // A one-time schedule has a card but is no reason to ask on its own.
           const scheduleAsks = scheduleCard !== undefined && scheduleCard.oneShot !== true;
+          // A Firewall agent's internal write may go to the judge when its content holds no URL,
+          // image, link or HTML tag and the owner's own words exist to compare it with. Owner
+          // decision; the sends, schedules, skills and message_bot stay with a person.
+          const firewallJudgeWrite =
+            firewallAskCall &&
+            FIREWALL_JUDGEABLE_WRITES.has(name) &&
+            !contentHasOutboundChannel(args) &&
+            (await loadAutoReviewPreferences()).enabled &&
+            (await loadOwnerWords()).trim() !== "";
           // A call the firewall lifted (see above) is not consequential: it sends nothing and only
           // changes mail the agent alone may change.
           const requiresApprovalByDefault =
             !firewallLifted &&
             (requiresUnattendedApproval ||
+              firewallJudgeWrite ||
               siteGate === "new" ||
               connectorReadGated ||
               scheduleAsks ||
@@ -6023,9 +6043,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // mail_modify is the one case a tool rule clears).
           const agentAccountWrite =
             (writeOnAgentConnection && !inboxOwnModify) || connectorWriteOnAgentConnection;
+          // A new site whose URL repeats private text this run read is never judged, in any run.
+          const fragmentHold =
+            siteGate === "new" &&
+            name === "web_fetch" &&
+            fetchUrl !== undefined &&
+            checkFetchUrl(fetchUrl, await outboundFragments()).verdict === "fragment";
+          // A mail change naming Trash, Spam, Drafts or Sent is never judged.
+          const fixedLabelMailChange = name === "mail_modify" && mailModifyTouchesFixedLabel(args);
           const otherMandatory =
             // A fetch the exfiltration check held is never cleared by a saved rule or another review.
             standingHold !== undefined ||
+            fragmentHold ||
+            fixedLabelMailChange ||
             mailModifyNeedsToolRule ||
             protectedArchive ||
             scheduleNamesNewSite ||
@@ -6035,7 +6065,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             (connectorReadGated && run.unattended === true) ||
             meetingTaintedCall ||
             externalTaintedCall ||
-            firewallAskCall ||
+            (firewallAskCall && !firewallJudgeWrite) ||
             toolRequiresExplicitApproval(name) ||
             // No saved rule or Auto Review may send mail for the Carta agent (investor email).
             isCartaMailSend(bot.spawnKey, name) ||
@@ -6113,7 +6143,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 readOnly: declaredReadOnly,
               });
             })());
-          const unattendedJudge = routineReviewRead || backgroundReview;
+          const unattendedJudge = routineReviewRead || backgroundReview || firewallJudgeWrite;
           const requiresMandatoryApproval =
             (requiresUnattendedApproval && !routineLifted && !unattendedJudge) || otherMandatory;
           const gateResolved = routineLifted
@@ -6143,7 +6173,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const checker =
             requiresMandatoryApproval || run.goalId || (run.unattended && !unattendedJudge)
               ? undefined
-              : backgroundReview && !isAutoReviewCheckerConfigured({})
+              : !isAutoReviewCheckerConfigured({})
                 ? // No checker is set in the environment: judge with the model this run uses.
                   { provider: runModelProvider, model: runModelId }
                 : resolveAutoReviewChecker();
@@ -6282,12 +6312,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         unattendedJudge ? await loadOwnerWords() : task.prompt,
                         runSecrets,
                       ),
+                      ...(firewallJudgeWrite ? { untrustedContent: true } : {}),
                       botDescription,
                       matchingRules: approvalResolved.matchingRules,
                     };
               const reviewTimeoutMs = run.unattended
                 ? BACKGROUND_REVIEW_TIMEOUT_MS
-                : autoReviewTimeoutMs();
+                : isAutoReviewCheckerConfigured({})
+                  ? autoReviewTimeoutMs()
+                  : RUN_MODEL_REVIEW_TIMEOUT_MS;
               const reviewContext: AdapterContext = {
                 operationId: `auto-review:${runId}`,
                 traceId: `auto-review:${runId}`,
@@ -6295,10 +6328,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 userId: run.userId,
                 botId: bot.id,
                 runId,
-                signal: AbortSignal.any([
-                  context.signal,
-                  AbortSignal.timeout(reviewTimeoutMs),
-                ]),
+                signal: AbortSignal.any([context.signal, AbortSignal.timeout(reviewTimeoutMs)]),
               };
               const provider = await buildReviewProvider(injectedReview, checker, reviewTimeoutMs);
               const judge = await provider.review(reviewRequest, reviewContext);
@@ -6445,15 +6475,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ? "routine_review"
                   : backgroundReview
                     ? "background_review"
-                    : requiresUnattendedApproval
-                    ? "unattended"
-                    : firewallAskCall
-                      ? "firewall"
-                      : externalTaintedCall
-                        ? "external_taint"
-                        : requiresMandatoryApproval
-                          ? "mandatory"
-                          : approvalResolved.source,
+                    : firewallJudgeWrite
+                      ? "firewall_review"
+                      : requiresUnattendedApproval
+                        ? "unattended"
+                        : firewallAskCall
+                          ? "firewall"
+                          : externalTaintedCall
+                            ? "external_taint"
+                            : requiresMandatoryApproval
+                              ? "mandatory"
+                              : approvalResolved.source,
             );
           }
           const bypassApproval = gateDecision === "allow" && requiresApprovalByDefault;
