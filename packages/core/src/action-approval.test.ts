@@ -1249,6 +1249,10 @@ describe("backgroundAutoReviewAllowed", () => {
     "calendar_create_event",
     "calendar_delete_event",
     "gtm_post",
+    "add_mcp_server",
+    "spawn_bot",
+    "update_bot",
+    "cloud_agent_launch",
     "share_meeting",
     "fundraising_round_save",
   ])("never judges %s", (toolName) => {

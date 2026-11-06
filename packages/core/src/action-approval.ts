@@ -342,8 +342,12 @@ export const BACKGROUND_REVIEW_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
   "save_memory",
   "save_shared_memory",
   "forget_memory",
+  // Change what the agents are or can reach.
+  "add_mcp_server",
+  "spawn_bot",
+  "update_bot",
 ]);
-const BACKGROUND_REVIEW_EXCLUDED_PREFIXES = ["schedule_", "skill_", "watch_"];
+const BACKGROUND_REVIEW_EXCLUDED_PREFIXES = ["schedule_", "skill_", "watch_", "cloud_agent_"];
 const BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES: ReadonlySet<ApprovalActionType> = new Set([
   ...ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES,
   "calendar_changes",
