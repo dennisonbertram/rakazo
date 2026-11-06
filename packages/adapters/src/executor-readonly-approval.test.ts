@@ -4665,6 +4665,22 @@ describe("runs that began with an external bot", () => {
     expect(JSON.stringify(card.actions)).not.toMatch(/always/i);
   });
 
+  it("a goal continuation that is restricted still asks, without saying an external bot asked", async () => {
+    const f = fixture({
+      name: "mail_search",
+      builtin: true,
+      mail: mailStub(),
+      trigger: "goal",
+      externalTaint: true,
+    });
+    f.setCalls([mailCall]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    const card = askBlock(f);
+    expect(card.approvalReason).not.toBe(EXTERNAL_REQUEST_REASON);
+    expect(JSON.stringify(card)).not.toContain(EXTERNAL_REQUEST_REASON);
+  });
+
   it("the same call in an unmarked run does not ask", async () => {
     const f = fixture({ name: "mail_search", builtin: true, mail: mailStub() });
     f.setCalls([mailCall]);
