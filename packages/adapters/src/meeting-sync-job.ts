@@ -6,7 +6,12 @@ import type {
   SecretStore,
 } from "@rakazo/adapter-kit";
 import { MeetingSourceError, meetingsSyncJob } from "@rakazo/adapter-kit";
-import { GRANOLA_API_CONNECTOR_ID, isWisprFlowEndpoint } from "@rakazo/contracts";
+import {
+  GRANOLA_API_CONNECTOR_ID,
+  isWisprFlowEndpoint,
+  OMI_CLOUD_CONNECTOR_ID,
+  OMI_CLOUD_PROVIDER,
+} from "@rakazo/contracts";
 import type { MeetingSourceRef, PrismaClient } from "@rakazo/db";
 import { getMeetingSyncState, upsertMeetingSyncState } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -278,6 +283,12 @@ export async function requestMeetingSync(
   return { syncing: true };
 }
 
+/** API-key connectors that sync meetings: connector id and meeting provider. */
+const KEY_SOURCES = [
+  [GRANOLA_API_CONNECTOR_ID, "granola"],
+  [OMI_CLOUD_CONNECTOR_ID, OMI_CLOUD_PROVIDER],
+] as const;
+
 /**
  * Scheduler step, run by the elected reconciler: queues a sync for each connected Granola key and
  * each Wispr Flow MCP server whose sync state has been idle for 5 minutes (or does not exist yet). A source that failed is retried by
@@ -291,33 +302,35 @@ export async function reconcileMeetingSyncs(
   const batchSize = options.batchSize ?? 200;
   const idleBefore = new Date(now.getTime() - MEETINGS_SYNC_INTERVAL_MS);
   let queued = 0;
-  let after: string | undefined;
-  for (;;) {
-    const page = await deps.prisma.connection.findMany({
-      where: {
-        connectorId: GRANOLA_API_CONNECTOR_ID,
-        status: "connected",
-        OR: [{ meetingSyncState: null }, { meetingSyncState: { updatedAt: { lt: idleBefore } } }],
-      },
-      select: { id: true, spaceId: true, userId: true },
-      orderBy: { id: "asc" },
-      take: batchSize,
-      ...(after ? { cursor: { id: after }, skip: 1 } : {}),
-    });
-    for (const c of page) {
-      await deps.jobs.enqueue({
-        ...meetingsSyncJob({
-          spaceId: c.spaceId,
-          userId: c.userId,
-          provider: "granola",
-          connectionId: c.id,
-        }),
-        keepExisting: true,
+  for (const [connectorId, provider] of KEY_SOURCES) {
+    let after: string | undefined;
+    for (;;) {
+      const page = await deps.prisma.connection.findMany({
+        where: {
+          connectorId,
+          status: "connected",
+          OR: [{ meetingSyncState: null }, { meetingSyncState: { updatedAt: { lt: idleBefore } } }],
+        },
+        select: { id: true, spaceId: true, userId: true },
+        orderBy: { id: "asc" },
+        take: batchSize,
+        ...(after ? { cursor: { id: after }, skip: 1 } : {}),
       });
-      queued++;
+      for (const c of page) {
+        await deps.jobs.enqueue({
+          ...meetingsSyncJob({
+            spaceId: c.spaceId,
+            userId: c.userId,
+            provider,
+            connectionId: c.id,
+          }),
+          keepExisting: true,
+        });
+        queued++;
+      }
+      if (page.length < batchSize) break;
+      after = page[page.length - 1]?.id;
     }
-    if (page.length < batchSize) break;
-    after = page[page.length - 1]?.id;
   }
   return queued + (await reconcileWisprFlowSyncs(deps, idleBefore));
 }

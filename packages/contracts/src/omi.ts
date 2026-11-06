@@ -88,3 +88,23 @@ export const OmiCloudConversationSchema = z.object({
   transcript_segments: z.array(OmiCloudSegmentSchema).nullish(),
 });
 export type OmiCloudConversation = z.infer<typeof OmiCloudConversationSchema>;
+
+export const OmiCloudConnectInputSchema = z.object({ apiKey: z.string().max(512) });
+export type OmiCloudConnectInput = z.infer<typeof OmiCloudConnectInputSchema>;
+
+/** The Developer key route; null until a key was pasted. Never carries the key. */
+export const OmiCloudStatusSchema = z
+  .object({
+    connectionId: Id,
+    /** `needs_reconnect`: Omi rejected the stored key during a sync. */
+    status: z.enum(["connected", "needs_reconnect", "disconnected"]),
+    /** Null until the first full sync has finished. */
+    syncedThrough: z.string().nullable(),
+    /** Set only when the last sync failed or is late. */
+    lastSyncedAt: z.string().nullable(),
+    /** Stored meetings synced from the cloud. */
+    syncedCount: z.number().int().nonnegative(),
+    agentBotId: Id.nullable(),
+  })
+  .nullable();
+export type OmiCloudStatus = z.infer<typeof OmiCloudStatusSchema>;
