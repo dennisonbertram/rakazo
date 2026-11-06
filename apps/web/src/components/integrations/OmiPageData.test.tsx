@@ -21,6 +21,7 @@ vi.mock("../../lib/omi/useOmiSync", () => ({
   useOmiSync: () => ({ state: { kind: "idle" }, sync: () => undefined }),
 }));
 const rpc = vi.hoisted(() => ({
+  omiCloud: { status: vi.fn(async () => null) },
   omi: {
     status: vi.fn(),
     deleteRecordings: vi.fn(),

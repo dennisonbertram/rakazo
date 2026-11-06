@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { OmiStatus } from "@rakazo/contracts";
+import type { OmiCloudStatus, OmiStatus } from "@rakazo/contracts";
 import {
   Button,
   DropdownMenu,
@@ -21,6 +21,7 @@ import { Shimmer } from "../ai/primitives";
 import { ConfirmDialog } from "./AppDetail";
 import { AppLogo } from "./AppLogo";
 import { IntegrationAgentSection } from "./IntegrationAgentSection";
+import { OmiCloudKeyCard } from "./OmiCloudKeyCard";
 import { OmiSegments } from "./OmiSegments";
 import { AgentToggleList } from "./parts";
 import type { IntegrationsData } from "./useIntegrations";
@@ -344,11 +345,13 @@ export function OmiPage({
 }) {
   const [status, setStatus] = useState<OmiStatus | undefined>(undefined);
   const [noKey, setNoKey] = useState(false);
+  const [cloud, setCloud] = useState<OmiCloudStatus>(null);
   const [segmentsKey, setSegmentsKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     try {
       setStatus((await rpc.omi.status()) ?? null);
+      setCloud((await rpc.omiCloud.status()) ?? null);
       // A recording without a key stays "ready" with the error, so the status is not filtered.
       const items = await rpc.dataRoom.items.list({ source: "omi", limit: 100 });
       setNoKey(
@@ -395,6 +398,7 @@ export function OmiPage({
       onDeleteAll={() => void deleteAll()}
       onOpenVoiceSettings={onOpenVoiceSettings}
     >
+      <OmiCloudKeyCard status={cloud} onChanged={() => void reload()} />
       {status ? (
         <>
           <OmiSegments reloadKey={segmentsKey} />
