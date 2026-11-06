@@ -122,6 +122,12 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "tool_run",
   "web_fetch",
   "web_search",
+  // The owner's own finance records; the executor asks once the run is tainted.
+  "finance_overview",
+  "finance_breakdown",
+  "finance_transactions",
+  "finance_recurring",
+  "finance_crypto",
   // Write only inside Rakazo (the owner's own notifications, pages, pins and files).
   // message_user posts a short update into the run's own thread; show_emails renders the owner's
   // own cached mail in their chat and returns no mail text to the run.
@@ -294,11 +300,6 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
  * judge them instead of asking. Nothing here writes, sends or reaches the network.
  */
 export const ROUTINE_AUTO_REVIEW_READ_TOOLS: ReadonlySet<string> = new Set([
-  "finance_overview",
-  "finance_breakdown",
-  "finance_transactions",
-  "finance_recurring",
-  "finance_crypto",
   "cap_table_read",
   "fundraising_read",
   "ticket_get",
