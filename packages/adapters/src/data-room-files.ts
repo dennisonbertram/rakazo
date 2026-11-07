@@ -234,7 +234,10 @@ export function createFileDataRoomItem(
         });
       } else {
         importId = (
-          await createDataRoomImport(prisma, actor, { source: "upload", total: entryCount })
+          await createDataRoomImport(prisma, actor, {
+            source: input.source === "scan" ? "scan" : "upload",
+            total: entryCount,
+          })
         ).id;
       }
       await deps.jobs.enqueue(
