@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 352 of 352
-- Web and shared components: 894
+- Web and shared component files with stories: 353 of 353
+- Web and shared components: 900
 - Mobile components: 155 in 104 files, mobile — native story pending
 - SwiftUI views: 141 in 77 files, native story pending
 
@@ -151,6 +151,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
+| BrexCards, StatusLabel, UsageBar, CardTile, CardsBoard, NewCardDialog | [apps/web/src/components/brex/BrexCards.tsx](../../apps/web/src/components/brex/BrexCards.tsx) | [BrexCards.stories.tsx](../../apps/web/src/components/brex/BrexCards.stories.tsx) | web |
 | TopVendors, NearLimit, BrexOverview | [apps/web/src/components/brex/BrexOverview.tsx](../../apps/web/src/components/brex/BrexOverview.tsx) | [BrexOverview.stories.tsx](../../apps/web/src/components/brex/BrexOverview.stories.tsx) | web |
 | BrexPage | [apps/web/src/components/brex/BrexPage.tsx](../../apps/web/src/components/brex/BrexPage.tsx) | [BrexPage.stories.tsx](../../apps/web/src/components/brex/BrexPage.stories.tsx) | web |
 | SourceLabel, PhoneSankey, WideSankey, SpendSankey | [apps/web/src/components/brex/SpendSankey.tsx](../../apps/web/src/components/brex/SpendSankey.tsx) | [SpendSankey.stories.tsx](../../apps/web/src/components/brex/SpendSankey.stories.tsx) | web |

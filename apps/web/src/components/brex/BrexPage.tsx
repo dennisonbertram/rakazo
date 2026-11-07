@@ -10,6 +10,7 @@ import { BrexCardsConnectDialog } from "../integrations/BrexCardsConnectDialog";
 import { PageEmptyState } from "../PageEmptyState";
 import { PageHeader } from "../PageHeader";
 import { StillLoading } from "../ShellSkeleton";
+import { BrexCards } from "./BrexCards";
 import { BrexOverview } from "./BrexOverview";
 
 const SECTIONS = [
@@ -119,6 +120,8 @@ export function BrexPage({ spaceName }: { spaceName?: string }) {
           <div className="mt-4">
             {section === "overview" ? (
               <BrexOverview data={overview.data} />
+            ) : section === "cards" ? (
+              <BrexCards />
             ) : (
               <PageEmptyState
                 icon={<AppLogo name="Brex" size="lg" />}
