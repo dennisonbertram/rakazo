@@ -433,6 +433,17 @@ import {
   brexCardsReplaceToken,
   brexCardsSetControls,
 } from "./brex-cards.js";
+import {
+  brexCardsAccounts,
+  brexCardsActivity,
+  brexCardsExpenses,
+  brexCardsLimits,
+  brexCardsOverview,
+  brexCardsPeople,
+  brexCardsSpending,
+  brexCardsTrips,
+  brexCardsView,
+} from "./brex-cards-read-model.js";
 import type { CartaSyncDeps } from "./carta-agent.js";
 import {
   assignToExistingCartaAgent,
@@ -9090,6 +9101,33 @@ export function createRouter(deps: RouterDeps): AppRouter {
       }),
       cards: authed.brexCards.cards.handler(({ context }) =>
         brexCardsCards(brexCardsDeps, context.actor),
+      ),
+      overview: authed.brexCards.overview.handler(({ context }) =>
+        brexCardsOverview(brexCardsDeps, context.actor),
+      ),
+      cardsView: authed.brexCards.cardsView.handler(({ context }) =>
+        brexCardsView(brexCardsDeps, context.actor),
+      ),
+      spending: authed.brexCards.spending.handler(({ context, input }) =>
+        brexCardsSpending(brexCardsDeps, context.actor, input),
+      ),
+      limits: authed.brexCards.limits.handler(({ context }) =>
+        brexCardsLimits(brexCardsDeps, context.actor),
+      ),
+      people: authed.brexCards.people.handler(({ context }) =>
+        brexCardsPeople(brexCardsDeps, context.actor),
+      ),
+      expenses: authed.brexCards.expenses.handler(({ context }) =>
+        brexCardsExpenses(brexCardsDeps, context.actor),
+      ),
+      accounts: authed.brexCards.accounts.handler(({ context }) =>
+        brexCardsAccounts(brexCardsDeps, context.actor),
+      ),
+      trips: authed.brexCards.trips.handler(({ context }) =>
+        brexCardsTrips(brexCardsDeps, context.actor),
+      ),
+      activity: authed.brexCards.activity.handler(({ context }) =>
+        brexCardsActivity(brexCardsDeps, context.actor),
       ),
       getControls: authed.brexCards.getControls.handler(({ context }) =>
         brexCardsGetControls(brexCardsDeps, context.actor),

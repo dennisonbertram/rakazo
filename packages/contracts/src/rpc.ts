@@ -29,10 +29,20 @@ import {
   StoredBotSecretName,
 } from "./bot-secrets.js";
 import {
+  BrexAccountsSchema,
+  BrexActivitySchema,
   BrexCardsConnectInputSchema,
   BrexCardsConnectOutputSchema,
   BrexCardsControlsSchema,
   BrexCardsListSchema,
+  BrexCardsOverviewSchema,
+  BrexCardsViewSchema,
+  BrexExpensesSchema,
+  BrexLimitsSchema,
+  BrexPeopleSchema,
+  BrexSpendingInputSchema,
+  BrexSpendingSchema,
+  BrexTripsSchema,
 } from "./brex-cards.js";
 import { CalendarAgendaInputSchema, CalendarAgendaSchema } from "./calendar.js";
 import {
@@ -2096,8 +2106,18 @@ export const appContract = {
     connect: oc.input(BrexCardsConnectInputSchema).output(BrexCardsConnectOutputSchema),
     /** Checks the new token first; a refused token keeps the old one. Controls and model are kept. */
     replaceToken: oc.input(BrexCardsConnectInputSchema).output(z.object({ ok: z.literal(true) })),
-    /** The cards from Brex's `list_cards`, the only tool this page calls. */
+    /** The raw card list from Brex's `list_cards`. */
     cards: oc.output(BrexCardsListSchema),
+    /** Owner-only live read model for the Brex page. */
+    overview: oc.output(BrexCardsOverviewSchema),
+    cardsView: oc.output(BrexCardsViewSchema),
+    spending: oc.input(BrexSpendingInputSchema).output(BrexSpendingSchema),
+    limits: oc.output(BrexLimitsSchema),
+    people: oc.output(BrexPeopleSchema),
+    expenses: oc.output(BrexExpensesSchema),
+    accounts: oc.output(BrexAccountsSchema),
+    trips: oc.output(BrexTripsSchema),
+    activity: oc.output(BrexActivitySchema),
     getControls: oc.output(BrexCardsControlsSchema),
     setControls: oc.input(BrexCardsControlsSchema).output(BrexCardsControlsSchema),
   },

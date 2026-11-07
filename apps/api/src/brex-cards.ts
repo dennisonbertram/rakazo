@@ -24,6 +24,8 @@ export interface BrexCardsDeps {
   /** The integration agent of the server: the owner's Brex finance agent, or a new "Brex agent". */
   provisionAgent: (actor: Actor, serverId: string) => Promise<Bot>;
   archiveBot: (actor: Actor, botId: string) => Promise<void>;
+  /** Injectable clock for period calculations; tests use a fixed instant. */
+  now?: () => Date;
 }
 
 const REJECTED = "Brex rejected this token";
@@ -85,7 +87,7 @@ const secretContext = (operationId: string, scope: { spaceId: string; userId: st
     signal: new AbortController().signal,
   }) as never;
 
-const connectionOf = async (deps: BrexCardsDeps, actor: Actor) => {
+export const connectionOf = async (deps: BrexCardsDeps, actor: Actor) => {
   const connection = await deps.prisma.brexCardsConnection.findUnique({
     where: { spaceId: actor.spaceId },
     include: { server: true },
