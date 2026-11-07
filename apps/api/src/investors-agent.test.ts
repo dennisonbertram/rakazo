@@ -12,6 +12,7 @@ import {
   ensureInvestorsAgent,
   INVESTOR_UPDATE_ROUTINE_NAME,
   INVESTORS_AGENT_INSTRUCTIONS,
+  OLD_INVESTORS_AGENT_INSTRUCTIONS,
   setInvestorsReminder,
 } from "./investors-agent.js";
 import { INVESTORS_DEFAULT_WITH_SOURCE_SENTENCE } from "./investors-old-default.fixture.js";
@@ -134,11 +135,11 @@ describe("investor update routine", () => {
 describe("ensureInvestorsAgent", () => {
   it("upgrades stored instructions only while they are the earlier default", async () => {
     const { prisma, jobs } = routineFakes();
-    const earlier = INVESTORS_AGENT_INSTRUCTIONS.replace(
+    const earlier = OLD_INVESTORS_AGENT_INSTRUCTIONS.replace(
       / SAFEs are recorded in Mercury[^.]*\./,
       "",
     );
-    expect(earlier).not.toBe(INVESTORS_AGENT_INSTRUCTIONS);
+    expect(earlier).not.toBe(OLD_INVESTORS_AGENT_INSTRUCTIONS);
     const replaceBotInstructions = vi.fn(async () => undefined);
     const run = (instructions: string) =>
       ensureInvestorsAgent(
@@ -185,11 +186,11 @@ describe("ensureInvestorsAgent", () => {
 
   it("upgrades an agent that still has the instructions saying it cannot add rounds or prospects", async () => {
     const { prisma, jobs } = routineFakes();
-    const stored = INVESTORS_AGENT_INSTRUCTIONS.replace(
+    const stored = OLD_INVESTORS_AGENT_INSTRUCTIONS.replace(
       /fundraising_read gives[\s\S]*?so point to the prospect's row on that page;/,
       "fundraising_read gives the Fundraising page (the open round, the pending amount and each prospect's stage, check size and next step), and you cannot change a stage, so point to the prospect's row on that page;",
     );
-    expect(stored).not.toBe(INVESTORS_AGENT_INSTRUCTIONS);
+    expect(stored).not.toBe(OLD_INVESTORS_AGENT_INSTRUCTIONS);
     expect(stored).not.toContain("fundraising_round_save");
     const replaceBotInstructions = vi.fn(async () => undefined);
     await ensureInvestorsAgent(
