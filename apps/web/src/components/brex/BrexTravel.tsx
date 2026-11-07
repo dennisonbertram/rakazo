@@ -44,16 +44,18 @@ function tripSortKey(trip: BrexTrip): string {
   return trip.startsAt ?? trip.endsAt ?? "";
 }
 
-/** Upcoming trips first (nearest first), then past trips (most recent first); `dir` reverses that. */
+/** Upcoming trips first (nearest first), then everything else (most recent first); `dir` reverses that. A cancelled trip is never upcoming. */
 function sortTripsByDate(trips: readonly BrexTrip[], dir: SortDir): BrexTrip[] {
   const now = new Date().toISOString();
+  const isUpcoming = (trip: BrexTrip) =>
+    trip.status !== "CANCELLED" && (trip.endsAt ?? trip.startsAt ?? "") >= now;
   const upcoming = trips
-    .filter((trip) => (trip.endsAt ?? trip.startsAt ?? "") >= now)
+    .filter(isUpcoming)
     .sort((a, b) => tripSortKey(a).localeCompare(tripSortKey(b)));
-  const past = trips
-    .filter((trip) => (trip.endsAt ?? trip.startsAt ?? "") < now)
+  const rest = trips
+    .filter((trip) => !isUpcoming(trip))
     .sort((a, b) => tripSortKey(b).localeCompare(tripSortKey(a)));
-  const ordered = [...upcoming, ...past];
+  const ordered = [...upcoming, ...rest];
   return dir === "desc" ? ordered.reverse() : ordered;
 }
 
