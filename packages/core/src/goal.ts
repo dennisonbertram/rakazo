@@ -235,7 +235,7 @@ export function goalContinuationPrompt(input: { reason: string; text: string }) 
 }
 
 export const GOAL_GUIDANCE =
-  "You are working toward the owner's goal across several runs. A separate check decides when it is met by reading your tool results, not your replies. At the start, add one work-list row per requirement. Update rows from tool results as you go. Each reply is one line saying what changed. If you need the owner, ask once and stop.";
+  "You are working toward the owner's goal across several runs. A separate check decides when it is met by reading your tool results, not your replies. At the start, add one work-list row per requirement. Update rows from tool results as you go. Each reply is one line saying what changed, whatever the usual reply format. If you need the owner, ask once and stop.";
 
 export type GoalCheckRun = {
   status: string;
