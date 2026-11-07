@@ -555,7 +555,7 @@ export async function prepareMailReplyBatch(
     } else {
       if (deps.refuseNewEmail) {
         return {
-          error: `${name(index)}: new emails are not available here, only replies. Remove the row and call again.`,
+          error: `${name(index)}: new emails cannot go in a batch here. Remove the row, then send each new email with mail_send, one at a time; the owner sees each one in full.`,
         };
       }
       if (!newEmailIsComplete(reply)) {
