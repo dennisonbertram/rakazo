@@ -3720,8 +3720,10 @@ model DataRoomItem {
   /// The import that filed this item, when one did.
   importId           String?
   import             DataRoomImport?   @relation(fields: [importId], references: [id], onDelete: SetNull)
-  /// "upload", "drive", "box", "gmail", "chat", "finance", "omi" or "meeting" (a meeting's notes in Recordings).
+  /// "upload", "scan", "drive", "box", "gmail", "chat", "finance", "omi" or "meeting" (a meeting's notes in Recordings).
   source             String
+  /// The one automatic Scanner task created after this scan's text is ready.
+  scannerRunId       String?
   sourceConnectionId String?
   sourceConnection   Connection?       @relation(fields: [sourceConnectionId], references: [id], onDelete: SetNull)
   externalId         String?
@@ -3780,6 +3782,7 @@ model DataRoomItem {
   @@index([spaceId, userId, docDate, id])
   @@index([spaceId, userId, name, id])
   @@index([spaceId, userId, docType, id])
+  @@index([spaceId, userId, source, status, scannerRunId, createdAt])
   @@index([parties], type: Gin)
   @@index([tags], type: Gin)
   @@map("data_room_items")

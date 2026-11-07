@@ -108,6 +108,7 @@ import {
   PIPELINE_IMPORT_REVIEW_TOOL,
   PIPELINE_IMPORT_STAGE_TOOL,
   RunPhaseSchema,
+  scannerAgentSpawnKey,
   VOICE_AGENT_BUILTIN_TOOLS,
   ZERNIO_READ_TOOLS,
 } from "@rakazo/contracts";
@@ -668,6 +669,7 @@ import {
   tryCompleteConnectionWithCode,
 } from "./run-secret.js";
 import { withRuntimeCleanup } from "./runtime-stream.js";
+import { prepareScannerHandoff, scannerToolAllowed } from "./scanner-tools.js";
 import {
   cancelScheduleFromTool,
   compactScheduleInput,
@@ -2599,6 +2601,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const legalOnly = isLegalAgentSpawnKey(bot.spawnKey);
         // The Data room agent gets a fixed list of built-ins and no connector tools.
         const dataRoomAgent = isDataRoomAgentSpawnKey(bot.spawnKey);
+        const scannerOnly = bot.spawnKey === scannerAgentSpawnKey(bot.userId);
         // The Investors agent gets a fixed list of built-ins and no connector tools (no MCP, no Composio).
         const investorsAgent = isInvestorsAgentSpawnKey(bot.spawnKey);
         // Connections limited to chosen agents stay out of this run unless the bot was granted access.
@@ -2616,11 +2619,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const ordinaryAllowedConnections = storedConnections.filter(
           (connection) => !deniedIds.has(connection.id),
         );
-        const runConnections = appAgentIdentity
-          ? appAgentConnection
-            ? [appAgentConnection]
-            : []
-          : ordinaryAllowedConnections;
+        const runConnections = scannerOnly
+          ? []
+          : appAgentIdentity
+            ? appAgentConnection
+              ? [appAgentConnection]
+              : []
+            : ordinaryAllowedConnections;
         const composioRows = appAgentIdentity
           ? appAgentConnection?.connectorId === "composio"
             ? [appAgentConnection]
@@ -3195,9 +3200,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let chatRecipient: ReturnType<typeof aiRecipient> = null;
         const chatGated =
           !legalOnly &&
-          // A delegated run carries the owner's chat text to the target's model, so it needs the
-          // same consent; the owner's own run user holds it.
-          (run.trigger === "user" ||
+          (scannerOnly ||
+            // A delegated run carries the owner's chat text to the target's model, so it needs the
+            // same consent; the owner's own run user holds it.
+            run.trigger === "user" ||
             run.trigger === "follow_up" ||
             run.trigger === "goal" ||
             (run.trigger === "bot_message" && peerMessage?.ownerOrigin === true)) &&
@@ -3951,16 +3957,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const dataRoomEnabled =
           Boolean(deps.artifacts) &&
           (!voiceAgent || voiceWorkspaceReadAllowed) &&
-          dataRoomToolsAllowed({
-            hasProvider: true,
-            groupId: thread.groupId,
-            runUserId: run.userId,
-            botUserId: bot.userId,
-            trigger: run.trigger,
-            messagingChannelRun,
-            ownerAgentPeer:
-              Boolean(omiConnection) && senderInScope && peerMessage?.ownerOrigin === true,
-          }) &&
+          (scannerOnly ||
+            dataRoomToolsAllowed({
+              hasProvider: true,
+              groupId: thread.groupId,
+              runUserId: run.userId,
+              botUserId: bot.userId,
+              trigger: run.trigger,
+              messagingChannelRun,
+              ownerAgentPeer:
+                Boolean(omiConnection) && senderInScope && peerMessage?.ownerOrigin === true,
+            })) &&
           // The Omi agent's Data room reads need the same AI data consent as meetings_*.
           (!omiConnection || (await meetingConsentOk()));
         // Owner-initiated runs only (the owner's message, or a bot_message from the owner's own
@@ -4207,6 +4214,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               (!gtmAgent || GTM_AGENT_TOOL_SET.has(tool.name)) &&
               (!legalOnly || legalToolSet.has(tool.name)) &&
               (!dataRoomAgent || dataRoomAgentToolSet.has(tool.name)) &&
+              (!scannerOnly || scannerToolAllowed(tool.name, run.trigger)) &&
+              (tool.name !== "update_scan" || scannerOnly) &&
               (!companyAgent || companyAgentToolSet.has(tool.name)) &&
               (!companyImporter || companyImporterToolSet.has(tool.name)) &&
               (!investorsAgent || investorsToolSet.has(tool.name)) &&
@@ -4288,6 +4297,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           connectedAppPeerRun = Boolean(sender && appAgentConnection);
         }
         const exposedConnectorTools =
+          !scannerOnly &&
           !voiceAgent &&
           (!meetingAgent || meetingsEnabled) &&
           !omiConnection &&
@@ -4402,6 +4412,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // others exist, and a call to one is refused (see applyToolCall).
         const toolsBeforeAccess = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])].filter(
           (tool) =>
+            (!scannerOnly || scannerToolAllowed(tool.name, run.trigger)) &&
+            (tool.name !== "update_scan" || scannerOnly) &&
             (!bot.firewall ||
               firewallToolClass(
                 tool.name,
@@ -4429,13 +4441,31 @@ export function createRunExecutor(deps: ExecutorDeps) {
               accessState.awaitingReplay.has(capability.id) && !accessLacking.includes(capability),
           ),
         ];
-        const tools = toolsBeforeAccess.flatMap((tool) =>
-          tool.name !== REQUEST_ACCESS_TOOL
+        const tools = toolsBeforeAccess.flatMap((tool) => {
+          if (scannerOnly && tool.name === "message_bot") {
+            return [
+              {
+                ...tool,
+                description:
+                  "Ask a same-owner page agent to review a scan chosen by the user. Supply only bot_id and item_id; the review request is fixed.",
+                inputSchema: {
+                  type: "object",
+                  properties: {
+                    bot_id: { type: "string", description: "The target page agent's bot id." },
+                    item_id: { type: "string", description: "The user-chosen scanned item id." },
+                  },
+                  required: ["bot_id", "item_id"],
+                  additionalProperties: false,
+                },
+              },
+            ];
+          }
+          return tool.name !== REQUEST_ACCESS_TOOL
             ? [tool]
             : accessEnum.length > 0 && !voiceAgent
               ? [requestAccessToolFor(tool, accessEnum)]
-              : [],
-        );
+              : [];
+        });
         const offeredToolNames = new Set(tools.map((tool) => tool.name));
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
@@ -5159,8 +5189,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
           route?: unknown,
           observer?: AgentToolExecutionObserver,
         ) => {
-          await refreshGoalId();
           try {
+            if (scannerOnly) {
+              if (!scannerToolAllowed(name, run.trigger)) {
+                return { error: `Tool ${name} is not available to this bot.` };
+              }
+              if (name === "message_bot") {
+                const prepared = await prepareScannerHandoff(
+                  deps.prisma,
+                  { userId: bot.userId, spaceId: run.spaceId },
+                  args,
+                );
+                if (!prepared.ok) return { error: prepared.error };
+                args = prepared.args;
+              }
+            }
+            await refreshGoalId();
             const result = await applyToolCall(name, args, executionId, route, observer);
             if (!isToolPauseResult(result)) recordGoalEvidence(name, args, result);
             if (!isToolPauseResult(result) && !NO_FRAGMENT_TOOLS.has(name)) {
@@ -5194,6 +5238,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           _route?: unknown,
           observer?: AgentToolExecutionObserver,
         ) => {
+          if (name === "update_scan" && !scannerOnly) {
+            return { error: `Tool ${name} is not available to this bot.` };
+          }
+          if (scannerOnly && !scannerToolAllowed(name, run.trigger)) {
+            return { error: `Tool ${name} is not available to this bot.` };
+          }
           if (voiceAgent && !offeredToolNames.has(name)) {
             return { error: `Tool ${name} is not available to Elio.` };
           }
@@ -8583,10 +8633,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   driveAccounts,
                   deniedConnectionIds: [...deniedIds],
                   ...(omiConnection ? { onlyConnectionId: omiConnection.id } : {}),
+                  ...(scannerOnly ? { onlySource: "scan" as const } : {}),
                   // Omi recording text is untrusted: the thread is marked before it is returned,
                   // so every later write or send asks (the same mark meeting text sets).
                   meetingConsentOk: meetingConsentOk,
-                  onUntrustedContent: async () => {
+                  onUntrustedContent: async (source) => {
+                    if (source === "scan") {
+                      if (run.externalTaint !== true) await storeExternalTaint();
+                      return;
+                    }
                     runReadMeetingText = true;
                     await deps.prisma.thread.updateMany({
                       where: { id: thread.id, meetingTaintedAt: null },
@@ -8600,7 +8655,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             // The Legal agent's documents go to its own model, so its Data room reads need the
             // consent for that model on every call, and the result carries the item revision.
             return finish(
-              legalOnly
+              legalOnly || scannerOnly
                 ? await legalDataRoomGate(
                     {
                       prisma: deps.prisma,

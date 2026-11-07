@@ -28,6 +28,7 @@ import { dataRoomVisionKey } from "./data-room-models.js";
 import { LlmDataRoomClassifier } from "./llm-data-room-classifier.js";
 import { modelAcceptsImageInput } from "./model-vision.js";
 import { extractOfficeText, MAX_INPUT_BYTES, OFFICE_TYPES } from "./office-text.js";
+import { scheduleReadyScans, scheduleScannerRun } from "./scanner-run.js";
 import { extractPdfText, MAX_PAGES, pdfPageCount } from "./statements/pdf-text.js";
 import { streamChunks } from "./stream-chunks.js";
 
@@ -690,6 +691,10 @@ export async function runDataRoomIndex(deps: DataRoomJobDeps, payload: Payload):
     if (wrote && item.importId) await settleDataRoomImport(deps.prisma, item.importId);
     return wrote;
   });
+  const item = await repo.findItem(actor, payload.itemId);
+  if (item?.source === "scan" && item.status === "ready") {
+    await scheduleScannerRun(deps, payload, item.id).catch(() => undefined);
+  }
 }
 
 const STRANDED_AFTER_MS = 15 * 60_000;
@@ -725,5 +730,6 @@ export async function reconcileDataRoom(
     const name = STEP_JOB_FOR_STATUS[item.status as keyof typeof STEP_JOB_FOR_STATUS];
     await deps.jobs.enqueue(dataRoomStepJob(name, item, item.id));
   }
+  await scheduleReadyScans(deps, { batchSize: options.batchSize });
   return stranded.length;
 }

@@ -1,5 +1,17 @@
 import { DataRoomApiName } from "./data-room-api.js";
 
+export const scannerAgentSpawnKey = (userId: string) => `scanner-agent:${userId}`;
+
+export const isScannerAgentSpawnKey = (spawnKey: string | null | undefined) =>
+  Boolean(spawnKey?.startsWith(scannerAgentSpawnKey("")));
+
+export const SCANNER_AGENT_BUILTIN_TOOLS = [
+  "search_data_room",
+  "read_data_room_item",
+  "update_scan",
+  "message_bot",
+] as const;
+
 export type ScannerKind = "sane-missing" | "not-found" | "busy" | "ready" | "scanning" | "error";
 
 export const SCANNER_DEFAULT_FOLDER = ["Scans"] as const;

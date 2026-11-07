@@ -141,6 +141,7 @@ import {
   saveBotPins,
   scheduleComputerControlExpiry,
   scheduleComputerSleep,
+  scheduleReadyScans,
   screenLeaseIdForRun,
   scriptedCatalogEntry,
   selectDefaultCredentialId,
@@ -214,6 +215,7 @@ import {
   isLegalAgentSpawnKey,
   isMailThreadAgentSpawnKey,
   isRetiredVoiceAgentSpawnKey,
+  isScannerAgentSpawnKey,
   isShareableArtifactMimeType,
   isVoiceAgentSpawnKey,
   isZernioEndpoint,
@@ -678,6 +680,7 @@ import { createMcpConnectionsRoutes } from "./routes/mcp-connections.js";
 import { createUpdaterRoutes } from "./routes/updater.js";
 import { listRoutineRuns } from "./routine-runs.js";
 import { listPendingApprovalNotifications, listSpaceRuns } from "./runs.js";
+import { ensureScannerAgent } from "./scanner-agent.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { querySpaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
@@ -2917,6 +2920,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           isLegalAgentSpawnKey(input.spawnKey) ||
           isInvestorsAgentSpawnKey(input.spawnKey) ||
           isDataRoomAgentSpawnKey(input.spawnKey) ||
+          isScannerAgentSpawnKey(input.spawnKey) ||
           isCompanyAgentSpawnKey(input.spawnKey) ||
           isCompanyImporterSpawnKey(input.spawnKey) ||
           isCartaAgentSpawnKey(input.spawnKey) ||
@@ -9011,6 +9015,20 @@ export function createRouter(deps: RouterDeps): AppRouter {
       disconnectLocal: authed.meetings.disconnectLocal.handler(({ context, input }) =>
         disconnectLocal(meetingsFor(context.actor), context.actor, input),
       ),
+    },
+    scanner: {
+      agent: authed.scanner.agent.handler(async ({ context }) => {
+        try {
+          const bot = await ensureScannerAgent({ repos }, context.actor);
+          await scheduleReadyScans(
+            { prisma: deps.prisma, jobs: deps.jobs },
+            { scope: { userId: context.actor.userId, spaceId: context.actor.spaceId } },
+          ).catch(() => undefined);
+          return bot;
+        } catch (error) {
+          throw mapSpaceLifecycleError(error);
+        }
+      }),
     },
     meetingCaptures: {
       start: authed.meetingCaptures.start.handler(({ context, input }) =>

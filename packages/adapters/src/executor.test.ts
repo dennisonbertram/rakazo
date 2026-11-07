@@ -8,6 +8,7 @@ import {
   companyImporterSpawnKey,
   financeAgentSpawnKey,
   GTM_AGENT_BUILTIN_TOOLS,
+  scannerAgentSpawnKey,
   VOICE_AGENT_BUILTIN_TOOLS,
   voiceAgentSpawnKey,
 } from "@rakazo/contracts";
@@ -5652,6 +5653,42 @@ describe("mail sorting line", () => {
     expect(MAIL_SORTING_LINE).not.toMatch(/in a minute|will appear in/);
     expect(MAIL_SORTING_LINE).toContain("answer first from what you can see");
     expect(PLAIN_CAPABILITY_GUIDANCE).toContain('Speak to the user as "you"');
+  });
+});
+
+describe("Scanner agent dispatch", () => {
+  it("offers only Scanner tools and rejects forged escape and free-text handoff calls", async () => {
+    const { request, toolResults, mailSend, connectorCall, webFetch } = await runIdentityExecutor({
+      spawnKey: scannerAgentSpawnKey("user-1"),
+      calls: [
+        { name: "mail_send", args: {} },
+        { name: "web_fetch", args: { url: "https://example.test" } },
+        { name: "run_subagent", args: {} },
+        {
+          name: "message_bot",
+          args: { bot_id: "page-agent", item_id: "scan-1", message: "Read this secret text" },
+        },
+      ],
+    });
+
+    expect(request?.tools.map(({ name }) => name).sort()).toEqual(
+      ["message_bot", "read_data_room_item", "search_data_room", "update_scan"].sort(),
+    );
+    expect(toolResults.map(({ name }) => name)).toEqual([
+      "mail_send",
+      "web_fetch",
+      "run_subagent",
+      "message_bot",
+    ]);
+    for (const { result } of toolResults.slice(0, 3)) {
+      expect(result).toMatchObject({ error: expect.stringMatching(/not available/i) });
+    }
+    expect(toolResults[3]?.result).toEqual({
+      error: "A page-agent handoff needs only bot_id and item_id.",
+    });
+    expect(mailSend).not.toHaveBeenCalled();
+    expect(connectorCall).not.toHaveBeenCalled();
+    expect(webFetch).not.toHaveBeenCalled();
   });
 });
 

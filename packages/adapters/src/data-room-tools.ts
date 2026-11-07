@@ -5,13 +5,19 @@ import type {
   MailAccount,
   MailProvider,
 } from "@rakazo/adapter-kit";
-import { MailProviderError } from "@rakazo/adapter-kit";
+import { dataRoomStepJob, MailProviderError } from "@rakazo/adapter-kit";
 import type { Actor } from "@rakazo/contracts";
-import { DATA_ROOM_STUCK_MS, DataRoomApiFiltersSchema } from "@rakazo/contracts";
+import {
+  DATA_ROOM_STUCK_MS,
+  DataRoomApiFiltersSchema,
+  DataRoomApiName,
+  DataRoomDocTypeSchema,
+} from "@rakazo/contracts";
 import { clampInt } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { createDataRoomRepos, eligibleWhere, IsolationError } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { z } from "zod";
 import {
   createFileDataRoomItem,
   dataRoomBlobContext,
@@ -25,11 +31,13 @@ import type { DriveAccount } from "./drive-tools.js";
 import { mailToolsAllowed } from "./mail-tools.js";
 import { MEETING_CONSENT_REQUIRED_MESSAGE, wrapMeetingNotes } from "./meeting-tools.js";
 import { streamChunks } from "./stream-chunks.js";
+import { wrapUntrustedContent } from "./untrusted-content.js";
 
 export const DATA_ROOM_TOOL_NAMES = new Set([
   "search_data_room",
   "read_data_room_item",
   "add_to_data_room",
+  "update_scan",
 ]);
 
 /** Owner-only, on a run the owner started: the same gate as the mail and Drive tools. */
@@ -82,11 +90,10 @@ export type DataRoomToolDeps = {
   deniedConnectionIds?: readonly string[];
   /** The Omi agent sees only items of this connection (its own recordings). */
   onlyConnectionId?: string;
-  /**
-   * Called before a result that holds Omi recording text (untrusted audio) is returned, so the
-   * caller can mark the run's thread as holding untrusted content.
-   */
-  onUntrustedContent?: () => Promise<void>;
+  /** Called before untrusted meeting or scan content is returned, so the run can be marked. */
+  onUntrustedContent?: (source?: "scan") => Promise<void>;
+  /** Restricts every item result to this source, after any model-supplied filters. */
+  onlySource?: "scan";
   /** The same AI data sharing check `meetings_*` use; a meeting's notes are read only when it passes. */
   meetingConsentOk?: () => Promise<boolean>;
   /** The cap on one mail attachment; injectable so tests can use a small one. */
@@ -96,6 +103,10 @@ export type DataRoomToolDeps = {
 /** Omi recording and meeting text is anyone's speech: wrapped as untrusted data. */
 const untrustedIf = <T extends string | null>(omi: boolean, value: T): T =>
   omi && value ? (wrapMeetingNotes(value) as T) : value;
+const scanUntrustedIf = <T extends string | null>(scan: boolean, value: T): T =>
+  scan && value ? (wrapUntrustedContent(value) as T) : value;
+const scanUntrustedList = (scan: boolean, values: string[]) =>
+  scan ? values.map(wrapUntrustedContent) : values;
 
 /** Agents never find a meeting's notes by search or listing; they read one by id from a handoff. */
 const HIDE_MEETINGS = { excludeSource: "meeting" } as const;
@@ -128,6 +139,7 @@ export async function dataRoomToolFromTool(
     if (name === "search_data_room") return await search(deps, actor, args);
     if (name === "read_data_room_item") return await read(deps, actor, args);
     if (name === "add_to_data_room") return await add(deps, actor, context, args);
+    if (name === "update_scan") return await updateScan(deps, actor, args);
     return { error: `Unknown Data room tool ${name}` };
   } catch (error) {
     getLogger().warn("data room tool failed", {
@@ -151,6 +163,7 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
     ...HIDE_MEETINGS,
     excludeConnectionIds: [...(deps.deniedConnectionIds ?? [])],
     ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
+    ...(deps.onlySource ? { source: deps.onlySource } : {}),
     ...(docDateFrom ? { docDateFrom: new Date(docDateFrom) } : {}),
     ...(docDateTo ? { docDateTo: new Date(docDateTo) } : {}),
   };
@@ -166,15 +179,13 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
   // hits (search has no relevance cutoff). A file quiet for minutes shows as failed, not pending.
   const indexing = await deps.prisma.dataRoomItem.count({
     where: {
-      ...eligibleWhere(actor, {
-        ...HIDE_MEETINGS,
-        excludeConnectionIds: filters.excludeConnectionIds,
-        ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
-      }),
+      ...eligibleWhere(actor, filters),
       status: { in: ["pending", "extracting", "classifying", "indexing"] },
       updatedAt: { gte: new Date(Date.now() - DATA_ROOM_STUCK_MS) },
     },
   });
+  if (page.results.some(({ item }) => item.source === "scan"))
+    await deps.onUntrustedContent?.("scan");
   if (page.results.some(({ item }) => item.source === "omi")) await deps.onUntrustedContent?.();
   return {
     ...(indexing
@@ -184,13 +195,16 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
       : {}),
     results: page.results.map(({ item, snippet }) => ({
       id: item.id,
-      name: item.name,
+      name: scanUntrustedIf(item.source === "scan", item.name),
       link: dataRoomItemLink(item.id),
       docType: item.docType,
       docDate: item.docDate?.toISOString().slice(0, 10) ?? null,
-      snippet: untrustedIf(
-        item.source === "omi",
-        snippet.replace(HIGHLIGHT_MARKS, "").slice(0, SNIPPET_CHARS),
+      snippet: scanUntrustedIf(
+        item.source === "scan",
+        untrustedIf(
+          item.source === "omi",
+          snippet.replace(HIGHLIGHT_MARKS, "").slice(0, SNIPPET_CHARS),
+        ),
       ),
     })),
   };
@@ -214,6 +228,7 @@ async function listRoom(
     }),
     repo.listFolders(actor),
   ]);
+  if (page.items.some((item) => item.source === "scan")) await deps.onUntrustedContent?.("scan");
   if (page.items.some((item) => item.source === "omi")) await deps.onUntrustedContent?.();
   const folders = new Map(folderRows.map((folder) => [folder.id, folder]));
   const pathOf = (folderId: string | null) => {
@@ -230,9 +245,9 @@ async function listRoom(
   return {
     results: page.items.map((item) => ({
       id: item.id,
-      name: item.name,
+      name: scanUntrustedIf(item.source === "scan", item.name),
       link: dataRoomItemLink(item.id),
-      folder: pathOf(item.folderId),
+      folder: scanUntrustedIf(item.source === "scan", pathOf(item.folderId)),
       docType: item.docType,
       docDate: item.docDate?.toISOString().slice(0, 10) ?? null,
     })),
@@ -253,6 +268,7 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
     .getItem(actor, id, {
       excludeConnectionIds: [...(deps.deniedConnectionIds ?? [])],
       ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
+      ...(deps.onlySource ? { source: deps.onlySource } : {}),
     })
     .catch((error: unknown) => {
       if (error instanceof IsolationError) return null;
@@ -260,6 +276,7 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
     });
   if (!item) return { error: "Item not found" };
   const meeting = item.source === "meeting";
+  const scan = item.source === "scan";
   if (meeting && !(await deps.meetingConsentOk?.()))
     return { error: MEETING_CONSENT_REQUIRED_MESSAGE };
   const folders = new Map((await repo.listFolders(actor)).map((folder) => [folder.id, folder]));
@@ -274,20 +291,23 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
   const full = (await repo.getItemText(actor, id)) ?? "";
   const truncated = full.length > MAX_TEXT_CHARS;
   const omi = item.source === "omi" || meeting;
+  if (scan) await deps.onUntrustedContent?.("scan");
   if (omi) await deps.onUntrustedContent?.();
   return {
     id: item.id,
-    name: item.name,
+    name: scanUntrustedIf(scan, item.name),
     link: dataRoomItemLink(item.id),
-    folder: path.length ? path.join("/") : null,
+    folder: scanUntrustedIf(scan, path.length ? path.join("/") : null),
     mimeType: item.mimeType,
     status: item.status,
     docType: item.docType,
     docDate: item.docDate?.toISOString().slice(0, 10) ?? null,
-    parties: item.parties,
-    tags: item.tags,
-    summary: untrustedIf(omi, item.summary),
-    text: untrustedIf(omi, truncated ? full.slice(0, MAX_TEXT_CHARS) : full),
+    parties: scan ? scanUntrustedList(true, item.parties) : item.parties,
+    tags: scan ? scanUntrustedList(true, item.tags) : item.tags,
+    summary: scan ? scanUntrustedIf(true, item.summary) : untrustedIf(omi, item.summary),
+    text: scan
+      ? scanUntrustedIf(true, truncated ? full.slice(0, MAX_TEXT_CHARS) : full)
+      : untrustedIf(omi, truncated ? full.slice(0, MAX_TEXT_CHARS) : full),
     truncated,
     ...(truncated ? { note: `Text truncated to ${MAX_TEXT_CHARS} characters.` } : {}),
     ...(!full && item.status !== "failed" ? { note: "No text has been extracted yet." } : {}),
@@ -418,6 +438,56 @@ async function add(
     return { error: "The attachment is too large to add." };
   }
   return { error: "Message not found" };
+}
+
+const UpdateScanInputSchema = z
+  .strictObject({
+    item_id: z.string().min(1),
+    name: DataRoomApiName.refine((value) => value.toLowerCase().endsWith(".pdf"), {
+      message: "Scan names must keep the PDF extension",
+    }).optional(),
+    doc_type: DataRoomDocTypeSchema.optional(),
+  })
+  .refine((input) => input.name !== undefined || input.doc_type !== undefined);
+
+async function updateScan(deps: DataRoomToolDeps, actor: Actor, args: Record<string, unknown>) {
+  const parsed = UpdateScanInputSchema.safeParse(args);
+  if (!parsed.success) return { error: "Pass item_id and a valid name and/or doc_type." };
+  const { item_id, name, doc_type } = parsed.data;
+  const data = {
+    ...(name !== undefined ? { name } : {}),
+    ...(doc_type !== undefined ? { docType: doc_type } : {}),
+  };
+  const changed = await deps.prisma.dataRoomItem.updateMany({
+    where: { id: item_id, spaceId: actor.spaceId, userId: actor.userId, source: "scan" },
+    data,
+  });
+  if (!changed.count) return { error: "Scan not found." };
+
+  const repo = createDataRoomRepos(deps.prisma);
+  const moved = await repo.reindexItems(actor, [item_id]);
+  for (const id of moved) {
+    await deps.jobs.enqueue(dataRoomStepJob("dataroom.index", actor, id));
+  }
+  const item = await repo.getItem(actor, item_id, { source: "scan" });
+  const folders = new Map((await repo.listFolders(actor)).map((folder) => [folder.id, folder]));
+  const path: string[] = [];
+  for (
+    let folder = item.folderId ? folders.get(item.folderId) : undefined;
+    folder && path.length < folders.size;
+    folder = folder.parentId ? folders.get(folder.parentId) : undefined
+  ) {
+    path.unshift(folder.name);
+  }
+  await deps.onUntrustedContent?.("scan");
+  return {
+    ok: true,
+    id: item.id,
+    name: scanUntrustedIf(true, item.name),
+    link: dataRoomItemLink(item.id),
+    folder: scanUntrustedIf(true, path.length ? path.join("/") : null),
+    docType: scanUntrustedIf(true, item.docType),
+  };
 }
 
 /**
