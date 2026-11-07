@@ -36,6 +36,8 @@ export const FIREWALL_FREE_TOOLS: ReadonlySet<string> = new Set([
   // Its own thread.
   "read_history",
   "search_history",
+  // Always a card (explicit approval), so offering it lets the agent ask without a free path.
+  "request_access",
 ]);
 
 /**
@@ -76,9 +78,17 @@ export const FIREWALL_MAIL_THREAD_ASK_TOOLS: ReadonlySet<string> = new Set([
 
 export type FirewallToolClass = "free" | "ask" | "dropped";
 
-export function firewallToolClass(name: string, mailThreadAgent = false): FirewallToolClass {
+/**
+ * `askExtra` holds the tools of capabilities the owner granted this agent through request_access
+ * (see `firewallAccessTools`). They ask on every call; a grant never makes a tool free.
+ */
+export function firewallToolClass(
+  name: string,
+  mailThreadAgent = false,
+  askExtra: ReadonlySet<string> = new Set(),
+): FirewallToolClass {
   if (FIREWALL_FREE_TOOLS.has(name)) return "free";
-  if (FIREWALL_ASK_TOOLS.has(name)) return "ask";
+  if (FIREWALL_ASK_TOOLS.has(name) || askExtra.has(name)) return "ask";
   if (mailThreadAgent && FIREWALL_MAIL_THREAD_ASK_TOOLS.has(name)) return "ask";
   return "dropped";
 }

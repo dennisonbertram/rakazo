@@ -106,6 +106,7 @@ function mapBot(
     disabledBuiltinTools?: string[];
     audience?: string;
     firewall?: boolean;
+    firewallAskCapabilities?: string[];
     proactivity?: string;
     externalMessageTargets?: string[];
     externalComputerTools?: boolean;
@@ -164,8 +165,8 @@ function mapBot(
     disabledBuiltinTools: bot.disabledBuiltinTools ?? [],
     audience: bot.audience === "external" ? "external" : "internal",
     firewall: bot.firewall ?? false,
-    proactivity:
-      bot.proactivity === "low" ? "low" : bot.proactivity === "high" ? "high" : "medium",
+    firewallAskCapabilities: bot.firewallAskCapabilities ?? [],
+    proactivity: bot.proactivity === "low" ? "low" : bot.proactivity === "high" ? "high" : "medium",
     externalMessageTargets: bot.externalMessageTargets ?? [],
     externalComputerTools: bot.externalComputerTools ?? false,
     webhookConfigured: Boolean(bot.webhookSecretId),

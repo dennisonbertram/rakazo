@@ -98,6 +98,19 @@ describe("readsFirewalledContent", () => {
       expect(await reads(prisma(), name, { botId: "other" })).toBe(false);
     }
   });
+  it("taints contacts_list when a firewalled agent wrote a matching contact", async () => {
+    const find = vi.fn(async () => [{ botId: "fw" }]);
+    expect(
+      await reads(prisma({ contact: { findMany: find } }), "contacts_list", { query: "ann" }),
+    ).toBe(true);
+    expect(JSON.stringify(find.mock.calls[0])).toContain("ann");
+    expect(
+      await reads(prisma({ contact: { findMany: rows([{ botId: null }]) } }), "contacts_list"),
+    ).toBe(false);
+    expect(
+      await reads(prisma({ contact: { findMany: rows([{ botId: "other" }]) } }), "contacts_list"),
+    ).toBe(false);
+  });
   it("ignores tools that read nothing an agent wrote", async () => {
     expect(await reads(prisma(), "mail_get", { botId: "fw" })).toBe(false);
   });

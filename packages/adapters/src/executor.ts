@@ -113,7 +113,10 @@ import {
 } from "@rakazo/contracts";
 import type { ActionApprovalRule, ToolCallStreak, UrlVerdict } from "@rakazo/core";
 import {
+  ACCESS_CAPABILITIES,
   ACTIVE_RUN_STATUSES,
+  accessCapability,
+  accessCapabilityTools,
   accountAllowedIn,
   actionTypeForTool,
   appendGoalEvidence,
@@ -148,6 +151,7 @@ import {
   externalTaintAllowsTool,
   FIREWALL_CARD_REASON,
   findSkillByName,
+  firewallAccessTools,
   firewallToolClass,
   formatSkillRunPrompt,
   formatSkillsCatalogInstruction,
@@ -184,6 +188,7 @@ import {
   privateDataAreas,
   promptInvokesSkill,
   quietRoutineGuidance,
+  REQUEST_ACCESS_TOOL,
   ROUTINE_AUTO_REVIEW_READ_TOOLS,
   redactSecrets,
   renderBotDirectory,
@@ -625,6 +630,7 @@ import { actorMayUsePrivateEndpoint } from "./private-endpoint.js";
 import type { RemoteTransportDependencies } from "./remote-mcp.js";
 import { assertSafeRemoteUrl } from "./remote-mcp.js";
 import { loadReplyContext, messageToAgentHistoryText } from "./reply-context.js";
+import { accessRunState, requestAccessToolFor, requestableCapabilities } from "./request-access.js";
 import {
   backOffRoutineAfterAccountError,
   clearConnectionPause,
@@ -635,7 +641,6 @@ import {
 import { routineTimerNonce } from "./routine-coalescing.js";
 import { lateRoutineRunInstruction } from "./routine-lateness.js";
 import { notifyThreadEvent } from "./run-notification.js";
-import { expireSupersededRoutineRuns } from "./stuck-work.js";
 import {
   commitConsumedRunSecret,
   normalizeSecretAskPurpose,
@@ -699,6 +704,7 @@ import {
   SPREADSHEET_GUIDANCE,
   spreadsheetAttachmentSummary,
 } from "./spreadsheet-tools.js";
+import { expireSupersededRoutineRuns } from "./stuck-work.js";
 import type { TakeoverResumeCheckpoint } from "./takeover-resume.js";
 import {
   continueRunClaimFence,
@@ -3309,7 +3315,25 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 userId: run.userId,
                 botId: bot.id,
               }))));
-        const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+        // request_access: what the owner allowed in this run, and every capability already asked.
+        // The tool list is rebuilt on each execution, so an allow takes effect when the run resumes.
+        const accessState = accessRunState(
+          await deps.prisma.externalEffect.findMany({
+            where: { runId, kind: REQUEST_ACCESS_TOOL },
+            select: { status: true, request: true },
+          }),
+        );
+        const accessRunTools = accessCapabilityTools([...accessState.granted]);
+        // On a Firewall agent a grant (this run's, or the owner's Always) only moves tools to ask.
+        const firewallAskTools = firewallAccessTools([
+          ...(bot.firewallAskCapabilities ?? []),
+          ...accessState.granted,
+        ]);
+        const disabledBuiltinTools = new Set(
+          [...disabledBuiltinToolSet(bot.disabledBuiltinTools)].filter(
+            (name) => !accessRunTools.has(name),
+          ),
+        );
         // An external bot is told nothing about tools it is not offered, and gets none of the
         // automatic private context (memory, tickets, recall, environment, connected apps).
         const externalBot = bot.audience === "external";
@@ -3331,7 +3355,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ...disabledBuiltinTools,
                 ...BUILTIN_TOOL_NAMES.filter(
                   (name) =>
-                    firewallToolClass(name, isMailThreadAgentSpawnKey(bot.spawnKey)) === "dropped",
+                    firewallToolClass(
+                      name,
+                      isMailThreadAgentSpawnKey(bot.spawnKey),
+                      firewallAskTools,
+                    ) === "dropped",
                 ),
               ])
             : disabledBuiltinTools;
@@ -3944,73 +3972,75 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const companyAgentToolSet: ReadonlySet<string> = new Set(COMPANY_AGENT_BUILTIN_TOOLS);
         const companyImporterToolSet: ReadonlySet<string> = new Set(COMPANY_IMPORTER_BUILTIN_TOOLS);
         const investorsToolSet: ReadonlySet<string> = new Set(INVESTORS_AGENT_BUILTIN_TOOLS);
-        const builtins = [
-          ...selectBuiltinToolsForRun({
-            ticketBoardEnabled:
-              Boolean(deps.ticketBoardEnabled) && (!voiceAgent || voiceWorkspaceReadAllowed),
-            companyContextEnabled: companyContextAllowed,
-            historyRetrievalEnabled: contextStrategy !== "current",
-            graphicalToolsAllowed,
-            pageBrowserAllowed,
-            appControlEnabled: appControlOfferedForRun,
-            groupId: thread.groupId,
-            trigger: run.trigger,
-            semanticMemoryEnabled,
-            cloudAgentEnabled: cloudAgentsEnabled(cloudAgent, run.spaceId),
-            mailEnabled,
-            imessageEnabled,
-            calendarEnabled,
-            driveEnabled,
-            dataRoomEnabled,
-            financeEnabled,
-            legalEnabled,
-            contactsEnabled,
-            capTableEnabled,
-            investorsEnabled,
-            fundraisingEnabled,
-            meetingsEnabled,
-            messagingChannelRun,
-            cartaAgent,
-            gtmAgent,
-            integrationAgent: integrationAgent || appAgentIdentity,
-            omiAgent: Boolean(omiConnection),
-            googleAgentProvider:
-              appAgentConnection?.connectorId === "google"
-                ? appAgentConnection.provider
-                : undefined,
-            voiceAgent,
-            voiceWorkspaceReadAllowed,
-            voiceCall,
-            disabledBuiltinTools: bot.disabledBuiltinTools,
-            audience: bot.audience,
-            externalComputerTools: bot.externalComputerTools,
-          }),
-          // Cross-owner agent connections only exist for chat-linked bots.
-          ...(hasMessagingIdentity &&
-          bot.crossSpaceCommunication === true &&
-          bot.audience !== "external" &&
-          !voiceAgent &&
-          !gtmAgent &&
-          !cartaAgent &&
-          !integrationAgent &&
-          !appAgentIdentity &&
-          !isBackgroundRunTrigger(run.trigger)
-            ? agentConnectionTools.filter((tool) => !disabledBuiltinTools.has(tool.name))
-            : []),
-        ].filter(
-          (tool) =>
-            (!gtmAgent || GTM_AGENT_TOOL_SET.has(tool.name)) &&
-            (!legalOnly || legalToolSet.has(tool.name)) &&
-            (!dataRoomAgent || dataRoomAgentToolSet.has(tool.name)) &&
-            (!companyAgent || companyAgentToolSet.has(tool.name)) &&
-            (!companyImporter || companyImporterToolSet.has(tool.name)) &&
-            (!investorsAgent || investorsToolSet.has(tool.name)) &&
-            !(capTableWriteBlocked && tool.name === "cap_table_update") &&
-            (!meetingAgent || meetingAgentToolSet.has(tool.name)) &&
-            // pi-runtime runs run_subagent itself, before the executor's approval gate.
-            ((!meetingTaint && externalChain === undefined) ||
-              !["run_subagent", "request_takeover"].includes(tool.name)),
-        );
+        const builtinsFor = (disabledList: readonly string[]) =>
+          [
+            ...selectBuiltinToolsForRun({
+              ticketBoardEnabled:
+                Boolean(deps.ticketBoardEnabled) && (!voiceAgent || voiceWorkspaceReadAllowed),
+              companyContextEnabled: companyContextAllowed,
+              historyRetrievalEnabled: contextStrategy !== "current",
+              graphicalToolsAllowed,
+              pageBrowserAllowed,
+              appControlEnabled: appControlOfferedForRun,
+              groupId: thread.groupId,
+              trigger: run.trigger,
+              semanticMemoryEnabled,
+              cloudAgentEnabled: cloudAgentsEnabled(cloudAgent, run.spaceId),
+              mailEnabled,
+              imessageEnabled,
+              calendarEnabled,
+              driveEnabled,
+              dataRoomEnabled,
+              financeEnabled,
+              legalEnabled,
+              contactsEnabled,
+              capTableEnabled,
+              investorsEnabled,
+              fundraisingEnabled,
+              meetingsEnabled,
+              messagingChannelRun,
+              cartaAgent,
+              gtmAgent,
+              integrationAgent: integrationAgent || appAgentIdentity,
+              omiAgent: Boolean(omiConnection),
+              googleAgentProvider:
+                appAgentConnection?.connectorId === "google"
+                  ? appAgentConnection.provider
+                  : undefined,
+              voiceAgent,
+              voiceWorkspaceReadAllowed,
+              voiceCall,
+              disabledBuiltinTools: disabledList,
+              audience: bot.audience,
+              externalComputerTools: bot.externalComputerTools,
+            }),
+            // Cross-owner agent connections only exist for chat-linked bots.
+            ...(hasMessagingIdentity &&
+            bot.crossSpaceCommunication === true &&
+            bot.audience !== "external" &&
+            !voiceAgent &&
+            !gtmAgent &&
+            !cartaAgent &&
+            !integrationAgent &&
+            !appAgentIdentity &&
+            !isBackgroundRunTrigger(run.trigger)
+              ? agentConnectionTools.filter((tool) => !disabledBuiltinTools.has(tool.name))
+              : []),
+          ].filter(
+            (tool) =>
+              (!gtmAgent || GTM_AGENT_TOOL_SET.has(tool.name)) &&
+              (!legalOnly || legalToolSet.has(tool.name)) &&
+              (!dataRoomAgent || dataRoomAgentToolSet.has(tool.name)) &&
+              (!companyAgent || companyAgentToolSet.has(tool.name)) &&
+              (!companyImporter || companyImporterToolSet.has(tool.name)) &&
+              (!investorsAgent || investorsToolSet.has(tool.name)) &&
+              !(capTableWriteBlocked && tool.name === "cap_table_update") &&
+              (!meetingAgent || meetingAgentToolSet.has(tool.name)) &&
+              // pi-runtime runs run_subagent itself, before the executor's approval gate.
+              ((!meetingTaint && externalChain === undefined) ||
+                !["run_subagent", "request_takeover"].includes(tool.name)),
+          );
+        const builtins = builtinsFor([...disabledBuiltinTools]);
         // Generic connector tools (Composio, Pipedream, MCP) reach the owner's accounts, so a run
         // another agent started (bot_message, possibly from another account) gets none of them.
         // Webhook and messaging runs keep them: they have their own approval rules.
@@ -4184,13 +4214,41 @@ export function createRunExecutor(deps: ExecutorDeps) {
           );
         // Agent firewall: only tools on the two closed lists are offered. The model is not told the
         // others exist, and a call to one is refused (see applyToolCall).
-        const tools = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])].filter(
+        const toolsBeforeAccess = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])].filter(
           (tool) =>
             (!bot.firewall ||
-              firewallToolClass(tool.name, isMailThreadAgentSpawnKey(bot.spawnKey)) !==
-                "dropped") &&
+              firewallToolClass(
+                tool.name,
+                isMailThreadAgentSpawnKey(bot.spawnKey),
+                firewallAskTools,
+              ) !== "dropped") &&
             // An email's own agent answers one thread, so it has nothing to batch.
             (tool.name !== MAIL_REPLY_BATCH_TOOL || !isMailThreadAgentSpawnKey(bot.spawnKey)),
+        );
+        // request_access lists only capabilities the owner's switches (or the Firewall) hold back.
+        // The baseline is the same list built with no tool disabled, so every other rule still applies.
+        const accessLacking = toolsBeforeAccess.some((tool) => tool.name === REQUEST_ACCESS_TOOL)
+          ? requestableCapabilities({
+              baseline: new Set(builtinsFor([]).map((tool) => tool.name)),
+              offered: new Set(toolsBeforeAccess.map((tool) => tool.name)),
+              firewalled: bot.firewall === true,
+              asked: accessState.asked,
+            })
+          : [];
+        // An allowed request stays offered until the agent's call is replayed and settled.
+        const accessEnum = [
+          ...accessLacking,
+          ...ACCESS_CAPABILITIES.filter(
+            (capability) =>
+              accessState.awaitingReplay.has(capability.id) && !accessLacking.includes(capability),
+          ),
+        ];
+        const tools = toolsBeforeAccess.flatMap((tool) =>
+          tool.name !== REQUEST_ACCESS_TOOL
+            ? [tool]
+            : accessEnum.length > 0 && !voiceAgent
+              ? [requestAccessToolFor(tool, accessEnum)]
+              : [],
         );
         const offeredToolNames = new Set(tools.map((tool) => tool.name));
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
@@ -4982,7 +5040,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           const firewalled = await firewallNow();
           if (firewalled) {
             if (run.externalTaint !== true) await storeExternalTaint();
-            if (firewallToolClass(name, isMailThreadAgentSpawnKey(bot.spawnKey)) === "dropped") {
+            if (
+              firewallToolClass(name, isMailThreadAgentSpawnKey(bot.spawnKey), firewallAskTools) ===
+              "dropped"
+            ) {
               return { error: `Tool ${name} is not available to this bot.` };
             }
             // The to-do's stored botId becomes the recipient, so the firewalled author would be lost.
@@ -5222,6 +5283,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // A model can call a built-in it was never offered; the offer is the run's tool list.
           if (BUILTIN_AGENT_TOOL_NAMES.has(name) && !offeredToolNames.has(name)) {
             return { error: `Tool ${name} is not available to this bot.` };
+          }
+          // Only a capability on this run's list can be asked for, once. The replay of an allowed
+          // request is not a new ask.
+          if (name === REQUEST_ACCESS_TOOL && approvedEffectReplays.nextToolName() !== name) {
+            const id = accessCapability(args.capability)?.id;
+            if (id && accessState.asked.has(id)) {
+              return {
+                error: "You already asked for this in this run. Do not ask for it again.",
+              };
+            }
+            if (!id || !accessLacking.some((capability) => capability.id === id)) {
+              return { error: "That capability cannot be requested." };
+            }
           }
           if (PAGE_BROWSER_TOOL_NAMES.has(name) && !pageBrowserAllowed) {
             return { error: "Page browser is unavailable on this computer." };
@@ -5566,7 +5640,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           let firewallScopeLabelIds: Record<string, string> = {};
           let firewallAskCall = false;
           if (firewalled) {
-            if (firewallToolClass(name, isMailThreadAgentSpawnKey(bot.spawnKey)) === "ask") {
+            if (
+              firewallToolClass(name, isMailThreadAgentSpawnKey(bot.spawnKey), firewallAskTools) ===
+              "ask"
+            ) {
               firewallLifted =
                 firewallMail !== undefined &&
                 (name === "mail_modify"
@@ -6580,6 +6657,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
               imessage: imessageCard,
               schedule: scheduleCard,
               moneyNames,
+              requestAccess:
+                name === REQUEST_ACCESS_TOOL
+                  ? {
+                      agent: bot.name,
+                      firewalled: bot.firewall === true,
+                      // Always lets the agent use the tools without asking again, so a run that has
+                      // read outside text cannot offer it. A Firewall agent's Always only means "may ask".
+                      always:
+                        bot.firewall === true ||
+                        !(
+                          runTainted ||
+                          meetingTaintedCall ||
+                          externalTaintedCall ||
+                          (await isOutsideContentSeen())
+                        ),
+                    }
+                  : undefined,
               shareTarget:
                 name === SHARE_MEETING_TOOL
                   ? await shareTargetName(deps.prisma, run, args)
@@ -9069,6 +9163,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return pauseForSecret();
           }
           if (name === "request_takeover") return { ok: true };
+          if (name === REQUEST_ACCESS_TOOL) {
+            return finish({
+              ok: true,
+              granted: String(args.capability),
+              note: "The owner allowed it. The tools are available now.",
+            });
+          }
           if (name === "run_subagent") {
             return {
               ok: true,

@@ -819,3 +819,45 @@ describe("buildApprovalAskBlock argument summaries", () => {
     expect(block.text).not.toContain("](");
   });
 });
+
+describe("request_access card", () => {
+  const card = (
+    requestAccess: { agent: string; firewalled: boolean; always: boolean },
+    reason = "Save the lead",
+  ) =>
+    buildApprovalAskBlock("effect-1", "request_access", { capability: "contacts", reason }, [], {
+      requestAccess,
+    });
+
+  it("names the agent and the fixed capability words, with the agent's reason as plain text", () => {
+    const block = card(
+      { agent: "Support *Bot*", firewalled: false, always: true },
+      "Save <b>the</b>\nlead",
+    );
+    expect(block).toMatchObject({
+      text: "Support \\*Bot\\* asks to see, add and edit your contacts",
+      detail: "Agent's reason: Save <b>the</b> lead",
+      actions: [
+        { id: "allow", label: "Allow for this run" },
+        { id: "always", label: "Always for this agent" },
+        { id: "deny", label: "Deny" },
+      ],
+    });
+  });
+
+  it("adds the Firewall line, and leaves Always out when it is not offered", () => {
+    const block = card({ agent: "Scout", firewalled: true, always: false });
+    expect(block).toMatchObject({
+      detail: "Agent's reason: Save the lead\nFirewall is on, so each use will still ask you.",
+    });
+    expect((block as { actions: { id: string }[] }).actions.map((a) => a.id)).toEqual([
+      "allow",
+      "deny",
+    ]);
+  });
+
+  it("cuts a long reason to 300 characters", () => {
+    const block = card({ agent: "Scout", firewalled: false, always: true }, "x".repeat(500));
+    expect((block as { detail: string }).detail).toBe(`Agent's reason: ${"x".repeat(300)}`);
+  });
+});

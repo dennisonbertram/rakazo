@@ -39,6 +39,7 @@ export const FIREWALL_CONTENT_READERS: ReadonlySet<string> = new Set([
   "calendar_agenda",
   "board_tickets",
   "ticket_get",
+  "contacts_list",
 ]);
 
 /**
@@ -65,7 +66,7 @@ const AGENT_RECORD_TOOLS = new Set(["agent_context", "search_agent_history", "re
  * filters, the one ticket named. Checked by author, so the records carry no mark.
  */
 export async function readsFirewalledContent(
-  prisma: Pick<PrismaClient, "scratchpadItem" | "routine" | "ticket" | "ticketComment">,
+  prisma: Pick<PrismaClient, "scratchpadItem" | "routine" | "ticket" | "ticketComment" | "contact">,
   scope: Scope,
   name: string,
   args: Record<string, unknown>,
@@ -105,6 +106,24 @@ export async function readsFirewalledContent(
       }),
     ]);
     return written(items) || written(routines);
+  }
+  if (name === "contacts_list") {
+    // Contact.botId records the agent that added the contact.
+    const text = typeof args.query === "string" ? args.query.trim() : "";
+    const contains = (field: string) => ({ [field]: { contains: text, mode: "insensitive" } });
+    const rows = await prisma.contact.findMany({
+      where: {
+        ...scope,
+        botId: { in: authors },
+        ...(typeof args.kind === "string" && args.kind ? { kind: args.kind } : {}),
+        ...(text
+          ? { OR: ["name", "email", "organization", "notes"].map((field) => contains(field)) }
+          : {}),
+      },
+      select: { botId: true },
+      take: 1,
+    });
+    return written(rows);
   }
   if (name === "board_tickets") {
     const rows = await prisma.ticket.findMany({
