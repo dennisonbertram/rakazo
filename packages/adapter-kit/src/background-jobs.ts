@@ -153,7 +153,7 @@ const payloadSchemas = {
     entries: z.number().int().positive(),
     importId: z.string().min(1),
     name: z.string().min(1),
-    source: z.enum(["upload", "gmail", "drive", "box", "chat", "omi", "meeting"]),
+    source: z.enum(["upload", "scan", "gmail", "drive", "box", "chat", "omi", "meeting"]),
     folderId: z.string().min(1).nullable(),
     sourceConnectionId: z.string().min(1).optional(),
     externalId: z.string().min(1).optional(),

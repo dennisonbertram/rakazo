@@ -887,7 +887,7 @@ export interface BackgroundJobPayloads {
     /** The import that reports progress. */
     importId: string;
     name: string;
-    source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
+    source: "upload" | "scan" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
     folderId: string | null;
     sourceConnectionId?: string;
     externalId?: string;

@@ -40,7 +40,7 @@ export interface FileDataRoomInput {
   mimeType: string;
   folderId: string | null;
   importId?: string;
-  source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
+  source: "upload" | "scan" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
   sourceConnectionId?: string;
   externalId?: string;
   sourceUrl?: string;
