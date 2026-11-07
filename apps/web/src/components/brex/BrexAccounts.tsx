@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@rakazo/ui-web";
 import { dayRange, money, shortDay } from "../../lib/finance-format";
+import { useHideAmounts } from "../../lib/hide-amounts-preference";
 import { sortBy, useListParams } from "../../lib/list-params";
 import { rpc } from "../../lib/rpc";
 import { Section, useFinanceQuery } from "../finance/ui";
@@ -33,8 +34,8 @@ function accountStatus(status: string | null): string {
   return status;
 }
 
-function balance(cents: number | null): string {
-  return cents === null ? dash : money(cents);
+function balance(cents: number | null, currency?: string): string {
+  return cents === null ? dash : money(cents, undefined, currency);
 }
 
 function statementPeriod(statement: BrexStatement): string {
@@ -54,6 +55,7 @@ type AccountSort = "name" | "status" | "current" | "available";
 type StatementSort = "period" | "account" | "start" | "end";
 
 function AccountsView({ data }: { data: BrexAccountsData }) {
+  useHideAmounts();
   const accounts = useListParams(["name", "status", "current", "available"] as const, {
     field: "name",
     dir: "asc",
@@ -64,6 +66,13 @@ function AccountsView({ data }: { data: BrexAccountsData }) {
     { field: "period", dir: "desc" },
     "stmt-",
   );
+
+  // Statements carry no currency in the contract; a cash statement takes its account's.
+  const currencyById = new Map(
+    data.accounts.map((account) => [account.cashAccountId, account.currency]),
+  );
+  const statementCurrency = (statement: BrexStatement): string | undefined =>
+    statement.cashAccountId ? (currencyById.get(statement.cashAccountId) ?? undefined) : undefined;
 
   const accountPicks: Record<AccountSort, (account: BrexAccount) => string | number | null> = {
     name: (account) => account.name ?? account.cashAccountId,
@@ -143,10 +152,10 @@ function AccountsView({ data }: { data: BrexAccountsData }) {
                     {accountStatus(account.status)}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-end tabular-nums">
-                    {balance(account.currentBalanceCents)}
+                    {balance(account.currentBalanceCents, account.currency ?? undefined)}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-end tabular-nums">
-                    {balance(account.availableBalanceCents)}
+                    {balance(account.availableBalanceCents, account.currency ?? undefined)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -202,10 +211,10 @@ function AccountsView({ data }: { data: BrexAccountsData }) {
                   <TableCell className="max-w-48 truncate">{statementAccount(statement)}</TableCell>
                   <TableCell className="whitespace-nowrap">{statementPeriod(statement)}</TableCell>
                   <TableCell className="whitespace-nowrap text-end tabular-nums">
-                    {balance(statement.startBalanceCents)}
+                    {balance(statement.startBalanceCents, statementCurrency(statement))}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-end tabular-nums">
-                    {balance(statement.endBalanceCents)}
+                    {balance(statement.endBalanceCents, statementCurrency(statement))}
                   </TableCell>
                   <TableCell className="text-end">
                     <Button
