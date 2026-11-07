@@ -14,7 +14,10 @@ import { BrexAccounts } from "./BrexAccounts";
 import { BrexActivity } from "./BrexActivity";
 import { BrexCards } from "./BrexCards";
 import { BrexExpenses } from "./BrexExpenses";
+import { BrexLimits } from "./BrexLimits";
 import { BrexOverview } from "./BrexOverview";
+import { BrexPeople } from "./BrexPeople";
+import { BrexSpending } from "./BrexSpending";
 import { BrexTravel } from "./BrexTravel";
 
 const SECTIONS = [
@@ -126,6 +129,12 @@ export function BrexPage({ spaceName }: { spaceName?: string }) {
               <BrexOverview data={overview.data} />
             ) : section === "cards" ? (
               <BrexCards />
+            ) : section === "spending" ? (
+              <BrexSpending />
+            ) : section === "limits" ? (
+              <BrexLimits />
+            ) : section === "people" ? (
+              <BrexPeople />
             ) : section === "expenses" ? (
               <BrexExpenses />
             ) : section === "accounts" ? (
