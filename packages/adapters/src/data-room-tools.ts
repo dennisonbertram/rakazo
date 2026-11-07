@@ -44,7 +44,7 @@ export function describeDataRoomActivity(name: string): string | null {
 
 /** Shared guidance; included in a run only when add_to_data_room is offered. */
 export const DATA_ROOM_GUIDANCE =
-  "When you find, receive or create a document (an email attachment, a Drive file you opened, a file someone gave you, or a report you wrote), add it to the Data room with add_to_data_room. Do this without being asked. Don't choose a folder, name or tags; the Data room agent files it. Adding the same document again does nothing, so you don't need to check first. Add files only, not message text, and skip small inline images such as logos and signatures. If the tool says the Data room is off, don't add anything else and mention it at most once in the conversation.";
+  "When you find, receive or create a document (an email attachment, a Drive file you opened, a file someone gave you, or a report you wrote), add it to the Data room with add_to_data_room. Do this without being asked. Don't choose a folder, name or tags; the Data room files and tags it on its own. Adding the same document again does nothing, so you don't need to check first. Add files only, not message text, and skip small inline images such as logos and signatures. If the tool says the Data room is off, don't add anything else and mention it at most once in the conversation.";
 
 /**
  * The most a mail attachment can be. Unlike every other source, the mail provider contract returns
