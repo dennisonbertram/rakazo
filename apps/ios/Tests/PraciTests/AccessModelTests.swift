@@ -330,6 +330,7 @@ private func shot<V: View>(_ view: V, name: String, large: Bool, height: CGFloat
   let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
   let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow()
   window.frame = CGRect(origin: .zero, size: size)
+  defer { window.isHidden = true }  // a window left visible covers the screen for later tests
   let styled = view.dynamicTypeSize(large ? .accessibility2 : .large)
   window.rootViewController = UIHostingController(rootView: styled)
   window.isHidden = false
@@ -344,7 +345,6 @@ private func shot<V: View>(_ view: V, name: String, large: Bool, height: CGFloat
   let suffix = large ? "large" : "default"
   try? image.pngData()?.write(
     to: URL(fileURLWithPath: folder).appendingPathComponent("\(name)-\(suffix).png"))
-  window.isHidden = true
 }
 
 private func manyAgents(_ count: Int) -> [AccessAgent] {
