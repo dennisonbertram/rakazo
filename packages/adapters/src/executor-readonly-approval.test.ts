@@ -10,11 +10,11 @@ import { MEMORY_REVISION_CONFLICT_ERROR } from "@rakazo/adapter-kit";
 import {
   AI_DISCLOSURE_VERSION,
   cartaAgentSpawnKey,
+  financeAgentSpawnKey,
   inboxAgentSpawnKey,
   integrationAgentSpawnKey,
   MEETING_MARK_REASON,
   voiceAgentSpawnKey,
-  financeAgentSpawnKey,
 } from "@rakazo/contracts";
 import type { ActionApprovalRule } from "@rakazo/core";
 import {
@@ -28,7 +28,6 @@ import { approvalEffectKey, toolEffectIdempotencyKey } from "@rakazo/core/node/a
 import type { PreparedPipelineImport } from "@rakazo/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as AiConsentModule from "./ai-consent.js";
-import type * as FinanceToolsModule from "./finance-tools.js";
 import { DENIED_ACTION_MESSAGE, isApprovalPausedResult } from "./approval-effect.js";
 import { BlueBubblesEmulator, createEmulatedBlueBubblesPlatform } from "./bluebubbles-emulator.js";
 import type { MessageBotOptions } from "./bot-messages.js";
@@ -56,6 +55,7 @@ import {
 import { FakeBrowserProvider } from "./fake-browser.js";
 import { FakeWebProvider } from "./fake-web.js";
 import { fakeMercury, fakeMercuryMcpFetch } from "./finance-fake-tools.js";
+import type * as FinanceToolsModule from "./finance-tools.js";
 import type * as InboxTriageModule from "./inbox-triage.js";
 import { catalogEntries, DIRECT_TOOL_LIMIT, resolveCatalogCall } from "./lazy-tool-catalog.js";
 import { McpConnector } from "./mcp-connector.js";
@@ -296,6 +296,7 @@ function fixture({
   parallel = false,
   pageBrowser,
   firewall = false,
+  firewallAskCapabilities = [] as string[],
   semanticMemory,
   firewalledBots = [] as string[],
   groupId = null as string | null,
@@ -326,6 +327,8 @@ function fixture({
   scriptedRuntime?: boolean;
   /** The bot's Firewall switch at the start of the run. */
   firewall?: boolean;
+  /** Capabilities the owner granted a Firewall agent with Always. */
+  firewallAskCapabilities?: string[];
   /** A semantic memory provider the space has configured, with its default scope. */
   semanticMemory?: { provider: unknown; defaultScope: string };
   /** Other agents in the space with Firewall on. */
@@ -602,6 +605,7 @@ function fixture({
         disabledBuiltinTools,
         audience,
         firewall: botFlags.firewall,
+        firewallAskCapabilities,
         externalMessageTargets: [],
         externalComputerTools,
         computerId: "computer-1",
@@ -9968,5 +9972,179 @@ describe("a run that a goal adopts while it is running", () => {
     expect(logs).toContain("[redacted]");
     expect(logs).not.toContain("def");
     expect(logs).not.toContain("ghi");
+  });
+});
+
+describe("request_access", () => {
+  const contactTools = ["contacts_list", "contacts_add", "contacts_save"];
+  const accessTool = (f: { request: () => AgentRunRequest | undefined }) =>
+    f.request()!.tools!.find((t) => t.name === "request_access");
+  const enumOf = (f: { request: () => AgentRunRequest | undefined }) =>
+    (accessTool(f)?.inputSchema as { properties: { capability: { enum: string[] } } } | undefined)
+      ?.properties.capability.enum;
+  const ask = { capability: "contacts", reason: "Save the lead" };
+  const cardOf = (f: { pauseRunForInput: { mock: { calls: unknown[][] } } }) =>
+    (
+      f.pauseRunForInput.mock.calls[0]![0] as {
+        blocks: { text: string; detail?: string; actions: { id: string }[] }[];
+      }
+    ).blocks[0]!;
+  const disabledAgent = (extra: Record<string, unknown> = {}) =>
+    fixture({
+      name: "request_access",
+      builtin: true,
+      disabledBuiltinTools: contactTools,
+      ...extra,
+    });
+
+  it("lists only what an owner switch holds back, and not the Firewall-barred ones", async () => {
+    const plain = disabledAgent();
+    await plain.run();
+    expect(enumOf(plain)).toEqual(["contacts"]);
+    expect(plain.offeredTools).not.toContain("contacts_add");
+    const walled = fixture({ name: "notify_user", builtin: true, firewall: true, dataRoom: true });
+    await walled.run();
+    const ids = enumOf(walled)!;
+    expect(ids).toContain("contacts");
+    for (const barred of ["calendar_write", "drive_write", "web_search"]) {
+      expect(ids).not.toContain(barred);
+    }
+  });
+
+  it("is not offered when nothing is switched off", async () => {
+    const f = fixture({ name: "notify_user", builtin: true });
+    await f.run();
+    expect(accessTool(f)).toBeUndefined();
+  });
+
+  it("always shows a card, even when a saved rule allows every tool", async () => {
+    const f = disabledAgent({
+      rules: [{ effect: "always_allow", matchKind: "tool", matchValue: "request_access" }],
+    });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(cardOf(f)).toMatchObject({
+      text: "Assistant asks to see, add and edit your contacts",
+      detail: "Agent's reason: Save the lead",
+      actions: [{ id: "allow" }, { id: "always" }, { id: "deny" }],
+    });
+  });
+
+  it("offers no Always when the run is tainted and the agent has no Firewall", async () => {
+    const f = disabledAgent({ externalTaint: true });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    expect(cardOf(f).actions.map((a) => a.id)).toEqual(["allow", "deny"]);
+  });
+
+  it("keeps Always on a Firewall agent and adds the Firewall line", async () => {
+    const f = fixture({ name: "request_access", builtin: true, firewall: true });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    expect(cardOf(f).detail).toContain("Firewall is on, so each use will still ask you.");
+    expect(cardOf(f).actions.map((a) => a.id)).toContain("always");
+  });
+
+  it("refuses a capability that is not on this run's list", async () => {
+    const f = disabledAgent();
+    f.setCalls([{ args: { capability: "web_search", reason: "x" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results[0]).toEqual({ error: "That capability cannot be requested." });
+  });
+
+  it("rebuilds the tool list on resume: an allowed request offers the tools, still a card for a Firewall agent", async () => {
+    const f = fixture({ name: "request_access", builtin: true, firewall: true });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    expect(f.offeredTools).not.toContain("contacts_add");
+    expect(f.effects).toHaveLength(1);
+    f.effects[0]!.status = "approved";
+    f.offeredTools.length = 0;
+    f.pauseRunForInput.mockClear();
+    f.setCalls([
+      { args: ask, executionId: "c1" },
+      { name: "contacts_add", args: { name: "Ann", email: "ann@x.example" }, executionId: "c2" },
+    ]);
+    await f.run();
+    expect(f.offeredTools).toEqual(expect.arrayContaining(contactTools));
+    expect(f.results[1]).toMatchObject({ ok: true, granted: "contacts" });
+    // The granted tool is ask-each-time, not free.
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(cardOf(f).text).toContain("Contacts add");
+    expect(f.effects.filter((e) => e.kind === "request_access")).toHaveLength(1);
+  });
+
+  it("stops a denied capability from being asked again in the run", async () => {
+    const f = disabledAgent();
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    f.effects[0]!.status = "denied";
+    f.offeredTools.length = 0;
+    f.setCalls([{ args: { ...ask, reason: "Please, I really need it" }, executionId: "c2" }]);
+    await f.run();
+    // Nothing else could be asked for, so the tool is gone and the call is refused.
+    expect(f.offeredTools).not.toContain("request_access");
+    expect(f.results.at(-1)).toEqual({ error: expect.stringContaining("not available") });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("a denial for one capability does not answer or grant another", async () => {
+    const f = disabledAgent({ disabledBuiltinTools: [...contactTools, "web_search"] });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    f.effects[0]!.status = "denied";
+    f.pauseRunForInput.mockClear();
+    f.offeredTools.length = 0;
+    f.setCalls([{ args: { capability: "web_search", reason: "Look it up" }, executionId: "c2" }]);
+    await f.run();
+    // Its own card, not a completed effect with a denial error.
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(cardOf(f).text).toBe("Assistant asks to search the web");
+    expect(f.effects.map((e) => e.status)).toEqual(["denied", "intended"]);
+    // The next run still has neither tool.
+    f.offeredTools.length = 0;
+    f.setCalls([]);
+    await f.run();
+    expect(f.offeredTools).not.toContain("web_search");
+    expect(f.offeredTools).not.toContain("contacts_add");
+  });
+
+  it("does not treat a completed effect with an error result as a grant", async () => {
+    const f = disabledAgent({ disabledBuiltinTools: [...contactTools, "web_search"] });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    Object.assign(f.effects[0]!, { status: "completed", result: { error: "declined" } });
+    f.offeredTools.length = 0;
+    f.setCalls([]);
+    await f.run();
+    expect(f.offeredTools).not.toContain("contacts_add");
+  });
+
+  it("asks once per capability per run, whatever the reason", async () => {
+    const f = disabledAgent({ disabledBuiltinTools: [...contactTools, "web_search"] });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    expect(enumOf(f)).toEqual(expect.arrayContaining(["contacts", "web_search"]));
+    f.pauseRunForInput.mockClear();
+    f.setCalls([{ args: { ...ask, reason: "Again" }, executionId: "c2" }]);
+    await f.run();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.results.at(-1)).toEqual({ error: expect.stringContaining("already asked") });
+  });
+
+  it("a Firewall agent the owner gave Always starts a new run with the tools on ask-each-time", async () => {
+    const f = fixture({
+      name: "contacts_list",
+      builtin: true,
+      firewall: true,
+      firewallAskCapabilities: ["contacts"],
+    });
+    f.setCalls([{ args: { query: "ann" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.offeredTools).toContain("contacts_list");
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(cardOf(f).actions.map((a) => a.id)).not.toContain("always");
   });
 });

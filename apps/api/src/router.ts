@@ -3212,6 +3212,14 @@ export function createRouter(deps: RouterDeps): AppRouter {
             ...(input.runsOn !== undefined ? { runsOn: input.runsOn } : {}),
             ...(input.audience !== undefined ? { audience: input.audience } : {}),
             ...(input.firewall !== undefined ? { firewall: input.firewall } : {}),
+            ...(input.firewallAskCapabilities !== undefined
+              ? {
+                  // Only ids on the closed list that a firewalled agent may hold, and only to remove.
+                  firewallAskCapabilities: input.firewallAskCapabilities.filter((id) =>
+                    existing.firewallAskCapabilities.includes(id),
+                  ),
+                }
+              : {}),
             ...(input.proactivity !== undefined ? { proactivity: input.proactivity } : {}),
             ...(messageTargets !== undefined ? { externalMessageTargets: messageTargets } : {}),
             ...(input.externalComputerTools !== undefined

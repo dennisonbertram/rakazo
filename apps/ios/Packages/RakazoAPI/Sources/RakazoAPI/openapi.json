@@ -13658,6 +13658,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -13721,6 +13728,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -14158,6 +14166,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -14221,6 +14236,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -14658,6 +14674,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -14721,6 +14744,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -15147,6 +15171,13 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "firewallAskCapabilities": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "proactivity": {
                             "default": "medium",
                             "type": "string",
@@ -15210,6 +15241,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "firewallAskCapabilities",
                           "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
@@ -15637,6 +15669,13 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "firewallAskCapabilities": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "proactivity": {
                             "default": "medium",
                             "type": "string",
@@ -15700,6 +15739,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "firewallAskCapabilities",
                           "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
@@ -16799,6 +16839,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -16862,6 +16909,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -17059,17 +17107,20 @@
                       "firewall": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema25"
                       },
-                      "proactivity": {
+                      "firewallAskCapabilities": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema26"
                       },
-                      "externalMessageTargets": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
-                      },
-                      "externalComputerTools": {
+                      "proactivity": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema28"
                       },
-                      "runsOn": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema29"
+                      },
+                      "externalComputerTools": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema30"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema31"
                       }
                     },
                     "required": [
@@ -17381,6 +17432,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -17444,6 +17502,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -21401,6 +21460,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -21464,6 +21530,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -22223,6 +22290,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -22286,6 +22360,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -27797,6 +27872,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -27860,6 +27942,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -40426,6 +40509,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -40489,6 +40579,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -47471,6 +47562,13 @@
                                   "default": false,
                                   "type": "boolean"
                                 },
+                                "firewallAskCapabilities": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
                                 "proactivity": {
                                   "default": "medium",
                                   "type": "string",
@@ -47534,6 +47632,7 @@
                                 "disabledBuiltinTools",
                                 "audience",
                                 "firewall",
+                                "firewallAskCapabilities",
                                 "proactivity",
                                 "externalMessageTargets",
                                 "externalComputerTools",
@@ -51904,6 +52003,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -51967,6 +52073,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -70359,6 +70466,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -70422,6 +70536,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -72038,6 +72153,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -72101,6 +72223,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -72891,6 +73014,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -72954,6 +73084,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -79888,6 +80019,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -79951,6 +80089,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -87240,6 +87379,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -87303,6 +87449,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -124341,6 +124488,13 @@
                                     "default": false,
                                     "type": "boolean"
                                   },
+                                  "firewallAskCapabilities": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
                                   "proactivity": {
                                     "default": "medium",
                                     "type": "string",
@@ -124401,6 +124555,7 @@
                                   "disabledBuiltinTools",
                                   "audience",
                                   "firewall",
+                                  "firewallAskCapabilities",
                                   "proactivity",
                                   "externalMessageTargets",
                                   "externalComputerTools",
@@ -138454,6 +138609,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -138517,6 +138679,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -140871,6 +141034,13 @@
             "default": false,
             "type": "boolean"
           },
+          "firewallAskCapabilities": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "proactivity": {
             "default": "medium",
             "type": "string",
@@ -140931,6 +141101,7 @@
           "disabledBuiltinTools",
           "audience",
           "firewall",
+          "firewallAskCapabilities",
           "proactivity",
           "externalMessageTargets",
           "externalComputerTools",
@@ -142332,7 +142503,7 @@
         ]
       },
       "RpcBotsUpdateInputSchema22": {
-        "maxItems": 143,
+        "maxItems": 144,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
@@ -142354,6 +142525,17 @@
         "type": "boolean"
       },
       "RpcBotsUpdateInputSchema26": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
+        }
+      },
+      "RpcBotsUpdateInputSchema27": {
+        "type": "string",
+        "maxLength": 64
+      },
+      "RpcBotsUpdateInputSchema28": {
         "type": "string",
         "enum": [
           "low",
@@ -142361,17 +142543,17 @@
           "high"
         ]
       },
-      "RpcBotsUpdateInputSchema27": {
+      "RpcBotsUpdateInputSchema29": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema28": {
+      "RpcBotsUpdateInputSchema30": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema29": {
+      "RpcBotsUpdateInputSchema31": {
         "anyOf": [
           {
             "type": "string",

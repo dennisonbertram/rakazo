@@ -2475,6 +2475,26 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "request_access",
+    description:
+      "Ask the owner for a capability you lack because they switched it off. The owner sees a card and answers Allow for this run, Always for this agent, or Deny. Ask only when the task needs it, once per capability, and say plainly why. If denied, do not ask again in this run.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        capability: {
+          type: "string",
+          description: "The capability to ask for.",
+        },
+        reason: {
+          type: "string",
+          maxLength: 300,
+          description: "One short sentence on why the task needs it.",
+        },
+      },
+      required: ["capability", "reason"],
+    },
+  },
+  {
     name: "create_space",
     description:
       "Propose a new space in the current organization when the user asks for a separate data boundary. A space can contain many bots and groups, but its chats, files, memory, tools, and integrations stay isolated from other spaces. This always shows the user a confirmation card before creation. Creating the space is the whole action; do not create bots in it unless the user asks later.",

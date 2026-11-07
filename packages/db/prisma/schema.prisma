@@ -898,6 +898,8 @@ model Bot {
   // Agent firewall: treat everything the agent reads as untrusted. Server-owned: only the owner's
   // settings API sets it; no bot tool reads or sets it.
   firewall               Boolean               @default(false)
+  // Capability ids (packages/core request-access.ts) a firewalled agent may ask to use, each use still on a card. Server-owned: only the owner's answer to a request-access card or settings change it.
+  firewallAskCapabilities String[]             @default([])
   // "low", "medium" (default) or "high": how far the agent goes beyond the request. Owner-only; no bot tool sets it and nothing reads it for an approval decision.
   proactivity            String                @default("medium")
   // For an external bot: the internal bots it may message (bot ids; empty means none).
@@ -3384,6 +3386,8 @@ model Contact {
   /// The agent that added the contact, set by the server; null for a contact added by hand or after the agent was deleted.
   botId            String?
   bot              Bot?                  @relation(fields: [botId], references: [id], onDelete: SetNull)
+  /// The agent that last changed this contact with contacts_save. A Firewall agent's edit marks the contact as untrusted text (see readsFirewalledContent).
+  lastEditedByBotId String?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   companyEntities CompanyEntity[] @relation("CompanyEntityContact")

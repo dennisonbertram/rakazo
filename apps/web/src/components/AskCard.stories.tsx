@@ -111,6 +111,38 @@ export const ConnectorToolApproval: Story = {
   },
 };
 
+/** An agent asks for a capability the owner switched off. The Firewall line is added for a Firewall agent. */
+export const RequestAccess: Story = {
+  args: {
+    block: ask({
+      text: "Scout asks to see, add and edit your contacts",
+      detail: "Agent's reason: Save the three leads from this thread.",
+      approvalEffectId: "effect_access",
+      actions: [
+        { id: "allow", label: "Allow for this run" },
+        { id: "always", label: "Always for this agent" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
+export const RequestAccessFirewall: Story = {
+  args: {
+    block: ask({
+      text: "Scout asks to see, add and edit your contacts",
+      detail:
+        "Agent's reason: Save the three leads from this thread.\nFirewall is on, so each use will still ask you.",
+      approvalEffectId: "effect_access",
+      actions: [
+        { id: "allow", label: "Allow for this run" },
+        { id: "always", label: "Always for this agent" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
 export const Answered: Story = { args: { block: ask({ status: "answered", answer: "approved" }) } };
 
 export const NoLongerActive: Story = { args: { canAnswer: false } };
@@ -232,7 +264,11 @@ export const NewSiteWithAllSites: Story = {
       actions: [
         { id: "allow", label: "Allow once" },
         { id: "always", label: "Always allow npmjs.com" },
-        { id: "always_bot_sites", label: "Allow all sites for this agent (it can read Drive, calendar, Data room, contacts and records)" },
+        {
+          id: "always_bot_sites",
+          label:
+            "Allow all sites for this agent (it can read Drive, calendar, Data room, contacts and records)",
+        },
         { id: "deny", label: "Deny" },
       ],
     }),

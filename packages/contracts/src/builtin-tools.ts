@@ -136,6 +136,7 @@ export const BUILTIN_TOOL_NAMES = [
   "tool_run",
   "run_subagent",
   "create_space",
+  "request_access",
   "spawn_bot",
   "update_bot",
   "archive_bot",

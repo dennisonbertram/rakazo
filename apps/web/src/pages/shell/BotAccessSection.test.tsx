@@ -15,6 +15,7 @@ const rpc = vi.hoisted(() => ({
     setAgentAccess: vi.fn(),
   },
   capabilities: { list: vi.fn(), setAgentAccess: vi.fn() },
+  bots: { update: vi.fn() },
   mcp: {
     servers: { list: vi.fn(), setAgentAssignment: vi.fn() },
     assignments: { list: vi.fn() },
@@ -365,4 +366,23 @@ it("shows Allow changes for a granted source and keeps a firewalled agent off it
   });
   const walled = await mount({ ...ada, firewall: true } as Bot);
   expect(walled.sw("Ada can use Contacts API").getAttribute("aria-disabled")).toBe("true");
+});
+
+it("lists what the owner let a Firewall agent ask for, and removes one with its switch", async () => {
+  rpc.connections.list.mockResolvedValue([]);
+  rpc.connections.effectiveAccess.mockResolvedValue({});
+  rpc.connections.accessAll.mockResolvedValue({});
+  rpc.capabilities.list.mockResolvedValue([]);
+  const { container, sw } = await mount({
+    ...ada,
+    firewall: true,
+    firewallAskCapabilities: ["contacts", "calendar_read"],
+  } as Bot);
+  expect(container.textContent).toContain("Contacts");
+  await act(async () => sw("Ada can ask to use Contacts").click());
+  expect(rpc.bots.update).toHaveBeenCalledWith({
+    botId: "ada",
+    firewallAskCapabilities: ["calendar_read"],
+  });
+  expect(container.textContent).not.toContain("Contacts");
 });

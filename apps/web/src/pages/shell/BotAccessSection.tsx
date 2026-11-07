@@ -28,6 +28,17 @@ type Row = {
   };
 };
 
+/** Names for the capabilities an owner can grant a Firewall agent from a request-access card. */
+function useCapabilityNames() {
+  const { t } = useLingui();
+  return {
+    contacts: t`Contacts`,
+    data_room_read: t`Data room`,
+    calendar_read: t`Calendar`,
+    drive_read: t`Drive`,
+  } as Record<string, string>;
+}
+
 /** What one agent can reach: the connected accounts and servers, each with the switch the integration page has. */
 export function BotAccessSection({ bot }: { bot: Bot }) {
   const { t } = useLingui();
@@ -36,6 +47,22 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  // Capabilities the owner granted this Firewall agent; each use still asks.
+  const [grants, setGrants] = useState(bot.firewallAskCapabilities ?? []);
+  const capabilityNames = useCapabilityNames();
+
+  async function revoke(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = grants.filter((grant) => grant !== id);
+      await rpc.bots.update({ botId: bot.id, firewallAskCapabilities: next });
+      setGrants(next);
+    } catch (err) {
+      setError(errorText(err, t`Could not update access`));
+    }
+    setBusy(false);
+  }
 
   const load = useCallback(async () => {
     const [connections, servers, effective, access, assigned, installs] = await Promise.all([
@@ -189,18 +216,19 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
         </Button>
       </section>
     );
-  if (!rows || rows.length === 0) return null;
+  if ((!rows || rows.length === 0) && grants.length === 0) return null;
+  const list = rows ?? [];
   const needle = query.trim().toLowerCase();
   const shown =
-    rows.length > AGENT_LIST_CONTROLS_MIN
-      ? rows.filter((row) => `${row.name} ${row.address ?? ""}`.toLowerCase().includes(needle))
-      : rows;
+    list.length > AGENT_LIST_CONTROLS_MIN
+      ? list.filter((row) => `${row.name} ${row.address ?? ""}`.toLowerCase().includes(needle))
+      : list;
   return (
     <section data-testid="bot-access" className="mt-6">
       <div className="mb-2 text-[13.5px] font-medium text-foreground">
         <Trans>Access</Trans>
       </div>
-      {rows.length > AGENT_LIST_CONTROLS_MIN ? (
+      {list.length > AGENT_LIST_CONTROLS_MIN ? (
         <SearchField
           name="access-search"
           className="mb-2"
@@ -211,6 +239,17 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
         />
       ) : null}
       <div className="divide-y divide-border rounded-xl border border-border bg-card">
+        {grants.map((id) => (
+          <div key={`grant-${id}`} className="flex items-center gap-3 px-3.5 py-2.5">
+            <span className="min-w-0 flex-1 truncate text-sm">{capabilityNames[id] ?? id}</span>
+            <Switch
+              aria-label={t`${bot.name} can ask to use ${capabilityNames[id] ?? id}`}
+              checked
+              disabled={busy}
+              onCheckedChange={() => void revoke(id)}
+            />
+          </div>
+        ))}
         {shown.map((row) => (
           <div key={row.key}>
             <div className="flex items-center gap-3 px-3.5 py-2.5">
@@ -252,7 +291,7 @@ export function BotAccessSection({ bot }: { bot: Bot }) {
             ) : null}
           </div>
         ))}
-        {shown.length === 0 ? (
+        {list.length > 0 && shown.length === 0 ? (
           <div className="px-3.5 py-2.5 text-sm text-muted-foreground">
             <Trans>No matching accounts</Trans>
           </div>

@@ -162,6 +162,8 @@ export const BotSchema = z.object({
   audience: BotAudienceSchema.default("internal"),
   /** Agent firewall: everything the agent reads is untrusted. Only the owner's settings set it. */
   firewall: z.boolean().default(false),
+  /** Capabilities a firewalled agent may ask to use (each use still asks). Owner-only. */
+  firewallAskCapabilities: z.array(z.string()).default([]),
   proactivity: BotProactivitySchema.default("medium"),
   /** An external bot may message only these internal bots. */
   externalMessageTargets: z.array(Id).default([]),
@@ -458,6 +460,7 @@ export const UpdateBotInput = z
     disabledBuiltinTools: DisabledBuiltinToolsSchema.optional(),
     audience: BotAudienceSchema.optional(),
     firewall: z.boolean().optional(),
+    firewallAskCapabilities: z.array(z.string().max(64)).max(20).optional(),
     proactivity: BotProactivitySchema.optional(),
     externalMessageTargets: z.array(Id).max(200).optional(),
     externalComputerTools: z.boolean().optional(),

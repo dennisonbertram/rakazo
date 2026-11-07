@@ -85,6 +85,9 @@ function answeredTone(
 }
 
 /** Answers that save a standing permission; shown as quiet links under the one-off answers. */
+/** The server's label for Always on a request_access card. */
+const ACCESS_ALWAYS_LABEL = "Always for this agent";
+
 const STANDING_ACTIONS: ReadonlySet<string> = new Set([
   "always",
   "always_bot_sites",
@@ -109,6 +112,8 @@ function approvalActionLabel(
   if (id === "allow" && fallback === "Allow for this run") return t`Allow for this run`;
   if (id === "allow")
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
+  // A request-access card's Always changes one agent's settings, not a space-wide rule.
+  if (id === "always" && fallback === ACCESS_ALWAYS_LABEL) return t`Always for this agent`;
   if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
   if (id === "deny") return t`Deny`;
   if (id === "always_routine") return t`Always for this routine`;
@@ -386,7 +391,7 @@ export function AskCard({
                       )
                     )}
                   </Button>
-                  {action.id === "always" ? (
+                  {action.id === "always" && action.label !== ACCESS_ALWAYS_LABEL ? (
                     <span className="text-[13px] text-muted-foreground">
                       <Trans>Won't ask again anywhere in this space.</Trans>
                     </span>

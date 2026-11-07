@@ -120,6 +120,7 @@ function bot(description = "Billing"): Bot {
     externalMessageTargets: [],
     externalComputerTools: false,
     firewall: false,
+    firewallAskCapabilities: [],
     proactivity: "medium",
     webhookConfigured: false,
     spawnKey: null,

@@ -21,6 +21,7 @@ import {
 import {
   ALL_SITES_ACTION_ID,
   ALL_SITES_ACTION_LABEL,
+  accessCapability,
   bodyHasLink,
   humanizeToolName,
   providerLabel,
@@ -79,8 +80,13 @@ export function buildApprovalAskBlock(
     mailBatch?: readonly MailBatchCardRow[];
     /** pipeline_import_review: the review of the import. */
     pipelineImport?: { importId: string; text: string; detail: string };
+    /** request_access: the asking agent, and whether Always for this agent may be offered. */
+    requestAccess?: { agent: string; firewalled: boolean; always: boolean };
   },
 ): MessageBlock {
+  if (toolName === "request_access" && options?.requestAccess) {
+    return buildRequestAccessBlock(effectId, args, secrets, options.requestAccess);
+  }
   if (toolName === MAIL_REPLY_BATCH_TOOL) {
     return buildMailBatchAskBlock(effectId, options?.mailBatch ?? [], options?.approvalReason);
   }
@@ -259,6 +265,42 @@ export function buildApprovalAskBlock(
               : []),
             { id: "deny", label: "Deny" },
           ],
+  };
+}
+
+/**
+ * The card for request_access. The capability words are fixed server text from the closed list, so
+ * the card states exactly what Allow grants; only the reason is the agent's own words, shown as plain
+ * text in the detail. The answer ids are the usual three, so every client already renders them.
+ */
+function buildRequestAccessBlock(
+  effectId: string,
+  args: Record<string, unknown>,
+  secrets: string[],
+  card: { agent: string; firewalled: boolean; always: boolean },
+): MessageBlock {
+  const agent = sanitizeMessagingLabel(card.agent).replace(CARD_TITLE_ESCAPED, "\\$&");
+  const words = accessCapability(args.capability)?.words ?? "use a tool you switched off";
+  const reason = redactSecrets(String(args.reason ?? ""), secrets)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+  return {
+    kind: "ask",
+    approvalEffectId: effectId,
+    text: `${agent} asks to ${words}`,
+    detail: [
+      reason ? `Agent's reason: ${reason}` : undefined,
+      card.firewalled ? "Firewall is on, so each use will still ask you." : undefined,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    status: "pending",
+    actions: [
+      { id: "allow", label: "Allow for this run" },
+      ...(card.always ? [{ id: "always", label: "Always for this agent" }] : []),
+      { id: "deny", label: "Deny" },
+    ],
   };
 }
 
