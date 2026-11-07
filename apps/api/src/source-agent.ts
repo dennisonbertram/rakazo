@@ -89,6 +89,10 @@ export async function listCapabilities(deps: SourceAgentDeps, actor: Actor) {
   return rows.map((row) => capabilityDto(row, bots as ListedBot[]));
 }
 
+/** The default text of a source's agent: the single source for creation and upgrade. */
+export const sourceAgentInstructions = (name: string, source: string) =>
+  instructions(name, integrationPresetForEndpoint(source)?.instructions);
+
 /**
  * Creates (or finds) the source's own agent and links it. Idempotent across processes: createBot
  * returns the existing bot for the spawn key. A source starts private to its agent and read-only
@@ -143,7 +147,7 @@ export async function ensureSourceAgent(
       name: `${initial.name} agent`,
       title: "",
       description: preset?.description ?? `Your ${initial.name} tools`,
-      instructions: instructions(initial.name, preset?.instructions),
+      instructions: sourceAgentInstructions(initial.name, initial.source),
       notifyOnFinish: true,
       color: appAgentColor([initial.name], spawnKey),
     });
