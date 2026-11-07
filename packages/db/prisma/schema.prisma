@@ -528,6 +528,7 @@ model Member {
 }
 
 model Space {
+  runFragments RunFragment[]
   modelConnectionPauses ModelConnectionPause[]
   pipelineRecords PipelineRecord[]
   pipelineImports PipelineImport[]
@@ -1186,6 +1187,9 @@ model Run {
   // outside text entered the run. readDesktop: the run listed or read a desktop app.
   readOutsideContent   Boolean           @default(false)
   readDesktop          Boolean           @default(false)
+  /// The run's record of what it read is kept in run_fragments (set when the first attempt claims it).
+  fragmentRecord       Boolean           @default(false)
+  fragments            RunFragment[]
 
   @@unique([spaceId, clientNonce])
   @@index([status, leaseExpiresAt])
@@ -1201,6 +1205,27 @@ model Run {
   @@index([routineId])
   @@index([goalId])
   @@map("runs")
+}
+
+/// Keyed hashes of what a run read, one row per recorded tool result, so a resumed attempt can
+/// check outbound text against it. Holds no readable private text; publicWords is public text only.
+model RunFragment {
+  id          Int      @id @default(autoincrement())
+  runId       String
+  run         Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId      String
+  fence       Int
+  /// First 8 hex of a keyed check value; differs after the server key changes.
+  keyId       String
+  /// 17-byte entries: one tag byte (public ? 4 : 0 | kind) then a 16-byte hash.
+  entries     Bytes
+  publicWords String?
+  createdAt   DateTime @default(now())
+
+  @@index([runId, id])
+  @@map("run_fragments")
 }
 
 model SteeringMessage {

@@ -520,6 +520,7 @@ function expireClient(run: ReturnType<typeof candidate>, options?: { cancelled?:
   const client = {
     externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     run: {
       findMany: vi.fn(async () => [run]),
       updateMany: vi.fn(async () => ({ count: options?.cancelled ?? 1 })),

@@ -101,6 +101,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "PipelineEvent",
   "PipelineImport",
   "ModelConnectionPause",
+  "RunFragment",
   "PipelineImportRow",
   "ThreadGoal",
   "Thread",

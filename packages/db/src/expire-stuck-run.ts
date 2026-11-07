@@ -9,6 +9,7 @@ import {
   discardAnsweredSteering,
 } from "./events.js";
 import { createThreadMessageInTransaction } from "./messages.js";
+import { clearRunFragments } from "./run-fragments.js";
 import { deleteRunSecretsInTransaction } from "./run-secrets.js";
 import { clearRunTurnCheckpoints } from "./run-turn-checkpoint.js";
 
@@ -121,6 +122,7 @@ export async function expireStuckRun(
   });
   await tx.event.deleteMany({ where: { runId: input.runId, type: "thread.progress" } });
   await clearRunTurnCheckpoints(tx, [input.runId]);
+  await clearRunFragments(tx, [input.runId]);
   await deleteRunSecretsInTransaction(tx, [
     { id: input.runId, userId: run.userId, spaceId: run.spaceId },
   ]);

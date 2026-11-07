@@ -309,7 +309,13 @@ function fixture({
   scriptedRuntime = false,
   companyDocs = [] as { path: string; content: string }[],
   goalId = null as string | null,
+  fragmentKey,
+  failFragmentWrites = false,
 }: {
+  /** Keeps the run's record of what it read in run_fragments, hashed with this key. */
+  fragmentKey?: string;
+  /** The run_fragments write fails. */
+  failFragmentWrites?: boolean;
   /** The goal the run's row points to at the start. `attachGoal` changes it while the run lives. */
   goalId?: string | null;
   /** The owner's company context sections. */
@@ -375,7 +381,7 @@ function fixture({
   availableTools?: ConnectorTool[];
   beforeToolCall?: (index: number) => void | Promise<void>;
   /** Messages the run claims as steering, in order, when the runtime asks. */
-  steering?: { blocks: unknown[] }[];
+  steering?: { blocks: unknown[]; messageId?: string }[];
   /** Replaces the stub connector, for runs against a real McpConnector. */
   connector?: unknown;
   route?: ConnectorTool["route"];
@@ -535,7 +541,22 @@ function fixture({
       },
     ),
   };
+  const fragmentRows: Record<string, unknown>[] = [];
+  const fragmentFaults = { write: failFragmentWrites, load: false };
+  const replySource: { value: unknown } = { value: null };
   const prisma = {
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
+    runFragment: {
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        if (fragmentFaults.write) throw new Error("fragment write failed");
+        fragmentRows.push(data);
+        return data;
+      }),
+      findMany: vi.fn(async () => {
+        if (fragmentFaults.load) throw new Error("fragment load failed");
+        return fragmentRows;
+      }),
+    },
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     routine: {
       findUnique: vi.fn(async () => ({
@@ -559,6 +580,10 @@ function fixture({
       ),
       findMany: vi.fn(async () => []),
       findUniqueOrThrow: vi.fn(async () => run),
+      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        Object.assign(run, data);
+        return run;
+      }),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
         return { count: 1 };
@@ -706,7 +731,7 @@ function fixture({
           ...m,
         })),
       ),
-      findFirst: vi.fn(async () => null),
+      findFirst: vi.fn(async () => replySource.value),
       findUnique: vi.fn(async () =>
         sourceText !== undefined
           ? {
@@ -1028,6 +1053,7 @@ function fixture({
     shutdownSignal,
     web,
     mail,
+    ...(fragmentKey ? { fragmentKey } : {}),
     ...(ticketBoard ? { ticketBoardEnabled: true } : {}),
     ...(messaging ? { messaging } : {}),
     ...(googleConnectors ? { connectors: {} } : {}),
@@ -1037,6 +1063,13 @@ function fixture({
     rules,
     web,
     fetchedUrls,
+    fragmentRows,
+    fragmentFaults,
+    replySource,
+    fragmentRecord: () => (run as Record<string, unknown>).fragmentRecord,
+    forgetFragmentRecord: () => {
+      (run as Record<string, unknown>).fragmentRecord = false;
+    },
     finalizeRun,
     events: { append: appendEvent },
     offeredTools,
@@ -5487,6 +5520,129 @@ describe("what a run read is checked before it reaches an external bot", () => {
     expect(await later.outbound!()).toBeUndefined();
   });
 
+  it("knows a resumed run's earlier reads from the stored record, and holds without it", async () => {
+    sentBotMessages.calls.length = 0;
+    const f = fixture({ name: "message_bot", builtin: true, fragmentKey: "test-key" });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "again" }, executionId: "c2" }]);
+    await f.run();
+    const later = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect(await later.outbound!()).toBeDefined();
+    // A run first claimed before records were kept has no trustworthy record.
+    f.forgetFragmentRecord();
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "third" }, executionId: "c3" }]);
+    await f.run();
+    const third = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect(await third.outbound!()).toBeUndefined();
+  });
+
+  it("stops trusting the stored record once an attempt could not load it", async () => {
+    sentBotMessages.calls.length = 0;
+    const f = fixture({ name: "message_bot", builtin: true, fragmentKey: "test-key" });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.fragmentRecord()).toBe(true);
+    f.fragmentFaults.load = true;
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "again" }, executionId: "c2" }]);
+    await f.run();
+    expect(f.fragmentRecord()).toBe(false);
+    f.fragmentFaults.load = false;
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "third" }, executionId: "c3" }]);
+    await f.run();
+    const third = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect(await third.outbound!()).toBeUndefined();
+  });
+
+  it("records late shell output before it is handed to the model", async () => {
+    sentBotMessages.calls.length = 0;
+    const f = fixture({ name: "message_bot", builtin: true, fragmentKey: "test-key" });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    const options = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    const rowsBefore = f.fragmentRows.length;
+    await f.request()!.recordLateOutput!(["total 7654321", '{"name":"Priya Shah"}']);
+    expect(f.fragmentRows.length).toBe(rowsBefore + 1);
+    expect((await options.outbound!())!.matches("pay 7654321")).toContain("number");
+    expect((await options.outbound!())!.matches("Priya Shah")).toContain("name");
+    f.fragmentFaults.write = true;
+    await expect(f.request()!.recordLateOutput!(["total 8765432"])).rejects.toThrow(
+      "fragment write failed",
+    );
+  });
+
+  it("records the quoted reply context of a steering message before it is returned", async () => {
+    sentBotMessages.calls.length = 0;
+    const steering: { blocks: unknown[]; messageId: string }[] = [];
+    const f = fixture({
+      name: "message_bot",
+      builtin: true,
+      fragmentKey: "test-key",
+      steering,
+    });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    const options = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    f.replySource.value = {
+      id: "m-steer",
+      threadId: "thread-1",
+      role: "user",
+      blocks: [],
+      replyTo: {
+        id: "m-old",
+        threadId: "thread-1",
+        role: "assistant",
+        blocks: [{ kind: "text", text: "The wire total was 5,550,001 on Friday." }],
+      },
+    };
+    steering.push({ messageId: "m-steer", blocks: [] });
+    const rowsBefore = f.fragmentRows.length;
+    await f.request()!.claimSteering!([]);
+    expect(f.fragmentRows.length).toBe(rowsBefore + 1);
+    expect((await options.outbound!())!.matches("pay 5550001")).toContain("number");
+  });
+
+  it("keeps a relayed reply in the record after it leaves the history window", async () => {
+    sentBotMessages.calls.length = 0;
+    const history: { blocks: unknown[] }[] = [
+      {
+        blocks: [
+          {
+            kind: "bot_message_received",
+            fromBotId: "peer-1",
+            fromBotName: "Finance",
+            text: "Priya Shah at Halcyon Ventures committed the seed round.",
+            hop: 1,
+            intent: "result",
+            returnToMessageId: "m0",
+          },
+        ],
+      },
+    ];
+    const f = fixture({
+      name: "message_bot",
+      builtin: true,
+      knownBots: { "peer-1": "" },
+      history,
+      fragmentKey: "test-key",
+    });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    history.length = 0;
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "again" }, executionId: "c2" }]);
+    await f.run();
+    const later = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect((await later.outbound!())!.matches("Our lead is priya shah.")).toContain("name");
+  });
+
+  it("does not return a tool result whose record could not be written", async () => {
+    const f = fixture({ fragmentKey: "test-key", failFragmentWrites: true });
+    f.setCalls([{ args: { id: "Total 1,250,000" }, executionId: "read-1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.results).toEqual([]);
+    expect(f.finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "failed" }));
+  });
+
   it("records an internal bot's plain-text relay as private, names included", async () => {
     sentBotMessages.calls.length = 0;
     const f = fixture({
@@ -8303,6 +8459,29 @@ describe("fetching new sites without a card", () => {
     await f.run();
     expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it("keeps checking fetches for repeated reads after a card was answered (a resumed run)", async () => {
+    const f = fixture({ rules: allSites, fragmentKey: "test-key" });
+    f.setCalls([
+      { name: "demo_get_item", args: { id: "Budget 1,250,000" }, executionId: "read-1" },
+    ]);
+    await f.run();
+    // Answering a card resumes the run under a later lease.
+    f.setCalls([
+      { ...fetchNew, executionId: "call-1" },
+      {
+        name: "web_fetch",
+        args: { url: "https://www.npmjs.com/package/y?q=1250000" },
+        executionId: "call-2",
+      },
+    ]);
+    await f.run();
+    expect(f.fetchedUrls).toEqual(["https://www.npmjs.com/package/x"]);
+    const card = (
+      f.pauseRunForInput.mock.calls as unknown as [{ blocks: { approvalReason?: string }[] }][]
+    )[0]![0].blocks[0]!;
+    expect(card.approvalReason).toBe("Held before fetching: URL repeats private text.");
   });
 
   it("does not honour the rule for a firewalled agent, a tainted run or a webhook run", async () => {

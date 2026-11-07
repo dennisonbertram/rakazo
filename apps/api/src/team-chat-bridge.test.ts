@@ -1283,6 +1283,7 @@ describe("team chat bridge", () => {
       prisma: {
         externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+        runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         externalMessage: {
           updateMany,
           findUnique: vi.fn(async () => ({

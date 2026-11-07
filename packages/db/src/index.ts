@@ -57,6 +57,7 @@ export {
   delegatePendingIds,
   settleApprovalsOfEndedRuns,
 } from "./run-pauses.js";
+export * from "./run-fragments.js";
 export * from "./run-secrets.js";
 export * from "./run-turn-checkpoint.js";
 export * from "./safes.js";

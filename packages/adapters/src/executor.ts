@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type {
   AdapterContext,
@@ -176,6 +176,7 @@ import {
   outboundSiteGate,
   ownsLine,
   PrivateFragments,
+  RUN_RECORD_UNKNOWN,
   parseGoalEvidence,
   parseSkillMd,
   plainRunError,
@@ -217,6 +218,7 @@ import type { McpServer, NotificationEvents, Prisma, PrismaClient, ThreadEvents 
 import {
   AUDIT_DRAFT_PROMPT_START,
   appendEventInTransaction,
+  appendRunFragments,
   createSpaceForMember,
   createThreadMessageInTransaction,
   dropRunTurnCheckpoint,
@@ -230,6 +232,7 @@ import {
   isUniqueViolation,
   listApprovalRules,
   listRoutineToolAllows,
+  loadRunFragments,
   loadRunHistoryMessages,
   loadRunTurnCheckpoint,
   loadStoppedRunWork,
@@ -926,6 +929,8 @@ type AppControlBotFields = {
 };
 
 export interface ExecutorDeps {
+  /** Server key the run's record of what it read is hashed with; without it the record is memory-only. */
+  fragmentKey?: string;
   /** Local desktop control (docs/local-desktop-control); absent unless the deployment turned it on. */
   appControl?: AppControlProvider;
   /** The store behind `appControl`, to tell whether this run has read an app yet. */
@@ -1958,7 +1963,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const fence = nextFence(run.leaseFence);
       const renew = () => renewRunLease(deps, runId, workerId, fence);
       const phases = runPhaseWriter(deps, run, fence);
-      if (!(await claimRunLease(deps.prisma, run, workerId, fence))) return;
+      if (
+        !(await claimRunLease(
+          deps.prisma,
+          run,
+          workerId,
+          fence,
+          new Date(),
+          Boolean(deps.fragmentKey),
+        ))
+      ) {
+        return;
+      }
 
       const current = await deps.prisma.run.findUniqueOrThrow({
         where: { id: runId },
@@ -2330,7 +2346,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // What this run read from private sources, and what is public to a recipient (the external
         // person's own words, web pages). A message to an external bot that repeats a private
         // fragment is held for the owner instead of sent.
-        const privateFragments = new PrivateFragments();
+        const fragmentHasher = deps.fragmentKey ? runFragmentHasher(deps.fragmentKey) : undefined;
+        const privateFragments = new PrivateFragments(fragmentHasher?.hash);
         // Set when any message of this run to an external bot was held for the owner.
         let heldForOwner = false;
         let chainFragmentsLoaded: Promise<void> | undefined;
@@ -2365,10 +2382,59 @@ export function createRunExecutor(deps: ExecutorDeps) {
           })();
           return chainFragmentsLoaded;
         };
-        // The record lives in this process only. A run resumed after an approval, or reclaimed after a
-        // crash, runs under a later lease and cannot know what its earlier attempts read, so every
-        // message it sends to an external bot is held (fail closed).
-        const readsKnown = fence <= 1;
+        // The record is stored as keyed hashes (run_fragments) and reloaded when a run resumes under a
+        // later lease. When it cannot be loaded (a run that started before records were kept, no key,
+        // a changed key, a failed read), every message it sends to an external bot is held.
+        let readsKnown = fence <= 1;
+        if (fence > 1 && run.fragmentRecord && fragmentHasher) {
+          try {
+            const rows = await loadRunFragments(deps.prisma, run);
+            if (rows.every((row) => row.keyId === fragmentHasher.keyId)) {
+              privateFragments.restore(rows);
+              readsKnown = true;
+            }
+          } catch (error) {
+            getLogger().warn("run fragments load failed", { error });
+          }
+        }
+        // This attempt cannot extend the stored record, so a later attempt must not trust it: the
+        // flag is cleared before anything reaches the model. If that write fails the attempt ends.
+        if (fence > 1 && run.fragmentRecord && !readsKnown) {
+          await deps.prisma.run.update({ where: { id: runId }, data: { fragmentRecord: false } });
+          run.fragmentRecord = false;
+        }
+        // Rows are written only while the record is complete.
+        const persistFragments = Boolean(fragmentHasher) && readsKnown;
+        let fragmentWriteFailed = false;
+        let recording: Promise<void> = Promise.resolve();
+        // Commits what was read since the last call. A result reaches the model only after this
+        // returns; when the write fails the attempt ends so no context holds an unrecorded result.
+        const recordFragments = (): Promise<void> => {
+          if (!persistFragments || !fragmentHasher) return Promise.resolve();
+          // One at a time, so a call never returns before entries another call took are committed.
+          const next = recording.then(async () => {
+            if (fragmentWriteFailed) throw new Error("Run fragments could not be recorded");
+            const delta = privateFragments.takeDelta();
+            if (!delta) return;
+            try {
+              await appendRunFragments(
+                deps.prisma,
+                run,
+                workerId,
+                fence,
+                fragmentHasher.keyId,
+                delta,
+              );
+            } catch (error) {
+              fragmentWriteFailed = true;
+              leaseValid = false;
+              runAbortController?.abort();
+              throw error;
+            }
+          });
+          recording = next.catch(() => undefined);
+          return next;
+        };
         const outboundFragments = async () => {
           if (!readsKnown) return undefined;
           await loadChainFragments();
@@ -2892,7 +2958,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ]);
         // The index is private to the owner like a tool result: a message to an external bot that
         // repeats it is held for approval.
-        if (companyContext) privateFragments.addPrivate(companyContext);
+        if (companyContext) {
+          privateFragments.addPrivate(companyContext);
+          await recordFragments();
+        }
         // A run without history still loads durable memory, open to-dos and its routine's prompt,
         // which a marked chat may have written. Held when any of them changed after the mark.
         const markedAt = (thread as { meetingTaintedAt?: Date | null }).meetingTaintedAt;
@@ -4702,6 +4771,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
         const stoppedNote =
           stoppedWork && !stoppedWork.restricted ? stoppedWorkNote(stoppedWork.runs) : "";
+        // The stopped run's results sit in context as this note, so a repeat of them is held too.
+        if (stoppedNote) {
+          privateFragments.addPrivate(stoppedNote);
+          await recordFragments();
+        }
         // The markers are written to the run the moment they are set, so a goal continuation or a
         // later stopped-run note reads them from the row and not from the capped tool log.
         const persistedMarkers = {
@@ -5011,6 +5085,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               const text = JSON.stringify(result);
               if (PUBLIC_RESULT_TOOLS.has(name)) privateFragments.addPublic(text);
               else privateFragments.addPrivate(text);
+              await recordFragments();
             }
             const settle = settleReadEffect.get(executionId);
             if (settle && !isToolPauseResult(result)) {
@@ -6568,7 +6643,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     : approvalResolved.source === "require_approval" && actionType
                       ? `Asked because of your rule for ${ACTION_TYPE_LABELS[actionType]}.`
                       : standingHold
-                        ? `Held before fetching: ${standingHold.reason}.`
+                        ? standingHold.reason === RUN_RECORD_UNKNOWN
+                          ? "Asked because Praci couldn't check this link against what the agent read earlier."
+                          : `Held before fetching: ${standingHold.reason}.`
                         : protectedArchive
                           ? PROTECTED_ARCHIVE_REASON
                           : agentAccountWrite
@@ -10167,6 +10244,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Stop during setup must not still open the model. A reclaimed lease can
         // leave status "running" under a new owner, and the stream loop only
         // notices cancellation after the provider request has started.
+        // What an external bot or an internal relay said is part of the record before the model sees
+        // the history, so a reply that later leaves the history window is still held.
+        await loadChainFragments();
+        await recordFragments();
         const beforeModel = await deps.prisma.run.findUnique({
           where: { id: runId },
           select: { status: true, leaseOwner: true, leaseFence: true },
@@ -10425,6 +10506,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     return fallbackModel;
                   }
                 : undefined,
+              recordLateOutput: async (texts) => {
+                for (const text of texts) privateFragments.addPrivate(text);
+                await recordFragments();
+              },
               beforeModelRequest: async () => {
                 // A mark that arrives mid-run: from then on consent for this model is required and
                 // no backup model is used. Unmarked runs cost one row read per model request.
@@ -10538,7 +10623,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       excludeExternalOrigin:
                         externalChain === undefined && bot.audience !== "external",
                     });
-                    return Promise.all(
+                    const claimed = await Promise.all(
                       steering.map(async (item) => {
                         const { images, files, unavailableInstruction } =
                           await settleSteeringAttachmentLoads(
@@ -10564,22 +10649,26 @@ export function createRunExecutor(deps: ExecutorDeps) {
                           );
                         workspaceCheckpoint.markFiles(files);
                         const filesInstruction = currentTurnFilesInstruction(files);
+                        const quoted = await loadReplyContext(
+                          deps.prisma,
+                          thread.id,
+                          item.messageId,
+                        );
+                        // The quoted message reaches the model with the steering text.
+                        if (quoted) privateFragments.addPrivate(quoted);
                         return {
                           id: item.id,
                           messageId: item.messageId,
                           historyText: item.text,
-                          text: [
-                            await loadReplyContext(deps.prisma, thread.id, item.messageId),
-                            item.text,
-                            filesInstruction,
-                            unavailableInstruction,
-                          ]
+                          text: [quoted, item.text, filesInstruction, unavailableInstruction]
                             .filter(Boolean)
                             .join("\n\n"),
                           images,
                         };
                       }),
                     );
+                    await recordFragments();
+                    return claimed;
                   },
             },
             context,
@@ -11749,11 +11838,16 @@ export async function claimRunLease(
   workerId: string,
   fence: number,
   now = new Date(),
+  /** The first attempt keeps a durable record of what the run reads; later attempts trust it. */
+  keepFragments = false,
 ): Promise<boolean> {
   const leased = await prisma.run.updateMany({
     where: {
       id: run.id,
       ...continueRunClaimFence(run),
+      // Only a claim that really is the first may set the flag: a delayed one must not undo a
+      // flag cleared after the run was requeued.
+      ...(keepFragments && fence === 1 ? { leaseFence: 0 } : {}),
       OR: [
         { status: { in: ["queued", "waiting_input", "waiting_takeover"] } },
         { status: { in: ["leased", "running"] }, leaseExpiresAt: { lte: now } },
@@ -11766,9 +11860,20 @@ export async function claimRunLease(
       leaseExpiresAt: new Date(now.getTime() + RUN_LEASE_MS),
       error: null,
       checkpoint: null,
+      ...(keepFragments && fence === 1 ? { fragmentRecord: true } : {}),
     },
   });
   return leased.count === 1;
+}
+
+/** A keyed hash for the stored record of what a run read, and a check value that changes with the key. */
+function runFragmentHasher(key: string) {
+  const derived = createHmac("sha256", key).update("praci run fragments v1").digest();
+  return {
+    hash: (value: string) =>
+      createHmac("sha256", derived).update(value).digest().subarray(0, 16).toString("hex"),
+    keyId: createHmac("sha256", derived).update("key-check").digest("hex").slice(0, 8),
+  };
 }
 
 async function renewRunLease(
