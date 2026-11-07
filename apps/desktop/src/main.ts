@@ -24,6 +24,11 @@ import { createAppOpener } from "./app-opener.js";
 import { buildApplicationMenuTemplate } from "./application-menu.js";
 import type { ElectronAutoUpdater } from "./auto-update.js";
 import { DesktopUpdateController, LAUNCH_CHECK_DELAY_MS } from "./auto-update.js";
+import {
+  createBluetoothPicker,
+  createPairingHandler,
+  originKeyedStore,
+} from "./bluetooth-picker.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { createDeviceSpeech } from "./device-speech.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
@@ -45,7 +50,6 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
-import { createBluetoothPicker, createPairingHandler, originKeyedStore } from "./bluetooth-picker.js";
 import type { ScannerScope, ScannerService } from "./scanner.js";
 import { createScanner } from "./scanner.js";
 import { scannerIpcAuthorized } from "./scanner-security.js";
