@@ -10147,8 +10147,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     return fallbackModel;
                   }
                 : undefined,
-              recordLateOutput: async (text) => {
-                privateFragments.addPrivate(text);
+              recordLateOutput: async (texts) => {
+                for (const text of texts) privateFragments.addPrivate(text);
                 await recordFragments();
               },
               beforeModelRequest: async () => {
@@ -10256,7 +10256,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                       excludeExternalOrigin:
                         externalChain === undefined && bot.audience !== "external",
                     });
-                    return Promise.all(
+                    const claimed = await Promise.all(
                       steering.map(async (item) => {
                         const { images, files, unavailableInstruction } =
                           await settleSteeringAttachmentLoads(
@@ -10282,22 +10282,26 @@ export function createRunExecutor(deps: ExecutorDeps) {
                           );
                         workspaceCheckpoint.markFiles(files);
                         const filesInstruction = currentTurnFilesInstruction(files);
+                        const quoted = await loadReplyContext(
+                          deps.prisma,
+                          thread.id,
+                          item.messageId,
+                        );
+                        // The quoted message reaches the model with the steering text.
+                        if (quoted) privateFragments.addPrivate(quoted);
                         return {
                           id: item.id,
                           messageId: item.messageId,
                           historyText: item.text,
-                          text: [
-                            await loadReplyContext(deps.prisma, thread.id, item.messageId),
-                            item.text,
-                            filesInstruction,
-                            unavailableInstruction,
-                          ]
+                          text: [quoted, item.text, filesInstruction, unavailableInstruction]
                             .filter(Boolean)
                             .join("\n\n"),
                           images,
                         };
                       }),
                     );
+                    await recordFragments();
+                    return claimed;
                   },
             },
             context,
@@ -11443,6 +11447,9 @@ export async function claimRunLease(
     where: {
       id: run.id,
       ...continueRunClaimFence(run),
+      // Only a claim that really is the first may set the flag: a delayed one must not undo a
+      // flag cleared after the run was requeued.
+      ...(keepFragments && fence === 1 ? { leaseFence: 0 } : {}),
       OR: [
         { status: { in: ["queued", "waiting_input", "waiting_takeover"] } },
         { status: { in: ["leased", "running"] }, leaseExpiresAt: { lte: now } },

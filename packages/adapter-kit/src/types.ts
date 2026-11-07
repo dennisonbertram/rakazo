@@ -580,10 +580,11 @@ export interface AgentRunRequest {
    */
   beforeModelRequest?: () => Promise<void>;
   /**
-   * Awaited with late output (a shell command that finished after its turn) before it is handed to
-   * the model. A rejection stops the run: the executor records the text in the run's read record.
+   * Awaited with the raw output (stdout and stderr, unformatted) of a shell command that finished
+   * after its turn, before it is handed to the model. A rejection stops the run: the executor
+   * records the texts in the run's read record.
    */
-  recordLateOutput?: (text: string) => Promise<void>;
+  recordLateOutput?: (texts: string[]) => Promise<void>;
   executeTool?: (
     name: string,
     args: Record<string, unknown>,

@@ -55,12 +55,15 @@ export async function deliverFinishedShells(
   pending: Array<Promise<FinishedShellCommand>>,
   turn: { toolResults: Array<{ toolName?: string; details?: unknown }> },
   signal?: AbortSignal,
+  /** Called with the raw output before it is formatted for the model. */
+  record?: (results: FinishedShellCommand[]) => Promise<void>,
 ): Promise<void> {
   if (pending.length === 0 || turnReturnedRunningShell(turn)) return;
   const batch = pending.splice(0, pending.length);
   const results = await Promise.all(batch.map((completion) => finishOrAbort(completion, signal)));
   const texts = results.filter((result): result is FinishedShellCommand => result !== undefined);
   if (texts.length === 0) return;
+  await record?.(texts);
   await followUp(texts.map((result) => formatFinishedShellCommand(result)).join("\n\n"));
 }
 

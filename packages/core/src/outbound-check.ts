@@ -27,11 +27,11 @@ const SHINGLE_WORDS = 8;
 const MAX_TEXT_CHARS = 200_000;
 const MAX_FRAGMENTS = 50_000;
 /**
- * A name is matched as a run of 1..16 outbound words so it can be looked up by hash.
- * ponytail: a longer name is kept as its first 16 words, so text repeating those 16 words is held
+ * A name is matched as a run of 1..32 outbound words so it can be looked up by hash.
+ * ponytail: a longer name is kept as its first 32 words, so text repeating those 32 words is held
  * even if the rest differs. Raise the cap if such names appear.
  */
-const MAX_NAME_WORDS = 16;
+const MAX_NAME_WORDS = 32;
 
 type Fragments = {
   emails: Set<string>;
@@ -252,7 +252,7 @@ export class PrivateFragments {
     if (hit("emails")) kinds.push("email");
     if (hit("numbers")) kinds.push("number");
     // A name is read from the spaced-out outbound words, so case and spacing do not matter: it
-    // matches when it equals a run of 1..16 of them.
+    // matches when it equals a run of 1..32 of them.
     if (this.privateSet.names.size > 0 && this.hasName(words(text))) kinds.push("name");
     if (hit("passages")) kinds.push("passage");
     return kinds;

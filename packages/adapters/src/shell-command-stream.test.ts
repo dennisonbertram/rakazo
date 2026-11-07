@@ -295,4 +295,18 @@ describe("deliverFinishedShells", () => {
       ),
     ).rejects.toThrow("not recorded");
   });
+
+  it("hands the raw output to the recorder before the follow-up", async () => {
+    const order: string[] = [];
+    await deliverFinishedShells(
+      () => order.push("followUp"),
+      [Promise.resolve({ stdout: '{"name":"Priya Shah"}', stderr: "e", code: 0 })],
+      { toolResults: [] },
+      undefined,
+      async (results) => {
+        order.push(`record:${results[0]!.stdout}`);
+      },
+    );
+    expect(order).toEqual(['record:{"name":"Priya Shah"}', "followUp"]);
+  });
 });

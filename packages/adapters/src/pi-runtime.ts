@@ -476,8 +476,7 @@ export class PiAgentRuntime implements AgentRuntime {
           },
           finishTurn: async (turn, turnSignal) => {
             await deliverFinishedShells(
-              async (text) => {
-                await request.recordLateOutput?.(text);
+              (text) => {
                 agent.followUp({
                   role: "user",
                   content: text,
@@ -487,6 +486,9 @@ export class PiAgentRuntime implements AgentRuntime {
               host.pendingShells,
               turn,
               turnSignal,
+              (results) =>
+                request.recordLateOutput?.(results.flatMap((r) => [r.stdout, r.stderr])) ??
+                Promise.resolve(),
             );
           },
           prepareNextTurnWithContext: async () => {
@@ -1764,8 +1766,7 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
   nested = new Agent({
     finishTurn: async (turn, turnSignal) => {
       await deliverFinishedShells(
-        async (text) => {
-          await host.request.recordLateOutput?.(text);
+        (text) => {
           nested.followUp({
             role: "user",
             content: text,
@@ -1775,6 +1776,9 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
         nestedHost.pendingShells,
         turn,
         turnSignal,
+        (results) =>
+          host.request.recordLateOutput?.(results.flatMap((r) => [r.stdout, r.stderr])) ??
+          Promise.resolve(),
       );
     },
     sessionId: conversationSessionId(host.request.threadId, host.request.botId, agentId),

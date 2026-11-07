@@ -520,6 +520,7 @@ function fixture({
   };
   const fragmentRows: Record<string, unknown>[] = [];
   const fragmentFaults = { write: failFragmentWrites, load: false };
+  const replySource: { value: unknown } = { value: null };
   const prisma = {
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
     runFragment: {
@@ -700,7 +701,7 @@ function fixture({
           ...m,
         })),
       ),
-      findFirst: vi.fn(async () => null),
+      findFirst: vi.fn(async () => replySource.value),
       findUnique: vi.fn(async () =>
         sourceText !== undefined
           ? { role: "user", blocks: [{ kind: "text", text: sourceText }], replyTo: null }
@@ -1009,6 +1010,7 @@ function fixture({
     fetchedUrls,
     fragmentRows,
     fragmentFaults,
+    replySource,
     fragmentRecord: () => (run as Record<string, unknown>).fragmentRecord,
     forgetFragmentRecord: () => {
       (run as Record<string, unknown>).fragmentRecord = false;
@@ -5045,13 +5047,45 @@ describe("what a run read is checked before it reaches an external bot", () => {
     await f.run();
     const options = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
     const rowsBefore = f.fragmentRows.length;
-    await f.request()!.recordLateOutput!("Shell command finished.\nstdout:\ntotal 7654321");
+    await f.request()!.recordLateOutput!(["total 7654321", '{"name":"Priya Shah"}']);
     expect(f.fragmentRows.length).toBe(rowsBefore + 1);
     expect((await options.outbound!())!.matches("pay 7654321")).toContain("number");
+    expect((await options.outbound!())!.matches("Priya Shah")).toContain("name");
     f.fragmentFaults.write = true;
-    await expect(f.request()!.recordLateOutput!("stdout:\ntotal 8765432")).rejects.toThrow(
+    await expect(f.request()!.recordLateOutput!(["total 8765432"])).rejects.toThrow(
       "fragment write failed",
     );
+  });
+
+  it("records the quoted reply context of a steering message before it is returned", async () => {
+    sentBotMessages.calls.length = 0;
+    const steering: { messageId: string }[] = [];
+    const f = fixture({
+      name: "message_bot",
+      builtin: true,
+      fragmentKey: "test-key",
+      steering,
+    });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    const options = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    f.replySource.value = {
+      id: "m-steer",
+      threadId: "thread-1",
+      role: "user",
+      blocks: [],
+      replyTo: {
+        id: "m-old",
+        threadId: "thread-1",
+        role: "assistant",
+        blocks: [{ kind: "text", text: "The wire total was 5,550,001 on Friday." }],
+      },
+    };
+    steering.push({ messageId: "m-steer" });
+    const rowsBefore = f.fragmentRows.length;
+    await f.request()!.claimSteering!([]);
+    expect(f.fragmentRows.length).toBe(rowsBefore + 1);
+    expect((await options.outbound!())!.matches("pay 5550001")).toContain("number");
   });
 
   it("keeps a relayed reply in the record after it leaves the history window", async () => {

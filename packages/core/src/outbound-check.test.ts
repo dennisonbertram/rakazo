@@ -211,16 +211,14 @@ describe("hashed and restored records", () => {
 });
 
 describe("long names", () => {
-  it("still holds a 17-word name whose passages are all in the public text", () => {
-    const name = Array.from({ length: 17 }, (_, i) => `Word${String.fromCharCode(97 + i)}`).join(
-      " ",
-    );
+  it("still holds a 33-word name whose passages are all in the public text", () => {
+    const name = Array.from({ length: 33 }, (_, i) => `Word${i.toString(36)}`).join(" ");
     const f = new PrivateFragments();
     f.addPrivate(JSON.stringify({ name }));
     // Every 8-word passage of the name is public, but never the name itself in one run.
     const list = name.split(" ");
     f.addPublic(
-      Array.from({ length: 10 }, (_, i) => `${list.slice(i, i + 8).join(" ")} filler${i}`).join(
+      Array.from({ length: 26 }, (_, i) => `${list.slice(i, i + 8).join(" ")} filler${i}`).join(
         " ",
       ),
     );
