@@ -20,7 +20,7 @@ import {
 import { startAppControlBridge } from "./app-control-bridge.js";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
-import { createAppOpener } from "./app-opener.js";
+import { createAppOpener, reloadRestoredAppWindow } from "./app-opener.js";
 import { buildApplicationMenuTemplate } from "./application-menu.js";
 import type { ElectronAutoUpdater } from "./auto-update.js";
 import { DesktopUpdateController, LAUNCH_CHECK_DELAY_MS } from "./auto-update.js";
@@ -956,7 +956,10 @@ async function openAppOnce(targetUrl: string, switching: boolean) {
   } catch (error) {
     pendingPreviousWindow = null;
     // Keep the previous app window so Cancel / close can restore it.
-    if (previous !== null && !previous.isDestroyed()) mainWindow = previous;
+    if (previous !== null && !previous.isDestroyed()) {
+      mainWindow = previous;
+      reloadRestoredAppWindow(previous);
+    }
     // Show the setup window BEFORE destroying the failed one: on Windows/Linux,
     // destroying the last window fires "window-all-closed" -> app.quit() before
     // showSetupWindow() runs, so the app silently exits instead of showing this error.
@@ -989,6 +992,7 @@ function abandonPendingAppSwitch(
     mainWindow = previous;
     currentSetup = previousSetup;
     currentTargetUrl = previousUrl;
+    reloadRestoredAppWindow(previous);
     // If setup was already closed (e.g. during a slow write), make the restored
     // session visible — otherwise macOS can be left with no shown window.
     if (setupWindow === null || setupWindow.isDestroyed()) {
