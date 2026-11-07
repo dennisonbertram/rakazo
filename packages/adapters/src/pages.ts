@@ -589,6 +589,30 @@ export async function pageToolFromTool(
   }
 }
 
+/**
+ * The page text before and after a page_write or page_edit would save, for the outbound check of a
+ * Firewall agent. Null when the target page or the edit cannot be resolved (the tool would fail).
+ */
+export async function previewPageWrite(
+  deps: { prisma: PrismaClient },
+  scope: { spaceId: string; botId: string; userId: string },
+  name: "page_write" | "page_edit",
+  args: Record<string, unknown>,
+): Promise<{ original: string; result: string } | null> {
+  const wantedTitle = typeof args.page === "string" ? args.page.trim() : "";
+  let pageId: string | undefined;
+  if (wantedTitle) {
+    const found = await findPageByTitle(deps.prisma, scope, wantedTitle);
+    if (!found) return null;
+    pageId = found.id;
+  }
+  const original = (await getBotPage(deps.prisma, { ...scope, pageId }))?.content ?? "";
+  if (name === "page_write") return { original, result: String(args.content ?? "") };
+  const oldString = String(args.old_string ?? "");
+  if (!oldString || original.split(oldString).length - 1 !== 1) return null;
+  return { original, result: original.replace(oldString, () => String(args.new_string ?? "")) };
+}
+
 /** The in-app path of a bot page. Chat renders a Markdown link to it as in-app navigation. */
 export const botPageLink = (botId: string, pageId: string) =>
   `/app/pages/${encodeURIComponent(botId)}/${encodeURIComponent(pageId)}`;

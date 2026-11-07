@@ -23,7 +23,8 @@ const accountSecurity = (value: AccountSecurity) => () => {
     "aiConsent.status": { recipients: [] },
     "models.credentials": [],
     "approvalRules.list": [],
-    "autoReview.get": { enabled: false, checkerAvailable: true },
+    "autoReview.get": { enabled: false, background: false, checkerAvailable: true },
+      "autoReview.recent": [],
   });
   const original = window.fetch;
   window.fetch = async (input, init) => {

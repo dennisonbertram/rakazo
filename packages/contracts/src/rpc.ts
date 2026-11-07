@@ -118,6 +118,7 @@ import { DevinAgentOutputSchema, DevinKeyInputSchema, DevinSessionsOutputSchema 
 import {
   ActionApprovalEffectSchema,
   ActionApprovalRuleSchema,
+  ActionAutoReviewRecentSchema,
   ActionAutoReviewSettingsSchema,
   AgentSecretInputSchema,
   AgentSecretSchema,
@@ -1617,7 +1618,10 @@ export const appContract = {
   },
   autoReview: {
     get: oc.output(ActionAutoReviewSettingsSchema),
-    set: oc.input(z.object({ enabled: z.boolean() })).output(ActionAutoReviewSettingsSchema),
+    set: oc
+      .input(z.object({ enabled: z.boolean().optional(), background: z.boolean().optional() }))
+      .output(ActionAutoReviewSettingsSchema),
+    recent: oc.output(z.array(ActionAutoReviewRecentSchema)),
   },
   artifacts: {
     list: oc.input(botId).output(z.array(ArtifactSchema)),

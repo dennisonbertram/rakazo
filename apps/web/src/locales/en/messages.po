@@ -1678,6 +1678,10 @@ msgstr "Already sent a few minutes ago"
 msgid "Already tidy."
 msgstr "Already tidy."
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Also in background runs"
+msgstr "Also in background runs"
+
 #: src/components/inbox/InboxCleanup.tsx
 msgid "Also in Gmail"
 msgstr "Also in Gmail"
@@ -2209,6 +2213,10 @@ msgstr "Authorize"
 msgid "Authorize this server so bots can use its tools. A popup opens."
 msgstr "Authorize this server so bots can use its tools. A popup opens."
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Auto Review"
+msgstr "Auto Review"
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "Auto-renews"
 msgstr "Auto-renews"
@@ -2299,8 +2307,8 @@ msgid "Back to sign in"
 msgstr "Back to sign in"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
-msgstr "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
+msgid "Background runs ask before they send, change or run anything, unless you always allowed it, allowed it for one routine, or Auto Review approved it."
+msgstr "Background runs ask before they send, change or run anything, unless you always allowed it, allowed it for one routine, or Auto Review approved it."
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Backup models"
@@ -4662,6 +4670,7 @@ msgid "Could not save the SAFE"
 msgstr "Could not save the SAFE"
 
 #: src/components/AutoFileEmailSetting.tsx
+#: src/components/AutoReviewSettings.tsx
 msgid "Could not save the setting"
 msgstr "Could not save the setting"
 
@@ -11203,6 +11212,10 @@ msgstr "Receipts"
 #: src/pages/McpConnectionActivity.tsx
 msgid "Recent activity"
 msgstr "Recent activity"
+
+#: src/components/AutoReviewSettings.tsx
+msgid "Recently approved by Auto Review"
+msgstr "Recently approved by Auto Review"
 
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Recipients"

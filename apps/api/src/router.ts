@@ -8682,11 +8682,31 @@ export function createRouter(deps: RouterDeps): AppRouter {
           create: {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
-            enabled: input.enabled,
+            enabled: input.enabled ?? deploymentAutoReviewDefault(process.env),
+            background: input.background ?? true,
           },
-          update: { enabled: input.enabled },
+          update: { enabled: input.enabled, background: input.background },
         });
         return loadAutoReviewSettings(deps, context.actor);
+      }),
+      // Every call the judge passed for this user in this space, newest first.
+      recent: authed.autoReview.recent.handler(async ({ context }) => {
+        const rows = await deps.prisma.externalEffect.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            reviewDecision: "pass",
+            run: { userId: context.actor.userId, spaceId: context.actor.spaceId },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: { id: true, kind: true, reviewReason: true, createdAt: true },
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          tool: row.kind,
+          reason: row.reviewReason,
+          at: row.createdAt.toISOString(),
+        }));
       }),
     },
     company: {
@@ -10532,7 +10552,7 @@ async function loadAutoReviewSettings(deps: RouterDeps, actor: Actor) {
           userId: actor.userId,
         },
       },
-      select: { enabled: true },
+      select: { enabled: true, background: true },
     }),
     requiredUserProvider
       ? deps.prisma.userModelCredential.findFirst({
@@ -10543,7 +10563,7 @@ async function loadAutoReviewSettings(deps: RouterDeps, actor: Actor) {
   ]);
   const enabled = preference?.enabled ?? deploymentAutoReviewDefault(process.env);
   const checkerAvailable = environmentAvailable || Boolean(credential);
-  return { enabled, checkerAvailable };
+  return { enabled, background: enabled && (preference?.background ?? true), checkerAvailable };
 }
 
 function hostCredentials(active: boolean, provider: string) {

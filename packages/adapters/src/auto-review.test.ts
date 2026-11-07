@@ -148,8 +148,10 @@ describe("isAutoReviewCheckerConfigured", () => {
 });
 
 describe("deploymentAutoReviewDefault", () => {
-  it("defaults off", () => {
-    expect(deploymentAutoReviewDefault({})).toBe(false);
+  it("defaults on, and RAKAZO_AUTO_REVIEW=off turns it off", () => {
+    expect(deploymentAutoReviewDefault({})).toBe(true);
+    expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "off" })).toBe(false);
+    expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "0" })).toBe(false);
     expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "1" })).toBe(true);
     expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "true" })).toBe(true);
   });
