@@ -80,6 +80,7 @@ import {
   CalendarDays,
   ChartColumn,
   CodeXml,
+  CreditCard,
   Files,
   FileText,
   FolderOpen,
@@ -133,6 +134,7 @@ import { AgentPanelIntro } from "../components/AgentPanelIntro";
 import { BotAudienceTag } from "../components/BotAudienceTag";
 import type { BotToolControls, ComposerDraft } from "../components/BotToolControls";
 import { BotToolControlsContext } from "../components/BotToolControls";
+import { BrexPage } from "../components/brex/BrexPage";
 import { ComposeEmail, NEW_MESSAGE } from "../components/ComposeEmail";
 import { ComputerMaintenanceActions } from "../components/ComputerMaintenanceActions";
 import {
@@ -1187,6 +1189,7 @@ export function ShellPage() {
   const inboxMode = useMatch("/app/inbox") != null;
   const integrationsMode = useMatch("/app/integrations/*") != null;
   const financeMode = useMatch("/app/finance/*") != null;
+  const brexMode = useMatch("/app/brex/*") != null;
   const dataRoomMode = useMatch("/app/data-room") != null;
   const scannerMode = useMatch("/app/scanner") != null;
   useScannerDelivery(userId, bootstrapMe?.spaceId);
@@ -1221,6 +1224,7 @@ export function ShellPage() {
   const pageMode =
     inboxMode ||
     financeMode ||
+    brexMode ||
     legalMode ||
     gtmMode ||
     companyMode ||
@@ -2439,6 +2443,9 @@ export function ShellPage() {
     return [
       { id: "inbox", label: t`Inbox`, icon: <Mail {...icon} /> },
       { id: "finance", label: t`Finance`, icon: <ChartColumn {...icon} /> },
+      ...(glance.brexConnected
+        ? [{ id: "brex", label: t`Brex`, icon: <CreditCard {...icon} /> }]
+        : []),
       {
         id: "legal",
         label: t`Legal`,
@@ -2493,7 +2500,13 @@ export function ShellPage() {
         icon: <Settings {...icon} />,
       },
     ];
-  }, [t, bootstrapMe?.ticketBoardEnabled, glance.hasTickets, glance.devinConnected]);
+  }, [
+    t,
+    bootstrapMe?.ticketBoardEnabled,
+    glance.hasTickets,
+    glance.devinConnected,
+    glance.brexConnected,
+  ]);
   // A page hidden in Page options stays out of search and the command palette too.
   const visiblePages = useMemo(
     () => appPages.filter((page) => !hiddenPages.includes(page.id)),
@@ -4980,6 +4993,7 @@ export function ShellPage() {
         unseen={unseen}
         inboxUnread={inboxUnread}
         financeMode={financeMode}
+        brexMode={brexMode}
         glance={glance}
         legalMode={legalMode}
         gtmMode={gtmMode}
@@ -5342,6 +5356,8 @@ export function ShellPage() {
                 <BoardPage embedded />
               </Suspense>
             </ErrorBoundary>
+          ) : brexMode ? (
+            <BrexPage spaceName={pageSpaceName} />
           ) : financeMode ? (
             <FinancePage
               onAskAgent={financeAgentOpen ? undefined : askFinanceAgent}

@@ -5,13 +5,14 @@ struct AppShell: View {
 
   var body: some View {
     @Bindable var app = app
-    // ponytail: NavigationStack until the Duo phase moves this to NavigationSplitView.
-    NavigationStack(path: $app.path) {
-      HomeScreen()
-        .safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
-        .navigationDestination(for: Route.self) { route in
-          destination(route).safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
+    GeometryReader { geometry in
+      Group {
+        if DuoLayout.isTwoPane(width: geometry.size.width) {
+          twoPane(width: geometry.size.width)
+        } else {
+          stack
         }
+      }
     }
     .safeAreaInset(edge: .bottom) {
       if let id = app.archivedMessageID { ArchivedToast(messageID: id) }
@@ -26,6 +27,51 @@ struct AppShell: View {
     .sheet(isPresented: $app.showingSettings, onDismiss: app.settingsDidClose) {
       SettingsSheet(destination: app.settingsDestination)
     }
+  }
+
+  /// One column: phones, the Duo outer display and the Duo inner display held upright.
+  private var stack: some View {
+    @Bindable var app = app
+    return NavigationStack(path: $app.path) {
+      HomeScreen()
+        .safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
+        .navigationDestination(for: Route.self) { route in
+          destination(route).safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
+        }
+    }
+  }
+
+  /// Home on the left, the open screen on the right. The Duo inner display held in book pose is
+  /// 890 pt wide with the fold at x = 445, so each column is half the width and the divider sits
+  /// on the fold.
+  private func twoPane(width: CGFloat) -> some View {
+    let column = DuoLayout.sidebarWidth(width: width)
+    return NavigationSplitView(columnVisibility: .constant(.all)) {
+      HomeScreen(selection: Binding(
+        get: { app.path.first },
+        set: { app.path = $0.map { [$0] } ?? [] }))
+        .safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
+        .navigationSplitViewColumnWidth(column)
+    } detail: {
+      NavigationStack(path: Binding(
+        get: { Array(app.path.dropFirst()) },
+        set: { app.path = Array(app.path.prefix(1)) + $0 })
+      ) {
+        Group {
+          if let first = app.path.first {
+            destination(first)
+          } else {
+            ContentUnavailableView("Select an agent", systemImage: "bubble.left")
+          }
+        }
+        .id(app.path.first)
+        .safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
+        .navigationDestination(for: Route.self) { route in
+          destination(route).safeAreaInset(edge: .top, spacing: 0) { RecordingBar() }
+        }
+      }
+    }
+    .navigationSplitViewStyle(.balanced)
   }
 
   @ViewBuilder
@@ -78,4 +124,14 @@ private struct ArchivedToast: View {
       if app.archivedMessageID == messageID { app.archivedMessageID = nil }
     }
   }
+}
+
+/// The wide layout is for the iPhone Duo inner display held in book pose (890 x 626 pt). Portrait
+/// inner (626 wide) and the outer display (466 wide) keep one column.
+enum DuoLayout {
+  static let twoPaneMinimumWidth: CGFloat = 800
+
+  static func isTwoPane(width: CGFloat) -> Bool { width >= twoPaneMinimumWidth }
+
+  static func sidebarWidth(width: CGFloat) -> CGFloat { (width / 2).rounded() }
 }

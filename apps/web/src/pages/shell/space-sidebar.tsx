@@ -34,6 +34,7 @@ import {
   CircleAlert,
   CodeXml,
   Compass,
+  CreditCard,
   Files,
   FolderOpen,
   HandCoins,
@@ -396,10 +397,12 @@ export type SpaceSidebarProps = {
   unseen: Record<string, number>;
   inboxUnread: number;
   financeMode: boolean;
+  brexMode: boolean;
   glance: {
     hasTickets: boolean;
     legalDueSoon: number;
     devinConnected: boolean;
+    brexConnected: boolean;
     devinNeedsYou: number;
     gtmNeedsYou: number;
     dataRoomWaiting: number;
@@ -523,6 +526,7 @@ export function SpaceSidebar({
   unseen,
   inboxUnread,
   financeMode,
+  brexMode,
   glance,
   legalMode,
   gtmMode,
@@ -841,6 +845,7 @@ export function SpaceSidebar({
               pages={[
                 { key: "inbox", label: t`Inbox` },
                 { key: "finance", label: t`Finance` },
+                ...(glance.brexConnected ? [{ key: "brex", label: t`Brex` }] : []),
                 { key: "legal", label: t`Legal` },
                 { key: "gtm", label: t`GTM` },
                 ...(glance.devinConnected ? [{ key: "devin", label: t`Devin` }] : []),
@@ -891,6 +896,20 @@ export function SpaceSidebar({
                     navigate("/app/finance");
                   }}
                   {...glanceBadge({ unseen: unseen.finance ?? 0, rail })}
+                />
+              )}
+              {hiddenPages.includes("brex") || !glance.brexConnected ? null : (
+                <SidebarPageLink
+                  testId="sidebar-brex"
+                  href="/app/brex"
+                  current={brexMode}
+                  icon={<CreditCard size={15} strokeWidth={1.8} aria-hidden="true" />}
+                  label={t`Brex`}
+                  rail={rail}
+                  onOpen={() => {
+                    setMobileSidebarOpen(false);
+                    navigate("/app/brex");
+                  }}
                 />
               )}
               {hiddenPages.includes("legal") ? null : (

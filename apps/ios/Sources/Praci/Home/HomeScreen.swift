@@ -10,6 +10,9 @@ struct HomeScreen: View {
   @Environment(AppModel.self) private var app
   @State private var model = HomeModel()
   @State private var sheet: HomeSheet?
+  /// Set only in the two-pane layout, where tapping a row opens it in the right-hand pane. A List
+  /// with a selection binding does not push NavigationLink rows, so the one-column layout has none.
+  var selection: Binding<Route?>?
 
   var body: some View {
     LoadableView(state: model.state, retry: { Task { await model.load(app) } }, content: { boot in
@@ -100,65 +103,75 @@ struct HomeScreen: View {
   private func content(_ boot: Bootstrap) -> some View {
     let roster = Roster(bots: boot.bots, groups: boot.groups, sections: boot.botSections)
     let visible = roster.visibleAgents(expanded: model.agentsExpanded)
-    return List {
-      if let message = model.refreshError {
-        Section {
-          Label(message, systemImage: "exclamationmark.triangle")
-            .foregroundStyle(Color.token(.mutedForeground))
-          Button("Try again") { Task { await model.load(app) } }
-        }
+    return Group {
+      if let selection {
+        List(selection: selection) { rows(boot, roster: roster, visible: visible) }
+      } else {
+        List { rows(boot, roster: roster, visible: visible) }
       }
-      if boot.me.needsModel {
-        Section {
-          Text("\(boot.bots.first?.name ?? String(localized: "Your agent")) cannot reply until a model is connected.")
-          Button("Connect a model") { sheet = .connectModel }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("connectModel")
-        }
-      }
-      Section {
-        NavigationLink(value: Route.inbox) {
-          HStack {
-            Label("Inbox", systemImage: "tray")
-            Spacer()
-            if let count = model.unread, count > 0 {
-              Text(count, format: .number).foregroundStyle(Color.token(.mutedForeground))
-            }
-          }
-        }
-        .accessibilityIdentifier("inboxRow")
-      }
-      if !roster.pinned.isEmpty {
-        Section("Pinned") { ForEach(roster.pinned) { row in agentRow(row) } }
-      }
-      Section("Agents") {
-        if roster.isEmpty {
-          ContentUnavailableView {
-            Label("No agents yet", systemImage: "person")
-          } actions: {
-            Button("New agent") { sheet = .newAgent }
-          }
-        }
-        ForEach(visible.rows) { row in agentRow(row) }
-        if roster.agents.count > 4 {
-          Button {
-            withAnimation { model.agentsExpanded.toggle() }
-          } label: {
-            Label(
-              model.agentsExpanded ? "Show less" : "Show \(visible.hiddenCount) more",
-              systemImage: model.agentsExpanded ? "chevron.up" : "chevron.down")
-          }
-          .foregroundStyle(Color.token(.mutedForeground))
-          .accessibilityIdentifier("showMore")
-        }
-      }
-      ForEach(roster.sections, id: \.section.id) { group in
-        sectionView(group)
-      }
-      pages(boot)
     }
     .refreshable { await model.load(app) }
     .accessibilityIdentifier("homeList")
+  }
+
+  @ViewBuilder
+  // swiftlint:disable:next function_body_length
+  private func rows(_ boot: Bootstrap, roster: Roster, visible: (rows: [RosterRow], hiddenCount: Int)) -> some View {
+    if let message = model.refreshError {
+      Section {
+        Label(message, systemImage: "exclamationmark.triangle")
+          .foregroundStyle(Color.token(.mutedForeground))
+        Button("Try again") { Task { await model.load(app) } }
+      }
+    }
+    if boot.me.needsModel {
+      Section {
+        Text("\(boot.bots.first?.name ?? String(localized: "Your agent")) cannot reply until a model is connected.")
+        Button("Connect a model") { sheet = .connectModel }
+          .buttonStyle(.borderedProminent)
+          .accessibilityIdentifier("connectModel")
+      }
+    }
+    Section {
+      NavigationLink(value: Route.inbox) {
+        HStack {
+          Label("Inbox", systemImage: "tray")
+          Spacer()
+          if let count = model.unread, count > 0 {
+            Text(count, format: .number).foregroundStyle(Color.token(.mutedForeground))
+          }
+        }
+      }
+      .accessibilityIdentifier("inboxRow")
+    }
+    if !roster.pinned.isEmpty {
+      Section("Pinned") { ForEach(roster.pinned) { row in agentRow(row) } }
+    }
+    Section("Agents") {
+      if roster.isEmpty {
+        ContentUnavailableView {
+          Label("No agents yet", systemImage: "person")
+        } actions: {
+          Button("New agent") { sheet = .newAgent }
+        }
+      }
+      ForEach(visible.rows) { row in agentRow(row) }
+      if roster.agents.count > 4 {
+        Button {
+          withAnimation { model.agentsExpanded.toggle() }
+        } label: {
+          Label(
+            model.agentsExpanded ? "Show less" : "Show \(visible.hiddenCount) more",
+            systemImage: model.agentsExpanded ? "chevron.up" : "chevron.down")
+        }
+        .foregroundStyle(Color.token(.mutedForeground))
+        .accessibilityIdentifier("showMore")
+      }
+    }
+    ForEach(roster.sections, id: \.section.id) { group in
+      sectionView(group)
+    }
+    pages(boot)
   }
 
   private func sectionView(_ group: Roster.Group) -> some View {

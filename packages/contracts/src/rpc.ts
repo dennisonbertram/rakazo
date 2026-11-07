@@ -1769,6 +1769,8 @@ export const appContract = {
         devinNeedsYou: z.number().int(),
         /** The space has a Devin connection; the Devin page shows in the sidebar only then. */
         devinConnected: z.boolean(),
+        /** The current space owner has connected Brex cards; the Brex page shows in the sidebar only then. */
+        brexConnected: z.boolean(),
         /** Parked gated GTM items still waiting for the founder on their active GTM agent. */
         gtmNeedsYou: z.number().int(),
         dataRoomWaiting: z.number().int(),

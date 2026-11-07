@@ -109198,6 +109198,9 @@
                         "devinConnected": {
                           "type": "boolean"
                         },
+                        "brexConnected": {
+                          "type": "boolean"
+                        },
                         "gtmNeedsYou": {
                           "type": "integer",
                           "minimum": -9007199254740991,
@@ -109233,6 +109236,7 @@
                         "legalDueSoon",
                         "devinNeedsYou",
                         "devinConnected",
+                        "brexConnected",
                         "gtmNeedsYou",
                         "dataRoomWaiting",
                         "hasTickets",
