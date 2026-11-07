@@ -180,7 +180,6 @@ import {
   outboundSiteGate,
   ownsLine,
   PrivateFragments,
-  RUN_RECORD_UNKNOWN,
   parseGoalEvidence,
   parseSkillMd,
   plainRunError,
@@ -191,6 +190,7 @@ import {
   quietRoutineGuidance,
   REQUEST_ACCESS_TOOL,
   ROUTINE_AUTO_REVIEW_READ_TOOLS,
+  RUN_RECORD_UNKNOWN,
   redactSecrets,
   renderBotDirectory,
   repeatsPrivateText,
@@ -3474,7 +3474,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const accessState = accessRunState(
           await deps.prisma.externalEffect.findMany({
             where: { runId, kind: REQUEST_ACCESS_TOOL },
-            select: { status: true, request: true },
+            select: { status: true, request: true, result: true },
           }),
         );
         const accessRunTools = accessCapabilityTools([...accessState.granted]);
@@ -7247,6 +7247,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           // Every parallel call of a denied tool resolves to the denial, not a new card.
           const askUnlessDenied = async () => {
+            // Each capability gets its own card; a denial for one never answers another. The
+            // handler already refuses a repeat of the same capability.
+            if (name === REQUEST_ACCESS_TOOL) return requestApproval();
             // A denial ends this request for the run: a reworded retry gets no new card.
             const denied = await deps.prisma.externalEffect.findMany({
               where: {

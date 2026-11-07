@@ -5,7 +5,9 @@ import { ACCESS_CAPABILITIES, accessCapability } from "@rakazo/core";
 type Capability = (typeof ACCESS_CAPABILITIES)[number];
 
 /** Effects of this run's request_access calls: what was granted, and every capability already asked. */
-export function accessRunState(effects: readonly { status: string; request: unknown }[]) {
+export function accessRunState(
+  effects: readonly { status: string; request: unknown; result?: unknown }[],
+) {
   const asked = new Set<string>();
   const granted = new Set<AccessCapabilityId>();
   /** Approved, but the agent's call has not been replayed yet: the tool stays offered to replay it. */
@@ -16,7 +18,13 @@ export function accessRunState(effects: readonly { status: string; request: unkn
     )?.id;
     if (!id) continue;
     asked.add(id);
-    if (["approved", "executing", "completed"].includes(effect.status)) granted.add(id);
+    // A completed effect is a grant only when the owner's allow ran the call. A denial answered
+    // without a card also completes an effect, with an error result.
+    const allowed =
+      effect.status === "approved" ||
+      effect.status === "executing" ||
+      (effect.status === "completed" && (effect.result as { ok?: unknown } | null)?.ok === true);
+    if (allowed) granted.add(id);
     if (effect.status === "approved") awaitingReplay.add(id);
   }
   return { asked, granted, awaitingReplay };

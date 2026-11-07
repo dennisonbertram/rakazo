@@ -3386,6 +3386,8 @@ model Contact {
   /// The agent that added the contact, set by the server; null for a contact added by hand or after the agent was deleted.
   botId            String?
   bot              Bot?                  @relation(fields: [botId], references: [id], onDelete: SetNull)
+  /// The agent that last changed this contact with contacts_save. A Firewall agent's edit marks the contact as untrusted text (see readsFirewalledContent).
+  lastEditedByBotId String?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   companyEntities CompanyEntity[] @relation("CompanyEntityContact")

@@ -200,9 +200,18 @@ export async function contactToolFromTool(
         : null;
       if (!existing)
         return { error: "No contact with this email. Use contacts_add for new people." };
-      return {
-        contact: await saveContact(deps.prisma, deps.scope, { ...input.data, id: existing.id }),
-      };
+      const contact = await saveContact(deps.prisma, deps.scope, {
+        ...input.data,
+        id: existing.id,
+      });
+      // Who changed it, so a Firewall agent's edit is untrusted text to whoever reads it later.
+      if (deps.botId) {
+        await deps.prisma.contact.update({
+          where: { id: existing.id },
+          data: { lastEditedByBotId: deps.botId },
+        });
+      }
+      return { contact };
     }
     return { error: `Unknown contact tool ${name}` };
   } catch (error) {

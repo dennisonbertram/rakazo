@@ -10090,6 +10090,38 @@ describe("request_access", () => {
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 
+  it("a denial for one capability does not answer or grant another", async () => {
+    const f = disabledAgent({ disabledBuiltinTools: [...contactTools, "web_search"] });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    f.effects[0]!.status = "denied";
+    f.pauseRunForInput.mockClear();
+    f.offeredTools.length = 0;
+    f.setCalls([{ args: { capability: "web_search", reason: "Look it up" }, executionId: "c2" }]);
+    await f.run();
+    // Its own card, not a completed effect with a denial error.
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+    expect(cardOf(f).text).toBe("Assistant asks to search the web");
+    expect(f.effects.map((e) => e.status)).toEqual(["denied", "intended"]);
+    // The next run still has neither tool.
+    f.offeredTools.length = 0;
+    f.setCalls([]);
+    await f.run();
+    expect(f.offeredTools).not.toContain("web_search");
+    expect(f.offeredTools).not.toContain("contacts_add");
+  });
+
+  it("does not treat a completed effect with an error result as a grant", async () => {
+    const f = disabledAgent({ disabledBuiltinTools: [...contactTools, "web_search"] });
+    f.setCalls([{ args: ask, executionId: "c1" }]);
+    await f.run();
+    Object.assign(f.effects[0]!, { status: "completed", result: { error: "declined" } });
+    f.offeredTools.length = 0;
+    f.setCalls([]);
+    await f.run();
+    expect(f.offeredTools).not.toContain("contacts_add");
+  });
+
   it("asks once per capability per run, whatever the reason", async () => {
     const f = disabledAgent({ disabledBuiltinTools: [...contactTools, "web_search"] });
     f.setCalls([{ args: ask, executionId: "c1" }]);
