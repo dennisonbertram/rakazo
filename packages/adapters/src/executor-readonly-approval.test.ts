@@ -381,7 +381,7 @@ function fixture({
   availableTools?: ConnectorTool[];
   beforeToolCall?: (index: number) => void | Promise<void>;
   /** Messages the run claims as steering, in order, when the runtime asks. */
-  steering?: { blocks: unknown[] }[];
+  steering?: { blocks: unknown[]; messageId?: string }[];
   /** Replaces the stub connector, for runs against a real McpConnector. */
   connector?: unknown;
   route?: ConnectorTool["route"];
@@ -5573,7 +5573,7 @@ describe("what a run read is checked before it reaches an external bot", () => {
 
   it("records the quoted reply context of a steering message before it is returned", async () => {
     sentBotMessages.calls.length = 0;
-    const steering: { messageId: string }[] = [];
+    const steering: { blocks: unknown[]; messageId: string }[] = [];
     const f = fixture({
       name: "message_bot",
       builtin: true,
@@ -5595,7 +5595,7 @@ describe("what a run read is checked before it reaches an external bot", () => {
         blocks: [{ kind: "text", text: "The wire total was 5,550,001 on Friday." }],
       },
     };
-    steering.push({ messageId: "m-steer" });
+    steering.push({ messageId: "m-steer", blocks: [] });
     const rowsBefore = f.fragmentRows.length;
     await f.request()!.claimSteering!([]);
     expect(f.fragmentRows.length).toBe(rowsBefore + 1);
