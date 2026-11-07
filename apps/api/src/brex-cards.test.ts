@@ -16,6 +16,17 @@ import {
   brexCardsReplaceToken,
   brexCardsSetControls,
 } from "./brex-cards.js";
+import {
+  brexCardsAccounts,
+  brexCardsActivity,
+  brexCardsExpenses,
+  brexCardsLimits,
+  brexCardsOverview,
+  brexCardsPeople,
+  brexCardsSpending,
+  brexCardsTrips,
+  brexCardsView,
+} from "./brex-cards-read-model.js";
 import { ensureIntegrationAgent } from "./integration-agent.js";
 import type { RouterDeps } from "./router.js";
 import { createRouter } from "./router.js";
@@ -30,12 +41,13 @@ const NEW_TOKEN = "bxt_unit_test_token_new_77c1";
 type Row = Record<string, unknown> & { id?: string };
 
 /** The few tables the Brex cards code touches, in memory. */
-function fakeDb(seed: { bot?: Row; server?: Row; connection?: Row } = {}) {
+function fakeDb(seed: { bot?: Row; server?: Row; connection?: Row; effects?: Row[] } = {}) {
   const state = {
     servers: seed.server ? [seed.server] : ([] as Row[]),
     secrets: [] as Row[],
     connections: seed.connection ? [seed.connection] : ([] as Row[]),
     bots: seed.bot ? [seed.bot] : ([] as Row[]),
+    effects: seed.effects ?? ([] as Row[]),
   };
   let n = 0;
   const spaceMember = {
@@ -139,6 +151,16 @@ function fakeDb(seed: { bot?: Row; server?: Row; connection?: Row } = {}) {
     botSecret: { count: vi.fn(async () => 0) },
     integrationProviderConfig: { count: vi.fn(async () => 0) },
     bot,
+    externalEffect: {
+      findMany: vi.fn(async ({ where }: { where?: Row } = {}) => {
+        const botId = (where?.run as Row | undefined)?.botId;
+        return state.effects.filter(
+          (effect) =>
+            (!where?.spaceId || effect.spaceId === where.spaceId) &&
+            (!botId || (effect.runBotId ?? "bot-1") === botId),
+        );
+      }),
+    },
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     $queryRaw: vi.fn(async () => []),
     $executeRaw: vi.fn(async () => 0),
@@ -790,5 +812,595 @@ describe("generic MCP routes on the Brex cards server", () => {
     expect(db.state.servers[0]).toMatchObject({ writesEnabled: true });
     await current.mcp.servers.setWrites({ id: "srv-existing", enabled: false });
     expect(db.state.servers[0]).toMatchObject({ writesEnabled: false });
+  });
+});
+
+describe("brex cards read model", () => {
+  const NOW = new Date("2025-03-15T12:00:00Z");
+  const CARDS = [
+    {
+      id: "card_figma",
+      name: "Figma",
+      lastFour: "4242",
+      status: "ACTIVE",
+      ownerUserId: "usr_ada",
+      type: "VIRTUAL",
+      limitCents: 50_000,
+      currency: "USD",
+      duration: "MONTHLY",
+    },
+    {
+      id: "card_ads",
+      name: "Ad spend",
+      lastFour: "5555",
+      status: "ACTIVE",
+      ownerUserId: "usr_ben",
+      type: "VIRTUAL",
+      limitCents: 100_000,
+      currency: "USD",
+      duration: "ONE_TIME",
+    },
+    {
+      id: "card_locked",
+      name: "Locked travel",
+      lastFour: "3333",
+      status: "LOCKED",
+      ownerUserId: "usr_ben",
+      type: "PHYSICAL",
+      limitCents: 80_000,
+      currency: "USD",
+      duration: "QUARTERLY",
+    },
+    {
+      id: "card_ended",
+      name: "Old ads",
+      lastFour: "4444",
+      status: "TERMINATED",
+      ownerUserId: "usr_cy",
+      type: "VIRTUAL",
+      limitCents: 25_000,
+      currency: "USD",
+      duration: "ONE_TIME",
+    },
+    {
+      id: "card_yearly",
+      name: "Yearly cloud",
+      lastFour: "6666",
+      status: "ACTIVE",
+      ownerUserId: "usr_cy",
+      type: "VIRTUAL",
+      limitCents: 250_000,
+      currency: "USD",
+      duration: "YEARLY",
+    },
+  ];
+  const USERS = [
+    { id: "usr_ada", name: "Ada Example", email: "ada@example.test", status: "ACTIVE" },
+    { id: "usr_ben", name: "Ben Example", email: "ben@example.test", status: "ACTIVE" },
+    { id: "usr_cy", name: "Cy Example", email: "cy@example.test", status: "ACTIVE" },
+  ];
+  const LIMITS = [
+    {
+      id: "sl_software",
+      name: "Software",
+      status: "ACTIVE",
+      period: "PER_MONTH",
+      currentPeriodBalance: { amountSpentCents: 8_500, currency: "USD" },
+      baseLimitCents: 10_000,
+      currency: "USD",
+      memberUserIds: ["usr_ada"],
+    },
+  ];
+  const EXPENSES = [
+    {
+      id: "exp_figma",
+      memo: null,
+      status: "SUBMITTED",
+      paymentStatus: "CLEARED",
+      purchasedAt: "2025-03-10T12:00:00Z",
+      amountCents: 1_200,
+      currency: "USD",
+      userId: "usr_ada",
+      merchant: "Figma",
+      merchantMcc: "5734",
+      category: "RECURRING_SOFTWARE_AND_SAAS",
+      expenseType: "CARD",
+      receipts: [],
+      complianceStatus: "DUE",
+    },
+    {
+      id: "exp_travel",
+      memo: "Client dinner",
+      status: "APPROVED",
+      paymentStatus: "CLEARED",
+      purchasedAt: "2025-03-12T12:00:00Z",
+      amountCents: 5_000,
+      currency: "USD",
+      userId: "usr_ben",
+      merchant: "Example Travel",
+      merchantMcc: "7011",
+      category: "LODGING",
+      expenseType: "CARD",
+      receipts: [{ id: "rcpt_1" }],
+      complianceStatus: "DUE",
+    },
+  ];
+  const TRANSACTIONS = [
+    {
+      id: "txn_feb_figma",
+      cardId: "card_figma",
+      description: "Figma",
+      amountCents: 800,
+      currency: "USD",
+      postedAt: "2025-02-10T12:00:00Z",
+      type: "PURCHASE",
+      merchant: "Figma",
+      mcc: "5734",
+      expenseId: "exp_figma",
+    },
+    {
+      id: "txn_mar_figma",
+      cardId: "card_figma",
+      description: "Figma",
+      amountCents: 1_200,
+      currency: "USD",
+      postedAt: "2025-03-10T12:00:00Z",
+      type: "PURCHASE",
+      merchant: "Figma",
+      mcc: "5734",
+      expenseId: "exp_figma",
+    },
+    {
+      id: "txn_mar_ads",
+      cardId: "card_ads",
+      description: "Example Ads",
+      amountCents: 2_400,
+      currency: "USD",
+      postedAt: "2025-03-11T12:00:00Z",
+      type: "PURCHASE",
+      merchant: "Example Ads",
+      mcc: "7311",
+      expenseId: null,
+    },
+    {
+      id: "txn_mar_travel",
+      cardId: "card_locked",
+      description: "Example Travel",
+      amountCents: 5_000,
+      currency: "USD",
+      postedAt: "2025-03-12T12:00:00Z",
+      type: "PURCHASE",
+      merchant: "Example Travel",
+      mcc: "7011",
+      expenseId: "exp_travel",
+    },
+    {
+      id: "txn_mar_unknown",
+      cardId: "card_yearly",
+      description: "Unknown",
+      amountCents: 1_000,
+      currency: "USD",
+      postedAt: "2025-03-13T12:00:00Z",
+      type: "PURCHASE",
+      merchant: null,
+      mcc: "9999",
+      expenseId: null,
+    },
+    {
+      id: "txn_mar_figma_ads",
+      cardId: "card_ads",
+      description: "Figma",
+      amountCents: 300,
+      currency: "USD",
+      postedAt: "2025-03-14T12:00:00Z",
+      type: "PURCHASE",
+      merchant: "Figma",
+      mcc: "5734",
+      expenseId: null,
+    },
+  ];
+  const READS: Record<string, unknown> = {
+    list_cards: { cards: CARDS },
+    list_users: { users: USERS },
+    list_spend_limits: { spendLimits: LIMITS },
+    list_card_transactions: { transactions: TRANSACTIONS, incomplete: false },
+    list_expenses: { expenses: EXPENSES, incomplete: false },
+    list_cash_accounts: {
+      accounts: [
+        {
+          id: "cash_1",
+          name: "Operating",
+          status: "ACTIVE",
+          currentBalanceCents: 100_000,
+          availableBalanceCents: 90_000,
+          currency: "USD",
+          primary: true,
+        },
+      ],
+    },
+    list_reimbursements: {
+      reimbursements: [
+        {
+          id: "exp_reimb_1",
+          memo: "Taxi",
+          status: "APPROVED",
+          paymentStatus: "CLEARED",
+          purchasedAt: "2025-03-09T12:00:00Z",
+          amountCents: 4_200,
+          currency: "USD",
+          userId: "usr_ada",
+          merchant: "Taxi Example",
+          merchantMcc: "4121",
+          category: "OTHER_TRAVEL_EXPENSES",
+          expenseType: "REIMBURSEMENT",
+          receipts: [],
+          complianceStatus: "DUE",
+        },
+      ],
+      incomplete: false,
+    },
+    list_trips: {
+      trips: [
+        {
+          id: "trip_1",
+          name: "Example offsite",
+          status: "UPCOMING",
+          bookerUserId: "usr_ada",
+          startsAt: "2025-04-01T09:00:00Z",
+          endsAt: "2025-04-03T17:00:00Z",
+        },
+      ],
+    },
+    list_statements: {
+      statements: [
+        {
+          id: "stmt_card_1",
+          startDate: "2025-02-01",
+          endDate: "2025-02-28",
+          startBalanceCents: 10_000,
+          endBalanceCents: 12_000,
+        },
+      ],
+    },
+  };
+  const text = (value: unknown) => ({ content: [{ type: "text", text: JSON.stringify(value) }] });
+  const mockReads = (t: ReturnType<typeof deps>, overrides: Record<string, unknown> = {}) => {
+    t.callServerTool.mockImplementation(async (_server: unknown, _context: unknown, tool: string) =>
+      text({ ...(READS[tool] as object), ...(overrides[tool] as object | undefined) }),
+    );
+  };
+  const readDeps = (db = connectedDb(), overrides: Record<string, unknown> = {}) => {
+    const t = deps(db, fakeBrex(), { now: () => NOW });
+    mockReads(t, overrides);
+    return t;
+  };
+
+  it.each([
+    ["overview", (t: ReturnType<typeof deps>) => brexCardsOverview(t.deps, member)],
+    ["cardsView", (t: ReturnType<typeof deps>) => brexCardsView(t.deps, member)],
+    ["spending", (t: ReturnType<typeof deps>) => brexCardsSpending(t.deps, member, {})],
+    ["limits", (t: ReturnType<typeof deps>) => brexCardsLimits(t.deps, member)],
+    ["people", (t: ReturnType<typeof deps>) => brexCardsPeople(t.deps, member)],
+    ["expenses", (t: ReturnType<typeof deps>) => brexCardsExpenses(t.deps, member)],
+    ["accounts", (t: ReturnType<typeof deps>) => brexCardsAccounts(t.deps, member)],
+    ["trips", (t: ReturnType<typeof deps>) => brexCardsTrips(t.deps, member)],
+    ["activity", (t: ReturnType<typeof deps>) => brexCardsActivity(t.deps, member)],
+  ])("%s refuses a member before calling Brex", async (_name, call) => {
+    const t = readDeps();
+    await expect(call(t)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(t.callServerTool).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["overview", (t: ReturnType<typeof deps>) => brexCardsOverview(t.deps, owner)],
+    ["cardsView", (t: ReturnType<typeof deps>) => brexCardsView(t.deps, owner)],
+    ["spending", (t: ReturnType<typeof deps>) => brexCardsSpending(t.deps, owner, {})],
+    ["limits", (t: ReturnType<typeof deps>) => brexCardsLimits(t.deps, owner)],
+    ["people", (t: ReturnType<typeof deps>) => brexCardsPeople(t.deps, owner)],
+    ["expenses", (t: ReturnType<typeof deps>) => brexCardsExpenses(t.deps, owner)],
+    ["accounts", (t: ReturnType<typeof deps>) => brexCardsAccounts(t.deps, owner)],
+    ["trips", (t: ReturnType<typeof deps>) => brexCardsTrips(t.deps, owner)],
+    ["activity", (t: ReturnType<typeof deps>) => brexCardsActivity(t.deps, owner)],
+  ])("%s refuses a new owner using the previous owner's connection", async (_name, call) => {
+    const t = readDeps(connectedDb({}, "former"));
+    await expect(call(t)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(t.callServerTool).not.toHaveBeenCalled();
+  });
+
+  it("builds overview totals, sankey flows, card counts, near-limit and vendors from the shared reads", async () => {
+    const t = readDeps();
+    const result = await brexCardsOverview(t.deps, owner);
+
+    expect(result.partial).toBe(false);
+    expect(result.cash).toEqual({ totalCents: 100_000, availableCents: 90_000, accountCount: 1 });
+    expect(result.cards).toEqual({ active: 4, locked: 1, terminated: 1 });
+    expect(result.cardSpend.monthToDateCents).toBe(9_900);
+    expect(result.cardSpend.previousMonthToDateCents).toBe(800);
+    expect(result.cardSpend.sparkline).toHaveLength(90);
+    expect(result.cardSpend.sparkline.reduce((sum, point) => sum + point.cents, 0)).toBe(10_700);
+    expect(result.sankey.totalCents).toBe(10_700);
+    expect(result.sankey.categories.reduce((sum, category) => sum + category.cents, 0)).toBe(
+      result.sankey.totalCents,
+    );
+    for (const category of result.sankey.categories) {
+      expect(category.merchants.reduce((sum, merchant) => sum + merchant.cents, 0)).toBe(
+        category.cents,
+      );
+      expect(category.partial).toBe(false);
+    }
+    expect(
+      result.sankey.categories.find((category) => category.bucket === "software"),
+    ).toMatchObject({
+      cents: 2_300,
+      merchants: [{ merchant: "Figma", cents: 2_300, count: 3, partial: false }],
+    });
+    expect(result.topVendors[0]).toMatchObject({ merchant: "Example Travel", cents: 5_000 });
+    expect(result.nearLimit).toMatchObject({ partial: false, count: 1 });
+    expect(result.nearLimit.items[0]).toMatchObject({ kind: "spend_limit", percent: 85 });
+    expect(t.callServerTool.mock.calls.map((call) => call[2])).toEqual([
+      "list_cards",
+      "list_users",
+      "list_spend_limits",
+      "list_card_transactions",
+      "list_expenses",
+      "list_cash_accounts",
+    ]);
+  });
+
+  it("marks every transaction-derived aggregate partial when the capped reads are incomplete", async () => {
+    const t = readDeps(connectedDb(), {
+      list_card_transactions: { incomplete: true },
+      list_expenses: { incomplete: true },
+    });
+    const overview = await brexCardsOverview(t.deps, owner);
+    expect(overview.partial).toBe(true);
+    expect(overview.cardSpend.partial).toBe(true);
+    expect(overview.nearLimit.partial).toBe(true);
+    expect(overview.sankey.partial).toBe(true);
+    expect(overview.sankey.categories.every((category) => category.partial)).toBe(true);
+    expect(overview.topVendors.every((vendor) => vendor.partial)).toBe(true);
+
+    const cards = await brexCardsView(t.deps, owner);
+    expect(cards.partial).toBe(true);
+    expect(cards.cards.every((card) => card.partial)).toBe(true);
+
+    const spending = await brexCardsSpending(t.deps, owner, {});
+    expect(spending.partial).toBe(true);
+    expect(spending.categories.every((category) => category.partial)).toBe(true);
+    expect(spending.sankey.partial).toBe(true);
+  });
+
+  it("shows usage for monthly and quarterly cards only and excludes terminated cards from active counts", async () => {
+    const t = readDeps();
+    const result = await brexCardsView(t.deps, owner);
+    const byId = new Map(result.cards.map((card) => [card.cardId, card]));
+
+    expect(byId.get("card_figma")?.usage).toMatchObject({ usedCents: 1_200, limitCents: 50_000 });
+    expect(byId.get("card_locked")?.usage).toMatchObject({ usedCents: 5_000, limitCents: 80_000 });
+    expect(byId.get("card_ads")?.usage).toBeNull();
+    expect(byId.get("card_yearly")?.usage).toBeNull();
+    expect(byId.get("card_yearly")?.series).toHaveLength(90);
+
+    const people = await brexCardsPeople(t.deps, owner);
+    const cy = people.people.find((person) => person.userId === "usr_cy");
+    expect(cy).toMatchObject({ activeCardCount: 1, terminatedCardCount: 1 });
+  });
+
+  it("counts the first days of a 92-day quarter toward quarterly card usage", async () => {
+    const t = deps(connectedDb(), fakeBrex(), { now: () => new Date("2025-09-30T12:00:00Z") });
+    mockReads(t, {
+      list_card_transactions: {
+        transactions: [
+          {
+            id: "txn_quarter_start",
+            cardId: "card_locked",
+            description: "Example Travel",
+            amountCents: 1_000,
+            currency: "USD",
+            postedAt: "2025-07-01",
+            type: "PURCHASE",
+            merchant: "Example Travel",
+            mcc: "7011",
+            expenseId: null,
+          },
+        ],
+      },
+    });
+
+    const result = await brexCardsView(t.deps, owner);
+    expect(result.cards.find((card) => card.cardId === "card_locked")?.usage).toMatchObject({
+      usedCents: 1_000,
+      limitCents: 80_000,
+    });
+    expect(t.callServerTool).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "list_card_transactions",
+      { postedAtStart: "2025-07-01" },
+    );
+  });
+
+  it("filters spending by merchant and category and finds duplicate subscriptions across cards", async () => {
+    const t = readDeps();
+    const result = await brexCardsSpending(t.deps, owner, {
+      merchant: "figma",
+      category: "software",
+    });
+
+    expect(result.partial).toBe(false);
+    expect(result.transactions.map((transaction) => transaction.id)).toEqual([
+      "txn_mar_figma_ads",
+      "txn_mar_figma",
+      "txn_feb_figma",
+    ]);
+    expect(result.totalCents).toBe(2_300);
+    expect(result.categories).toHaveLength(1);
+    expect(result.duplicates).toEqual([
+      expect.objectContaining({
+        merchant: "Figma",
+        month: "2025-03",
+        cardIds: ["card_figma", "card_ads"],
+        cents: 1_500,
+        count: 2,
+      }),
+    ]);
+  });
+
+  it("rejects spending ranges outside the shared 90-day window", async () => {
+    const t = readDeps();
+    await expect(brexCardsSpending(t.deps, owner, { from: "2024-01-01" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    await expect(brexCardsSpending(t.deps, owner, { from: "2025-03-20" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("returns expenses, reimbursements, accounts, trips and statements from their fixed read tools", async () => {
+    const t = readDeps();
+    const expenses = await brexCardsExpenses(t.deps, owner);
+    expect(expenses.expenses.find((expense) => expense.expenseId === "exp_figma")).toMatchObject({
+      bucket: "software",
+      missingReceipt: true,
+      missingMemo: true,
+      cardId: "card_figma",
+    });
+    expect(expenses.reimbursements[0]).toMatchObject({
+      expenseId: "exp_reimb_1",
+      bucket: "travel",
+      missingReceipt: true,
+    });
+    expect(expenses.expenses.find((expense) => expense.expenseId === "exp_travel")).toMatchObject({
+      missingReceipt: false,
+      missingMemo: false,
+    });
+
+    const accounts = await brexCardsAccounts(t.deps, owner);
+    expect(accounts.accounts[0]).toMatchObject({
+      cashAccountId: "cash_1",
+      currentBalanceCents: 100_000,
+    });
+    expect(accounts.statements[0]).toMatchObject({
+      statementId: "stmt_card_1",
+      accountKind: "card",
+    });
+
+    const trips = await brexCardsTrips(t.deps, owner);
+    expect(trips.trips[0]).toMatchObject({ tripId: "trip_1", bookerName: "Ada Example" });
+
+    const tools = t.callServerTool.mock.calls.map((call) => call[2]);
+    expect(tools).toEqual(
+      expect.arrayContaining([
+        "list_expenses",
+        "list_reimbursements",
+        "list_cash_accounts",
+        "list_statements",
+        "list_trips",
+      ]),
+    );
+  });
+
+  it("lists only this space's approved Brex write effects for the connected server", async () => {
+    const marker = "__rakazoCatalogTool";
+    const db = connectedDb();
+    db.state.effects.push(
+      {
+        id: "eff_direct",
+        spaceId: "space",
+        status: "approved",
+        createdAt: new Date("2025-03-14T10:00:00Z"),
+        request: [
+          marker,
+          "direct",
+          {
+            route: {
+              connectorId: "mcp",
+              resourceId: "srv-existing",
+              toolName: "lock_card",
+              resourceRevision: 3,
+            },
+            args: { cardName: "Figma" },
+          },
+        ],
+      },
+      {
+        id: "eff_catalog",
+        spaceId: "space",
+        status: "executed",
+        createdAt: new Date("2025-03-13T10:00:00Z"),
+        request: [
+          marker,
+          "connectors_execute_tool",
+          { id: "srv-existing:update_card", arguments: { cardName: "Ad spend" } },
+        ],
+      },
+      {
+        id: "eff_other_space",
+        spaceId: "other-space",
+        status: "approved",
+        createdAt: new Date("2025-03-15T10:00:00Z"),
+        request: [
+          marker,
+          "direct",
+          {
+            route: { connectorId: "mcp", resourceId: "srv-existing", toolName: "lock_card" },
+            args: { cardName: "Figma" },
+          },
+        ],
+      },
+      {
+        id: "eff_other_server",
+        spaceId: "space",
+        status: "approved",
+        createdAt: new Date("2025-03-15T11:00:00Z"),
+        request: [
+          marker,
+          "direct",
+          {
+            route: { connectorId: "mcp", resourceId: "srv-other", toolName: "lock_card" },
+            args: { cardName: "Figma" },
+          },
+        ],
+      },
+      {
+        id: "eff_other_bot",
+        spaceId: "space",
+        runBotId: "bot-other",
+        status: "approved",
+        createdAt: new Date("2025-03-15T13:00:00Z"),
+        request: [
+          marker,
+          "direct",
+          {
+            route: { connectorId: "mcp", resourceId: "srv-existing", toolName: "lock_card" },
+            args: { cardName: "Figma" },
+          },
+        ],
+      },
+      {
+        id: "eff_read",
+        spaceId: "space",
+        status: "approved",
+        createdAt: new Date("2025-03-15T12:00:00Z"),
+        request: [
+          marker,
+          "direct",
+          {
+            route: { connectorId: "mcp", resourceId: "srv-existing", toolName: "list_cards" },
+            args: {},
+          },
+        ],
+      },
+    );
+    const t = readDeps(db);
+    const result = await brexCardsActivity(t.deps, owner);
+
+    expect(result.activities.map((activity) => activity.effectId)).toEqual([
+      "eff_direct",
+      "eff_catalog",
+    ]);
+    expect(result.activities[0]).toMatchObject({ action: "lock_card", target: "Figma" });
+    expect(result.activities[1]).toMatchObject({ action: "update_card", target: "Ad spend" });
+    expect(t.callServerTool).not.toHaveBeenCalled();
   });
 });

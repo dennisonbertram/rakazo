@@ -13,6 +13,13 @@ export {
   type NormalizedMailEdits,
   normalizeMailEdits,
 } from "./approval-ask.js";
+export {
+  boundDirectApprovalDetails,
+  catalogApprovalConnectorId,
+  catalogApprovalDetails,
+  catalogApprovalInnerArgs,
+  parseCatalogApprovalTarget,
+} from "./approval-effect.js";
 export * from "./artifacts.js";
 export * from "./attachment-review.js";
 export * from "./audit-intake.js";

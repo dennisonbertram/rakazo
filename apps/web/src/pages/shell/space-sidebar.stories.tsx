@@ -133,6 +133,8 @@ export function SidebarFixture({
   devinMode = false,
   devinConnected = false,
   devinNeedsYou = 0,
+  brexConnected = false,
+  brexMode = false,
   investorsMode = false,
   fundraisingMode = false,
   tourOpen = false,
@@ -155,6 +157,8 @@ export function SidebarFixture({
   devinMode?: boolean;
   devinConnected?: boolean;
   devinNeedsYou?: number;
+  brexConnected?: boolean;
+  brexMode?: boolean;
   investorsMode?: boolean;
   fundraisingMode?: boolean;
   tourOpen?: boolean;
@@ -266,9 +270,11 @@ export function SidebarFixture({
     unseen: {},
     inboxUnread: 0,
     financeMode: false,
+    brexMode,
     glance: {
       hasTickets: false,
       devinConnected,
+      brexConnected,
       devinNeedsYou,
       gtmNeedsYou,
       legalDueSoon: 0,

@@ -467,6 +467,52 @@ it("shows Devin's needs-you count and opens its page", async () => {
   }
 });
 
+it("shows Brex only when the space owner's glance says cards are connected", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  stubSidebarObservers();
+  Element.prototype.scrollIntoView ??= () => undefined;
+
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  const renderSidebar = (brexConnected: boolean) =>
+    createElement(
+      MemoryRouter,
+      null,
+      createElement(
+        "div",
+        null,
+        createElement(SidebarFixture, { mode: "expanded", brexMode: true, brexConnected }),
+        createElement(CurrentPath),
+      ),
+    );
+  try {
+    await act(async () => {
+      root.render(renderSidebar(false));
+    });
+    expect(container.querySelector('[data-testid="sidebar-brex"]')).toBeNull();
+
+    await act(async () => root.render(renderSidebar(true)));
+    const link = container.querySelector<HTMLButtonElement>('[data-testid="sidebar-brex"]');
+    expect(link?.getAttribute("aria-current")).toBe("page");
+    expect(link?.textContent).toContain("Brex");
+
+    await act(async () => {
+      link?.click();
+    });
+    expect(container.querySelector('[data-testid="current-path"]')?.textContent).toBe("/app/brex");
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 it("shows GTM's needs-you count and opens its page", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("matchMedia", () => ({

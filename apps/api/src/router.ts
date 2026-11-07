@@ -433,6 +433,17 @@ import {
   brexCardsReplaceToken,
   brexCardsSetControls,
 } from "./brex-cards.js";
+import {
+  brexCardsAccounts,
+  brexCardsActivity,
+  brexCardsExpenses,
+  brexCardsLimits,
+  brexCardsOverview,
+  brexCardsPeople,
+  brexCardsSpending,
+  brexCardsTrips,
+  brexCardsView,
+} from "./brex-cards-read-model.js";
 import type { CartaSyncDeps } from "./carta-agent.js";
 import {
   assignToExistingCartaAgent,
@@ -681,7 +692,7 @@ import {
   setSourceExclusive,
   setSourceWrites,
 } from "./source-agent.js";
-import { requireSpaceOwner } from "./space-owner.js";
+import { isSpaceOwnerRole, requireSpaceOwner } from "./space-owner.js";
 import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { HEARTBEAT, withHeartbeat } from "./stream.js";
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
@@ -9091,6 +9102,33 @@ export function createRouter(deps: RouterDeps): AppRouter {
       cards: authed.brexCards.cards.handler(({ context }) =>
         brexCardsCards(brexCardsDeps, context.actor),
       ),
+      overview: authed.brexCards.overview.handler(({ context }) =>
+        brexCardsOverview(brexCardsDeps, context.actor),
+      ),
+      cardsView: authed.brexCards.cardsView.handler(({ context }) =>
+        brexCardsView(brexCardsDeps, context.actor),
+      ),
+      spending: authed.brexCards.spending.handler(({ context, input }) =>
+        brexCardsSpending(brexCardsDeps, context.actor, input),
+      ),
+      limits: authed.brexCards.limits.handler(({ context }) =>
+        brexCardsLimits(brexCardsDeps, context.actor),
+      ),
+      people: authed.brexCards.people.handler(({ context }) =>
+        brexCardsPeople(brexCardsDeps, context.actor),
+      ),
+      expenses: authed.brexCards.expenses.handler(({ context }) =>
+        brexCardsExpenses(brexCardsDeps, context.actor),
+      ),
+      accounts: authed.brexCards.accounts.handler(({ context }) =>
+        brexCardsAccounts(brexCardsDeps, context.actor),
+      ),
+      trips: authed.brexCards.trips.handler(({ context }) =>
+        brexCardsTrips(brexCardsDeps, context.actor),
+      ),
+      activity: authed.brexCards.activity.handler(({ context }) =>
+        brexCardsActivity(brexCardsDeps, context.actor),
+      ),
       getControls: authed.brexCards.getControls.handler(({ context }) =>
         brexCardsGetControls(brexCardsDeps, context.actor),
       ),
@@ -10182,6 +10220,8 @@ export function createRouter(deps: RouterDeps): AppRouter {
           legalDueSoon,
           devinNeedsYou,
           isDevinConnected,
+          brexMembership,
+          brexConnection,
           gtmNeedsYou,
           dataRoomWaiting,
           hasTicket,
@@ -10191,6 +10231,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
           legalDueSoonCount(legalDeps, context.actor, 7),
           devinNeedsYouCount(devinDeps, context.actor),
           devinConnected(devinDeps, context.actor),
+          deps.prisma.spaceMember.findUnique({
+            where: {
+              spaceId_userId: { spaceId: context.actor.spaceId, userId: context.actor.userId },
+            },
+            select: { role: true },
+          }),
+          deps.prisma.brexCardsConnection.findUnique({
+            where: { spaceId: context.actor.spaceId },
+            select: { server: { select: { userId: true } } },
+          }),
           gtmNeedsYouCount(deps.prisma, context.actor),
           // Failed items are the only ones the user can act on (retry or remove).
           deps.prisma.dataRoomItem.count({
@@ -10208,11 +10258,15 @@ export function createRouter(deps: RouterDeps): AppRouter {
             : null,
           unseenBotKinds(deps.prisma, context.actor),
         ]);
+        const brexConnected =
+          isSpaceOwnerRole(brexMembership?.role) &&
+          brexConnection?.server.userId === context.actor.userId;
         return {
           financeRunwayMonths: runwayMonths,
           legalDueSoon,
           devinNeedsYou,
           devinConnected: isDevinConnected,
+          brexConnected,
           gtmNeedsYou,
           dataRoomWaiting,
           hasTickets: Boolean(hasTicket),
