@@ -19,7 +19,7 @@ type Prisma = Pick<PrismaClient, "bot" | "mcpServer" | "connection" | "capabilit
 type Row = { spaceId: string; userId: string };
 
 /** The current default for the agent behind an id, with what its past defaults were built from. */
-async function currentDefault(prisma: Prisma, bot: Row & { id: string }, id: string) {
+export async function currentDefault(prisma: Prisma, bot: Row & { id: string }, id: string) {
   const own = { spaceId: bot.spaceId, userId: bot.userId };
   const server = await prisma.mcpServer.findFirst({
     where: { id, ...own },

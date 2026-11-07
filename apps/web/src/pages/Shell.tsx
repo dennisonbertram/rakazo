@@ -32,6 +32,7 @@ import {
   isIntegrationAgentSpawnKey,
   isMailThreadAgentSpawnKey,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  NEW_PAGE_INSTRUCTIONS,
   RunPhaseSchema,
   WatchSpecSchema,
 } from "@rakazo/contracts";
@@ -143,6 +144,7 @@ import { CallCard } from "../components/call/CallCard";
 import { ComputerWorkspace } from "../components/computer/ComputerWorkspace";
 import type { SendTarget } from "../components/data-room/SendToAgent";
 import { ErrorBoundary, lazyOverlay, SectionLoadFailed } from "../components/ErrorBoundary";
+import { InstructionsUpgradeNotice } from "../components/InstructionsUpgradeNotice";
 import { AgentAvatar } from "../components/integrations/AgentAvatar";
 import { DevinConnectDialog } from "../components/integrations/DevinConnectDialog";
 import { RecordingPillHost } from "../components/meeting-capture/RecordingPillHost";
@@ -405,8 +407,6 @@ const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
 const wideScreen = () => window.matchMedia(PANEL_DOCKED_QUERY).matches;
 /** How long "Sent to <group> · Open" stays under the composer after an @group message. */
 const FORWARDED_NOTICE_MS = 8000;
-const NEW_PAGE_INSTRUCTIONS =
-  "You build and keep this page. Ask the user what the page should show, then name yourself after the page with update_bot and write it with page_write: lead with what matters, use charts and tables where they help, and keep it current when asked. Keep chat replies short and put the substance on the page.";
 
 function threadSnapshotSignal(parent: AbortSignal): AbortSignal {
   return AbortSignal.any([parent, AbortSignal.timeout(THREAD_SNAPSHOT_TIMEOUT_MS)]);
@@ -4479,6 +4479,15 @@ export function ShellPage() {
   }, [active?.id, focusComposerBotId, sendMessage, t]);
   const threadView = (
     <>
+      {active && !inGroup ? (
+        <InstructionsUpgradeNotice
+          botId={active.id}
+          instructions={active.instructions}
+          onUpgraded={(updated) =>
+            setBots((current) => current.map((bot) => (bot.id === updated.id ? updated : bot)))
+          }
+        />
+      ) : null}
       {cartaAgentPage ? (
         <div className="shrink-0 px-4 pt-2 md:px-7">
           <Link

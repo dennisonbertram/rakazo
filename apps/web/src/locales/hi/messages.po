@@ -5076,6 +5076,10 @@ msgstr ""
 msgid "Crypto is left out of cash and this runway."
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Current"
+msgstr ""
+
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
@@ -5566,6 +5570,7 @@ msgstr ""
 #: src/components/data-room/DropZone.tsx
 #: src/components/data-room/ImportActivity.tsx
 #: src/components/finance/StatementImport.tsx
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/meeting-capture/RecordingPill.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -7515,6 +7520,10 @@ msgstr ""
 msgid "Keep memories"
 msgstr "मेमोरी रखें"
 
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Keep mine"
+msgstr ""
+
 #: src/pages/CompanyReview.tsx
 msgid "Keep separate"
 msgstr ""
@@ -8866,6 +8875,7 @@ msgstr ""
 msgid "new"
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/PageAgentsRow.tsx
 #: src/components/sidebar-glance.tsx
@@ -11894,6 +11904,7 @@ msgstr "Praci पर लौटें"
 msgid "Revenue"
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Review"
@@ -14891,6 +14902,18 @@ msgstr ""
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Updating…"
 msgstr "अपडेट हो रहा है…"
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade"
+msgstr ""
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade system prompt"
+msgstr ""
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade this agent's system prompt?"
+msgstr ""
 
 #: src/components/computer/FilesApp.tsx
 #: src/components/data-room/FilterBar.tsx
