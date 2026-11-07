@@ -215,6 +215,21 @@ describe("BrexApiEmulator", () => {
     const all = await api("/v1/expenses/card");
     expect(due.body.items.length).toBeGreaterThan(0);
     expect(due.body.items.length).toBeLessThan(all.body.items.length);
+    expect(all.body.items.every((e: any) => e.expense_type !== "REIMBURSEMENT")).toBe(true);
+    expect(all.body.items.some((e: any) => e.category === "SERVERS")).toBe(true);
+    expect(txns.body.items.every((t: any) => typeof t.expense_id === "string")).toBe(true);
+
+    const reimbursements = await api("/v1/expenses?expense_type[]=REIMBURSEMENT");
+    expect(reimbursements.body.items.length).toBeGreaterThan(0);
+    expect(reimbursements.body.items.every((e: any) => e.expense_type === "REIMBURSEMENT")).toBe(
+      true,
+    );
+    expect(reimbursements.body.items[0]).toMatchObject({
+      category: expect.any(String),
+      review: { compliance_status: expect.any(String) },
+      receipts: expect.any(Array),
+    });
+    expect(txns.body.items[0].merchant.mcc).toMatch(/^\d{4}$/);
   });
 
   it("has no PAN, secure-email or unlock route: they answer 404 and are recorded", async () => {

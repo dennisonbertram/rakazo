@@ -345,7 +345,7 @@ describe("Brex cards integration-agent preset", () => {
     expect(integrationPresetForEndpoint(FINANCE_MCP_ENDPOINTS.brex)).toBe(brex);
   });
 
-  it("reads only the ten reads and forces every write", () => {
+  it("reads only the eleven reads and forces every write", () => {
     for (const name of BREX_CARDS_READ_TOOLS) expect(isReadTool({ name }, cards)).toBe(true);
     expect(cards.forcedWrites).toEqual([...BREX_CARDS_WRITE_TOOLS]);
     for (const name of BREX_CARDS_WRITE_TOOLS) {

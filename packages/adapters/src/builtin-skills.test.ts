@@ -6,7 +6,7 @@ import {
   PAGE_DESIGN_SKILL_NAME,
   PRESENT_CLEARLY_SKILL_NAME,
 } from "./builtin-skills.js";
-import { pagesGuidance, PRESENTATION_GUIDANCE } from "./executor.js";
+import { PRESENTATION_GUIDANCE, pagesGuidance } from "./executor.js";
 import { MEETING_AGENT_GUIDANCE } from "./meeting-tools.js";
 
 const skill = BUILTIN_AGENT_SKILLS.find((s) => s.name === "devin-sessions");
@@ -220,7 +220,7 @@ it("brex-receipts-close finds missing receipts and memos, leaves uploads and sta
 it("brex-reimbursements-travel is read-only and names no write tool", () => {
   const text = brexText("brex-reimbursements-travel");
   expect(text).toContain("read-only");
-  expect(text).toContain("list_expenses");
+  expect(text).toContain("list_reimbursements");
   expect(text).toContain("list_trips");
   expect(text).toContain("in Brex");
   for (const write of BREX_CARDS_WRITE_TOOLS) expect(text).not.toContain(write);
