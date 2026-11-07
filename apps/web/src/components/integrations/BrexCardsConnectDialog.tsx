@@ -75,12 +75,11 @@ export function BrexCardsConnectDialog({
               </DialogTitle>
             </div>
             <DialogDescription>
-              <Trans>
-                In Brex, Settings → Developer, create a user token with the scopes cards, budgets,
-                companies.readonly, users.readonly, expenses.card, transactions.card.readonly,
-                travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add
-                cards.pan.
-              </Trans>
+              {mode === "replace" ? (
+                <Trans>Use a token for the same Brex account.</Trans>
+              ) : (
+                <Trans>Every change waits for your approval.</Trans>
+              )}
             </DialogDescription>
           </DialogHeader>
           <Input
@@ -93,6 +92,28 @@ export function BrexCardsConnectDialog({
             value={token}
             onChange={(event) => setToken(event.target.value)}
           />
+          <details className="text-xs text-muted-foreground">
+            <summary className="w-fit cursor-pointer hover:text-foreground">
+              <Trans>Permissions for the token</Trans>
+            </summary>
+            <ul className="mt-2 flex flex-col gap-1">
+              <li>
+                <Trans>In Brex: Settings → Developer → Create API token.</Trans>
+              </li>
+              <li>
+                <Trans>Read and write: Cards, Budgets, Card Expenses</Trans>
+              </li>
+              <li>
+                <Trans>
+                  Read only: Users, Companies, Card Transactions, Trips, Business Accounts Data,
+                  Business Accounts Statements
+                </Trans>
+              </li>
+              <li>
+                <Trans>Leave Card Numbers Read and Send off.</Trans>
+              </li>
+            </ul>
+          </details>
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -103,7 +124,17 @@ export function BrexCardsConnectDialog({
               <Trans>Cancel</Trans>
             </Button>
             <Button type="submit" disabled={busy || !token.trim()}>
-              {mode === "replace" ? <Trans>Save</Trans> : <Trans>Connect</Trans>}
+              {mode === "replace" ? (
+                busy ? (
+                  <Trans>Saving…</Trans>
+                ) : (
+                  <Trans>Save</Trans>
+                )
+              ) : busy ? (
+                <Trans>Connecting…</Trans>
+              ) : (
+                <Trans>Connect</Trans>
+              )}
             </Button>
           </DialogFooter>
         </form>

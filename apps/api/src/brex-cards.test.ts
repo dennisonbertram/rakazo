@@ -271,7 +271,10 @@ describe("brexCardsConnect", () => {
 
   it.each([
     [{ "/v2/users/me": 401 }, "Brex rejected this token"],
-    [{ "/v2/cards": 403 }, "Brex rejected this token"],
+    [
+      { "/v2/cards": 403 },
+      "Brex refused this token. It may be missing a permission or have expired.",
+    ],
     [{ "/v2/company": 401 }, "Brex rejected this token"],
     [{ "/v2/users/me": 500 }, "Could not reach Brex"],
     [{ "/v2/cards": "network" as const }, "Could not reach Brex"],

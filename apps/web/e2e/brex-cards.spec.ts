@@ -137,7 +137,7 @@ test("Brex cards connects from its tile, shows cards and controls, and sends but
   await page.goto("/app/integrations");
   await page.getByRole("button", { name: "Connect Brex cards" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("Do not add cards.pan.");
+  await expect(dialog).toContainText("Every change waits for your approval.");
   await dialog.getByLabel("API token").fill("tok_demo");
   await dialog.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/app/integrations/mcp/${SERVER_ID}$`));

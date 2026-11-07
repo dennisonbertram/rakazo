@@ -234,7 +234,7 @@ it("offers Brex cards and opens its connect dialog, then lands on the server pag
   const connect = container.querySelector<HTMLButtonElement>('[aria-label="Connect Brex cards"]');
   expect(connect).not.toBeNull();
   await act(async () => connect?.click());
-  expect(document.body.textContent).toContain("Do not add cards.pan.");
+  expect(document.body.textContent).toContain("Every change waits for your approval.");
   const input = document.querySelector<HTMLInputElement>('input[aria-label="API token"]');
   expect(input?.type).toBe("password");
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
@@ -281,7 +281,7 @@ it("hides the Brex cards tile once its server is connected, and its card has no 
   await show({ ...data(true, true), servers: [server] });
   expect(container.querySelector('[aria-label="Connect Brex cards"]')).toBeNull();
   expect(container.querySelector('a[href="/app/integrations/mcp/s4"]')).not.toBeNull();
-  expect(container.textContent).not.toContain("cards.pan");
+  expect(container.textContent).not.toContain("Every change waits for your approval.");
 });
 
 const devinServer = {
