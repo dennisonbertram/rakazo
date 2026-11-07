@@ -91,3 +91,9 @@ export const WithSource: StoryObj<typeof meta> = {
       "capabilities.setAgentAccess": null,
     }),
 };
+
+/** A Firewall agent the owner gave Always on a request-access card: each use still asks, and the switch removes it. */
+export const WithFirewallGrants: StoryObj<typeof meta> = {
+  args: { bot: { ...bot, firewall: true, firewallAskCapabilities: ["contacts", "calendar_read"] } },
+  beforeEach: () => mockRpc({ ...loaded([]), "bots.update": null }),
+};

@@ -64,6 +64,8 @@ const BUILTIN_MAIL_WRITE_TOOLS = new Set([
 ]);
 /** Cannot be auto-reviewed or permanently allowed. imessage_send is a message to a person from the user's agent line. */
 const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
+  // The owner grants a capability; a saved rule or Auto Review would grant every later request.
+  "request_access",
   "respond_agent_connection",
   // The owner's own card per app per run (docs/local-desktop-control); never a saved rule.
   "desktop_app_act",

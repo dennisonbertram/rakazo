@@ -19,6 +19,7 @@ function tx(options?: {
     $queryRaw: vi.fn(async () => []),
     externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     run: {
       updateMany: vi.fn(async () => ({ count: options?.cancelled ?? 1 })),
       findUnique: vi.fn(async () => {

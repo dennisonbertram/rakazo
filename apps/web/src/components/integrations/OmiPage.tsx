@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { OmiStatus } from "@rakazo/contracts";
+import type { OmiCloudStatus, OmiStatus } from "@rakazo/contracts";
 import {
   Button,
   DropdownMenu,
@@ -21,6 +21,7 @@ import { Shimmer } from "../ai/primitives";
 import { ConfirmDialog } from "./AppDetail";
 import { AppLogo } from "./AppLogo";
 import { IntegrationAgentSection } from "./IntegrationAgentSection";
+import { OmiCloudKeyCard } from "./OmiCloudKeyCard";
 import { OmiSegments } from "./OmiSegments";
 import { AgentToggleList } from "./parts";
 import type { IntegrationsData } from "./useIntegrations";
@@ -28,6 +29,7 @@ import type { IntegrationsData } from "./useIntegrations";
 /** Hours with at most one decimal: 27, 3.2. */
 const hours = (minutes: number) => Math.round(minutes / 6) / 10;
 const LONG_MIN = 120;
+const CLOUD_POLL_MS = 10_000;
 
 function StatusLine({ state }: { state: OmiSyncState }) {
   const { t } = useLingui();
@@ -344,11 +346,13 @@ export function OmiPage({
 }) {
   const [status, setStatus] = useState<OmiStatus | undefined>(undefined);
   const [noKey, setNoKey] = useState(false);
+  const [cloud, setCloud] = useState<OmiCloudStatus>(null);
   const [segmentsKey, setSegmentsKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     try {
       setStatus((await rpc.omi.status()) ?? null);
+      setCloud((await rpc.omiCloud.status()) ?? null);
       // A recording without a key stays "ready" with the error, so the status is not filtered.
       const items = await rpc.dataRoom.items.list({ source: "omi", limit: 100 });
       setNoKey(
@@ -364,6 +368,31 @@ export function OmiPage({
     void reload();
   }, [reload]);
   const { state, sync } = useOmiSync(status, reload);
+  // The card shows "Syncing" until the first sync finishes; ask again until it does.
+  const cloudSyncing = cloud?.status === "connected" && !cloud.syncedThrough;
+  useEffect(() => {
+    if (!cloudSyncing) return;
+    const controller = new AbortController();
+    let pending = false;
+    const timer = setInterval(() => {
+      // One request at a time: a slow answer is not stacked under the next tick.
+      if (pending) return;
+      pending = true;
+      void rpc.omiCloud
+        .status(undefined, { signal: controller.signal })
+        .then((next) => {
+          if (!controller.signal.aborted) setCloud(next ?? null);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          pending = false;
+        });
+    }, CLOUD_POLL_MS);
+    return () => {
+      clearInterval(timer);
+      controller.abort();
+    };
+  }, [cloudSyncing]);
 
   async function deleteAll() {
     setError(null);
@@ -395,6 +424,7 @@ export function OmiPage({
       onDeleteAll={() => void deleteAll()}
       onOpenVoiceSettings={onOpenVoiceSettings}
     >
+      <OmiCloudKeyCard status={cloud} onChanged={() => void reload()} />
       {status ? (
         <>
           <OmiSegments reloadKey={segmentsKey} />

@@ -14,6 +14,7 @@ describe("clearEndedRunState", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 1 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 2 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     };
     await clearEndedRunState(prisma as unknown as PrismaClient, ["run-1", "run-2"]);
     expect(prisma.secret.deleteMany).toHaveBeenCalledWith({
@@ -32,6 +33,7 @@ describe("clearEndedRunState", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 1 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     };
     await clearEndedRunState(prisma as unknown as PrismaClient, ["run-1"]);
     expect(prisma.appControlSnapshot.deleteMany).toHaveBeenCalledWith({

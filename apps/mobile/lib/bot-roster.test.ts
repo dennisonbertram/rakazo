@@ -37,6 +37,7 @@ function bot(id = "bot-1"): Bot {
     disabledBuiltinTools: [],
     audience: "internal",
     firewall: false,
+    firewallAskCapabilities: [],
     proactivity: "medium",
     externalMessageTargets: [],
     externalComputerTools: false,

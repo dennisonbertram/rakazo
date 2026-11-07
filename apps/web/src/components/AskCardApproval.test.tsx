@@ -86,6 +86,28 @@ it("states the same scope on a site card", () => {
   expect(container.textContent).toContain("Won't ask again anywhere in this space.");
 });
 
+it("shows the server's label and no space-wide line on a request-access card", () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const block: AskBlock = {
+    ...pending,
+    text: "Scout asks to see your calendar",
+    actions: [
+      { id: "allow", label: "Allow for this run" },
+      { id: "always", label: "Always for this agent" },
+      { id: "deny", label: "Deny" },
+    ],
+  };
+  act(() =>
+    createRoot(container).render(
+      <AskCard block={block} canAnswer onAnswer={async () => undefined} />,
+    ),
+  );
+  expect(button(container, "Always for this agent")).toBeTruthy();
+  expect(container.textContent).not.toContain("Won't ask again anywhere in this space.");
+  expect(container.textContent).not.toContain("Always allow this");
+});
+
 it("moves focus to the composer once the answer is sent", async () => {
   const composer = document.createElement("textarea");
   composer.setAttribute("data-composer-input", "");

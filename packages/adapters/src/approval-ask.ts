@@ -21,6 +21,8 @@ import {
 import {
   ALL_SITES_ACTION_ID,
   ALL_SITES_ACTION_LABEL,
+  accessCapability,
+  bodyHasLink,
   humanizeToolName,
   providerLabel,
   redactSecrets,
@@ -51,6 +53,8 @@ export function buildApprovalAskBlock(
     /** One plain sentence under the card: the call asked because of a background run or a rule. */
     approvalReason?: string;
     fullMail?: boolean;
+    /** A full mail card: some recipient is new to the owner or off the thread (default: yes). */
+    newRecipient?: boolean;
     fullCompany?: boolean;
     integrationWriteTool?: string;
     /** Offer "Allow all sites for this agent" on a new-site card; lists the private data the agent can read. */
@@ -76,8 +80,13 @@ export function buildApprovalAskBlock(
     mailBatch?: readonly MailBatchCardRow[];
     /** pipeline_import_review: the review of the import. */
     pipelineImport?: { importId: string; text: string; detail: string };
+    /** request_access: the asking agent, and whether Always for this agent may be offered. */
+    requestAccess?: { agent: string; firewalled: boolean; always: boolean };
   },
 ): MessageBlock {
+  if (toolName === "request_access" && options?.requestAccess) {
+    return buildRequestAccessBlock(effectId, args, secrets, options.requestAccess);
+  }
   if (toolName === MAIL_REPLY_BATCH_TOOL) {
     return buildMailBatchAskBlock(effectId, options?.mailBatch ?? [], options?.approvalReason);
   }
@@ -147,7 +156,12 @@ export function buildApprovalAskBlock(
       : options?.imessage
         ? imessageSendDetail(args, options.imessage, options.reviewReason)
         : options?.fullMail
-          ? fullMailDetail(args, options.reviewReason)
+          ? fullMailDetail(
+              args,
+              options.reviewReason,
+              options.mailAccount,
+              options.newRecipient !== false,
+            )
           : isSendMoney(toolName)
             ? moneyDetail(args, options?.moneyNames, options?.reviewReason)
             : options?.fullCompany
@@ -204,6 +218,7 @@ export function buildApprovalAskBlock(
         : args,
       secrets,
       options?.mailChoices,
+      options?.fullMail,
     ),
     approvalReason: options?.approvalReason,
     ...(fetchSite ? { site: fetchSite } : {}),
@@ -250,6 +265,42 @@ export function buildApprovalAskBlock(
               : []),
             { id: "deny", label: "Deny" },
           ],
+  };
+}
+
+/**
+ * The card for request_access. The capability words are fixed server text from the closed list, so
+ * the card states exactly what Allow grants; only the reason is the agent's own words, shown as plain
+ * text in the detail. The answer ids are the usual three, so every client already renders them.
+ */
+function buildRequestAccessBlock(
+  effectId: string,
+  args: Record<string, unknown>,
+  secrets: string[],
+  card: { agent: string; firewalled: boolean; always: boolean },
+): MessageBlock {
+  const agent = sanitizeMessagingLabel(card.agent).replace(CARD_TITLE_ESCAPED, "\\$&");
+  const words = accessCapability(args.capability)?.words ?? "use a tool you switched off";
+  const reason = redactSecrets(String(args.reason ?? ""), secrets)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+  return {
+    kind: "ask",
+    approvalEffectId: effectId,
+    text: `${agent} asks to ${words}`,
+    detail: [
+      reason ? `Agent's reason: ${reason}` : undefined,
+      card.firewalled ? "Firewall is on, so each use will still ask you." : undefined,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    status: "pending",
+    actions: [
+      { id: "allow", label: "Allow for this run" },
+      ...(card.always ? [{ id: "always", label: "Always for this agent" }] : []),
+      { id: "deny", label: "Deny" },
+    ],
   };
 }
 
@@ -577,14 +628,44 @@ function imessageSendDetail(
   return lines.join("\n");
 }
 
-/** Every recipient, Bcc included, and the whole body. */
-function fullMailDetail(args: Record<string, unknown>, reviewReason?: string): string {
+/**
+ * Every bare address behind a recipient list, parsed as the sender parses it, so one entry holding
+ * several addresses shows them all. The model writes display names, and a name can say anything. An
+ * entry that does not parse is shown whole.
+ */
+const bareAddresses = (value: unknown): string[] =>
+  strings(value).flatMap((entry) => {
+    try {
+      return parseRecipients(entry).map((parsed) => parsed.address);
+    } catch {
+      return [entry];
+    }
+  });
+
+/**
+ * The sending account, every recipient (Bcc included) as a bare address, the subject, the whole
+ * body, and the flags a new email earns. The model writes display names, so none is shown.
+ */
+function fullMailDetail(
+  args: Record<string, unknown>,
+  reviewReason?: string,
+  account?: string,
+  newRecipient = true,
+): string {
   const lines = reviewReason?.trim() ? [reviewReason.trim()] : [];
+  const from = typeof args.account === "string" && args.account ? args.account : account;
+  if (from) lines.push(`from: ${from}`);
   for (const key of ["to", "cc", "bcc"]) {
-    const list = strings(args[key]);
+    const list = bareAddresses(args[key]);
     lines.push(`${key}: ${list.length ? list.join(", ") : "(none)"}`);
   }
-  lines.push(`subject: ${String(args.subject ?? "")}`, `body: ${String(args.body ?? "")}`);
+  const body = String(args.body ?? "");
+  lines.push(`subject: ${String(args.subject ?? "")}`, `body: ${body}`);
+  const flags = [
+    ...(newRecipient ? [MAIL_REPLY_FLAG_TEXT.new_recipient] : []),
+    ...(bodyHasLink(body) ? [MAIL_REPLY_FLAG_TEXT.has_link] : []),
+  ];
+  if (flags.length) lines.push(`flags: ${flags.join(", ")}`);
   return lines.join("\n");
 }
 
@@ -815,7 +896,10 @@ function formatAmount(value: unknown, currency: unknown): string {
   if (!Number.isFinite(number) || typeof value === "boolean") return String(value);
   const code = typeof currency === "string" && /^[A-Za-z]{3}$/.test(currency) ? currency : "USD";
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: code }).format(number);
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: code,
+    }).format(number);
   } catch {
     return String(value);
   }
@@ -837,6 +921,7 @@ function mailApproval(
   args: Record<string, unknown>,
   secrets: string[],
   choices?: MailApproval["choices"],
+  bare = false,
 ): MailApproval | undefined {
   if (toolName !== "mail_draft" && toolName !== "mail_send") return undefined;
   const text = (value: unknown) => (typeof value === "string" ? redactSecrets(value, secrets) : "");
@@ -848,9 +933,15 @@ function mailApproval(
       ? { account: redactSecrets(args.account, secrets) }
       : {}),
     ...(choices?.length ? { choices } : {}),
-    to: strings(args.to).map((item) => redactSecrets(item, secrets)),
-    cc: strings(args.cc).map((item) => redactSecrets(item, secrets)),
-    bcc: strings(args.bcc).map((item) => redactSecrets(item, secrets)),
+    to: (bare ? bareAddresses(args.to) : strings(args.to)).map((item) =>
+      redactSecrets(item, secrets),
+    ),
+    cc: (bare ? bareAddresses(args.cc) : strings(args.cc)).map((item) =>
+      redactSecrets(item, secrets),
+    ),
+    bcc: (bare ? bareAddresses(args.bcc) : strings(args.bcc)).map((item) =>
+      redactSecrets(item, secrets),
+    ),
     subject: text(args.subject),
     body,
     ...(typeof args.replyToId === "string" && args.replyToId.trim() ? { reply: true } : {}),

@@ -13829,6 +13829,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -13892,6 +13899,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -14329,6 +14337,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -14392,6 +14407,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -14829,6 +14845,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -14892,6 +14915,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -15318,6 +15342,13 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "firewallAskCapabilities": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "proactivity": {
                             "default": "medium",
                             "type": "string",
@@ -15381,6 +15412,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "firewallAskCapabilities",
                           "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
@@ -15808,6 +15840,13 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "firewallAskCapabilities": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "proactivity": {
                             "default": "medium",
                             "type": "string",
@@ -15871,6 +15910,7 @@
                           "disabledBuiltinTools",
                           "audience",
                           "firewall",
+                          "firewallAskCapabilities",
                           "proactivity",
                           "externalMessageTargets",
                           "externalComputerTools",
@@ -16970,6 +17010,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -17033,6 +17080,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -17230,17 +17278,20 @@
                       "firewall": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema25"
                       },
-                      "proactivity": {
+                      "firewallAskCapabilities": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema26"
                       },
-                      "externalMessageTargets": {
-                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
-                      },
-                      "externalComputerTools": {
+                      "proactivity": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema28"
                       },
-                      "runsOn": {
+                      "externalMessageTargets": {
                         "$ref": "#/components/schemas/RpcBotsUpdateInputSchema29"
+                      },
+                      "externalComputerTools": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema30"
+                      },
+                      "runsOn": {
+                        "$ref": "#/components/schemas/RpcBotsUpdateInputSchema31"
                       }
                     },
                     "required": [
@@ -17552,6 +17603,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -17615,6 +17673,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -21572,6 +21631,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -21635,6 +21701,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -22394,6 +22461,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -22457,6 +22531,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -27968,6 +28043,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -28031,6 +28113,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -40597,6 +40680,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -40660,6 +40750,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -47642,6 +47733,13 @@
                                   "default": false,
                                   "type": "boolean"
                                 },
+                                "firewallAskCapabilities": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
                                 "proactivity": {
                                   "default": "medium",
                                   "type": "string",
@@ -47705,6 +47803,7 @@
                                 "disabledBuiltinTools",
                                 "audience",
                                 "firewall",
+                                "firewallAskCapabilities",
                                 "proactivity",
                                 "externalMessageTargets",
                                 "externalComputerTools",
@@ -52075,6 +52174,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -52138,6 +52244,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -70530,6 +70637,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -70593,6 +70707,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -72209,6 +72324,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -72272,6 +72394,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -73062,6 +73185,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -73125,6 +73255,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -80059,6 +80190,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -80122,6 +80260,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -87411,6 +87550,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -87474,6 +87620,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -108644,6 +108791,503 @@
         ]
       }
     },
+    "/rpc/omiCloud/connect": {
+      "post": {
+        "operationId": "rpc_omiCloud_connect",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "apiKey": {
+                        "type": "string",
+                        "maxLength": 512
+                      }
+                    },
+                    "required": [
+                      "apiKey"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/omiCloud/disconnect": {
+      "post": {
+        "operationId": "rpc_omiCloud_disconnect",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/omiCloud/status": {
+      "post": {
+        "operationId": "rpc_omiCloud_status",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "connectionId": {
+                              "$ref": "#/components/schemas/RpcOmiCloudStatusOutputSchema0"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "connected",
+                                "needs_reconnect",
+                                "disconnected"
+                              ]
+                            },
+                            "syncedThrough": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "lastSyncedAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "syncedCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "agentBotId": {
+                              "anyOf": [
+                                {
+                                  "$ref": "#/components/schemas/RpcOmiCloudStatusOutputSchema0"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "connectionId",
+                            "status",
+                            "syncedThrough",
+                            "lastSyncedAt",
+                            "syncedCount",
+                            "agentBotId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/onboarding/appConnected": {
       "post": {
         "operationId": "rpc_onboarding_appConnected",
@@ -124015,6 +124659,13 @@
                                     "default": false,
                                     "type": "boolean"
                                   },
+                                  "firewallAskCapabilities": {
+                                    "default": [],
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
                                   "proactivity": {
                                     "default": "medium",
                                     "type": "string",
@@ -124075,6 +124726,7 @@
                                   "disabledBuiltinTools",
                                   "audience",
                                   "firewall",
+                                  "firewallAskCapabilities",
                                   "proactivity",
                                   "externalMessageTargets",
                                   "externalComputerTools",
@@ -138128,6 +138780,13 @@
                           "default": false,
                           "type": "boolean"
                         },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
                         "proactivity": {
                           "default": "medium",
                           "type": "string",
@@ -138191,6 +138850,7 @@
                         "disabledBuiltinTools",
                         "audience",
                         "firewall",
+                        "firewallAskCapabilities",
                         "proactivity",
                         "externalMessageTargets",
                         "externalComputerTools",
@@ -140545,6 +141205,13 @@
             "default": false,
             "type": "boolean"
           },
+          "firewallAskCapabilities": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "proactivity": {
             "default": "medium",
             "type": "string",
@@ -140605,6 +141272,7 @@
           "disabledBuiltinTools",
           "audience",
           "firewall",
+          "firewallAskCapabilities",
           "proactivity",
           "externalMessageTargets",
           "externalComputerTools",
@@ -142006,7 +142674,7 @@
         ]
       },
       "RpcBotsUpdateInputSchema22": {
-        "maxItems": 143,
+        "maxItems": 144,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema23"
@@ -142028,6 +142696,17 @@
         "type": "boolean"
       },
       "RpcBotsUpdateInputSchema26": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/RpcBotsUpdateInputSchema27"
+        }
+      },
+      "RpcBotsUpdateInputSchema27": {
+        "type": "string",
+        "maxLength": 64
+      },
+      "RpcBotsUpdateInputSchema28": {
         "type": "string",
         "enum": [
           "low",
@@ -142035,17 +142714,17 @@
           "high"
         ]
       },
-      "RpcBotsUpdateInputSchema27": {
+      "RpcBotsUpdateInputSchema29": {
         "maxItems": 200,
         "type": "array",
         "items": {
           "$ref": "#/components/schemas/RpcBotsUpdateInputSchema0"
         }
       },
-      "RpcBotsUpdateInputSchema28": {
+      "RpcBotsUpdateInputSchema30": {
         "type": "boolean"
       },
-      "RpcBotsUpdateInputSchema29": {
+      "RpcBotsUpdateInputSchema31": {
         "anyOf": [
           {
             "type": "string",
@@ -149096,6 +149775,9 @@
           "updatedAt": {
             "$ref": "#/components/schemas/RpcMeetingsImportLocalInputSchema1"
           },
+          "version": {
+            "type": "string"
+          },
           "deleted": {
             "type": "boolean"
           }
@@ -149400,6 +150082,10 @@
         "minLength": 1
       },
       "RpcOmiStatusOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcOmiCloudStatusOutputSchema0": {
         "type": "string",
         "minLength": 1
       },

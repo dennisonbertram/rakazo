@@ -829,8 +829,13 @@ export interface MeetingSource {
    * trusting a checkpoint. Throws MeetingSourceError.
    */
   list(filter: { updatedAfter?: Date; createdAfter?: Date; cursor?: string }): Promise<{
-    items: { externalId: string; updatedAt: string; deleted?: boolean }[];
+    items: { externalId: string; updatedAt: string; version?: string; deleted?: boolean }[];
     nextCursor?: string;
   }>;
   get(externalId: string, options: { includeTranscript: boolean }): Promise<SourceMeeting>;
+  /**
+   * False when reading this meeting now would exceed the source's read budget for this run; the
+   * run then stops and the next one continues. Absent: no budget.
+   */
+  canGet?(externalId: string): boolean;
 }

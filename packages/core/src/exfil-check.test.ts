@@ -62,7 +62,9 @@ const EXFIL: Array<[string, string]> = [
 
 describe("checkFetchUrl", () => {
   it.each(ORDINARY)("passes the ordinary URL %s", (url) => {
-    expect(checkFetchUrl(url, new PrivateFragments())).toEqual({ verdict: "clean" });
+    expect(checkFetchUrl(url, new PrivateFragments())).toEqual({
+      verdict: "clean",
+    });
     expect(checkFetchUrl(url, private_())).toEqual({ verdict: "clean" });
   });
 
@@ -84,7 +86,10 @@ describe("checkFetchUrl", () => {
     );
     expect(verdict).toMatchObject({ verdict: "fragment" });
     const shaped = checkFetchUrl(`https://x.test/c?d=${"x".repeat(200)}`, new PrivateFragments());
-    expect(shaped).toMatchObject({ verdict: "suspicious", reason: "unusually long URL" });
+    expect(shaped).toMatchObject({
+      verdict: "suspicious",
+      reason: "unusually long URL",
+    });
     expect(JSON.stringify(shaped)).not.toContain("xxxxxxxx");
   });
 });
@@ -96,5 +101,26 @@ describe("collectStrings", () => {
       "b",
       "c",
     ]);
+  });
+});
+
+describe("checkFetchUrl on a restored record", () => {
+  it("holds an encoded fragment and passes a clean URL", () => {
+    const hash = (value: string) => `x${value.length}:${value}`.split("").reverse().join("");
+    const first = new PrivateFragments(hash);
+    first.addPrivate(
+      JSON.stringify({
+        email: "priya.shah@acme-capital.example",
+        cash: "1,250,000",
+      }),
+    );
+    const restored = new PrivateFragments(hash);
+    restored.restore([first.takeDelta()!]);
+    const b64 = Buffer.from("priya.shah@acme-capital.example").toString("base64url");
+    expect(checkFetchUrl(`https://x.test/c?d=${b64}`, restored).verdict).toBe("fragment");
+    expect(checkFetchUrl("https://x.test/c?q=1250000", restored).verdict).toBe("fragment");
+    expect(checkFetchUrl("https://docs.python.org/3/library/csv.html", restored)).toEqual({
+      verdict: "clean",
+    });
   });
 });

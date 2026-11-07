@@ -549,6 +549,16 @@ code-b
       // Not JSON: fall through to the other intents.
     }
   }
+  // "request access fixture <json>": an access request, for demo and tests.
+  const accessFixture = /request access fixture\s+(\{[\s\S]*\})/i.exec(prompt);
+  if (accessFixture) {
+    try {
+      const args = JSON.parse(accessFixture[1] as string) as Record<string, unknown>;
+      return [{ toolCalls: [{ name: "request_access", args }], complete: true }];
+    } catch {
+      // Not JSON: fall through to the other intents.
+    }
+  }
   if (
     lower.includes("create a space") ||
     lower.includes("create space") ||

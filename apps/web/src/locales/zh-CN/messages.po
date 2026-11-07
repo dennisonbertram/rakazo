@@ -562,6 +562,7 @@ msgid "{count, plural, one {access to # shared document} other {access to # shar
 msgstr ""
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 msgid "{count, plural, one {Synced # meeting} other {Synced # meetings}}"
 msgstr ""
 
@@ -3550,6 +3551,7 @@ msgstr ""
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
@@ -3775,6 +3777,7 @@ msgstr ""
 #: src/components/integrations/DevinConnectDialog.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 #: src/components/integrations/OmiPage.tsx
 #: src/components/integrations/parts.tsx
 #: src/pages/Finance.tsx
@@ -4437,6 +4440,10 @@ msgstr ""
 msgid "Could not reach Granola"
 msgstr ""
 
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Could not reach Omi"
+msgstr ""
+
 #: src/components/inbox/EmailAgentPanel.tsx
 msgid "Could not reach Praci. Try again."
 msgstr ""
@@ -4506,6 +4513,10 @@ msgstr "无法移除规则"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Could not remove the credential"
+msgstr ""
+
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Could not remove the key"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
@@ -9819,6 +9830,10 @@ msgstr ""
 msgid "Omi agent"
 msgstr ""
 
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Omi developer key"
+msgstr ""
+
 #: src/components/integrations/parts.tsx
 msgid "On"
 msgstr ""
@@ -11197,6 +11212,7 @@ msgid "Reconnect Mercury"
 msgstr ""
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 msgid "Reconnect needed"
 msgstr ""
 
@@ -11393,6 +11409,7 @@ msgstr ""
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 #: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
@@ -13701,6 +13718,7 @@ msgstr ""
 #: src/components/inbox/TodoCard.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
 #: src/components/integrations/HexCard.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 msgid "Syncing"
 msgstr ""
 
@@ -14939,6 +14957,10 @@ msgstr ""
 
 #: src/pages/Onboarding.tsx
 msgid "Use an API key instead"
+msgstr ""
+
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Use an Omi key"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx

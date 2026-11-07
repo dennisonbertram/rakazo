@@ -39,6 +39,9 @@ export const FIREWALL_CONTENT_READERS: ReadonlySet<string> = new Set([
   "calendar_agenda",
   "board_tickets",
   "ticket_get",
+  "contacts_list",
+  "contacts_add",
+  "contacts_save",
 ]);
 
 /**
@@ -65,7 +68,7 @@ const AGENT_RECORD_TOOLS = new Set(["agent_context", "search_agent_history", "re
  * filters, the one ticket named. Checked by author, so the records carry no mark.
  */
 export async function readsFirewalledContent(
-  prisma: Pick<PrismaClient, "scratchpadItem" | "routine" | "ticket" | "ticketComment">,
+  prisma: Pick<PrismaClient, "scratchpadItem" | "routine" | "ticket" | "ticketComment" | "contact">,
   scope: Scope,
   name: string,
   args: Record<string, unknown>,
@@ -105,6 +108,52 @@ export async function readsFirewalledContent(
       }),
     ]);
     return written(items) || written(routines);
+  }
+  if (name === "contacts_list") {
+    // Contact.botId is the agent that added the contact, lastEditedByBotId the one that last changed it.
+    const text = typeof args.query === "string" ? args.query.trim() : "";
+    const contains = (field: string) => ({ [field]: { contains: text, mode: "insensitive" } });
+    const rows = await prisma.contact.findMany({
+      where: {
+        ...scope,
+        OR: [{ botId: { in: authors } }, { lastEditedByBotId: { in: authors } }],
+        ...(typeof args.kind === "string" && args.kind ? { kind: args.kind } : {}),
+        ...(text
+          ? { AND: [{ OR: ["name", "email", "organization", "notes"].map((f) => contains(f)) }] }
+          : {}),
+      },
+      select: { botId: true, lastEditedByBotId: true },
+      take: 1,
+    });
+    return rows.some(
+      (row) =>
+        (row.botId != null && firewalled.has(row.botId)) ||
+        (row.lastEditedByBotId != null && firewalled.has(row.lastEditedByBotId)),
+    );
+  }
+  if (name === "contacts_add" || name === "contacts_save") {
+    // An existing contact is returned whole, notes included: the same match contacts_add uses
+    // (the email, or the name and organization without one).
+    const email = typeof args.email === "string" ? args.email.trim().toLowerCase() : "";
+    const person = typeof args.name === "string" ? args.name.trim() : "";
+    const organization = typeof args.organization === "string" ? args.organization.trim() : "";
+    const same = (value: string) => ({
+      equals: value.replace(/[\\%_]/g, "\\$&"),
+      mode: "insensitive" as const,
+    });
+    if (!email && !person) return false;
+    const rows = await prisma.contact.findMany({
+      where: {
+        ...scope,
+        OR: [{ botId: { in: authors } }, { lastEditedByBotId: { in: authors } }],
+        ...(email
+          ? { email }
+          : { name: same(person), organization: organization ? same(organization) : null }),
+      },
+      select: { botId: true, lastEditedByBotId: true },
+      take: 1,
+    });
+    return rows.length > 0;
   }
   if (name === "board_tickets") {
     const rows = await prisma.ticket.findMany({

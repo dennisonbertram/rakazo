@@ -529,6 +529,7 @@ model Member {
 }
 
 model Space {
+  runFragments RunFragment[]
   modelConnectionPauses ModelConnectionPause[]
   pipelineRecords PipelineRecord[]
   pipelineImports PipelineImport[]
@@ -898,6 +899,8 @@ model Bot {
   // Agent firewall: treat everything the agent reads as untrusted. Server-owned: only the owner's
   // settings API sets it; no bot tool reads or sets it.
   firewall               Boolean               @default(false)
+  // Capability ids (packages/core request-access.ts) a firewalled agent may ask to use, each use still on a card. Server-owned: only the owner's answer to a request-access card or settings change it.
+  firewallAskCapabilities String[]             @default([])
   // "low", "medium" (default) or "high": how far the agent goes beyond the request. Owner-only; no bot tool sets it and nothing reads it for an approval decision.
   proactivity            String                @default("medium")
   // For an external bot: the internal bots it may message (bot ids; empty means none).
@@ -1187,6 +1190,9 @@ model Run {
   // outside text entered the run. readDesktop: the run listed or read a desktop app.
   readOutsideContent   Boolean           @default(false)
   readDesktop          Boolean           @default(false)
+  /// The run's record of what it read is kept in run_fragments (set when the first attempt claims it).
+  fragmentRecord       Boolean           @default(false)
+  fragments            RunFragment[]
 
   @@unique([spaceId, clientNonce])
   @@index([status, leaseExpiresAt])
@@ -1202,6 +1208,27 @@ model Run {
   @@index([routineId])
   @@index([goalId])
   @@map("runs")
+}
+
+/// Keyed hashes of what a run read, one row per recorded tool result, so a resumed attempt can
+/// check outbound text against it. Holds no readable private text; publicWords is public text only.
+model RunFragment {
+  id          Int      @id @default(autoincrement())
+  runId       String
+  run         Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  spaceId     String
+  space       Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId      String
+  fence       Int
+  /// First 8 hex of a keyed check value; differs after the server key changes.
+  keyId       String
+  /// 17-byte entries: one tag byte (public ? 4 : 0 | kind) then a 16-byte hash.
+  entries     Bytes
+  publicWords String?
+  createdAt   DateTime @default(now())
+
+  @@index([runId, id])
+  @@map("run_fragments")
 }
 
 model SteeringMessage {
@@ -3360,6 +3387,8 @@ model Contact {
   /// The agent that added the contact, set by the server; null for a contact added by hand or after the agent was deleted.
   botId            String?
   bot              Bot?                  @relation(fields: [botId], references: [id], onDelete: SetNull)
+  /// The agent that last changed this contact with contacts_save. A Firewall agent's edit marks the contact as untrusted text (see readsFirewalledContent).
+  lastEditedByBotId String?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   companyEntities CompanyEntity[] @relation("CompanyEntityContact")
@@ -4156,6 +4185,8 @@ model Meeting {
   /// investor | customer | hiring | team | other; from the digest call.
   category          String?
   sourceUpdatedAt   DateTime
+  /// Content version from a source whose update time does not change on an edit (Omi cloud).
+  sourceVersion     String?
   /// Only for providers that report deletions.
   deletedAt         DateTime?
   createdAt         DateTime                 @default(now())

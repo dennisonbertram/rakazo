@@ -19,6 +19,7 @@ function fixture() {
     $transaction: async (action: (tx: unknown) => Promise<unknown>) => action(client),
     run: { updateMany: locked, findMany: async () => [] },
     secret: { deleteMany: vi.fn() },
+    runFragment: { deleteMany: vi.fn() },
     externalEffect: {
       upsert,
       findMany: async () => (stored ? [{ result: stored }] : []),

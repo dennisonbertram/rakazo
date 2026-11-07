@@ -11,11 +11,13 @@ import {
 import type { ClosedApprovalAnswer } from "@rakazo/core";
 import {
   ALL_SITES_ACTION_ID,
+  accessCapability,
   callIdFromClientNonce,
   closeApprovalAsks,
   isApprovalAskBlock,
   isConversationalRun,
   isSecretAskBlock,
+  REQUEST_ACCESS_TOOL,
   resolveAskChoice,
   routineAlwaysAllowable,
   SKIPPED_APPROVAL_ANSWER,
@@ -557,7 +559,8 @@ async function commitAnswerRunInput(
     // Only the run's owner can answer for their data.
     if (
       (approvalEffect.kind === AI_CONSENT_EFFECT_KIND ||
-        approvalEffect.kind === DESKTOP_APP_USE_EFFECT_KIND) &&
+        approvalEffect.kind === DESKTOP_APP_USE_EFFECT_KIND ||
+        approvalEffect.kind === REQUEST_ACCESS_TOOL) &&
       run.userId !== input.answeredByUserId
     ) {
       return null;
@@ -687,9 +690,43 @@ async function commitAnswerRunInput(
         effect: "always_allow",
       });
     }
+    // "Always for this agent" on an access request changes the agent's own settings. It must never
+    // reach the generic rule below, which would auto-approve every later access request.
+    const accessRequest = approvalEffect!.kind === REQUEST_ACCESS_TOOL;
+    if (accessRequest && input.answer === "always") {
+      const capability = accessCapability(
+        (approvalEffect!.request as { capability?: unknown } | null)?.capability,
+      );
+      const bot = await tx.bot.findFirst({
+        where: { id: run.botId, spaceId: input.spaceId, userId: run.userId },
+        select: { disabledBuiltinTools: true, firewall: true, firewallAskCapabilities: true },
+      });
+      if (capability && bot) {
+        await tx.bot.update({
+          where: { id: run.botId },
+          data: {
+            disabledBuiltinTools: bot.disabledBuiltinTools.filter(
+              (tool) => !(capability.tools as readonly string[]).includes(tool),
+            ),
+            // A Firewall agent may now ask to use the tools; every use still asks.
+            ...(bot.firewall && capability.firewall
+              ? {
+                  firewallAskCapabilities: [
+                    ...new Set([...bot.firewallAskCapabilities, capability.id]),
+                  ],
+                }
+              : {}),
+          },
+        });
+      }
+    }
     // "Always" on a fetch card allows that site, never every site the tool can reach.
     const site = alwaysAllowedSite(approvalEffect!);
-    if (input.answer === "always" && (site || !SITE_GATED_TOOLS.has(approvalEffect!.kind))) {
+    if (
+      !accessRequest &&
+      input.answer === "always" &&
+      (site || !SITE_GATED_TOOLS.has(approvalEffect!.kind))
+    ) {
       // A card's "Always allow" is a space-wide rule; it replaces any rule for that target.
       await setApprovalRule(tx, {
         spaceId: input.spaceId,

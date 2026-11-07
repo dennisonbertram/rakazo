@@ -160,12 +160,15 @@ export function repeatsPrivateText(text: string, fragments: PrivateFragments): b
   return decodedCandidates(text).some((candidate) => fragments.matches(candidate).length > 0);
 }
 
+/** The reason when the run's record of what it read could not be loaded. */
+export const RUN_RECORD_UNKNOWN = "run record unknown";
+
 /** The deterministic verdict for one URL. `fragments` undefined means the run's record is unknown. */
 export function checkFetchUrl(
   urlText: string,
   fragments: PrivateFragments | undefined,
 ): UrlVerdict {
-  if (!fragments) return { verdict: "fragment", reason: "run record unknown" };
+  if (!fragments) return { verdict: "fragment", reason: RUN_RECORD_UNKNOWN };
   if (repeatsPrivateText(urlText, fragments)) {
     return { verdict: "fragment", reason: "URL repeats private text" };
   }
