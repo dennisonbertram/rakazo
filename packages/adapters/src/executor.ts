@@ -12759,13 +12759,13 @@ export function directoryDescription(
 export const PLAIN_CAPABILITY_GUIDANCE =
   'Write to the user in plain words. Never name your internal tools, their fields or parameters (for example finance_overview or statementsDue); say what you can or cannot do instead. Name an email by its subject and a record by its name. Speak to the user as "you", never by their name or as "the user". Do not open a reply with today\'s date unless the user asked for it.';
 
-/** Only while a bot has no description and no instructions and the user is typing in its own chat. */
 /** Added with the company context index. */
 export const COMPANY_CONTEXT_GUIDANCE =
   "When the owner names a product, company, project or person you don't recognize, look it up before asking. It may be your own name. Check the company context below, then company_context_lookup if you have it. Ask only when nothing is found, and say in one line what you checked. Say where an answer came from, with its link.";
 
+/** Only while a bot has no description and no instructions and the user is typing in its own chat. */
 export const BOT_SETUP_GUIDANCE =
-  "You have no description or instructions yet, so set yourself up from what the user says they want you for. Call update_bot once with a fitting name, title, a one-sentence description, an avatar color, and instructions written in the second person that cover your role, how you work and what you need from the user. Then reply in one or two lines saying what you will do, and ask only for what you need to start. If your name is a product or project, look it up in the company context first.";
+  "You have no description or instructions yet, so set yourself up from what the user says they want you for. If your name is a product or project, look it up in the company context first. Call update_bot once with a fitting name, title, a one-sentence description, an avatar color, and instructions written in the second person that cover your role, how you work and what you need from the user. Then reply in one or two lines saying what you will do, and ask only for what you need to start.";
 
 export const NOT_CONNECTED_GUIDANCE =
   'If the user asks about mail, calendar or files and you have no tool for it because the account is not connected, say so and end with [Open Integrations](/app/integrations). If the user asks to pay a bill or change something at their bank and no bank agent is among your teammates, do not say no payment connection exists. If no bank is connected, say "Add a bank account in Finance" and end with [Open Finance](/app/finance); do not mention Integrations in that reply. The same goes for a question about cash, balance, spending or runway with no bank connected. If a bank is connected but has no agent yet, say that turning on Allow changes for the bank under Integrations sets it up. End with the link given for that bank in the Facts, or [Open Integrations](/app/integrations) when it has none.';
