@@ -1,9 +1,14 @@
 import { MeetingSourceError } from "@rakazo/adapter-kit";
-import { GRANOLA_API_CONNECTOR_ID, isWisprFlowEndpoint } from "@rakazo/contracts";
+import {
+  GRANOLA_API_CONNECTOR_ID,
+  isWisprFlowEndpoint,
+  OMI_CLOUD_CONNECTOR_ID,
+} from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { createGranolaMeetingSource } from "./granola-meeting-source.js";
 import type { McpConnector } from "./mcp-connector.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
+import { createOmiCloudMeetingSource } from "./omi-cloud-meeting-source.js";
 import { createWisprFlowMeetingSource } from "./wispr-flow-meeting-source.js";
 
 /** A failed MCP call as the source error the sync job understands. */
@@ -23,6 +28,7 @@ function mcpSourceError(error: unknown): MeetingSourceError {
 export function createMeetingSourceRegistry(
   options: {
     granolaBaseUrl?: string;
+    omiCloudBaseUrl?: string;
     fetch?: typeof fetch;
     /** The user's MCP servers; without it there is no Wispr Flow source and its syncs do nothing. */
     mcp?: { prisma: PrismaClient; connector: Pick<McpConnector, "callServerTool"> };
@@ -74,6 +80,26 @@ export function createMeetingSourceRegistry(
           apiKey,
           ...(options.granolaBaseUrl ? { baseUrl: options.granolaBaseUrl } : {}),
           // Every request ends when the run's deadline passes.
+          fetch: (input, init) =>
+            base(input, {
+              ...init,
+              signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal,
+            }),
+        });
+      },
+    },
+    omi_cloud: {
+      connectorId: OMI_CLOUD_CONNECTOR_ID,
+      // Assumed from Omi's docs (not confirmed): a list call with transcripts costs one of 25
+      // transcript reads an hour. Two such calls every 6 minutes is 20 an hour.
+      chainDelayMs: 6 * 60_000,
+      create: ({ apiKey }, signal) => {
+        const base = options.fetch ?? fetch;
+        if (!apiKey) throw new Error("Omi needs an API key");
+        return createOmiCloudMeetingSource({
+          apiKey,
+          maxTranscriptCalls: 2,
+          ...(options.omiCloudBaseUrl ? { baseUrl: options.omiCloudBaseUrl } : {}),
           fetch: (input, init) =>
             base(input, {
               ...init,

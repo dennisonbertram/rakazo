@@ -44,7 +44,7 @@ export interface MeetingsDeps {
   agent: Parameters<typeof ensureConnectedAppAgent>[0];
 }
 
-const owner = (actor: Actor) => ({ spaceId: actor.spaceId, userId: actor.userId });
+export const owner = (actor: Actor) => ({ spaceId: actor.spaceId, userId: actor.userId });
 
 /** The user's Granola key connection, whatever its status except revoked. */
 const findConnection = (deps: MeetingsDeps, actor: Actor) =>
@@ -136,7 +136,7 @@ async function missingConsent(deps: MeetingsDeps, actor: Actor, botId?: string |
 }
 
 /** Connecting is the consent act: it records consent for the primary model's recipient. */
-async function recordConsent(deps: MeetingsDeps, actor: Actor, botId: string | null) {
+export async function recordConsent(deps: MeetingsDeps, actor: Actor, botId: string | null) {
   for (const recipient of await missingConsent(deps, actor, botId)) {
     await deps.router.prisma.aiDataConsent.upsert({
       where: {

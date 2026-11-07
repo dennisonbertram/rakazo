@@ -52,6 +52,7 @@ export async function upsertMeeting(
     summary: meeting.summary,
     privateNotes: meeting.privateNotes,
     sourceUpdatedAt,
+    ...(meeting.version !== undefined ? { sourceVersion: meeting.version } : {}),
     deletedAt: meeting.deleted ? new Date() : null,
     // A listing-only update has no transcript; keep the one already stored.
     ...(meeting.transcript
@@ -79,7 +80,14 @@ export async function upsertMeeting(
     }
     // The write itself is conditional, so an older update never wins even without the lock.
     const { count } = await tx.meeting.updateMany({
-      where: { ...key, sourceUpdatedAt: { lt: sourceUpdatedAt } },
+      // A versioned source updates when the version differs; the others when the date is newer.
+      where:
+        meeting.version !== undefined
+          ? {
+              ...key,
+              OR: [{ sourceVersion: null }, { sourceVersion: { not: meeting.version } }],
+            }
+          : { ...key, sourceUpdatedAt: { lt: sourceUpdatedAt } },
       data,
     });
     // A source-side deletion takes the meeting's Recordings note with it.

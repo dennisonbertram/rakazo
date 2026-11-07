@@ -3,10 +3,10 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 346 of 346
-- Web and shared components: 881
-- Mobile components: 153 in 102 files, mobile — native story pending
-- SwiftUI views: 140 in 76 files, native story pending
+- Web and shared component files with stories: 347 of 347
+- Web and shared components: 882
+- Mobile components: 155 in 104 files, mobile — native story pending
+- SwiftUI views: 141 in 77 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
 
@@ -297,6 +297,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | IntegrationSetup | [apps/web/src/components/integrations/IntegrationSetup.tsx](../../apps/web/src/components/integrations/IntegrationSetup.tsx) | [IntegrationSetup.stories.tsx](../../apps/web/src/components/integrations/IntegrationSetup.stories.tsx) | web |
 | Card, OpenPageLink, UsedBy, McpCard, GranolaKeyCard, AppCard, SourceCard, AppTile, IntegrationsHome | [apps/web/src/components/integrations/IntegrationsHome.tsx](../../apps/web/src/components/integrations/IntegrationsHome.tsx) | [IntegrationsHome.stories.tsx](../../apps/web/src/components/integrations/IntegrationsHome.stories.tsx) | web |
 | McpDetail | [apps/web/src/components/integrations/McpDetail.tsx](../../apps/web/src/components/integrations/McpDetail.tsx) | [McpDetail.stories.tsx](../../apps/web/src/components/integrations/McpDetail.stories.tsx) | web |
+| OmiCloudKeyCard | [apps/web/src/components/integrations/OmiCloudKeyCard.tsx](../../apps/web/src/components/integrations/OmiCloudKeyCard.tsx) | [OmiCloudKeyCard.stories.tsx](../../apps/web/src/components/integrations/OmiCloudKeyCard.stories.tsx) | web |
 | StatusLine, OmiView, OmiAgent, OmiPage | [apps/web/src/components/integrations/OmiPage.tsx](../../apps/web/src/components/integrations/OmiPage.tsx) | [OmiPage.stories.tsx](../../apps/web/src/components/integrations/OmiPage.stories.tsx) | web |
 | SegmentRow, OmiSegments, OmiTrash | [apps/web/src/components/integrations/OmiSegments.tsx](../../apps/web/src/components/integrations/OmiSegments.tsx) | [OmiPage.stories.tsx](../../apps/web/src/components/integrations/OmiPage.stories.tsx), [OmiSegments.stories.tsx](../../apps/web/src/components/integrations/OmiSegments.stories.tsx) | web |
 | IntegrationTile, StatusBadge, TileMenu, AgentStack, AgentToggleList, CardHead, SectionTitle, SourceBadge | [apps/web/src/components/integrations/parts.tsx](../../apps/web/src/components/integrations/parts.tsx) | [parts.stories.tsx](../../apps/web/src/components/integrations/parts.stories.tsx) | web |
@@ -546,6 +547,8 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | GlassSurface | [apps/mobile/components/glass-surface.ios.tsx](../../apps/mobile/components/glass-surface.ios.tsx) | mobile — native story pending | mobile |
 | GlassSurface | [apps/mobile/components/glass-surface.tsx](../../apps/mobile/components/glass-surface.tsx) | mobile — native story pending | mobile |
 | GlassTitle | [apps/mobile/components/glass-title.ios.tsx](../../apps/mobile/components/glass-title.ios.tsx) | mobile — native story pending | mobile |
+| GoalCard | [apps/mobile/components/goal-card.tsx](../../apps/mobile/components/goal-card.tsx) | mobile — native story pending | mobile |
+| GoalLine | [apps/mobile/components/goal-line.tsx](../../apps/mobile/components/goal-line.tsx) | mobile — native story pending | mobile |
 | GranolaKeyGroup | [apps/mobile/components/granola-key-group.tsx](../../apps/mobile/components/granola-key-group.tsx) | mobile — native story pending | mobile |
 | GroupAvatar | [apps/mobile/components/group-avatar.tsx](../../apps/mobile/components/group-avatar.tsx) | mobile — native story pending | mobile |
 | ZoomableImage, ImageArtifactViewer | [apps/mobile/components/image-artifact-viewer.tsx](../../apps/mobile/components/image-artifact-viewer.tsx) | mobile — native story pending | mobile |
@@ -660,6 +663,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | SecretAskView | [apps/ios/Sources/Praci/Thread/Approvals/SecretAskView.swift](../../apps/ios/Sources/Praci/Thread/Approvals/SecretAskView.swift) | native story pending | iOS |
 | ComposerView | [apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift](../../apps/ios/Sources/Praci/Thread/Composer/ComposerView.swift) | native story pending | iOS |
 | PendingSendsView | [apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift](../../apps/ios/Sources/Praci/Thread/Composer/PendingSendsView.swift) | native story pending | iOS |
+| GoalBlockView | [apps/ios/Sources/Praci/Thread/GoalViews.swift](../../apps/ios/Sources/Praci/Thread/GoalViews.swift) | native story pending | iOS |
 | MessageActions | [apps/ios/Sources/Praci/Thread/MessageActions.swift](../../apps/ios/Sources/Praci/Thread/MessageActions.swift) | native story pending | iOS |
 | MarkdownView, TableView, ToolLabel, StepsBlockView, SubagentRowView, PageCardView, ImageBlockView, FileBlockView | [apps/ios/Sources/Praci/Thread/ThreadBlocks.swift](../../apps/ios/Sources/Praci/Thread/ThreadBlocks.swift) | native story pending | iOS |
 | ThreadMessageView, MarkUnreadButton, WorkingIndicator | [apps/ios/Sources/Praci/Thread/ThreadMessageView.swift](../../apps/ios/Sources/Praci/Thread/ThreadMessageView.swift) | native story pending | iOS |
