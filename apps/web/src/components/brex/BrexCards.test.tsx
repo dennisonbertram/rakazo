@@ -155,6 +155,31 @@ it("sends the exact New card message, then opens the agent chat", async () => {
   );
 });
 
+it("requires a lock date for a one-time card", async () => {
+  await mount(view());
+  await click(buttonIn(container, "New card"));
+  await typeInto(field("brex-new-card-name"), "Launch");
+  await typeInto(field("brex-new-card-merchant"), "Figma");
+  await typeInto(field("brex-new-card-limit"), "500");
+  await click(buttonIn(dialog(), "One time"));
+  await click(buttonIn(dialog(), "Request card"));
+  expect(send).not.toHaveBeenCalled();
+  expect(dialog().textContent).toContain("Enter a lock date for a one-time card");
+  await typeInto(field("brex-new-card-lock-date"), "2026-12-31");
+  await click(buttonIn(dialog(), "Request card"));
+  expect(send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      text: "Create a vendor card named Launch for Figma, $500 per one time, locked to Figma, lock after 2026-12-31.",
+    }),
+  );
+});
+
+it("shows an unrecognized status as Unknown, not Active", async () => {
+  await mount(view());
+  expect(container.textContent).toContain("Legacy card");
+  expect(container.textContent).toContain("Unknown");
+});
+
 it("cannot send the New card form after Allow changes turns off", async () => {
   await mount(view());
   await click(buttonIn(container, "New card"));

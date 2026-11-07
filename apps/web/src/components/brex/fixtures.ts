@@ -234,6 +234,15 @@ export const cardsViewFixture: BrexCardsView = {
       usage: null,
     }),
     cardView({
+      cardId: "card_legacy",
+      name: "Legacy card",
+      lastFour: "8888",
+      status: "UNKNOWN",
+      periodSpendCents: 0,
+      series: spendSeries(0, 0),
+      usage: null,
+    }),
+    cardView({
       cardId: "card_yearly",
       name: "Yearly cloud",
       lastFour: "6666",

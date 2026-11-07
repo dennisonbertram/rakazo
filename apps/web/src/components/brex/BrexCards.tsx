@@ -82,20 +82,22 @@ export function newCardMessage(details: NewCardDetails): string {
   return `Create a vendor card named ${name} for ${merchant}, $${centsToDollars(details.amountCents)} per ${period}, locked to ${merchant}${lock}.`;
 }
 
-type StatusBucket = "active" | "locked" | "terminated";
-const BUCKETS: StatusBucket[] = ["active", "locked", "terminated"];
+type StatusBucket = "active" | "locked" | "terminated" | "unknown";
+const BUCKETS: StatusBucket[] = ["active", "locked", "terminated", "unknown"];
 
 function bucketOf(card: BrexCardView): StatusBucket {
   const status = card.status.toUpperCase();
-  if (status === "TERMINATED") return "terminated";
+  if (status === "ACTIVE") return "active";
   if (status === "LOCKED") return "locked";
-  return "active";
+  if (status === "TERMINATED") return "terminated";
+  return "unknown";
 }
 
 function bucketLabel(bucket: StatusBucket): string {
   if (bucket === "active") return t`Active`;
   if (bucket === "locked") return t`Locked`;
-  return t`Terminated`;
+  if (bucket === "terminated") return t`Terminated`;
+  return t`Unknown`;
 }
 
 function durationOf(card: BrexCardView): string {
@@ -280,6 +282,9 @@ export function CardsBoard({ data }: { data: BrexCardsView }) {
   }, [data.cards, query, hidden]);
 
   const hasTerminated = data.cards.some((card) => bucketOf(card) === "terminated");
+  const presentBuckets = BUCKETS.filter((bucket) =>
+    data.cards.some((card) => bucketOf(card) === bucket),
+  );
   const terminatedHidden = hasTerminated && hidden.has("terminated");
   const filtering = query.trim() !== "" || hidden.size > 0;
 
@@ -325,7 +330,7 @@ export function CardsBoard({ data }: { data: BrexCardsView }) {
             <ChevronDown aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-max min-w-40">
-            {BUCKETS.map((bucket) => (
+            {presentBuckets.map((bucket) => (
               <DropdownMenuCheckboxItem
                 key={bucket}
                 checked={!hidden.has(bucket)}
@@ -609,14 +614,16 @@ function NewCardDialog({
   const [limit, setLimit] = useState("");
   const [duration, setDuration] = useState<"MONTHLY" | "ONE_TIME">("MONTHLY");
   const [lockAfterDate, setLockAfterDate] = useState("");
-  const [invalid, setInvalid] = useState(false);
+  const [invalid, setInvalid] = useState<"fields" | "lock" | null>(null);
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const amountCents = dollarsToCents(limit);
-    const valid = name.trim() !== "" && merchant.trim() !== "" && amountCents !== null;
-    setInvalid(!valid);
-    if (!valid || amountCents === null || !enabled) return;
+    const fieldsValid = name.trim() !== "" && merchant.trim() !== "" && amountCents !== null;
+    // Brex refuses a ONE_TIME card without a lock date, so the form does too.
+    const lockMissing = duration === "ONE_TIME" && lockAfterDate === "";
+    setInvalid(!fieldsValid ? "fields" : lockMissing ? "lock" : null);
+    if (!fieldsValid || lockMissing || amountCents === null || !enabled) return;
     onSend({
       name,
       merchant,
@@ -716,7 +723,11 @@ function NewCardDialog({
           </p>
           {invalid || error ? (
             <p role="alert" className="text-sm text-destructive">
-              {invalid ? t`Enter a card name, vendor and limit` : error}
+              {invalid === "fields"
+                ? t`Enter a card name, vendor and limit`
+                : invalid === "lock"
+                  ? t`Enter a lock date for a one-time card`
+                  : error}
             </p>
           ) : null}
           <DialogFooter>
