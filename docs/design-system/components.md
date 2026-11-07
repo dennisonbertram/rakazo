@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 348 of 348
-- Web and shared components: 885
+- Web and shared component files with stories: 352 of 352
+- Web and shared components: 894
 - Mobile components: 155 in 104 files, mobile — native story pending
 - SwiftUI views: 141 in 77 files, native story pending
 
@@ -146,6 +146,14 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | CollaborationMarker, ActiveBotGlyph | [apps/web/src/components/ai/CollaborationMarker.tsx](../../apps/web/src/components/ai/CollaborationMarker.tsx) | [CollaborationMarker.stories.tsx](../../apps/web/src/components/ai/CollaborationMarker.stories.tsx) | web |
 | Shimmer, DefaultLoadingState, LoadingState, SuccessPop, BuiCard | [apps/web/src/components/ai/primitives.tsx](../../apps/web/src/components/ai/primitives.tsx) | [primitives.stories.tsx](../../apps/web/src/components/ai/primitives.stories.tsx) | web |
 | ToolCallLabel | [apps/web/src/components/ai/ToolCallLabel.tsx](../../apps/web/src/components/ai/ToolCallLabel.tsx) | [ToolCallLabel.stories.tsx](../../apps/web/src/components/ai/ToolCallLabel.stories.tsx) | web |
+
+## Web components/brex
+
+| Component | File | Story file | Surface |
+| --- | --- | --- | --- |
+| TopVendors, NearLimit, BrexOverview | [apps/web/src/components/brex/BrexOverview.tsx](../../apps/web/src/components/brex/BrexOverview.tsx) | [BrexOverview.stories.tsx](../../apps/web/src/components/brex/BrexOverview.stories.tsx) | web |
+| BrexPage | [apps/web/src/components/brex/BrexPage.tsx](../../apps/web/src/components/brex/BrexPage.tsx) | [BrexPage.stories.tsx](../../apps/web/src/components/brex/BrexPage.stories.tsx) | web |
+| SourceLabel, PhoneSankey, WideSankey, SpendSankey | [apps/web/src/components/brex/SpendSankey.tsx](../../apps/web/src/components/brex/SpendSankey.tsx) | [SpendSankey.stories.tsx](../../apps/web/src/components/brex/SpendSankey.stories.tsx) | web |
 
 ## Web components/call
 
