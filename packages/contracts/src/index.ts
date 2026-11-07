@@ -64,6 +64,7 @@ export * from "./reactions.js";
 export * from "./routines.js";
 export * from "./rpc.js";
 export * from "./runs.js";
+export * from "./scanner.js";
 export * from "./search.js";
 export * from "./sidebar-folders.js";
 export * from "./sidebar-pages.js";

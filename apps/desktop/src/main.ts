@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
+import { isScannerFolderPath } from "@rakazo/contracts";
 import { LOCAL_SETTINGS_PAGE } from "@rakazo/contracts/local-settings";
 import type { Session } from "electron";
 import {
@@ -23,6 +24,11 @@ import { createAppOpener } from "./app-opener.js";
 import { buildApplicationMenuTemplate } from "./application-menu.js";
 import type { ElectronAutoUpdater } from "./auto-update.js";
 import { DesktopUpdateController, LAUNCH_CHECK_DELAY_MS } from "./auto-update.js";
+import {
+  createBluetoothPicker,
+  createPairingHandler,
+  originKeyedStore,
+} from "./bluetooth-picker.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { createDeviceSpeech } from "./device-speech.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
@@ -44,7 +50,14 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
-import { createBluetoothPicker, createPairingHandler, originKeyedStore } from "./bluetooth-picker.js";
+import type { ScannerScope, ScannerService } from "./scanner.js";
+import { createScanner } from "./scanner.js";
+import { scannerIpcAuthorized } from "./scanner-security.js";
+import {
+  createScannerScopeCoordinator,
+  isScannerSessionCookie,
+  verifyScannerSessionScope,
+} from "./scanner-session.js";
 import { installSessionPermissions, isAppWebContents } from "./session-permissions.js";
 import {
   DEFAULT_LOCAL_WEB_URL,
@@ -79,6 +92,7 @@ const PROBE_TIMEOUT_MS = 8_000;
 const DESKTOP_STACK_PROBE_PATH = "/.well-known/rakazo-desktop-stack";
 const DESKTOP_STACK_TOKEN_HEADER = "x-rakazo-desktop-stack-token";
 let mainWindow: BrowserWindow | null = null;
+let scannerService: ScannerService | null = null;
 const appWindowTargets = new WeakMap<BrowserWindow, string>();
 let setupWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -90,6 +104,27 @@ let currentSetup: DesktopSetup | null = null;
 let currentTargetUrl: string | null = null;
 let setupError: string | null = null;
 let setupSaveInProgress = false;
+const scannerScopeCoordinator = createScannerScopeCoordinator<BrowserWindow>({
+  currentWindow: () => mainWindow,
+  originForWindow: (win) => {
+    if (win !== mainWindow || win.isDestroyed()) return null;
+    const origin = trustedScannerOrigin();
+    return origin !== null && safeOrigin(win.webContents.mainFrame.url) === origin ? origin : null;
+  },
+  clearScope: () => scannerService?.setScope(null) ?? Promise.resolve(),
+  verifyScope: (win, origin, claim, isCurrent) => {
+    const targetSession = win.webContents.session;
+    return verifyScannerSessionScope({
+      origin,
+      userId: claim.userId,
+      spaceId: claim.spaceId,
+      fetch: (input, init) => targetSession.fetch(input, init),
+      isCurrent: () =>
+        isCurrent() && !win.isDestroyed() && win.webContents.session === targetSession,
+    });
+  },
+  setScope: (claim, origin) => scannerService?.setScope(claim, origin) ?? Promise.resolve(),
+});
 const appOpener = createAppOpener(openAppOnce);
 /** Prior app window kept until setup is persisted (or the switch is abandoned). */
 let pendingPreviousWindow: BrowserWindow | null = null;
@@ -227,6 +262,100 @@ function fromMainWindow(event: Electron.IpcMainInvokeEvent) {
   return mainWindow !== null && windowFrom(event) === mainWindow;
 }
 
+function trustedScannerOrigin() {
+  if (currentTargetUrl === null || mainWindow === null || mainWindow.isDestroyed()) return null;
+  const origin = safeOrigin(currentTargetUrl);
+  const windowTarget = appWindowTargets.get(mainWindow);
+  if (origin === null || windowTarget === undefined || safeOrigin(windowTarget) !== origin)
+    return null;
+  try {
+    const url = new URL(currentTargetUrl);
+    return url.protocol === "http:" || url.protocol === "https:" ? origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function scannerRequestAuthorized(event: Electron.IpcMainInvokeEvent) {
+  return scannerIpcAuthorized(
+    scannerService !== null && fromMainWindow(event),
+    event.senderFrame,
+    event.sender.mainFrame,
+    trustedScannerOrigin(),
+  );
+}
+
+function scannerAuthorizationIsCurrent(
+  generation: number,
+  win: BrowserWindow,
+  targetSession: Session,
+  origin: string,
+  scope: ScannerScope,
+) {
+  return (
+    scannerScopeCoordinator.isCurrent(generation, win, origin) &&
+    !win.isDestroyed() &&
+    win.webContents.session === targetSession &&
+    scannerScopeCoordinator.matches(scope)
+  );
+}
+
+async function authorizeScannerScope(scope: ScannerScope) {
+  if (!scannerScopeCoordinator.matches(scope)) return false;
+  const win = mainWindow;
+  const origin = trustedScannerOrigin();
+  if (win === null || origin === null || origin !== scope.serverOrigin || win.isDestroyed()) {
+    clearScannerScope();
+    return false;
+  }
+  const targetSession = win.webContents.session;
+  const generation = scannerScopeCoordinator.generation();
+  const isCurrent = () =>
+    scannerAuthorizationIsCurrent(generation, win, targetSession, origin, scope);
+  const authorized = await verifyScannerSessionScope({
+    origin,
+    userId: scope.userId,
+    spaceId: scope.spaceId,
+    fetch: (input, init) => targetSession.fetch(input, init),
+    isCurrent,
+  });
+  if (!authorized && isCurrent()) clearScannerScope();
+  return authorized && isCurrent();
+}
+
+function clearScannerScope() {
+  void scannerScopeCoordinator.invalidate().catch(() => undefined);
+}
+
+function sendScannerEvent(channel: string, payload: unknown) {
+  const win = mainWindow;
+  const origin = trustedScannerOrigin();
+  if (
+    win !== null &&
+    !win.isDestroyed() &&
+    origin !== null &&
+    safeOrigin(win.webContents.mainFrame.url) === origin
+  ) {
+    win.webContents.send(channel, payload);
+  }
+}
+
+function scannerUserScope(value: unknown) {
+  if (value === null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return undefined;
+  const scope = value as Record<string, unknown>;
+  if (
+    Object.keys(scope).sort().join(",") !== "spaceId,userId" ||
+    typeof scope.userId !== "string" ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(scope.userId) ||
+    typeof scope.spaceId !== "string" ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(scope.spaceId)
+  ) {
+    return undefined;
+  }
+  return { userId: scope.userId, spaceId: scope.spaceId };
+}
+
 /** Dock/taskbar icon for unpackaged launches; packaged builds get theirs from electron-builder. */
 function developmentIcon() {
   if (app.isPackaged) return undefined;
@@ -350,12 +479,26 @@ function createWindow(url: string, partition: string | null) {
     },
   });
   restrictWebRtc(win.webContents);
-  // A chooser still open in the window being replaced must not outlive it.
-  if (mainWindow !== null) bluetoothPickers.get(mainWindow)?.cancel();
+  if (mainWindow !== null) {
+    if (mainWindow !== win) clearScannerScope();
+    // A chooser still open in the window being replaced must not outlive it.
+    bluetoothPickers.get(mainWindow)?.cancel();
+  }
   mainWindow = win;
   appWindowTargets.set(win, url);
   installBluetooth(win);
   const targetOrigin = safeOrigin(url);
+  const targetSession = win.webContents.session;
+  const onCookiesChanged = (_event: Electron.Event, cookie: Electron.Cookie) => {
+    if (
+      mainWindow === win &&
+      targetOrigin !== null &&
+      isScannerSessionCookie(cookie, targetOrigin)
+    ) {
+      void scannerScopeCoordinator.reauthenticate(win).catch(() => undefined);
+    }
+  };
+  targetSession.cookies.on("changed", onCookiesChanged);
   // Intentional OAuth flows open the provider's authorize page via a named
   // window; give those and same-origin popups a normal frame. Everything else
   // opens in the system browser so a connected server cannot navigate us away.
@@ -373,10 +516,16 @@ function createWindow(url: string, partition: string | null) {
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (event, navigationUrl) => {
-    if (targetOrigin !== null && safeOrigin(navigationUrl) === targetOrigin) return;
+    if (targetOrigin !== null && safeOrigin(navigationUrl) === targetOrigin) {
+      void scannerScopeCoordinator.forgetWindow(win).catch(() => undefined);
+      return;
+    }
     event.preventDefault();
     const external = safeExternalUrl(navigationUrl);
     if (external !== null) void shell.openExternal(external);
+  });
+  win.webContents.on("did-navigate", () => {
+    void scannerScopeCoordinator.forgetWindow(win).catch(() => undefined);
   });
   // The popup has no address bar, so a loopback redirect would otherwise strand
   // the user on a blank window holding the authorization code in a URL they
@@ -417,7 +566,11 @@ function createWindow(url: string, partition: string | null) {
   });
   win.once("closed", () => {
     clearTimeout(warmWindowTimer);
-    if (mainWindow === win) mainWindow = null;
+    targetSession.cookies.removeListener("changed", onCookiesChanged);
+    void scannerScopeCoordinator.forgetWindow(win).catch(() => undefined);
+    if (mainWindow === win) {
+      mainWindow = null;
+    }
   });
   markOnce("rk:main:window-created");
   if (win.isVisible()) markOnce("rk:main:window-shown");
@@ -858,6 +1011,8 @@ function openFailureDetail(error: unknown): string {
 }
 
 async function openAppOnce(targetUrl: string, switching: boolean) {
+  const previousTargetUrl = currentTargetUrl;
+  if (currentTargetUrl !== null && currentTargetUrl !== targetUrl) clearScannerScope();
   const target = await resolveSessionForTarget(targetUrl);
   const previous = mainWindow;
   let win: BrowserWindow | null = null;
@@ -889,7 +1044,11 @@ async function openAppOnce(targetUrl: string, switching: boolean) {
   } catch (error) {
     pendingPreviousWindow = null;
     // Keep the previous app window so Cancel / close can restore it.
-    if (previous !== null && !previous.isDestroyed()) mainWindow = previous;
+    if (previous !== null && !previous.isDestroyed()) {
+      mainWindow = previous;
+      currentTargetUrl = previousTargetUrl;
+      void scannerScopeCoordinator.reauthenticate(previous).catch(() => undefined);
+    }
     // Show the setup window BEFORE destroying the failed one: on Windows/Linux,
     // destroying the last window fires "window-all-closed" -> app.quit() before
     // showSetupWindow() runs, so the app silently exits instead of showing this error.
@@ -922,6 +1081,7 @@ function abandonPendingAppSwitch(
     mainWindow = previous;
     currentSetup = previousSetup;
     currentTargetUrl = previousUrl;
+    void scannerScopeCoordinator.reauthenticate(previous).catch(() => undefined);
     // If setup was already closed (e.g. during a slow write), make the restored
     // session visible — otherwise macOS can be left with no shown window.
     if (setupWindow === null || setupWindow.isDestroyed()) {
@@ -1184,6 +1344,101 @@ app.whenReady().then(async () => {
       : { state: "not_found" },
   );
   // On-device speech needs Hex's helper, so it is macOS on Apple silicon only.
+  if (process.platform === "darwin" || process.platform === "linux") {
+    const scanner = createScanner({
+      userDataDir: app.getPath("userData"),
+      authorizeScope: authorizeScannerScope,
+    });
+    scannerService = scanner;
+    scanner.onState((state) => sendScannerEvent("desktop.scanner.state.changed", state));
+    scanner.onDocument((document) => {
+      const scope = scannerScopeCoordinator.scope();
+      if (
+        scope !== null &&
+        scope.userId === document.userId &&
+        scope.spaceId === document.spaceId &&
+        scope.serverOrigin === trustedScannerOrigin() &&
+        scannerScopeCoordinator.matches(scope)
+      ) {
+        sendScannerEvent("desktop.scanner.document", document);
+      }
+    });
+    void scanner.start();
+
+    const requireScanner = (event: Electron.IpcMainInvokeEvent) => {
+      if (!scannerRequestAuthorized(event)) throw new Error("Scanner request is not authorized.");
+      return scanner;
+    };
+    ipcMain.handle("desktop.scanner.state", (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      return service.state();
+    });
+    ipcMain.handle("desktop.scanner.scan", async (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      await service.scan();
+    });
+    ipcMain.handle("desktop.scanner.cancel", async (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      await service.cancel();
+    });
+    ipcMain.handle(
+      "desktop.scanner.setAutoScan",
+      async (event, value: unknown, ...args: unknown[]) => {
+        const service = requireScanner(event);
+        if (args.length !== 0 || typeof value !== "boolean")
+          throw new Error("Invalid scanner settings.");
+        await service.setAutoScan(value);
+      },
+    );
+    ipcMain.handle(
+      "desktop.scanner.setFolder",
+      async (event, folder: unknown, ...args: unknown[]) => {
+        const service = requireScanner(event);
+        if (args.length !== 0 || !isScannerFolderPath(folder))
+          throw new Error("Invalid scanner folder.");
+        await service.setFolder(folder);
+      },
+    );
+    ipcMain.handle(
+      "desktop.scanner.setScope",
+      async (event, value: unknown, ...args: unknown[]) => {
+        requireScanner(event);
+        if (args.length !== 0) throw new Error("Invalid scanner scope.");
+        const scope = scannerUserScope(value);
+        if (scope === undefined) throw new Error("Invalid scanner scope.");
+        const win = windowFrom(event);
+        if (win === null) throw new Error("Scanner request is not authorized.");
+        const result = await scannerScopeCoordinator.remember(win, scope);
+        if (result === "rejected") throw new Error("Scanner scope could not be verified.");
+      },
+    );
+    ipcMain.handle("desktop.scanner.pending", (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      return service.pending();
+    });
+    ipcMain.handle(
+      "desktop.scanner.confirm",
+      (event, id: unknown, storedSha256: unknown, ...args: unknown[]) => {
+        const service = requireScanner(event);
+        if (
+          args.length !== 0 ||
+          typeof id !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ||
+          typeof storedSha256 !== "string" ||
+          !/^[0-9a-f]{64}$/i.test(storedSha256)
+        ) {
+          throw new Error("Invalid scanner confirmation.");
+        }
+        return service.confirm(id, storedSha256);
+      },
+    );
+    app.on("will-quit", () => void scanner.close());
+  }
+
   const speech = createDeviceSpeech({
     userDataDir: app.getPath("userData"),
     supported: process.platform === "darwin" && process.arch === "arm64",
