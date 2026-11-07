@@ -82,6 +82,7 @@ private func shot<V: View>(_ view: V, size: CGSize, name: String) async {
 }
 
 private let sizes: [(String, CGSize)] = [
+  ("iphone-402x874", CGSize(width: 402, height: 874)),
   ("outer-466x678", CGSize(width: 466, height: 678)),
   ("inner-landscape-890x626", CGSize(width: 890, height: 626)),
   ("inner-portrait-626x890", CGSize(width: 626, height: 890)),
