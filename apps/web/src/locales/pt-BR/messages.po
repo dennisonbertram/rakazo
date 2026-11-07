@@ -2296,7 +2296,7 @@ msgid "Back to sign in"
 msgstr "Voltar para o login"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
+msgid "Background runs ask before they send, change or run anything, unless you always allowed it, allowed it for one routine, or Auto Review approved it."
 msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx

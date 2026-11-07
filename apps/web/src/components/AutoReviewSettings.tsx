@@ -3,6 +3,7 @@ import type { ActionAutoReviewRecent, ActionAutoReviewSettings } from "@rakazo/c
 import { toolStepLabel } from "@rakazo/core";
 import { Label, Switch } from "@rakazo/ui-web";
 import { useEffect, useId, useState } from "react";
+import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 
@@ -53,7 +54,7 @@ export function AutoReviewSettings() {
         </Label>
       </div>
       {settings?.enabled ? (
-        <div className="flex items-start gap-3 pl-1">
+        <div className="flex items-start gap-3">
           <Switch
             id={`${id}-background`}
             className="mt-0.5"
@@ -83,7 +84,7 @@ export function AutoReviewSettings() {
               <li key={item.id} className="text-[13px] text-foreground/75">
                 {toolStepLabel(item.tool)}
                 <span className="block text-[12px] text-muted-foreground">
-                  {new Date(item.at).toLocaleString()}
+                  {formatRelativeTime(item.at)}
                   {item.reason ? ` · ${item.reason}` : ""}
                 </span>
               </li>
