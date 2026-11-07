@@ -1678,6 +1678,10 @@ msgstr ""
 msgid "Already tidy."
 msgstr ""
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Also in background runs"
+msgstr ""
+
 #: src/components/inbox/InboxCleanup.tsx
 msgid "Also in Gmail"
 msgstr ""
@@ -2209,6 +2213,10 @@ msgstr "Autorizar"
 msgid "Authorize this server so bots can use its tools. A popup opens."
 msgstr ""
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Auto Review"
+msgstr ""
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "Auto-renews"
 msgstr ""
@@ -2299,7 +2307,7 @@ msgid "Back to sign in"
 msgstr "Volver a iniciar sesión"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
+msgid "Background runs ask before they send, change or run anything, unless you always allowed it, allowed it for one routine, or Auto Review approved it."
 msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
@@ -4662,6 +4670,7 @@ msgid "Could not save the SAFE"
 msgstr ""
 
 #: src/components/AutoFileEmailSetting.tsx
+#: src/components/AutoReviewSettings.tsx
 msgid "Could not save the setting"
 msgstr ""
 
@@ -5074,6 +5083,10 @@ msgstr ""
 
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Crypto is left out of cash and this runway."
+msgstr ""
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Current"
 msgstr ""
 
 #: src/components/AccountAccess.tsx
@@ -5566,6 +5579,7 @@ msgstr ""
 #: src/components/data-room/DropZone.tsx
 #: src/components/data-room/ImportActivity.tsx
 #: src/components/finance/StatementImport.tsx
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/meeting-capture/RecordingPill.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -7515,6 +7529,10 @@ msgstr ""
 msgid "Keep memories"
 msgstr "Conservar memorias"
 
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Keep mine"
+msgstr ""
+
 #: src/pages/CompanyReview.tsx
 msgid "Keep separate"
 msgstr ""
@@ -8866,6 +8884,7 @@ msgstr ""
 msgid "new"
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/PageAgentsRow.tsx
 #: src/components/sidebar-glance.tsx
@@ -11194,6 +11213,10 @@ msgstr ""
 msgid "Recent activity"
 msgstr ""
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Recently approved by Auto Review"
+msgstr ""
+
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Recipients"
 msgstr ""
@@ -11894,6 +11917,7 @@ msgstr "Volver a Praci"
 msgid "Revenue"
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Review"
@@ -14891,6 +14915,18 @@ msgstr ""
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Updating…"
 msgstr "Actualizando…"
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade"
+msgstr ""
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade system prompt"
+msgstr ""
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade this agent's system prompt?"
+msgstr ""
 
 #: src/components/computer/FilesApp.tsx
 #: src/components/data-room/FilterBar.tsx

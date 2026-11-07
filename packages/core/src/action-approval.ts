@@ -331,6 +331,152 @@ export function routineAlwaysAllowable(input: {
   return type === null || !ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES.has(type);
 }
 
+/**
+ * Tools Auto Review never judges in a background run, whatever the owner switched on: they change
+ * what later runs do (schedules, skills, watches, memory), send, post or spend, or are mandatory.
+ */
+export const BACKGROUND_REVIEW_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
+  "mail_send",
+  "message_outside",
+  "message_bot",
+  "gtm_post",
+  "remember",
+  "save_memory",
+  "save_shared_memory",
+  "forget_memory",
+  // Change what the agents are or can reach.
+  "add_mcp_server",
+  "spawn_bot",
+  "update_bot",
+]);
+const BACKGROUND_REVIEW_EXCLUDED_PREFIXES = ["schedule_", "skill_", "watch_", "cloud_agent_"];
+const BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES: ReadonlySet<ApprovalActionType> = new Set([
+  ...ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES,
+  "calendar_changes",
+  "use_computer",
+  "files_and_commands",
+]);
+
+/**
+ * True when Auto Review may judge a call in an unattended run: the owner turned on "Also in
+ * background runs", nothing outside is in the run, a person's own words (never a webhook, bot or
+ * channel message) say what the run is for, and the tool is not one of the excluded kinds.
+ */
+export function backgroundAutoReviewAllowed(input: {
+  enabled: boolean;
+  trigger?: string;
+  tainted: boolean;
+  outsideContentSeen: boolean;
+  meetingMarked: boolean;
+  firewalled: boolean;
+  externalBot: boolean;
+  ownerWords: string;
+  toolName: string;
+  viaConnector?: boolean;
+  connectorKind?: string;
+  readOnly?: boolean;
+}): boolean {
+  if (!input.enabled || input.trigger === "webhook") return false;
+  if (
+    input.tainted ||
+    input.outsideContentSeen ||
+    input.meetingMarked ||
+    input.firewalled ||
+    input.externalBot
+  ) {
+    return false;
+  }
+  if (!input.ownerWords.trim()) return false;
+  const name = input.toolName;
+  if (toolRequiresExplicitApproval(name) || BACKGROUND_REVIEW_EXCLUDED_TOOLS.has(name)) {
+    return false;
+  }
+  if (BACKGROUND_REVIEW_EXCLUDED_PREFIXES.some((prefix) => name.startsWith(prefix))) return false;
+  const type = actionTypeForTool(input);
+  return type === null || !BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES.has(type);
+}
+
+/**
+ * Internal writes of a Firewall agent that Auto Review may pass, but only after
+ * `contentHasOutboundChannel` finds nothing in the arguments. Owner decision: this lifts the
+ * Firewall plan's rule that its asks never clear without a person, for these tools only.
+ */
+export const FIREWALL_JUDGEABLE_WRITES: ReadonlySet<string> = new Set([
+  "page_edit",
+  "page_write",
+  "page_create",
+  "pins_write",
+]);
+
+const OUTBOUND_CHANNEL_PATTERNS = [
+  /https?:\/\/|\/\/[\w-]+\.[a-z]{2,}|\bwww\./i,
+  /!?\[[^\]]*\]\([^)]*\)|!\[|\]\[/,
+  /<\/?[a-z!][^>]*>/i,
+  /\b[\w-]+\.(com|org|net|io|ai|dev|app|co|me|ly|xyz|info|gg|sh)\b/i,
+];
+
+/**
+ * True when any string in the arguments holds a URL, a Markdown image or link, an HTML tag or a
+ * bare domain: each can carry data out when a page or memory is rendered or fetched. Scans every
+ * string, including keys.
+ */
+export function contentHasOutboundChannel(value: unknown): boolean {
+  if (typeof value === "string") {
+    return OUTBOUND_CHANNEL_PATTERNS.some((pattern) => pattern.test(value));
+  }
+  if (Array.isArray(value)) return value.some(contentHasOutboundChannel);
+  if (value && typeof value === "object") {
+    return Object.entries(value).some(
+      ([key, item]) => contentHasOutboundChannel(key) || contentHasOutboundChannel(item),
+    );
+  }
+  return false;
+}
+
+const HTML_TAG = /<\/?[a-z!][^>]*>/i;
+
+const OUTBOUND_TOKEN_PATTERNS = [
+  /(?:https?:)?\/\/[^\s)>\]"']+/gi,
+  /\bwww\.[^\s)>\]"']+/gi,
+  /!?\[[^\]]*\]\([^)]*\)/g,
+  /!?\[[^\]]*\]\[[^\]]*\]/g,
+  /\b[\w-]+\.(?:com|org|net|io|ai|dev|app|co|me|ly|xyz|info|gg|sh)\b[^\s)>\]"']*/gi,
+];
+
+/** Every URL, link, image and bare domain in the text, whole, as exact strings. */
+function outboundTokens(text: string): Set<string> {
+  const found = new Set<string>();
+  for (const pattern of OUTBOUND_TOKEN_PATTERNS) {
+    for (const match of text.matchAll(pattern)) found.add(match[0]);
+  }
+  return found;
+}
+
+/**
+ * True when saving `result` over `original` would put a new or changed URL, link, image or domain
+ * on the page, or leave any HTML in it. Comparing the saved result catches an edit that swaps
+ * private text into a URL that was already there. An empty original means any URL is new.
+ */
+export function pageWriteAddsChannel(_original: string, result: string): boolean {
+  // Destinations are not compared: any link or image destination in the result asks.
+  return (
+    HTML_TAG.test(result) ||
+    /\]\(|\]\[|^\s{0,3}\[[^\]]+\]:|<|https?:|www\.|data:|mailto:/im.test(result) ||
+    outboundTokens(result).size > 0
+  );
+}
+
+const FIXED_MAIL_LABELS = new Set(["TRASH", "SPAM", "DRAFT", "SENT"]);
+
+/** A mail_modify that names a delete, report or draft label is never judged. */
+export function mailModifyTouchesFixedLabel(args: Record<string, unknown>): boolean {
+  return [args.addLabels, args.removeLabels].some(
+    (list) =>
+      Array.isArray(list) &&
+      list.some((label) => typeof label === "string" && FIXED_MAIL_LABELS.has(label.toUpperCase())),
+  );
+}
+
 /** True when a tainted run may call the tool without a card. Same scratchpad rule as unattended. */
 export function externalTaintAllowsTool(toolName: string, args?: Record<string, unknown>): boolean {
   if (!EXTERNAL_TAINT_SAFE_TOOLS.has(toolName)) return false;

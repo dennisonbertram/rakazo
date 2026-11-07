@@ -29,10 +29,20 @@ import {
   StoredBotSecretName,
 } from "./bot-secrets.js";
 import {
+  BrexAccountsSchema,
+  BrexActivitySchema,
   BrexCardsConnectInputSchema,
   BrexCardsConnectOutputSchema,
   BrexCardsControlsSchema,
   BrexCardsListSchema,
+  BrexCardsOverviewSchema,
+  BrexCardsViewSchema,
+  BrexExpensesSchema,
+  BrexLimitsSchema,
+  BrexPeopleSchema,
+  BrexSpendingInputSchema,
+  BrexSpendingSchema,
+  BrexTripsSchema,
 } from "./brex-cards.js";
 import { CalendarAgendaInputSchema, CalendarAgendaSchema } from "./calendar.js";
 import {
@@ -118,6 +128,7 @@ import { DevinAgentOutputSchema, DevinKeyInputSchema, DevinSessionsOutputSchema 
 import {
   ActionApprovalEffectSchema,
   ActionApprovalRuleSchema,
+  ActionAutoReviewRecentSchema,
   ActionAutoReviewSettingsSchema,
   AgentSecretInputSchema,
   AgentSecretSchema,
@@ -727,6 +738,11 @@ export const appContract = {
     reorder: oc.input(ReorderBotsInput).output(z.object({ ok: z.literal(true) })),
     update: oc.input(UpdateBotInput).output(BotSchema),
     setComputer: oc.input(z.object({ botId: Id, mode: ComputerModeSchema })).output(BotSchema),
+    instructionsUpgrade: oc
+      .input(botId)
+      .output(z.object({ current: z.string(), next: z.string() }).nullable()),
+    upgradeInstructions: oc.input(z.object({ botId: Id, from: z.string() })).output(BotSchema),
+    dismissInstructionsUpgrade: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     archive: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     restore: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     remove: oc
@@ -1612,7 +1628,10 @@ export const appContract = {
   },
   autoReview: {
     get: oc.output(ActionAutoReviewSettingsSchema),
-    set: oc.input(z.object({ enabled: z.boolean() })).output(ActionAutoReviewSettingsSchema),
+    set: oc
+      .input(z.object({ enabled: z.boolean().optional(), background: z.boolean().optional() }))
+      .output(ActionAutoReviewSettingsSchema),
+    recent: oc.output(z.array(ActionAutoReviewRecentSchema)),
   },
   artifacts: {
     list: oc.input(botId).output(z.array(ArtifactSchema)),
@@ -2087,8 +2106,18 @@ export const appContract = {
     connect: oc.input(BrexCardsConnectInputSchema).output(BrexCardsConnectOutputSchema),
     /** Checks the new token first; a refused token keeps the old one. Controls and model are kept. */
     replaceToken: oc.input(BrexCardsConnectInputSchema).output(z.object({ ok: z.literal(true) })),
-    /** The cards from Brex's `list_cards`, the only tool this page calls. */
+    /** The raw card list from Brex's `list_cards`. */
     cards: oc.output(BrexCardsListSchema),
+    /** Owner-only live read model for the Brex page. */
+    overview: oc.output(BrexCardsOverviewSchema),
+    cardsView: oc.output(BrexCardsViewSchema),
+    spending: oc.input(BrexSpendingInputSchema).output(BrexSpendingSchema),
+    limits: oc.output(BrexLimitsSchema),
+    people: oc.output(BrexPeopleSchema),
+    expenses: oc.output(BrexExpensesSchema),
+    accounts: oc.output(BrexAccountsSchema),
+    trips: oc.output(BrexTripsSchema),
+    activity: oc.output(BrexActivitySchema),
     getControls: oc.output(BrexCardsControlsSchema),
     setControls: oc.input(BrexCardsControlsSchema).output(BrexCardsControlsSchema),
   },

@@ -419,6 +419,11 @@ import {
   listArtifactVersions,
   listSpaceArtifacts,
 } from "./artifacts.js";
+import {
+  dismissInstructionsUpgrade,
+  instructionsUpgrade,
+  upgradeInstructions,
+} from "./bot-instructions-upgrade.js";
 import { botProfileLabelsChanged, commitBotUpdate } from "./bot-update.js";
 import type { BrexCardsDeps } from "./brex-cards.js";
 import {
@@ -428,6 +433,17 @@ import {
   brexCardsReplaceToken,
   brexCardsSetControls,
 } from "./brex-cards.js";
+import {
+  brexCardsAccounts,
+  brexCardsActivity,
+  brexCardsExpenses,
+  brexCardsLimits,
+  brexCardsOverview,
+  brexCardsPeople,
+  brexCardsSpending,
+  brexCardsTrips,
+  brexCardsView,
+} from "./brex-cards-read-model.js";
 import type { CartaSyncDeps } from "./carta-agent.js";
 import {
   assignToExistingCartaAgent,
@@ -3265,6 +3281,21 @@ export function createRouter(deps: RouterDeps): AppRouter {
           repos.setBotComputer(context.actor, bot.id, input.mode),
         );
       }),
+      instructionsUpgrade: authed.bots.instructionsUpgrade.handler(({ context, input }) =>
+        instructionsUpgrade(deps.prisma, context.actor, input.botId),
+      ),
+      upgradeInstructions: authed.bots.upgradeInstructions.handler(async ({ context, input }) => {
+        await upgradeInstructions(deps.prisma, context.actor, input.botId, input.from);
+        const bot = (await repos.listBots(context.actor)).find((b) => b.id === input.botId);
+        if (!bot) throw new IsolationError();
+        return bot;
+      }),
+      dismissInstructionsUpgrade: authed.bots.dismissInstructionsUpgrade.handler(
+        async ({ context, input }) => {
+          await dismissInstructionsUpgrade(deps.prisma, context.actor, input.botId);
+          return { ok: true as const };
+        },
+      ),
       archive: authed.bots.archive.handler(async ({ context, input }) => {
         await archiveActorBot(context.actor, input.botId);
         return { ok: true as const };
@@ -8662,11 +8693,31 @@ export function createRouter(deps: RouterDeps): AppRouter {
           create: {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
-            enabled: input.enabled,
+            enabled: input.enabled ?? deploymentAutoReviewDefault(process.env),
+            background: input.background ?? true,
           },
-          update: { enabled: input.enabled },
+          update: { enabled: input.enabled, background: input.background },
         });
         return loadAutoReviewSettings(deps, context.actor);
+      }),
+      // Every call the judge passed for this user in this space, newest first.
+      recent: authed.autoReview.recent.handler(async ({ context }) => {
+        const rows = await deps.prisma.externalEffect.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            reviewDecision: "pass",
+            run: { userId: context.actor.userId, spaceId: context.actor.spaceId },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: { id: true, kind: true, reviewReason: true, createdAt: true },
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          tool: row.kind,
+          reason: row.reviewReason,
+          at: row.createdAt.toISOString(),
+        }));
       }),
     },
     company: {
@@ -9050,6 +9101,33 @@ export function createRouter(deps: RouterDeps): AppRouter {
       }),
       cards: authed.brexCards.cards.handler(({ context }) =>
         brexCardsCards(brexCardsDeps, context.actor),
+      ),
+      overview: authed.brexCards.overview.handler(({ context }) =>
+        brexCardsOverview(brexCardsDeps, context.actor),
+      ),
+      cardsView: authed.brexCards.cardsView.handler(({ context }) =>
+        brexCardsView(brexCardsDeps, context.actor),
+      ),
+      spending: authed.brexCards.spending.handler(({ context, input }) =>
+        brexCardsSpending(brexCardsDeps, context.actor, input),
+      ),
+      limits: authed.brexCards.limits.handler(({ context }) =>
+        brexCardsLimits(brexCardsDeps, context.actor),
+      ),
+      people: authed.brexCards.people.handler(({ context }) =>
+        brexCardsPeople(brexCardsDeps, context.actor),
+      ),
+      expenses: authed.brexCards.expenses.handler(({ context }) =>
+        brexCardsExpenses(brexCardsDeps, context.actor),
+      ),
+      accounts: authed.brexCards.accounts.handler(({ context }) =>
+        brexCardsAccounts(brexCardsDeps, context.actor),
+      ),
+      trips: authed.brexCards.trips.handler(({ context }) =>
+        brexCardsTrips(brexCardsDeps, context.actor),
+      ),
+      activity: authed.brexCards.activity.handler(({ context }) =>
+        brexCardsActivity(brexCardsDeps, context.actor),
       ),
       getControls: authed.brexCards.getControls.handler(({ context }) =>
         brexCardsGetControls(brexCardsDeps, context.actor),
@@ -10512,7 +10590,7 @@ async function loadAutoReviewSettings(deps: RouterDeps, actor: Actor) {
           userId: actor.userId,
         },
       },
-      select: { enabled: true },
+      select: { enabled: true, background: true },
     }),
     requiredUserProvider
       ? deps.prisma.userModelCredential.findFirst({
@@ -10523,7 +10601,7 @@ async function loadAutoReviewSettings(deps: RouterDeps, actor: Actor) {
   ]);
   const enabled = preference?.enabled ?? deploymentAutoReviewDefault(process.env);
   const checkerAvailable = environmentAvailable || Boolean(credential);
-  return { enabled, checkerAvailable };
+  return { enabled, background: enabled && (preference?.background ?? true), checkerAvailable };
 }
 
 function hostCredentials(active: boolean, provider: string) {

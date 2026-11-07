@@ -40,9 +40,7 @@ describe("newRunExternalTaint", () => {
 
 describe("chainedRunMode", () => {
   it("copies the source run", () => {
-    expect(
-      chainedRunMode("follow_up", { unattended: false, externalTaint: false }),
-    ).toEqual({
+    expect(chainedRunMode("follow_up", { unattended: false, externalTaint: false })).toEqual({
       unattended: false,
       externalTaint: false,
       readOutsideContent: false,

@@ -70,7 +70,7 @@ describe("Brex cards endpoint", () => {
 });
 
 describe("Brex cards tools", () => {
-  it("lists exactly the ten reads and seven writes, with no unlock", () => {
+  it("lists the eleven reads and seven writes, with no unlock", () => {
     expect([...BREX_CARDS_READ_TOOLS]).toEqual([
       "list_cards",
       "get_card",
@@ -78,6 +78,7 @@ describe("Brex cards tools", () => {
       "list_spend_limits",
       "get_spend_limit",
       "list_expenses",
+      "list_reimbursements",
       "list_card_transactions",
       "list_trips",
       "list_cash_accounts",
@@ -93,7 +94,7 @@ describe("Brex cards tools", () => {
       "update_expense_memo",
     ]);
     const all: string[] = [...BREX_CARDS_READ_TOOLS, ...BREX_CARDS_WRITE_TOOLS];
-    expect(new Set(all).size).toBe(17);
+    expect(new Set(all).size).toBe(18);
     expect(all.filter((name) => /unlock/i.test(name))).toEqual([]);
   });
 

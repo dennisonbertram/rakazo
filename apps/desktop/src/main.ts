@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
@@ -45,6 +45,7 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
+import { createBluetoothPicker, createPairingHandler, originKeyedStore } from "./bluetooth-picker.js";
 import type { ScannerScope, ScannerService } from "./scanner.js";
 import { createScanner } from "./scanner.js";
 import { scannerIpcAuthorized } from "./scanner-security.js";
@@ -53,7 +54,7 @@ import {
   isScannerSessionCookie,
   verifyScannerSessionScope,
 } from "./scanner-session.js";
-import { installSessionPermissions } from "./session-permissions.js";
+import { installSessionPermissions, isAppWebContents } from "./session-permissions.js";
 import {
   DEFAULT_LOCAL_WEB_URL,
   desktopStackImageTag,
@@ -173,6 +174,76 @@ function permissionTarget() {
   if (mainWindow === null || mainWindow.isDestroyed()) return null;
   const url = appWindowTargets.get(mainWindow);
   return url === undefined ? null : { webContents: mainWindow.webContents, url };
+}
+
+const bluetoothPickers = new WeakMap<BrowserWindow, ReturnType<typeof createBluetoothPicker>>();
+
+function installBluetooth(win: BrowserWindow) {
+  const origin = safeOrigin(appWindowTargets.get(win) ?? "");
+  const file = path.join(app.getPath("userData"), "bluetooth-device.json");
+  const store = originKeyedStore(
+    () => {
+      try {
+        const all = JSON.parse(readFileSync(file, "utf8"));
+        return all !== null && typeof all === "object" ? all : {};
+      } catch {
+        return {};
+      }
+    },
+    (all) => {
+      try {
+        writeFileSync(file, JSON.stringify(all));
+      } catch {
+        // Not remembering the device only means the chooser shows again.
+      }
+    },
+    // Fixed when the window is created: a later server switch must not change which origin a
+    // pending choice is saved under.
+    () => origin,
+  );
+  const picker = createBluetoothPicker({
+    ...store,
+    choose: async (names, signal) => {
+      const { response } = await dialog.showMessageBox(win, {
+        message: "Choose a device",
+        buttons: [...names, "Cancel"],
+        cancelId: names.length,
+        signal,
+      });
+      return response < names.length ? response : -1;
+    },
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: (timer) => clearTimeout(timer as NodeJS.Timeout),
+  });
+  // select-bluetooth-device carries no frame. Cross-origin frames are blocked by the bluetooth
+  // permissions-policy default ('self'), the web app grants allow="bluetooth" to no iframe, and
+  // agent HTML is sandboxed with an opaque origin.
+  win.webContents.on("select-bluetooth-device", (event, devices, callback) => {
+    event.preventDefault();
+    if (!isAppWebContents(win.webContents, permissionTarget)) callback("");
+    else picker.select(devices, callback);
+  });
+  win.once("closed", () => picker.cancel());
+  bluetoothPickers.set(win, picker);
+  win.webContents.session.setBluetoothPairingHandler(
+    createPairingHandler<Electron.BluetoothPairingHandlerHandlerDetails>(() => {
+      const active = mainWindow;
+      const activePicker = active === null ? undefined : bluetoothPickers.get(active);
+      if (active === null || active.isDestroyed() || activePicker === undefined) return null;
+      return {
+        picker: activePicker,
+        allows: (details) => {
+          const activeOrigin = safeOrigin(permissionTarget()?.url ?? "");
+          const frame = details.frame;
+          return (
+            details.pairingKind === "confirm" &&
+            isAppWebContents(active.webContents, permissionTarget) &&
+            !(frame && (frame.parent !== null || safeOrigin(frame.url) !== activeOrigin))
+          );
+        },
+      };
+    }),
+  );
 }
 
 function markOnce(name: string) {
@@ -404,9 +475,14 @@ function createWindow(url: string, partition: string | null) {
     },
   });
   restrictWebRtc(win.webContents);
-  if (mainWindow !== null && mainWindow !== win) clearScannerScope();
+  if (mainWindow !== null) {
+    if (mainWindow !== win) clearScannerScope();
+    // A chooser still open in the window being replaced must not outlive it.
+    bluetoothPickers.get(mainWindow)?.cancel();
+  }
   mainWindow = win;
   appWindowTargets.set(win, url);
+  installBluetooth(win);
   const targetOrigin = safeOrigin(url);
   const targetSession = win.webContents.session;
   const onCookiesChanged = (_event: Electron.Event, cookie: Electron.Cookie) => {

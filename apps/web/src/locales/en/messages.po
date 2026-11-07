@@ -1678,6 +1678,10 @@ msgstr "Already sent a few minutes ago"
 msgid "Already tidy."
 msgstr "Already tidy."
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Also in background runs"
+msgstr "Also in background runs"
+
 #: src/components/inbox/InboxCleanup.tsx
 msgid "Also in Gmail"
 msgstr "Also in Gmail"
@@ -2209,6 +2213,10 @@ msgstr "Authorize"
 msgid "Authorize this server so bots can use its tools. A popup opens."
 msgstr "Authorize this server so bots can use its tools. A popup opens."
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Auto Review"
+msgstr "Auto Review"
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "Auto-renews"
 msgstr "Auto-renews"
@@ -2299,8 +2307,8 @@ msgid "Back to sign in"
 msgstr "Back to sign in"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
-msgstr "Background runs always ask before they send, change or run anything, except mail changes you always allowed and tools you allowed for one routine."
+msgid "Background runs ask before they send, change or run anything, unless you always allowed it, allowed it for one routine, or Auto Review approved it."
+msgstr "Background runs ask before they send, change or run anything, unless you always allowed it, allowed it for one routine, or Auto Review approved it."
 
 #: src/pages/ModelBackupsSettings.tsx
 msgid "Backup models"
@@ -4662,6 +4670,7 @@ msgid "Could not save the SAFE"
 msgstr "Could not save the SAFE"
 
 #: src/components/AutoFileEmailSetting.tsx
+#: src/components/AutoReviewSettings.tsx
 msgid "Could not save the setting"
 msgstr "Could not save the setting"
 
@@ -5075,6 +5084,10 @@ msgstr "Crypto holdings"
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Crypto is left out of cash and this runway."
 msgstr "Crypto is left out of cash and this runway."
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Current"
+msgstr "Current"
 
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
@@ -5566,6 +5579,7 @@ msgstr "Discount"
 #: src/components/data-room/DropZone.tsx
 #: src/components/data-room/ImportActivity.tsx
 #: src/components/finance/StatementImport.tsx
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/meeting-capture/RecordingPill.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
@@ -7515,6 +7529,10 @@ msgstr "Keep editing"
 msgid "Keep memories"
 msgstr "Keep memories"
 
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Keep mine"
+msgstr "Keep mine"
+
 #: src/pages/CompanyReview.tsx
 msgid "Keep separate"
 msgstr "Keep separate"
@@ -8866,6 +8884,7 @@ msgstr "Never changes your account"
 msgid "new"
 msgstr "new"
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/PageAgentsRow.tsx
 #: src/components/sidebar-glance.tsx
@@ -11194,6 +11213,10 @@ msgstr "Receipts"
 msgid "Recent activity"
 msgstr "Recent activity"
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Recently approved by Auto Review"
+msgstr "Recently approved by Auto Review"
+
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Recipients"
 msgstr "Recipients"
@@ -11894,6 +11917,7 @@ msgstr "Return to Praci"
 msgid "Revenue"
 msgstr "Revenue"
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Review"
@@ -14891,6 +14915,18 @@ msgstr "Updating the cap table"
 #: src/components/SoftwareUpdateSection.tsx
 msgid "Updating…"
 msgstr "Updating…"
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade"
+msgstr "Upgrade"
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade system prompt"
+msgstr "Upgrade system prompt"
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade this agent's system prompt?"
+msgstr "Upgrade this agent's system prompt?"
 
 #: src/components/computer/FilesApp.tsx
 #: src/components/data-room/FilterBar.tsx

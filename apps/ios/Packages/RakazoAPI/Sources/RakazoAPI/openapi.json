@@ -6992,15 +6992,182 @@
                         "enabled": {
                           "type": "boolean"
                         },
+                        "background": {
+                          "type": "boolean"
+                        },
                         "checkerAvailable": {
                           "type": "boolean"
                         }
                       },
                       "required": [
                         "enabled",
+                        "background",
                         "checkerAvailable"
                       ],
                       "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/autoReview/recent": {
+      "post": {
+        "operationId": "rpc_autoReview_recent",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "tool": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "tool",
+                          "reason",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   }
                 }
@@ -7121,11 +7288,11 @@
                     "properties": {
                       "enabled": {
                         "type": "boolean"
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
-                    },
-                    "required": [
-                      "enabled"
-                    ]
+                    }
                   }
                 },
                 "required": [
@@ -7153,12 +7320,16 @@
                         "enabled": {
                           "type": "boolean"
                         },
+                        "background": {
+                          "type": "boolean"
+                        },
                         "checkerAvailable": {
                           "type": "boolean"
                         }
                       },
                       "required": [
                         "enabled",
+                        "background",
                         "checkerAvailable"
                       ],
                       "additionalProperties": false
@@ -13819,6 +13990,165 @@
         ]
       }
     },
+    "/rpc/bots/dismissInstructionsUpgrade": {
+      "post": {
+        "operationId": "rpc_bots_dismissInstructionsUpgrade",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "botId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "ok"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/bots/duplicate": {
       "post": {
         "operationId": "rpc_bots_duplicate",
@@ -14752,6 +15082,175 @@
                         "spawnKey"
                       ],
                       "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/bots/instructionsUpgrade": {
+      "post": {
+        "operationId": "rpc_bots_instructionsUpgrade",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "botId"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "current": {
+                              "type": "string"
+                            },
+                            "next": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "current",
+                            "next"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   }
                 }
@@ -17593,6 +18092,1013 @@
         ]
       }
     },
+    "/rpc/bots/upgradeInstructions": {
+      "post": {
+        "operationId": "rpc_bots_upgradeInstructions",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "from": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "botId",
+                      "from"
+                    ]
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                        },
+                        "spaceId": {
+                          "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "instructions": {
+                          "type": "string"
+                        },
+                        "color": {
+                          "type": "string"
+                        },
+                        "notifyOnFinish": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        },
+                        "sectionId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "position": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "archivedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "hiddenAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "unread": {
+                          "type": "boolean"
+                        },
+                        "parentBotId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "memoryScope": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "isolated",
+                                "shared"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "threadId": {
+                          "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                        },
+                        "preview": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "runPhase": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "computer_wait",
+                                    "computer_start",
+                                    "connecting",
+                                    "model_wait",
+                                    "thinking",
+                                    "retrying"
+                                  ]
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "at": {
+                                  "type": "string"
+                                },
+                                "since": {
+                                  "type": "string"
+                                },
+                                "count": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "runErrorId": {
+                          "default": null,
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "computerMode": {
+                          "type": "string",
+                          "enum": [
+                            "team",
+                            "dedicated"
+                          ]
+                        },
+                        "runsOn": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "docker",
+                                "this-mac"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "voiceId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "autoSpeak": {
+                          "type": "boolean"
+                        },
+                        "modelProvider": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "modelId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "modelCredentialId": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "thinkingLevel": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "off",
+                                "minimal",
+                                "low",
+                                "medium",
+                                "high",
+                                "xhigh",
+                                "max"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "teamChatAmbientEnabled": {
+                          "type": "boolean"
+                        },
+                        "teamChatRules": {
+                          "type": "string"
+                        },
+                        "crossSpaceCommunication": {
+                          "type": "boolean"
+                        },
+                        "appControl": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "apps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema1"
+                              }
+                            },
+                            "headed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "enabled",
+                            "apps",
+                            "headed"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "disabledBuiltinTools": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "audience": {
+                          "default": "internal",
+                          "type": "string",
+                          "enum": [
+                            "internal",
+                            "external"
+                          ]
+                        },
+                        "firewall": {
+                          "default": false,
+                          "type": "boolean"
+                        },
+                        "firewallAskCapabilities": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "proactivity": {
+                          "default": "medium",
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "externalMessageTargets": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcBotsUpgradeInstructionsOutputSchema0"
+                          }
+                        },
+                        "externalComputerTools": {
+                          "default": false,
+                          "type": "boolean"
+                        },
+                        "webhookConfigured": {
+                          "type": "boolean"
+                        },
+                        "spawnKey": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "spaceId",
+                        "name",
+                        "title",
+                        "description",
+                        "instructions",
+                        "color",
+                        "notifyOnFinish",
+                        "pinned",
+                        "sectionId",
+                        "archivedAt",
+                        "unread",
+                        "parentBotId",
+                        "memoryScope",
+                        "threadId",
+                        "preview",
+                        "status",
+                        "runPhase",
+                        "runErrorId",
+                        "computerMode",
+                        "updatedAt",
+                        "createdAt",
+                        "voiceId",
+                        "autoSpeak",
+                        "modelProvider",
+                        "modelId",
+                        "thinkingLevel",
+                        "teamChatAmbientEnabled",
+                        "teamChatRules",
+                        "disabledBuiltinTools",
+                        "audience",
+                        "firewall",
+                        "firewallAskCapabilities",
+                        "proactivity",
+                        "externalMessageTargets",
+                        "externalComputerTools",
+                        "webhookConfigured",
+                        "spawnKey"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/accounts": {
+      "post": {
+        "operationId": "rpc_brexCards_accounts",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "accounts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "cashAccountId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "currentBalanceCents": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsAccountsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "availableBalanceCents": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsAccountsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "currency": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "primary": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "cashAccountId",
+                              "name",
+                              "status",
+                              "currentBalanceCents",
+                              "availableBalanceCents",
+                              "currency",
+                              "primary"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "statements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "statementId": {
+                                "type": "string"
+                              },
+                              "accountKind": {
+                                "type": "string",
+                                "enum": [
+                                  "card",
+                                  "cash"
+                                ]
+                              },
+                              "cashAccountId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "accountName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "startDate": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsAccountsOutputSchema1"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "endDate": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsAccountsOutputSchema1"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "startBalanceCents": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsAccountsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "endBalanceCents": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsAccountsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "statementId",
+                              "accountKind",
+                              "cashAccountId",
+                              "accountName",
+                              "startDate",
+                              "endDate",
+                              "startBalanceCents",
+                              "endBalanceCents"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "accounts",
+                        "statements"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/activity": {
+      "post": {
+        "operationId": "rpc_brexCards_activity",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "activities": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "effectId": {
+                                "type": "string"
+                              },
+                              "at": {
+                                "type": "string"
+                              },
+                              "action": {
+                                "type": "string"
+                              },
+                              "target": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "effectId",
+                              "at",
+                              "action",
+                              "target",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "activities"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/brexCards/cards": {
       "post": {
         "operationId": "rpc_brexCards_cards",
@@ -17725,6 +19231,340 @@
                         "serverId",
                         "agentBotId",
                         "writesEnabled",
+                        "cards"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/cardsView": {
+      "post": {
+        "operationId": "rpc_brexCards_cardsView",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "partial": {
+                          "type": "boolean"
+                        },
+                        "cards": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "cardId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "lastFour": {
+                                "type": "string"
+                              },
+                              "ownerUserId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "limitCents": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "currency": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "duration": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "cardType": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "lockAfterDate": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "allowedMerchants": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "blockedMerchants": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "ownerName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "period": {
+                                "type": "object",
+                                "properties": {
+                                  "start": {
+                                    "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema0"
+                                  },
+                                  "end": {
+                                    "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema0"
+                                  }
+                                },
+                                "required": [
+                                  "start",
+                                  "end"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "periodSpendCents": {
+                                "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema1"
+                              },
+                              "series": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "day": {
+                                      "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema0"
+                                    },
+                                    "cents": {
+                                      "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema1"
+                                    }
+                                  },
+                                  "required": [
+                                    "day",
+                                    "cents"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "usage": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "usedCents": {
+                                        "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema1"
+                                      },
+                                      "limitCents": {
+                                        "$ref": "#/components/schemas/RpcBrexCardsCardsViewOutputSchema1"
+                                      },
+                                      "percent": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "usedCents",
+                                      "limitCents",
+                                      "percent"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "partial": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "cardId",
+                              "name",
+                              "lastFour",
+                              "ownerUserId",
+                              "status",
+                              "limitCents",
+                              "currency",
+                              "duration",
+                              "cardType",
+                              "lockAfterDate",
+                              "allowedMerchants",
+                              "blockedMerchants",
+                              "ownerName",
+                              "period",
+                              "periodSpendCents",
+                              "series",
+                              "usage",
+                              "partial"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "partial",
                         "cards"
                       ],
                       "additionalProperties": false
@@ -17975,6 +19815,180 @@
         ]
       }
     },
+    "/rpc/brexCards/expenses": {
+      "post": {
+        "operationId": "rpc_brexCards_expenses",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "partial": {
+                          "type": "boolean"
+                        },
+                        "expenses": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcBrexCardsExpensesOutputSchema0"
+                          }
+                        },
+                        "reimbursements": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcBrexCardsExpensesOutputSchema0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "partial",
+                        "expenses",
+                        "reimbursements"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/rpc/brexCards/getControls": {
       "post": {
         "operationId": "rpc_brexCards_getControls",
@@ -18074,6 +20088,932 @@
                       "additionalProperties": false,
                       "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
                       "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/limits": {
+      "post": {
+        "operationId": "rpc_brexCards_limits",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "partial": {
+                          "type": "boolean"
+                        },
+                        "limits": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "spendLimitId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "period": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "startDate": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsLimitsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "endDate": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsLimitsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "limitCents": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsLimitsOutputSchema1"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "currency": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "usedCents": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsLimitsOutputSchema1"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "percent": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "memberUserIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "userId": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "userId",
+                                    "name"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "spendLimitId",
+                              "name",
+                              "status",
+                              "period",
+                              "startDate",
+                              "endDate",
+                              "limitCents",
+                              "currency",
+                              "usedCents",
+                              "percent",
+                              "memberUserIds",
+                              "members"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "partial",
+                        "limits"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/overview": {
+      "post": {
+        "operationId": "rpc_brexCards_overview",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "partial": {
+                          "type": "boolean"
+                        },
+                        "cash": {
+                          "type": "object",
+                          "properties": {
+                            "totalCents": {
+                              "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                            },
+                            "availableCents": {
+                              "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                            },
+                            "accountCount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "totalCents",
+                            "availableCents",
+                            "accountCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "cardSpend": {
+                          "type": "object",
+                          "properties": {
+                            "partial": {
+                              "type": "boolean"
+                            },
+                            "monthToDateCents": {
+                              "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                            },
+                            "previousMonthToDateCents": {
+                              "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                            },
+                            "changePercent": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "sparkline": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "day": {
+                                    "type": "string",
+                                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                  },
+                                  "cents": {
+                                    "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                                  }
+                                },
+                                "required": [
+                                  "day",
+                                  "cents"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "partial",
+                            "monthToDateCents",
+                            "previousMonthToDateCents",
+                            "changePercent",
+                            "sparkline"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "cards": {
+                          "type": "object",
+                          "properties": {
+                            "active": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "locked": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "terminated": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "active",
+                            "locked",
+                            "terminated"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "nearLimit": {
+                          "type": "object",
+                          "properties": {
+                            "partial": {
+                              "type": "boolean"
+                            },
+                            "count": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "card",
+                                      "spend_limit"
+                                    ]
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "usedCents": {
+                                    "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                                  },
+                                  "limitCents": {
+                                    "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                                  },
+                                  "percent": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "id",
+                                  "name",
+                                  "usedCents",
+                                  "limitCents",
+                                  "percent"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "partial",
+                            "count",
+                            "items"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "sankey": {
+                          "type": "object",
+                          "properties": {
+                            "partial": {
+                              "type": "boolean"
+                            },
+                            "totalCents": {
+                              "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                            },
+                            "categories": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "bucket": {
+                                    "type": "string",
+                                    "enum": [
+                                      "software",
+                                      "cloud",
+                                      "travel",
+                                      "meals",
+                                      "marketing",
+                                      "other"
+                                    ]
+                                  },
+                                  "cents": {
+                                    "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+                                  },
+                                  "count": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "partial": {
+                                    "type": "boolean"
+                                  },
+                                  "merchants": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema1"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "bucket",
+                                  "cents",
+                                  "count",
+                                  "partial",
+                                  "merchants"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "partial",
+                            "totalCents",
+                            "categories"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "topVendors": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema1"
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "partial",
+                        "cash",
+                        "cardSpend",
+                        "cards",
+                        "nearLimit",
+                        "sankey",
+                        "topVendors"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/people": {
+      "post": {
+        "operationId": "rpc_brexCards_people",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "partial": {
+                          "type": "boolean"
+                        },
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "userId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "cards": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "cardId": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "lastFour": {
+                                      "type": "string"
+                                    },
+                                    "status": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "cardId",
+                                    "name",
+                                    "lastFour",
+                                    "status"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "activeCardCount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "terminatedCardCount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "spendLimitIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "spendLimitNames": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "monthSpendCents": {
+                                "$ref": "#/components/schemas/RpcBrexCardsPeopleOutputSchema0"
+                              },
+                              "windowSpendCents": {
+                                "$ref": "#/components/schemas/RpcBrexCardsPeopleOutputSchema0"
+                              },
+                              "partial": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "userId",
+                              "name",
+                              "email",
+                              "status",
+                              "cards",
+                              "activeCardCount",
+                              "terminatedCardCount",
+                              "spendLimitIds",
+                              "spendLimitNames",
+                              "monthSpendCents",
+                              "windowSpendCents",
+                              "partial"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "partial",
+                        "people"
+                      ],
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -18467,6 +21407,620 @@
                       "additionalProperties": false,
                       "description": "Some server-side Zod refinements cannot be represented in JSON Schema and remain enforced by the server.",
                       "x-rakazo-zod-refinements": "Enforced by the server; not expressible in JSON Schema."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/spending": {
+      "post": {
+        "operationId": "rpc_brexCards_spending",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                      "merchant": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "cardId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "userId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "category": {
+                        "type": "string",
+                        "enum": [
+                          "software",
+                          "cloud",
+                          "travel",
+                          "meals",
+                          "marketing",
+                          "other"
+                        ]
+                      },
+                      "from": {
+                        "$ref": "#/components/schemas/RpcBrexCardsSpendingInputSchema0"
+                      },
+                      "to": {
+                        "$ref": "#/components/schemas/RpcBrexCardsSpendingInputSchema0"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "partial": {
+                          "type": "boolean"
+                        },
+                        "range": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema0"
+                            },
+                            "to": {
+                              "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema0"
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "to"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "totalCents": {
+                          "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema1"
+                        },
+                        "transactions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "postedAt": {
+                                "type": "string"
+                              },
+                              "day": {
+                                "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema0"
+                              },
+                              "cardId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "cardName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "cardLastFour": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "userId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "userName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "merchant": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "amountCents": {
+                                "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema1"
+                              },
+                              "currency": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "bucket": {
+                                "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema2"
+                              },
+                              "expenseId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "postedAt",
+                              "day",
+                              "cardId",
+                              "cardName",
+                              "cardLastFour",
+                              "userId",
+                              "userName",
+                              "merchant",
+                              "description",
+                              "amountCents",
+                              "currency",
+                              "bucket",
+                              "expenseId"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "categories": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema3"
+                          }
+                        },
+                        "sankey": {
+                          "type": "object",
+                          "properties": {
+                            "partial": {
+                              "type": "boolean"
+                            },
+                            "totalCents": {
+                              "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema1"
+                            },
+                            "categories": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema3"
+                              }
+                            }
+                          },
+                          "required": [
+                            "partial",
+                            "totalCents",
+                            "categories"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "duplicates": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "merchant": {
+                                "type": "string"
+                              },
+                              "month": {
+                                "type": "string",
+                                "pattern": "^\\d{4}-\\d{2}$"
+                              },
+                              "cardIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "cardNames": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "cents": {
+                                "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema1"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "partial": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "merchant",
+                              "month",
+                              "cardIds",
+                              "cardNames",
+                              "cents",
+                              "count",
+                              "partial"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "partial",
+                        "range",
+                        "totalCents",
+                        "transactions",
+                        "categories",
+                        "sankey",
+                        "duplicates"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "402": {
+            "$ref": "#/components/responses/Http402"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "405": {
+            "$ref": "#/components/responses/Http405"
+          },
+          "406": {
+            "$ref": "#/components/responses/Http406"
+          },
+          "408": {
+            "$ref": "#/components/responses/Http408"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Http410"
+          },
+          "412": {
+            "$ref": "#/components/responses/Http412"
+          },
+          "413": {
+            "$ref": "#/components/responses/Http413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Http415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "428": {
+            "$ref": "#/components/responses/Http428"
+          },
+          "429": {
+            "$ref": "#/components/responses/Http429"
+          },
+          "499": {
+            "$ref": "#/components/responses/Http499"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "501": {
+            "$ref": "#/components/responses/Http501"
+          },
+          "502": {
+            "$ref": "#/components/responses/Http502"
+          },
+          "503": {
+            "$ref": "#/components/responses/Http503"
+          },
+          "504": {
+            "$ref": "#/components/responses/Http504"
+          },
+          "default": {
+            "$ref": "#/components/responses/OtherORPCError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/rpc/brexCards/trips": {
+      "post": {
+        "operationId": "rpc_brexCards_trips",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": false,
+            "description": "Native clients send rakazo://; include the application origin for origin checks.",
+            "schema": {
+              "type": "string",
+              "example": "rakazo://"
+            }
+          },
+          {
+            "name": "x-rakazo-space-id",
+            "in": "header",
+            "required": false,
+            "description": "Optional selected space identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "json": {
+                    "description": "This procedure has no input."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful RPC response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "json"
+                  ],
+                  "properties": {
+                    "json": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "properties": {
+                        "serverId": {
+                          "type": "string"
+                        },
+                        "agentBotId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "writesEnabled": {
+                          "type": "boolean"
+                        },
+                        "trips": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tripId": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "status": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "bookerUserId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "bookerName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "startsAt": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsTripsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "endsAt": {
+                                "anyOf": [
+                                  {
+                                    "$ref": "#/components/schemas/RpcBrexCardsTripsOutputSchema0"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "tripId",
+                              "name",
+                              "status",
+                              "bookerUserId",
+                              "bookerName",
+                              "startsAt",
+                              "endsAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "serverId",
+                        "agentBotId",
+                        "writesEnabled",
+                        "trips"
+                      ],
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -142567,6 +146121,205 @@
           }
         ]
       },
+      "RpcBotsUpgradeInstructionsOutputSchema0": {
+        "type": "string",
+        "minLength": 1
+      },
+      "RpcBotsUpgradeInstructionsOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBrexCardsAccountsOutputSchema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "RpcBrexCardsAccountsOutputSchema1": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "RpcBrexCardsCardsViewOutputSchema0": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "RpcBrexCardsCardsViewOutputSchema1": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "RpcBrexCardsExpensesOutputSchema0": {
+        "type": "object",
+        "properties": {
+          "expenseId": {
+            "type": "string"
+          },
+          "purchasedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "day": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "userId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "userName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "merchant": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "memo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paymentStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expenseType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "software",
+              "cloud",
+              "travel",
+              "meals",
+              "marketing",
+              "other"
+            ]
+          },
+          "amountCents": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "missingReceipt": {
+            "type": "boolean"
+          },
+          "missingMemo": {
+            "type": "boolean"
+          },
+          "complianceStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cardId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "expenseId",
+          "purchasedAt",
+          "day",
+          "userId",
+          "userName",
+          "merchant",
+          "memo",
+          "status",
+          "paymentStatus",
+          "expenseType",
+          "category",
+          "bucket",
+          "amountCents",
+          "currency",
+          "receipts",
+          "missingReceipt",
+          "missingMemo",
+          "complianceStatus",
+          "cardId"
+        ],
+        "additionalProperties": false
+      },
       "RpcBrexCardsGetControlsOutputSchema0": {
         "type": "integer",
         "exclusiveMinimum": 0,
@@ -142580,6 +146333,51 @@
           "QUARTERLY",
           "YEARLY"
         ]
+      },
+      "RpcBrexCardsLimitsOutputSchema0": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "RpcBrexCardsLimitsOutputSchema1": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "RpcBrexCardsOverviewOutputSchema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "RpcBrexCardsOverviewOutputSchema1": {
+        "type": "object",
+        "properties": {
+          "merchant": {
+            "type": "string"
+          },
+          "cents": {
+            "$ref": "#/components/schemas/RpcBrexCardsOverviewOutputSchema0"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "partial": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "merchant",
+          "cents",
+          "count",
+          "partial"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBrexCardsPeopleOutputSchema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
       },
       "RpcBrexCardsSetControlsOutputSchema0": {
         "type": "integer",
@@ -142608,6 +146406,89 @@
           "QUARTERLY",
           "YEARLY"
         ]
+      },
+      "RpcBrexCardsSpendingOutputSchema0": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "RpcBrexCardsSpendingOutputSchema1": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "RpcBrexCardsSpendingOutputSchema2": {
+        "type": "string",
+        "enum": [
+          "software",
+          "cloud",
+          "travel",
+          "meals",
+          "marketing",
+          "other"
+        ]
+      },
+      "RpcBrexCardsSpendingOutputSchema3": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema2"
+          },
+          "cents": {
+            "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema1"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "merchants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "merchant": {
+                  "type": "string"
+                },
+                "cents": {
+                  "$ref": "#/components/schemas/RpcBrexCardsSpendingOutputSchema1"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "partial": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "merchant",
+                "cents",
+                "count",
+                "partial"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "bucket",
+          "cents",
+          "count",
+          "partial",
+          "merchants"
+        ],
+        "additionalProperties": false
+      },
+      "RpcBrexCardsSpendingInputSchema0": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "RpcBrexCardsTripsOutputSchema0": {
+        "type": "string"
       },
       "RpcCalendarAgendaOutputSchema0": {
         "type": "string",

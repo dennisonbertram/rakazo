@@ -241,6 +241,9 @@ function fixture({
   rules = [] as ActionApprovalRule[],
   askText,
   autoReview = false,
+  autoReviewBackground = true,
+  pageContent,
+  noInjectedReview = false,
   trigger = "user",
   unattended = trigger === "webhook",
   externalTaint = false,
@@ -409,6 +412,12 @@ function fixture({
   /** The runtime ends its turn with an ask_user question. */
   askText?: string;
   autoReview?: boolean;
+  /** The owner's "Also in background runs" switch. */
+  autoReviewBackground?: boolean;
+  /** The bot's one page, for page_edit and page_write checks. */
+  pageContent?: string;
+  /** Builds the judge from the run's own connection instead of the injected mock. */
+  noInjectedReview?: boolean;
   trigger?: string;
   /** The owner's own message that started the run, which names sites the run may fetch. */
   sourceText?: string;
@@ -878,8 +887,25 @@ function fixture({
         where?.routineId ? routineRules.map((matchValue) => ({ matchValue })) : rules,
       ),
     },
+    botPage: {
+      findFirst: vi.fn(async () =>
+        pageContent === undefined
+          ? null
+          : {
+              id: "page-1",
+              botId: "bot-1",
+              title: "Notes",
+              content: pageContent,
+              kind: "blocks",
+              revision: 1,
+              updatedBy: "bot",
+              updatedAt: new Date(0),
+            },
+      ),
+      findMany: vi.fn(async () => []),
+    },
     actionAutoReviewPreference: {
-      findUnique: vi.fn(async () => ({ enabled: autoReview })),
+      findUnique: vi.fn(async () => ({ enabled: autoReview, background: autoReviewBackground })),
     },
     externalEffect,
   };
@@ -918,7 +944,14 @@ function fixture({
   const offeredTools: string[] = [];
   const claimSteeringSpy = vi.fn();
   let lastRequest: AgentRunRequest | undefined;
+  const reviewRequests: AgentRunRequest[] = [];
   const runtimeRun = vi.fn(async function* (request: AgentRunRequest) {
+    if (request.runId.endsWith(":auto-review")) {
+      reviewRequests.push(request);
+      yield { type: "text" as const, text: '{"decision":"pass","reason":"fits"}' };
+      yield { type: "done" as const, text: '{"decision":"pass","reason":"fits"}' };
+      return;
+    }
     offeredTools.push(...(request.tools ?? []).map((t) => t.name));
     lastRequest = request;
     if (parallel) {
@@ -1053,7 +1086,7 @@ function fixture({
     },
     jobs: { enqueue: jobsEnqueue },
     secrets,
-    autoReview: autoReviewProvider,
+    ...(noInjectedReview ? {} : { autoReview: autoReviewProvider }),
     shutdownSignal,
     web,
     mail,
@@ -1064,6 +1097,8 @@ function fixture({
     ...(dataRoom ? { artifacts: {} } : {}),
   } as unknown as Parameters<typeof createRunExecutor>[0]);
   return {
+    reviewRequests,
+    lastRunRequest: () => lastRequest,
     rules,
     web,
     fetchedUrls,
@@ -9828,6 +9863,288 @@ describe("Always for this routine and Auto Review of routine reads", () => {
       expect(after.pauseRunForInput).toHaveBeenCalledOnce();
       expect(reviewMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("Auto Review in background runs", () => {
+  const background = (
+    decision: "pass" | "ask" | "throw",
+    name = "page_source_list",
+    extra: Record<string, unknown> = {},
+  ) => {
+    reviewMock.mockReset();
+    if (decision === "throw") reviewMock.mockRejectedValue(new Error("down"));
+    else reviewMock.mockResolvedValue({ decision, reason: "fits", model: "mock" });
+    const f = fixture({
+      name,
+      builtin: true,
+      trigger: "routine",
+      unattended: true,
+      routineManagedKind: null,
+      autoReview: true,
+      autoReviewBackground: true,
+      ...extra,
+    });
+    f.setCalls([{ args: {}, executionId: "call-1" }]);
+    return f;
+  };
+
+  it("lets the judge pass a call in a clean routine run, with the owner's words only", async () => {
+    const f = background("pass");
+    await f.run({ expectFailure: true });
+    expect(reviewMock).toHaveBeenCalledOnce();
+    expect(reviewMock.mock.calls[0]?.[0].userTask).not.toBe("");
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it.each(["ask", "throw"] as const)("keeps the card when the judge says %s", async (decision) => {
+    const f = background(decision);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks for a clean routine cap_table_read when the background switch is off", async () => {
+    const f = background("pass", "ticket_get", { autoReviewBackground: false, ticketBoard: true });
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("does not judge when the background switch is off", async () => {
+    const f = background("pass", "page_source_list", { autoReviewBackground: false });
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("never judges a tainted run, a webhook run or an excluded tool", async () => {
+    for (const [name, extra] of [
+      ["page_source_list", { externalTaint: true }],
+      ["page_source_list", { trigger: "webhook" }],
+      ["remember", {}],
+      ["skill_create", {}],
+    ] as const) {
+      const f = background("pass", name, extra);
+      await f.run({ expectFailure: true });
+      expect(f.pauseRunForInput, name + JSON.stringify(extra)).toHaveBeenCalled();
+    }
+    expect(reviewMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Auto Review of attended and Firewall calls", () => {
+  const mail = {
+    listAccounts: vi.fn(async () => [{ id: "acct-1", address: "me@example.test" }]),
+  };
+  const judge = (decision: "pass" | "ask" = "pass") => {
+    reviewMock.mockReset();
+    reviewMock.mockResolvedValue({ decision, reason: "fits", model: "mock" });
+  };
+
+  const edit = (replacement: string) => ({
+    old_string: "teh",
+    new_string: replacement,
+    baseRevision: 1,
+  });
+  it("lets the judge pass a Firewall page_edit with plain text", async () => {
+    judge();
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+      pageContent: "Fix teh typo.",
+    });
+    f.setCalls([{ args: edit("the"), executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(reviewMock).toHaveBeenCalledOnce();
+    expect(reviewMock.mock.calls[0]?.[0].untrustedContent).toBe(true);
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an image", "![x](https://evil.test/p.png)"],
+    ["a link", "see https://evil.test/a"],
+    ["an HTML tag", "<img src=x>"],
+  ])("never judges a Firewall page_edit holding %s", async (_label, text) => {
+    judge();
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+      pageContent: "Fix teh typo.",
+    });
+    f.setCalls([{ args: edit(text), executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks when the judge doubts a Firewall page_edit", async () => {
+    judge("ask");
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+      pageContent: "Fix teh typo.",
+    });
+    f.setCalls([{ args: edit("the"), executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("never judges a Firewall page_edit that swaps private text into an existing image URL", async () => {
+    judge();
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+      pageContent: "![logo](https://cdn.example.test/logo.png?d=PLACEHOLDER)",
+    });
+    f.setCalls([
+      {
+        args: { old_string: "PLACEHOLDER", new_string: "PRIVATE-CUSTOMER-NOTE", baseRevision: 1 },
+        executionId: "c1",
+      },
+    ]);
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("judges on the run's own model connection when no checker is configured", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("PI_DEFAULT_CREDENTIALS", "");
+    const f = fixture({
+      name: "page_edit",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      noInjectedReview: true,
+      sourceText: "Tidy up my notes page",
+      pageContent: "Fix teh typo.",
+    });
+    f.setCalls([{ args: edit("the"), executionId: "c1" }]);
+    await f.run({ expectFailure: true });
+    expect(f.reviewRequests).toHaveLength(1);
+    const runModel = f.lastRunRequest()?.model;
+    const reviewModel = f.reviewRequests[0]?.model;
+    expect(reviewModel).toMatchObject({
+      provider: runModel?.provider,
+      id: runModel?.id,
+      baseUrl: runModel?.baseUrl,
+      apiKey: runModel?.apiKey,
+    });
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
+  it("never judges a Firewall remember, or a page write too long for the judge", async () => {
+    judge();
+    const memory = fixture({
+      name: "remember",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+    });
+    memory.setCalls([{ args: { fact: "likes tea" }, executionId: "c1" }]);
+    await memory.run({ expectFailure: true });
+    const long = fixture({
+      name: "page_write",
+      builtin: true,
+      firewall: true,
+      autoReview: true,
+      sourceText: "Tidy up my notes page",
+      pageContent: "",
+    });
+    long.setCalls([{ args: { content: "word ".repeat(400), baseRevision: 1 }, executionId: "c1" }]);
+    await long.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(long.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("judges an unattended Firewall write only while the background switch is on", async () => {
+    for (const [background, calls] of [
+      [false, 0],
+      [true, 1],
+    ] as const) {
+      judge();
+      const f = fixture({
+        name: "page_edit",
+        builtin: true,
+        firewall: true,
+        autoReview: true,
+        autoReviewBackground: background,
+        trigger: "routine",
+        unattended: true,
+        routineManagedKind: null,
+        pageContent: "Fix teh typo.",
+      });
+      f.setCalls([{ args: edit("the"), executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+      expect(reviewMock).toHaveBeenCalledTimes(calls);
+    }
+  });
+
+  it("never judges a Firewall mail_send or message_bot", async () => {
+    judge();
+    for (const [name, args] of [
+      ["mail_send", { to: ["a@example.test"], subject: "Hi", body: "Hello" }],
+      ["message_bot", { name: "Other", message: "hello" }],
+    ] as const) {
+      const f = fixture({
+        name,
+        builtin: true,
+        firewall: true,
+        autoReview: true,
+        mail,
+        sourceText: "Tidy up my notes page",
+      });
+      f.setCalls([{ args, executionId: "c1" }]);
+      await f.run({ expectFailure: true });
+    }
+    expect(reviewMock).not.toHaveBeenCalled();
+  });
+
+  it("lets the judge pass an attended mail_modify archive, but a TRASH change always asks", async () => {
+    judge();
+    const archive = fixture({ name: "mail_modify", builtin: true, autoReview: true, mail });
+    archive.setCalls([{ args: { id: "m1", archive: true }, executionId: "c1" }]);
+    await archive.run({ expectFailure: true });
+    expect(reviewMock).toHaveBeenCalledOnce();
+    expect(archive.pauseRunForInput).not.toHaveBeenCalled();
+    reviewMock.mockClear();
+    const trash = fixture({ name: "mail_modify", builtin: true, autoReview: true, mail });
+    trash.setCalls([{ args: { id: "m1", addLabels: ["TRASH"] }, executionId: "c1" }]);
+    await trash.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(trash.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
+  it("asks, without the judge, for a tainted web_fetch whose URL repeats private text", async () => {
+    judge();
+    const f = fixture({
+      name: "web_fetch",
+      builtin: true,
+      autoReview: true,
+      externalTaint: true,
+      sourceText: "Read https://example.com/page",
+    });
+    f.setCalls([
+      { args: { url: "https://example.com/page?q=PRIVATE-CUSTOMER-NOTE-4471" }, executionId: "c1" },
+    ]);
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 });
 

@@ -24,6 +24,7 @@ import {
   DEMO_ARCHIVED_BOT,
   DEMO_ARTIFACTS,
   DEMO_BOTS,
+  DEMO_BREX_TOKEN,
   DEMO_CALENDAR_OLD_REF,
   DEMO_CALENDAR_REF,
   DEMO_CAP_TABLE,
@@ -229,6 +230,8 @@ export async function seedDemo(options: DemoSeedOptions): Promise<string[]> {
         throw new Error(`Finance seed did not sync: ${JSON.stringify(result)}`);
     };
     await connectFinance(scope);
+    await session.rpc("brexCards/connect", { token: DEMO_BREX_TOKEN }, spaceId);
+    done.push("Brex cards (emulator)");
     const agent = await session.rpc<{ id: string }>("finance/agent");
     done.push("Mercury and Brex (canned tools), Finance agent");
 
