@@ -943,7 +943,8 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
         ) {
           return { ok: false };
         }
-        if ((await readyBundleDirectory(id)) !== bundleDir) return { ok: false };
+        if ((await readyBundleDirectory(id)) !== bundleDir || !sameScope(currentScope, scope))
+          return { ok: false };
         unlinkSync(pdfPath);
         unlinkSync(metadataPath);
         rmdirSync(bundleDir);
