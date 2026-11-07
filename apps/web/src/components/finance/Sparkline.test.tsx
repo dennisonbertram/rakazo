@@ -41,3 +41,30 @@ it("names the direction and uses the success or destructive tone", async () => {
 it("draws nothing for fewer than two values", async () => {
   expect((await render([5])).querySelector("svg")).toBeNull();
 });
+
+async function renderWith(props: { values: number[]; label?: string; neutral?: boolean }) {
+  const el = document.createElement("div");
+  await act(async () => createRoot(el).render(<Sparkline {...props} />));
+  return el;
+}
+
+it("keeps the default label and tone for price callers", async () => {
+  const svg = (await renderWith({ values: [1, 2] })).querySelector("svg");
+  expect(svg?.getAttribute("aria-label")).toBe("Price up");
+  expect(svg?.getAttribute("class")).toContain("text-success");
+});
+
+it("uses the caller's label and the neutral tone for spend", async () => {
+  const rising = (
+    await renderWith({ values: [1, 2], label: "Figma spend trend", neutral: true })
+  ).querySelector("svg");
+  expect(rising?.getAttribute("aria-label")).toBe("Figma spend trend");
+  // Rising spend is not success: neutral stays muted whatever the direction.
+  expect(rising?.getAttribute("class")).toContain("text-muted-foreground");
+  expect(rising?.getAttribute("class")).not.toContain("text-success");
+  const falling = (
+    await renderWith({ values: [2, 1], label: "Figma spend trend", neutral: true })
+  ).querySelector("svg");
+  expect(falling?.getAttribute("class")).toContain("text-muted-foreground");
+  expect(falling?.getAttribute("class")).not.toContain("text-destructive");
+});

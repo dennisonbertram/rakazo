@@ -66,15 +66,15 @@ export function useBrexCards(enabled: boolean) {
 }
 
 // Brex ids are plain tokens. The id is Brex-controlled text, so anything else is never sent.
-const SAFE_ID = /^[A-Za-z0-9_-]{1,200}$/;
+export const SAFE_ID = /^[A-Za-z0-9_-]{1,200}$/;
 
 // A one-time card has no period, so its message leaves "per {period}" out.
 const PERIODS: Record<string, string> = { MONTHLY: "month", QUARTERLY: "quarter", YEARLY: "year" };
 
-const lockMessage = (card: BrexCardRow) => `Lock card ${card.cardId}.`;
-const cancelMessage = (card: BrexCardRow, reason: BrexChangeCardReason) =>
+export const lockMessage = (card: BrexCardRow) => `Lock card ${card.cardId}.`;
+export const cancelMessage = (card: BrexCardRow, reason: BrexChangeCardReason) =>
   `Cancel card ${card.cardId}, reason ${reason}.`;
-function limitMessage(card: BrexCardRow, cents: number) {
+export function limitMessage(card: BrexCardRow, cents: number) {
   const period = card.duration ? PERIODS[card.duration] : undefined;
   return `Set the limit of card ${card.cardId} to $${centsToDollars(cents)}${period ? ` per ${period}` : ""}.`;
 }
@@ -276,7 +276,7 @@ export function BrexCardsSection({
   );
 }
 
-function EditLimitDialog({
+export function EditLimitDialog({
   busy,
   error,
   onSend,
@@ -340,7 +340,7 @@ function EditLimitDialog({
   );
 }
 
-function CancelDialog({
+export function CancelDialog({
   busy,
   error,
   onSend,
