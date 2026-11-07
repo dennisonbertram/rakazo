@@ -67,6 +67,7 @@ private func shot<V: View>(_ view: V, size: CGSize, name: String) async {
   let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
   let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow()
   window.frame = CGRect(origin: .zero, size: size)
+  defer { window.isHidden = true }  // a window left visible covers the screen for later tests
   window.rootViewController = UIHostingController(rootView: view)
   window.isHidden = false
   window.layoutIfNeeded()
@@ -78,7 +79,6 @@ private func shot<V: View>(_ view: V, size: CGSize, name: String) async {
   }
   try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
   try? image.pngData()?.write(to: URL(fileURLWithPath: folder).appendingPathComponent(name + ".png"))
-  window.isHidden = true
 }
 
 private let sizes: [(String, CGSize)] = [
