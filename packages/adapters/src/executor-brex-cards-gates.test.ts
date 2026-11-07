@@ -33,16 +33,23 @@ const CARD = {
 };
 const SERVER_ID = "server-1";
 
-type Approved = { id: string; args?: Record<string, unknown> };
+type Approved = { id: string; tool?: string; args?: Record<string, unknown> };
+type ToolCall = { tool: string; args: Record<string, unknown> };
 type FixtureOptions = {
   /** The MCP server's endpoint: the Brex sentinel or, to show nothing else changed, another one. */
   endpoint?: string;
   /** A saved Always-allow rule for the write, and Auto Review on with a reviewer that passes it. */
   allowEverything?: boolean;
+  /** Brex write tools the server offers. Defaults to the vendor-card write the original gate covered. */
+  tools?: string[];
   /** Effects the user already approved on a card, replayed in order. */
   approved?: Approved[];
-  /** Calls the model makes, in order. */
+  /** Effects the user already denied; a matching call resolves to the denial without a new card. */
+  denied?: Approved[];
+  /** Calls the model makes, in order. Plain objects are args for the default write. */
   calls?: Array<Record<string, unknown>>;
+  /** Calls the model makes, in order, each naming its offered tool. */
+  toolCalls?: ToolCall[];
 };
 
 function fixture(options: FixtureOptions = {}) {
@@ -82,37 +89,51 @@ function fixture(options: FixtureOptions = {}) {
       agentBot,
     },
   ];
-  const route = {
+  const routeFor = (toolName: string) => ({
     connectorId: "mcp",
     resourceId: SERVER_ID,
     resourceRevision: 1,
-    toolName: WRITE,
+    toolName,
     endpoint,
-  };
-  const tool: ConnectorTool = {
-    name: TOOL_NAME,
-    description: "Create a virtual vendor card.",
+  });
+  const toolNameFor = (write: string) => `mcp__brex-cards__${write}`;
+  const writes = options.tools ?? [WRITE];
+  const tools: ConnectorTool[] = writes.map((write) => ({
+    name: toolNameFor(write),
+    description: `Brex ${write} write.`,
     inputSchema: { type: "object", properties: {} },
     readOnly: false,
-    route: { ...route, discoveredReadOnly: false },
-  };
-
-  const externalEffects: Record<string, unknown>[] = (options.approved ?? []).map(
-    ({ id, args }, index) => ({
+    route: { ...routeFor(write), discoveredReadOnly: false },
+  }));
+  const effectRow = (
+    { id, tool = WRITE, args = CARD }: Approved,
+    index: number,
+    status: "approved" | "denied",
+    suffix: string,
+  ) => {
+    const kind = toolNameFor(tool);
+    const effectArgs = args;
+    return {
       id,
       spaceId: run.spaceId,
       runId: run.id,
-      kind: TOOL_NAME,
-      idempotencyKey: approvalEffectKey(run.id, TOOL_NAME, args ?? CARD) + `:approved-${index}`,
-      status: "approved",
-      request: boundDirectApprovalRequest(
-        { ...route, connectionId: undefined },
-        args ?? CARD,
-        "__rakazoCatalogTool",
-      ),
+      kind,
+      idempotencyKey:
+        approvalEffectKey(run.id, kind, effectArgs) +
+        (status === "approved" ? `:${suffix}-${index}` : `:${suffix}`),
+      status,
+      request: boundDirectApprovalRequest(routeFor(tool), effectArgs, "__rakazoCatalogTool"),
       createdAt: new Date(Date.UTC(2030, 0, 1, 0, 0, index)),
-    }),
-  );
+    };
+  };
+  const externalEffects: Record<string, unknown>[] = [
+    ...(options.approved ?? []).map((approved, index) =>
+      effectRow(approved, index, "approved", "approved"),
+    ),
+    ...(options.denied ?? []).map((denied, index) =>
+      effectRow(denied, index + (options.approved?.length ?? 0), "denied", "denied"),
+    ),
+  ];
   const externalEffect = {
     findMany: vi.fn(async ({ where }: { where?: { status?: string } } = {}) =>
       externalEffects.filter((effect) => !where?.status || effect.status === where.status),
@@ -149,7 +170,7 @@ function fixture(options: FixtureOptions = {}) {
   const execute = vi.fn(async function* (_call: unknown) {
     yield { type: "result" as const, data: { content: [{ type: "text", text: "{}" }] } };
   });
-  const discoverTools = vi.fn(async () => [tool]);
+  const discoverTools = vi.fn(async () => tools);
   const pauseRunForInput = vi.fn(async (_input: unknown) => true);
   const results: unknown[] = [];
   let request: AgentRunRequest | undefined;
@@ -297,9 +318,11 @@ function fixture(options: FixtureOptions = {}) {
 
   const runtimeRun = vi.fn(async function* (next: AgentRunRequest) {
     request = next;
-    for (const [index, args] of (options.calls ?? []).entries()) {
+    const calls: ToolCall[] =
+      options.toolCalls ?? (options.calls ?? []).map((args) => ({ tool: TOOL_NAME, args }));
+    for (const [index, call] of calls.entries()) {
       try {
-        results.push(await next.executeTool?.(TOOL_NAME, args, `tool-call-${index + 1}`));
+        results.push(await next.executeTool?.(call.tool, call.args, `tool-call-${index + 1}`));
       } catch (error) {
         results.push(error);
       }
@@ -411,5 +434,72 @@ describe("Brex cards executor gates", () => {
     const [call] = f.dispatched();
     expect(call?.executionId).toBe(f.externalEffects[0]?.idempotencyKey);
     expect(call?.executionId).not.toBe("effect-approved-1");
+  });
+
+  it("asks before an Offboard write and runs nothing until it is approved", async () => {
+    const f = fixture({
+      tools: ["lock_card"],
+      toolCalls: [{ tool: "mcp__brex-cards__lock_card", args: { cardId: "card_ops" } }],
+    });
+    await f.executor.continueRun(f.run.id, "worker-1");
+
+    expect(f.pauseRunForInput).toHaveBeenCalledTimes(1);
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.externalEffects).toHaveLength(1);
+    expect(f.externalEffects[0]).toMatchObject({
+      status: "intended",
+      kind: "mcp__brex-cards__lock_card",
+    });
+  });
+
+  it("needs a separate approved effect for each Offboard write", async () => {
+    const lock = { cardId: "card_ops" };
+    const cancel = { cardId: "card_ops" };
+    const limit = { spendLimitId: "limit_cloud", memberUserIds: ["u_ada"] };
+    const f = fixture({
+      tools: ["lock_card", "terminate_card", "update_spend_limit"],
+      approved: [
+        { id: "effect-lock", tool: "lock_card", args: lock },
+        { id: "effect-cancel", tool: "terminate_card", args: cancel },
+        { id: "effect-limit", tool: "update_spend_limit", args: limit },
+      ],
+      toolCalls: [
+        { tool: "mcp__brex-cards__lock_card", args: lock },
+        { tool: "mcp__brex-cards__terminate_card", args: cancel },
+        { tool: "mcp__brex-cards__update_spend_limit", args: limit },
+      ],
+    });
+    await f.executor.continueRun(f.run.id, "worker-1");
+
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.dispatched().map((call) => call.executionId)).toEqual([
+      "effect-lock",
+      "effect-cancel",
+      "effect-limit",
+    ]);
+    expect(f.dispatched().map((call) => call.tool)).toEqual([
+      "mcp__brex-cards__lock_card",
+      "mcp__brex-cards__terminate_card",
+      "mcp__brex-cards__update_spend_limit",
+    ]);
+    expect(f.externalEffects.map((effect) => effect.status)).toEqual([
+      "completed",
+      "completed",
+      "completed",
+    ]);
+  });
+
+  it("does not run an Offboard write after its approval was denied", async () => {
+    const lock = { cardId: "card_ops" };
+    const f = fixture({
+      tools: ["lock_card"],
+      denied: [{ id: "effect-denied", tool: "lock_card", args: lock }],
+      toolCalls: [{ tool: "mcp__brex-cards__lock_card", args: lock }],
+    });
+    await f.executor.continueRun(f.run.id, "worker-1");
+
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(f.externalEffects.some((effect) => effect.status === "denied")).toBe(true);
   });
 });

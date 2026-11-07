@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 352 of 352
-- Web and shared components: 894
+- Web and shared component files with stories: 355 of 355
+- Web and shared components: 898
 - Mobile components: 155 in 104 files, mobile — native story pending
 - SwiftUI views: 141 in 77 files, native story pending
 
@@ -151,8 +151,11 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 
 | Component | File | Story file | Surface |
 | --- | --- | --- | --- |
+| BrexLimits | [apps/web/src/components/brex/BrexLimits.tsx](../../apps/web/src/components/brex/BrexLimits.tsx) | [BrexLimits.stories.tsx](../../apps/web/src/components/brex/BrexLimits.stories.tsx) | web |
 | TopVendors, NearLimit, BrexOverview | [apps/web/src/components/brex/BrexOverview.tsx](../../apps/web/src/components/brex/BrexOverview.tsx) | [BrexOverview.stories.tsx](../../apps/web/src/components/brex/BrexOverview.stories.tsx) | web |
 | BrexPage | [apps/web/src/components/brex/BrexPage.tsx](../../apps/web/src/components/brex/BrexPage.tsx) | [BrexPage.stories.tsx](../../apps/web/src/components/brex/BrexPage.stories.tsx) | web |
+| OffboardDialog, BrexPeople | [apps/web/src/components/brex/BrexPeople.tsx](../../apps/web/src/components/brex/BrexPeople.tsx) | [BrexPeople.stories.tsx](../../apps/web/src/components/brex/BrexPeople.stories.tsx) | web |
+| BrexSpending | [apps/web/src/components/brex/BrexSpending.tsx](../../apps/web/src/components/brex/BrexSpending.tsx) | [BrexSpending.stories.tsx](../../apps/web/src/components/brex/BrexSpending.stories.tsx) | web |
 | SourceLabel, PhoneSankey, WideSankey, SpendSankey | [apps/web/src/components/brex/SpendSankey.tsx](../../apps/web/src/components/brex/SpendSankey.tsx) | [SpendSankey.stories.tsx](../../apps/web/src/components/brex/SpendSankey.stories.tsx) | web |
 
 ## Web components/call
