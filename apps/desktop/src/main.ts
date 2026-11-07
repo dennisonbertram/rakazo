@@ -415,7 +415,7 @@ function createWindow(url: string, partition: string | null) {
       targetOrigin !== null &&
       isScannerSessionCookie(cookie, targetOrigin)
     ) {
-      clearScannerScope();
+      void scannerScopeCoordinator.reauthenticate(win).catch(() => undefined);
     }
   };
   targetSession.cookies.on("changed", onCookiesChanged);

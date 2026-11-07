@@ -67,7 +67,7 @@ Exposed on `window.rakazoDesktop.scanner` in `apps/desktop/src/preload.cjs`, onl
 - `scan()`: start a scan now. `cancel()`: stop a running scan; nothing is filed.
 - `setAutoScan(on)`, `setFolder(path)` using Data Room folder names.
 - `onDocument(listener)` and `pending()`: deliver/recover `{ id, name, bytes, sha256, pages, folder, userId, spaceId }`.
-- `setScope({ userId, spaceId } | null)`: main treats renderer IDs as claims and verifies them through the app window's Electron session with `POST <trusted-origin>/rpc/me`, body `{"json":null}`, and `x-rakazo-space-id` set to the claimed space. Scope is accepted only when the response's `json.userId` and `json.spaceId` exactly match. Scan triggers, `pending()`, `confirm()`, and document delivery revalidate the session; navigation, server/window changes, and session-cookie changes clear scope, and stale verification results are rejected.
+- `setScope({ userId, spaceId } | null)`: main treats renderer IDs as claims and verifies them through the app window's Electron session with `POST <trusted-origin>/rpc/me`, body `{"json":null}`, and `x-rakazo-space-id` set to the claimed space. Scope is accepted only when the response's `json.userId` and `json.spaceId` exactly match. Scan triggers, `pending()`, `confirm()`, and document delivery revalidate the session. Navigation forgets that window's claim; explicit `null` forgets it as well. Session-cookie changes and restored server switches clear scope, then reauthenticate the saved claim when possible; stale verification results are rejected.
 - `confirm(id, storedSha256)`: main deletes the outbox file only when local and stored hashes match the unchanged scope.
 
 ### Scanner page (`/app/scanner`)
