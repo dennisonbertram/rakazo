@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 358 of 358
-- Web and shared components: 905
+- Web and shared component files with stories: 359 of 359
+- Web and shared components: 911
 - Mobile components: 156 in 105 files, mobile — native story pending
 - SwiftUI views: 141 in 77 files, native story pending
 
@@ -153,6 +153,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | --- | --- | --- | --- |
 | AccountsView, BrexAccounts | [apps/web/src/components/brex/BrexAccounts.tsx](../../apps/web/src/components/brex/BrexAccounts.tsx) | [BrexAccounts.stories.tsx](../../apps/web/src/components/brex/BrexAccounts.stories.tsx) | web |
 | ActivityView, BrexActivity | [apps/web/src/components/brex/BrexActivity.tsx](../../apps/web/src/components/brex/BrexActivity.tsx) | [BrexActivity.stories.tsx](../../apps/web/src/components/brex/BrexActivity.stories.tsx) | web |
+| BrexCards, StatusLabel, UsageBar, CardTile, CardsBoard, NewCardDialog | [apps/web/src/components/brex/BrexCards.tsx](../../apps/web/src/components/brex/BrexCards.tsx) | [BrexCards.stories.tsx](../../apps/web/src/components/brex/BrexCards.stories.tsx) | web |
 | MemoDialog, ExpensesView, BrexExpenses | [apps/web/src/components/brex/BrexExpenses.tsx](../../apps/web/src/components/brex/BrexExpenses.tsx) | [BrexExpenses.stories.tsx](../../apps/web/src/components/brex/BrexExpenses.stories.tsx) | web |
 | TopVendors, NearLimit, BrexOverview | [apps/web/src/components/brex/BrexOverview.tsx](../../apps/web/src/components/brex/BrexOverview.tsx) | [BrexOverview.stories.tsx](../../apps/web/src/components/brex/BrexOverview.stories.tsx) | web |
 | BrexPage | [apps/web/src/components/brex/BrexPage.tsx](../../apps/web/src/components/brex/BrexPage.tsx) | [BrexPage.stories.tsx](../../apps/web/src/components/brex/BrexPage.stories.tsx) | web |
