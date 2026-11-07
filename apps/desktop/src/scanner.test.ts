@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   access,
+  chmod,
   mkdir,
   mkdtemp,
   readdir,
@@ -16,7 +17,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ScannerService } from "./scanner.js";
+import type { ScannerService, ScannerServiceOptions } from "./scanner.js";
 import { createScanner } from "./scanner.js";
 import * as setupStore from "./setup-store.js";
 
@@ -39,6 +40,7 @@ interface Harness {
 
 const harnesses: Harness[] = [];
 let unblockOutboxWrite: (() => void) | null = null;
+let unblockScannerSetup: (() => void) | null = null;
 
 async function makeHarness(
   scenario: Record<string, unknown> = {},
@@ -47,6 +49,8 @@ async function makeHarness(
     scanTimeoutMs?: number;
     pollTimeoutMs?: number;
     missing?: boolean;
+    authorizeScope?: ScannerServiceOptions["authorizeScope"];
+    prepareScanDirectory?: ScannerServiceOptions["prepareScanDirectory"];
   } = {},
 ): Promise<Harness> {
   const root = await mkdtemp(join(tmpdir(), "rakazo-scanner-test-"));
@@ -74,6 +78,8 @@ async function makeHarness(
     pollTimeoutMs: options.pollTimeoutMs ?? 2_000,
     scanTimeoutMs: options.scanTimeoutMs ?? 5_000,
     now: options.now,
+    authorizeScope: options.authorizeScope,
+    prepareScanDirectory: options.prepareScanDirectory,
   });
   const result: Harness = {
     root,
@@ -125,6 +131,8 @@ async function countLines(file: string) {
 afterEach(async () => {
   unblockOutboxWrite?.();
   unblockOutboxWrite = null;
+  unblockScannerSetup?.();
+  unblockScannerSetup = null;
   vi.restoreAllMocks();
   await Promise.all(
     harnesses.splice(0).map(async ({ service, root }) => {
@@ -191,6 +199,18 @@ describe("offline SANE scanner service", () => {
     await harness.service.scan();
     expect(await harness.scanCalls()).toBe(0);
     expect(harness.service.state().error).toContain("Sign in");
+  });
+
+  it("does not start a scan when the configured scope authorizer denies it", async () => {
+    const authorizeScope = vi.fn(() => false);
+    const harness = await makeHarness({}, { authorizeScope });
+    await harness.service.start();
+    await useScope(harness.service);
+
+    await harness.service.scan();
+
+    expect(authorizeScope).toHaveBeenCalledOnce();
+    expect(await harness.scanCalls()).toBe(0);
   });
 
   it("waits for a stable loaded sensor and resets the auto-scan latch after the feeder clears", async () => {
@@ -352,6 +372,38 @@ describe("offline SANE scanner service", () => {
 
     expect(harness.service.state().kind).toBe("ready");
     expect(await harness.service.pending()).toEqual([]);
+    expect(
+      (await readdir(harness.userDataDir)).filter((name) => name.startsWith(".scan-pages-")),
+    ).toEqual([]);
+  });
+
+  it("does not start scanimage when canceled during temporary page setup", async () => {
+    let setupEntered!: () => void;
+    let releaseSetup!: () => void;
+    const setupPaused = new Promise<void>((resolve) => {
+      setupEntered = resolve;
+    });
+    const setupBarrier = new Promise<void>((resolve) => {
+      releaseSetup = resolve;
+    });
+    unblockScannerSetup = releaseSetup;
+    const prepareScanDirectory = async (directory: string) => {
+      setupEntered();
+      await setupBarrier;
+      await chmod(directory, 0o700);
+    };
+    const harness = await makeHarness({}, { prepareScanDirectory });
+    await harness.service.start();
+    await useScope(harness.service);
+
+    const scanning = harness.service.scan();
+    await setupPaused;
+    const cancelling = harness.service.cancel();
+    releaseSetup();
+    unblockScannerSetup = null;
+    await Promise.all([scanning, cancelling]);
+
+    expect(await harness.scanCalls()).toBe(0);
     expect(
       (await readdir(harness.userDataDir)).filter((name) => name.startsWith(".scan-pages-")),
     ).toEqual([]);

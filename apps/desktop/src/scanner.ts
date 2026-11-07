@@ -644,6 +644,7 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
     let tempDir: string | null = null;
     try {
       const executable = await findExecutable();
+      if (control.cancelled || closed || !sameScope(currentScope, control.scope)) return snapshot();
       if (!executable) {
         setSafeError("SANE is missing. Install SANE and restart the app.");
         return snapshot();
@@ -651,7 +652,17 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
       if (control.cancelled || !sameScope(currentScope, control.scope)) return snapshot();
       await outboxReady();
       tempDir = await mkdtemp(join(userDataDir, ".scan-pages-"));
-      await chmod(tempDir, 0o700);
+      if (options.prepareScanDirectory) await options.prepareScanDirectory(tempDir);
+      else await chmod(tempDir, 0o700);
+      if (control.cancelled || closed || !sameScope(currentScope, control.scope)) return snapshot();
+      const authorized = await authorizeCurrentScope(control.scope);
+      if (!authorized) {
+        if (!control.cancelled && !closed && sameScope(currentScope, control.scope)) {
+          setSafeError("Your session could not be verified. Sign in again to scan.");
+        }
+        return snapshot();
+      }
+      if (control.cancelled || closed || !sameScope(currentScope, control.scope)) return snapshot();
       const batch = join(tempDir, "page%03d.jpg");
       const result = await runCommand(
         executable,
