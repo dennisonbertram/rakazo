@@ -12,6 +12,7 @@ const PAGE_SEGMENTS = new Set([
   "inbox",
   "integrations",
   "finance",
+  "brex",
   "legal",
   "gtm",
   "devin",

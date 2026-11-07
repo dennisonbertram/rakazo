@@ -692,7 +692,7 @@ import {
   setSourceExclusive,
   setSourceWrites,
 } from "./source-agent.js";
-import { requireSpaceOwner } from "./space-owner.js";
+import { isSpaceOwnerRole, requireSpaceOwner } from "./space-owner.js";
 import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { HEARTBEAT, withHeartbeat } from "./stream.js";
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
@@ -10220,6 +10220,8 @@ export function createRouter(deps: RouterDeps): AppRouter {
           legalDueSoon,
           devinNeedsYou,
           isDevinConnected,
+          brexMembership,
+          brexConnection,
           gtmNeedsYou,
           dataRoomWaiting,
           hasTicket,
@@ -10229,6 +10231,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
           legalDueSoonCount(legalDeps, context.actor, 7),
           devinNeedsYouCount(devinDeps, context.actor),
           devinConnected(devinDeps, context.actor),
+          deps.prisma.spaceMember.findUnique({
+            where: {
+              spaceId_userId: { spaceId: context.actor.spaceId, userId: context.actor.userId },
+            },
+            select: { role: true },
+          }),
+          deps.prisma.brexCardsConnection.findUnique({
+            where: { spaceId: context.actor.spaceId },
+            select: { server: { select: { userId: true } } },
+          }),
           gtmNeedsYouCount(deps.prisma, context.actor),
           // Failed items are the only ones the user can act on (retry or remove).
           deps.prisma.dataRoomItem.count({
@@ -10246,11 +10258,15 @@ export function createRouter(deps: RouterDeps): AppRouter {
             : null,
           unseenBotKinds(deps.prisma, context.actor),
         ]);
+        const brexConnected =
+          isSpaceOwnerRole(brexMembership?.role) &&
+          brexConnection?.server.userId === context.actor.userId;
         return {
           financeRunwayMonths: runwayMonths,
           legalDueSoon,
           devinNeedsYou,
           devinConnected: isDevinConnected,
+          brexConnected,
           gtmNeedsYou,
           dataRoomWaiting,
           hasTickets: Boolean(hasTicket),

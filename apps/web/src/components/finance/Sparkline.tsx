@@ -20,7 +20,17 @@ const WIDTH = 64;
 const HEIGHT = 20;
 
 /** A tiny trend line, oldest value first. Draws nothing for fewer than two values. */
-export function Sparkline({ values }: { values: number[] }) {
+export function Sparkline({
+  values,
+  label,
+  neutral = false,
+}: {
+  values: number[];
+  /** Accessible name for non-price series; the price wording stays the default. */
+  label?: string;
+  /** Spend is not good or bad by direction, so Brex draws it in muted ink. */
+  neutral?: boolean;
+}) {
   const { t } = useLingui();
   if (values.length < 2) return null;
   const trend = trendOf(values);
@@ -34,15 +44,16 @@ export function Sparkline({ values }: { values: number[] }) {
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
-  const label = trend === "up" ? t`Price up` : trend === "down" ? t`Price down` : t`Price flat`;
+  const text =
+    label ?? (trend === "up" ? t`Price up` : trend === "down" ? t`Price down` : t`Price flat`);
   return (
     <svg
       role="img"
-      aria-label={label}
+      aria-label={text}
       width={WIDTH}
       height={HEIGHT}
       viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      className={TONE[trend]}
+      className={neutral ? "text-muted-foreground" : TONE[trend]}
     >
       <polyline
         points={points}
