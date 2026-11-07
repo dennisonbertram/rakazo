@@ -1,6 +1,6 @@
-import type { BrexPerson } from "@rakazo/contracts";
+import type { BrexCategorySpend, BrexPerson } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
-import { isSpendCents, offboardMessage, offboardPlan } from "./brex-utils";
+import { isSpendCents, offboardMessage, offboardPlan, spendCategoryTotals } from "./brex-utils";
 
 const person = (overrides: Partial<BrexPerson> = {}): BrexPerson => ({
   userId: "user_ada",
@@ -26,6 +26,24 @@ describe("isSpendCents", () => {
     expect(isSpendCents(-100)).toBe(false);
     expect(isSpendCents(0)).toBe(false);
     expect(isSpendCents(100)).toBe(true);
+  });
+});
+
+describe("spendCategoryTotals", () => {
+  const category = (
+    bucket: BrexCategorySpend["bucket"],
+    cents: number,
+    count = 1,
+  ): BrexCategorySpend => ({ bucket, cents, count, partial: false, merchants: [] });
+
+  it("uses net category cents and drops buckets refunds outweigh", () => {
+    expect(
+      spendCategoryTotals([
+        category("software", 6_000, 2),
+        category("meals", -1_000),
+        category("travel", 0),
+      ]),
+    ).toEqual([{ bucket: "software", cents: 6_000, count: 2 }]);
   });
 });
 

@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import type { BrexPerson, BrexSpendBucket } from "@rakazo/contracts";
+import type { BrexCategorySpend, BrexPerson, BrexSpendBucket } from "@rakazo/contracts";
 import { BREX_SPEND_BUCKETS } from "@rakazo/contracts";
 
 export function isSpendBucket(value: string | undefined): value is BrexSpendBucket {
@@ -7,6 +7,16 @@ export function isSpendBucket(value: string | undefined): value is BrexSpendBuck
 }
 
 export const isSpendCents = (cents: number) => cents > 0;
+
+export function spendCategoryTotals(
+  categories: readonly BrexCategorySpend[],
+): { bucket: BrexSpendBucket; cents: number; count: number }[] {
+  const byBucket = new Map(categories.map((category) => [category.bucket, category]));
+  return BREX_SPEND_BUCKETS.map((bucket) => {
+    const category = byBucket.get(bucket);
+    return { bucket, cents: category?.cents ?? 0, count: category?.count ?? 0 };
+  }).filter((category) => isSpendCents(category.cents));
+}
 
 export function spendBucketLabel(bucket: BrexSpendBucket): string {
   switch (bucket) {

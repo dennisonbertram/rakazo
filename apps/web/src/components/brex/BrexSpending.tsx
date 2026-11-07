@@ -22,7 +22,7 @@ import { sortBy, useListParams } from "../../lib/list-params";
 import { rpc } from "../../lib/rpc";
 import { ErrorNotice, Section, useFinanceQuery } from "../finance/ui";
 import { PhoneDateRange, PickFilter, SearchField, SortControl } from "../ListControls";
-import { isSpendBucket, isSpendCents, spendBucketLabel } from "./brex-utils";
+import { isSpendBucket, isSpendCents, spendBucketLabel, spendCategoryTotals } from "./brex-utils";
 
 type SpendSort = "date" | "merchant" | "card" | "person" | "category" | "amount";
 const SPEND_SORTS: readonly SpendSort[] = [
@@ -116,23 +116,10 @@ export function BrexSpending() {
     () => sortBy(spendTransactions, (row) => sortValue(row, list.sort.field), list.sort.dir),
     [spendTransactions, list.sort.field, list.sort.dir],
   );
-  const categories = useMemo(() => {
-    const byBucket = new Map<string, { cents: number; count: number }>();
-    for (const row of spendTransactions) {
-      const value = byBucket.get(row.bucket) ?? { cents: 0, count: 0 };
-      value.cents += row.amountCents;
-      value.count += 1;
-      byBucket.set(row.bucket, value);
-    }
-    return BREX_SPEND_BUCKETS.map((bucket) => ({
-      bucket,
-      cents: byBucket.get(bucket)?.cents ?? 0,
-      count: byBucket.get(bucket)?.count ?? 0,
-    }));
-  }, [spendTransactions]);
+  const categories = useMemo(() => spendCategoryTotals(data?.categories ?? []), [data]);
   const spendTotalCents = useMemo(
-    () => spendTransactions.reduce((sum, row) => sum + row.amountCents, 0),
-    [spendTransactions],
+    () => categories.reduce((sum, category) => sum + category.cents, 0),
+    [categories],
   );
   const duplicates = (data?.duplicates ?? []).filter(
     (row) => !dismissed.has(`${row.month}:${row.merchant.toLowerCase()}`),
@@ -314,7 +301,7 @@ export function BrexSpending() {
           </Table>
         </div>
       </Section>
-      {spendTransactions.length > 0 ? (
+      {categories.length > 0 ? (
         <Section title={<Trans>By category</Trans>}>
           <ul className="flex flex-col gap-2.5">
             {categories.map(({ bucket, cents, count }) => {
