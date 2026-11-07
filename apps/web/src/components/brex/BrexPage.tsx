@@ -12,6 +12,7 @@ import { PageHeader } from "../PageHeader";
 import { StillLoading } from "../ShellSkeleton";
 import { BrexAccounts } from "./BrexAccounts";
 import { BrexActivity } from "./BrexActivity";
+import { BrexCards } from "./BrexCards";
 import { BrexExpenses } from "./BrexExpenses";
 import { BrexOverview } from "./BrexOverview";
 import { BrexTravel } from "./BrexTravel";
@@ -123,6 +124,8 @@ export function BrexPage({ spaceName }: { spaceName?: string }) {
           <div className="mt-4">
             {section === "overview" ? (
               <BrexOverview data={overview.data} />
+            ) : section === "cards" ? (
+              <BrexCards />
             ) : section === "expenses" ? (
               <BrexExpenses />
             ) : section === "accounts" ? (
