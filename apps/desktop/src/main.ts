@@ -45,9 +45,10 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
-import type { ScannerService } from "./scanner.js";
+import type { ScannerScope, ScannerService } from "./scanner.js";
 import { createScanner } from "./scanner.js";
 import { scannerIpcAuthorized } from "./scanner-security.js";
+import { isScannerSessionCookie, verifyScannerSessionScope } from "./scanner-session.js";
 import { installSessionPermissions } from "./session-permissions.js";
 import {
   DEFAULT_LOCAL_WEB_URL,
@@ -83,6 +84,8 @@ const DESKTOP_STACK_PROBE_PATH = "/.well-known/rakazo-desktop-stack";
 const DESKTOP_STACK_TOKEN_HEADER = "x-rakazo-desktop-stack-token";
 let mainWindow: BrowserWindow | null = null;
 let scannerService: ScannerService | null = null;
+let scannerScopeGeneration = 0;
+let verifiedScannerScope: ScannerScope | null = null;
 const appWindowTargets = new WeakMap<BrowserWindow, string>();
 let setupWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -175,6 +178,22 @@ function trustedScannerOrigin() {
   }
 }
 
+function sameScannerScope(left: ScannerScope | null, right: ScannerScope) {
+  return (
+    left !== null &&
+    left.userId === right.userId &&
+    left.spaceId === right.spaceId &&
+    left.serverOrigin === right.serverOrigin
+  );
+}
+
+function invalidateScannerScope() {
+  scannerScopeGeneration++;
+  verifiedScannerScope = null;
+  const clearing = scannerService?.setScope(null) ?? Promise.resolve();
+  return { generation: scannerScopeGeneration, clearing };
+}
+
 function scannerRequestAuthorized(event: Electron.IpcMainInvokeEvent) {
   return scannerIpcAuthorized(
     scannerService !== null && fromMainWindow(event),
@@ -184,8 +203,47 @@ function scannerRequestAuthorized(event: Electron.IpcMainInvokeEvent) {
   );
 }
 
+function scannerAuthorizationIsCurrent(
+  generation: number,
+  win: BrowserWindow,
+  targetSession: Session,
+  origin: string,
+) {
+  return (
+    scannerScopeGeneration === generation &&
+    mainWindow === win &&
+    !win.isDestroyed() &&
+    win.webContents.session === targetSession &&
+    trustedScannerOrigin() === origin
+  );
+}
+
+async function authorizeScannerScope(scope: ScannerScope) {
+  if (!sameScannerScope(verifiedScannerScope, scope)) return false;
+  const win = mainWindow;
+  const origin = trustedScannerOrigin();
+  if (win === null || origin === null || origin !== scope.serverOrigin || win.isDestroyed()) {
+    clearScannerScope();
+    return false;
+  }
+  const targetSession = win.webContents.session;
+  const generation = scannerScopeGeneration;
+  const isCurrent = () =>
+    scannerAuthorizationIsCurrent(generation, win, targetSession, origin) &&
+    sameScannerScope(verifiedScannerScope, scope);
+  const authorized = await verifyScannerSessionScope({
+    origin,
+    userId: scope.userId,
+    spaceId: scope.spaceId,
+    fetch: (input, init) => targetSession.fetch(input, init),
+    isCurrent,
+  });
+  if (!authorized && isCurrent()) clearScannerScope();
+  return authorized && isCurrent();
+}
+
 function clearScannerScope() {
-  if (scannerService) void scannerService.setScope(null).catch(() => undefined);
+  void invalidateScannerScope().clearing.catch(() => undefined);
 }
 
 function sendScannerEvent(channel: string, payload: unknown) {
@@ -343,6 +401,17 @@ function createWindow(url: string, partition: string | null) {
   mainWindow = win;
   appWindowTargets.set(win, url);
   const targetOrigin = safeOrigin(url);
+  const targetSession = win.webContents.session;
+  const onCookiesChanged = (_event: Electron.Event, cookie: Electron.Cookie) => {
+    if (
+      mainWindow === win &&
+      targetOrigin !== null &&
+      isScannerSessionCookie(cookie, targetOrigin)
+    ) {
+      clearScannerScope();
+    }
+  };
+  targetSession.cookies.on("changed", onCookiesChanged);
   // Intentional OAuth flows open the provider's authorize page via a named
   // window; give those and same-origin popups a normal frame. Everything else
   // opens in the system browser so a connected server cannot navigate us away.
@@ -410,6 +479,7 @@ function createWindow(url: string, partition: string | null) {
   });
   win.once("closed", () => {
     clearTimeout(warmWindowTimer);
+    targetSession.cookies.removeListener("changed", onCookiesChanged);
     if (mainWindow === win) {
       mainWindow = null;
       clearScannerScope();
@@ -1182,10 +1252,22 @@ app.whenReady().then(async () => {
   );
   // On-device speech needs Hex's helper, so it is macOS on Apple silicon only.
   if (process.platform === "darwin" || process.platform === "linux") {
-    const scanner = createScanner({ userDataDir: app.getPath("userData") });
+    const scanner = createScanner({
+      userDataDir: app.getPath("userData"),
+      authorizeScope: authorizeScannerScope,
+    });
     scannerService = scanner;
     scanner.onState((state) => sendScannerEvent("desktop.scanner.state.changed", state));
-    scanner.onDocument((document) => sendScannerEvent("desktop.scanner.document", document));
+    scanner.onDocument((document) => {
+      const scope = verifiedScannerScope;
+      if (
+        scope?.userId === document.userId &&
+        scope.spaceId === document.spaceId &&
+        scope.serverOrigin === trustedScannerOrigin()
+      ) {
+        sendScannerEvent("desktop.scanner.document", document);
+      }
+    });
     void scanner.start();
 
     const requireScanner = (event: Electron.IpcMainInvokeEvent) => {
@@ -1232,12 +1314,30 @@ app.whenReady().then(async () => {
         if (args.length !== 0) throw new Error("Invalid scanner scope.");
         const scope = scannerUserScope(value);
         if (scope === undefined) throw new Error("Invalid scanner scope.");
-        if (scope === null) await service.setScope(null);
-        else {
-          const origin = trustedScannerOrigin();
-          if (origin === null) throw new Error("Scanner request is not authorized.");
-          await service.setScope(scope, origin);
-        }
+        const { generation, clearing } = invalidateScannerScope();
+        await clearing;
+        if (generation !== scannerScopeGeneration || scope === null) return;
+        const win = mainWindow;
+        const origin = trustedScannerOrigin();
+        if (win === null || origin === null || win.isDestroyed())
+          throw new Error("Scanner request is not authorized.");
+        const targetSession = win.webContents.session;
+        const isCurrent = () =>
+          scannerAuthorizationIsCurrent(generation, win, targetSession, origin);
+        const authorized = await verifyScannerSessionScope({
+          origin,
+          userId: scope.userId,
+          spaceId: scope.spaceId,
+          fetch: (input, init) => targetSession.fetch(input, init),
+          isCurrent,
+        });
+        if (!isCurrent()) return;
+        if (!authorized) throw new Error("Scanner scope could not be verified.");
+        const verifiedScope = { ...scope, serverOrigin: origin };
+        verifiedScannerScope = verifiedScope;
+        await service.setScope(scope, origin);
+        if (!isCurrent() && sameScannerScope(verifiedScannerScope, verifiedScope))
+          clearScannerScope();
       },
     );
     ipcMain.handle("desktop.scanner.pending", (event, ...args: unknown[]) => {

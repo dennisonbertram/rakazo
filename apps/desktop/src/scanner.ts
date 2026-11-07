@@ -84,6 +84,8 @@ export interface ScannerServiceOptions {
   pollTimeoutMs?: number;
   scanTimeoutMs?: number;
   now?: () => number;
+  authorizeScope?: (scope: ScannerScope) => boolean | Promise<boolean>;
+  prepareScanDirectory?: (directory: string) => Promise<void>;
 }
 
 export interface ScannerService {
@@ -450,6 +452,18 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
     folder: [...settings.folder],
   });
 
+  const authorizeCurrentScope = async (scope: ScannerScope) => {
+    if (closed || !sameScope(currentScope, scope)) return false;
+    if (!options.authorizeScope) return true;
+    try {
+      return (
+        (await options.authorizeScope({ ...scope })) && !closed && sameScope(currentScope, scope)
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const publish = (state: Omit<ScannerState, "autoScan" | "folder">) => {
     currentState = { ...state, autoScan: settings.autoScan, folder: [...settings.folder] };
     const value = snapshot();
@@ -470,6 +484,16 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
         // A renderer listener must not break scanner work.
       }
     }
+  };
+
+  const emitDocuments = async (documents: ScannerDocument[], scope: ScannerScope) => {
+    if (documents.length === 0) return true;
+    if (!(await authorizeCurrentScope(scope))) return false;
+    for (const document of documents) {
+      if (closed || !sameScope(currentScope, scope)) return false;
+      emitDocument(document);
+    }
+    return true;
   };
 
   const readSettings = async () => {
@@ -593,7 +617,7 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
     if (!validScope(scope)) return;
     const documents = await pendingForScope(scope);
     if (!sameScope(currentScope, scope)) return;
-    for (const document of documents) emitDocument(document);
+    await emitDocuments(documents, scope);
   };
 
   const findExecutable = () => firstExecutable(candidates);
@@ -727,7 +751,8 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
       if (control.cancelled || !sameScope(currentScope, control.scope)) return snapshot();
       publish({ kind: "ready", device: "Fujitsu scanner" });
       const document = await readDocument(metadata, control.scope);
-      if (document && sameScope(currentScope, control.scope)) emitDocument(document);
+      if (document && sameScope(currentScope, control.scope))
+        await emitDocuments([document], control.scope);
       return snapshot();
     } catch {
       if (control.cancelled) {
@@ -905,6 +930,7 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
     async pending() {
       const scope = currentScope;
       if (!validScope(scope)) return [];
+      if (!(await authorizeCurrentScope(scope))) return [];
       return pendingForScope({ ...scope });
     },
 
@@ -917,6 +943,7 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
       const scope = currentScope;
       if (!validScope(scope)) return { ok: false };
       try {
+        if (!(await authorizeCurrentScope(scope))) return { ok: false };
         await outboxReady();
         const bundleDir = await readyBundleDirectory(id);
         if (!bundleDir) return { ok: false };
