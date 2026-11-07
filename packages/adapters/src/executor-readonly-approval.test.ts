@@ -9903,6 +9903,13 @@ describe("Auto Review in background runs", () => {
     expect(f.pauseRunForInput).toHaveBeenCalledOnce();
   });
 
+  it("asks for a clean routine cap_table_read when the background switch is off", async () => {
+    const f = background("pass", "ticket_get", { autoReviewBackground: false, ticketBoard: true });
+    await f.run({ expectFailure: true });
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.pauseRunForInput).toHaveBeenCalledOnce();
+  });
+
   it("does not judge when the background switch is off", async () => {
     const f = background("pass", "page_source_list", { autoReviewBackground: false });
     await f.run({ expectFailure: true });

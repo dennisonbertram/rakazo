@@ -457,11 +457,13 @@ function outboundTokens(text: string): Set<string> {
  * on the page, or leave any HTML in it. Comparing the saved result catches an edit that swaps
  * private text into a URL that was already there. An empty original means any URL is new.
  */
-export function pageWriteAddsChannel(original: string, result: string): boolean {
-  if (HTML_TAG.test(result)) return true;
-  const before = outboundTokens(original);
-  for (const token of outboundTokens(result)) if (!before.has(token)) return true;
-  return false;
+export function pageWriteAddsChannel(_original: string, result: string): boolean {
+  // Destinations are not compared: any link or image destination in the result asks.
+  return (
+    HTML_TAG.test(result) ||
+    /\]\(|\]\[|^\s{0,3}\[[^\]]+\]:|<|https?:|www\.|data:|mailto:/im.test(result) ||
+    outboundTokens(result).size > 0
+  );
 }
 
 const FIXED_MAIL_LABELS = new Set(["TRASH", "SPAM", "DRAFT", "SENT"]);

@@ -70,6 +70,12 @@ describe("autoReview router", () => {
     expect(result.body.json).toMatchObject({ enabled: true, background: true });
   });
 
+  it("keeps the default for enabled on a first background-only save", async () => {
+    const { call, upsert } = setup();
+    await call("set", { background: false });
+    expect(upsert.mock.calls[0]?.[0].create).toMatchObject({ enabled: true, background: false });
+  });
+
   it("reports the background switch as off while Auto Review is off", async () => {
     const { call } = setup();
     await call("set", { background: true });

@@ -6064,7 +6064,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               const checker = resolveAutoReviewChecker();
               const available =
                 !run.goalId &&
-                (await loadAutoReviewPreference()) &&
+                (await loadAutoReviewPreferences().then(
+                  (prefs) => prefs.enabled && (!run.unattended || prefs.background),
+                )) &&
                 (Boolean(deps.autoReview) ||
                   (checker !== null &&
                     (isAutoReviewCheckerConfigured({}) ||
@@ -6476,6 +6478,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // outright, so the judge is not consulted then.
           const routineReviewRead =
             cleanRoutineRun &&
+            (await loadAutoReviewPreferences()).background &&
             !viaConnector &&
             ROUTINE_AUTO_REVIEW_READ_TOOLS.has(name) &&
             !outsideSeen &&

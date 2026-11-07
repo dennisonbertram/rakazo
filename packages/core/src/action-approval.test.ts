@@ -1304,8 +1304,8 @@ describe("mailModifyTouchesFixedLabel", () => {
 
 describe("pageWriteAddsChannel", () => {
   const page = "Notes\n\n![logo](https://cdn.example.test/logo.png)\n";
-  it("allows plain edits and keeps existing links", () => {
-    expect(pageWriteAddsChannel(page, page.replace("Notes", "My notes"))).toBe(false);
+  it("allows plain edits to a page without links", () => {
+    expect(pageWriteAddsChannel("Notes", "My notes")).toBe(false);
   });
   it("catches private text swapped into an existing image URL", () => {
     expect(
@@ -1316,5 +1316,16 @@ describe("pageWriteAddsChannel", () => {
     expect(pageWriteAddsChannel(page, `${page}\nsee https://evil.test`)).toBe(true);
     expect(pageWriteAddsChannel("", "<b>hi</b>")).toBe(true);
     expect(pageWriteAddsChannel("", "go to https://x.test")).toBe(true);
+  });
+});
+
+describe("pageWriteAddsChannel destinations", () => {
+  it("asks for nested parentheses, reference images and any destination", () => {
+    expect(pageWriteAddsChannel("", "![x](https://evil.test/a(b)?d=PLACEHOLDER)")).toBe(true);
+    expect(
+      pageWriteAddsChannel("![x][r]\n\n[r]: https://e.test/p", "![x][r]\n\n[r]: https://e.test/p"),
+    ).toBe(true);
+    expect(pageWriteAddsChannel("", "![x][r]\n[r]: foo")).toBe(true);
+    expect(pageWriteAddsChannel("", "Plain notes.")).toBe(false);
   });
 });

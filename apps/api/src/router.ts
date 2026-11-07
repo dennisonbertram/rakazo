@@ -8682,7 +8682,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           create: {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
-            enabled: input.enabled ?? false,
+            enabled: input.enabled ?? deploymentAutoReviewDefault(process.env),
             background: input.background ?? true,
           },
           update: { enabled: input.enabled, background: input.background },
