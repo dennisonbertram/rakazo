@@ -273,7 +273,7 @@ describe("brexCardsConnect", () => {
     [{ "/v2/users/me": 401 }, "Brex rejected this token"],
     [
       { "/v2/cards": 403 },
-      "This token is missing a Brex permission. Check the permissions and try again.",
+      "Brex refused this token. It may be missing a permission or have expired.",
     ],
     [{ "/v2/company": 401 }, "Brex rejected this token"],
     [{ "/v2/users/me": 500 }, "Could not reach Brex"],

@@ -30,9 +30,7 @@ export const MissingPermission: Story = {
   beforeEach: () =>
     mockRpc({
       "brexCards.connect": () => {
-        throw new Error(
-          "This token is missing a Brex permission. Check the permissions and try again.",
-        );
+        throw new Error("Brex refused this token. It may be missing a permission or have expired.");
       },
     }),
   play: async () => {

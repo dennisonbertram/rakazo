@@ -28,7 +28,7 @@ export interface BrexCardsDeps {
 
 const REJECTED = "Brex rejected this token";
 const MISSING_PERMISSION =
-  "This token is missing a Brex permission. Check the permissions and try again.";
+  "Brex refused this token. It may be missing a permission or have expired.";
 const UNREACHABLE = "Could not reach Brex";
 const CONFLICT_MESSAGE = "Brex cards are already connected in this space";
 const NOT_CONNECTED_MESSAGE = "Brex cards are not connected in this space";
