@@ -152,6 +152,12 @@ const window90 = (now: Date) => {
   const end = now.toISOString().slice(0, 10);
   return { start: addDays(end, -89), end };
 };
+const monthEnd = (month: string) => {
+  const year = Number(month.slice(0, 4));
+  const monthNumber = Number(month.slice(5, 7));
+  return new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10);
+};
+const endOfDay = (day: string) => `${day}T23:59:59.999Z`;
 const days = (start: string, end: string) => {
   const out: string[] = [];
   for (let day = start; day <= end; day = addDays(day, 1)) out.push(day);
@@ -242,7 +248,7 @@ async function listExpenses(
     z.object({ expenses: z.array(ExpensePayload), incomplete: z.boolean().optional() }),
     await callTool(deps, server, "list_expenses", {
       purchasedAtStart: start,
-      purchasedAtEnd: end,
+      purchasedAtEnd: endOfDay(end),
     }),
   );
   return { items: value.expenses, incomplete: value.incomplete === true };
@@ -357,11 +363,14 @@ async function sharedReads(deps: BrexCardsDeps, actor: Actor, withExpenses = tru
   const { server } = connection;
   const now = nowOf(deps);
   const window = window90(now);
+  // The longest current quarter is 92 days; card usage needs those two extra days while
+  // sparklines and spending ranges stay on the 90-day window.
+  const fetchStart = addDays(window.start, -2);
   const [cards, users, spendLimits, transactions, expenses, cashAccounts] = await Promise.all([
     listCards(deps, server),
     listUsers(deps, server),
     listSpendLimits(deps, server),
-    listTransactions(deps, server, window.start),
+    listTransactions(deps, server, fetchStart),
     withExpenses
       ? listExpenses(deps, server, window.start, window.end)
       : { items: [], incomplete: false },
@@ -372,7 +381,7 @@ async function sharedReads(deps: BrexCardsDeps, actor: Actor, withExpenses = tru
   const boundedTransactions = {
     items: transactions.items.filter((transaction) => {
       const day = dayOf(transaction.postedAt);
-      return day >= window.start && day <= window.end;
+      return day >= fetchStart && day <= window.end;
     }),
     incomplete: transactions.incomplete,
   };
@@ -397,18 +406,23 @@ export async function brexCardsOverview(
   const { server, now, window, cards, spendLimits, transactions, expenses, cashAccounts } =
     await sharedReads(deps, actor);
   const partial = transactions.incomplete || expenses.incomplete;
-  const { categories, sankeyTotal } = aggregates(transactions.items, expenses.items, partial);
-  const allSeries = seriesFor(transactions.items, window.start, window.end);
+  const windowTransactions = transactions.items.filter((transaction) => {
+    const day = dayOf(transaction.postedAt);
+    return day >= window.start && day <= window.end;
+  });
+  const { categories, sankeyTotal } = aggregates(windowTransactions, expenses.items, partial);
+  const allSeries = seriesFor(windowTransactions, window.start, window.end);
   const today = now.toISOString().slice(0, 10);
   const monthStart = `${monthOf(today)}-01`;
   const prevMonth = addDays(`${monthOf(today)}-01`, -1).slice(0, 7);
   const prevStart = `${prevMonth}-01`;
   const elapsed = Number(today.slice(8, 10));
-  const prevEndSame = addDays(prevStart, elapsed - 1);
-  const monthSpend = transactions.items
+  const elapsedEnd = addDays(prevStart, elapsed - 1);
+  const prevEndSame = elapsedEnd < monthEnd(prevMonth) ? elapsedEnd : monthEnd(prevMonth);
+  const monthSpend = windowTransactions
     .filter((t) => dayOf(t.postedAt) >= monthStart && dayOf(t.postedAt) <= today)
     .reduce((sum, t) => sum + t.amountCents, 0);
-  const prevSpend = transactions.items
+  const prevSpend = windowTransactions
     .filter((t) => dayOf(t.postedAt) >= prevStart && dayOf(t.postedAt) <= prevEndSame)
     .reduce((sum, t) => sum + t.amountCents, 0);
   const changePercent = prevSpend === 0 ? null : ((monthSpend - prevSpend) / prevSpend) * 100;
@@ -450,7 +464,7 @@ export async function brexCardsOverview(
   }
   near.sort((a, b) => b.percent - a.percent);
   const vendorMap = new Map<string, { cents: number; count: number }>();
-  for (const transaction of transactions.items) {
+  for (const transaction of windowTransactions) {
     const merchant = transaction.merchant?.trim() || transaction.description || "Unknown merchant";
     const value = vendorMap.get(merchant) ?? { cents: 0, count: 0 };
     value.cents += transaction.amountCents;
@@ -547,6 +561,8 @@ export async function brexCardsSpending(
   const expensesById = new Map(expenses.items.map((expense) => [expense.id, expense]));
   const from = input.from ?? window.start;
   const to = input.to ?? window.end;
+  if (from > to || from < window.start || to > window.end)
+    throw new ORPCError("BAD_REQUEST", { message: "Spending covers the last 90 days only" });
   const merchantNeedle = input.merchant?.trim().toLowerCase();
   const filtered = transactions.items.filter((transaction) => {
     const day = dayOf(transaction.postedAt);
@@ -712,8 +728,6 @@ function expenseView(
   users: User[],
   cardByExpense: Map<string, string>,
 ): BrexExpenseView {
-  const due = expense.complianceStatus === "DUE" || expense.complianceStatus === "OVERDUE";
-  const receipts = expense.receipts ?? [];
   const memo = expense.memo ?? null;
   return {
     expenseId: expense.id,
@@ -730,9 +744,9 @@ function expenseView(
     bucket: brexSpendBucket({ category: expense.category, mcc: expense.merchantMcc }),
     amountCents: expense.amountCents ?? null,
     currency: expense.currency ?? null,
-    receipts,
-    missingReceipt: receipts.length === 0 || due,
-    missingMemo: !memo?.trim() || due,
+    receipts: expense.receipts ?? [],
+    missingReceipt: (expense.receipts ?? []).length === 0,
+    missingMemo: !memo?.trim(),
     complianceStatus: expense.complianceStatus ?? null,
     cardId: cardByExpense.get(expense.id) ?? null,
   };
@@ -746,7 +760,7 @@ export async function brexCardsExpenses(deps: BrexCardsDeps, actor: Actor): Prom
     listExpenses(deps, server, window.start, window.end),
     callTool(deps, server, "list_reimbursements", {
       purchasedAtStart: window.start,
-      purchasedAtEnd: window.end,
+      purchasedAtEnd: endOfDay(window.end),
     }).then((value) =>
       parse(
         z.object({ reimbursements: z.array(ExpensePayload), incomplete: z.boolean().optional() }),
@@ -862,7 +876,9 @@ function activityTarget(args: Record<string, unknown>) {
 export async function brexCardsActivity(deps: BrexCardsDeps, actor: Actor): Promise<BrexActivity> {
   const server = await ownerServer(deps, actor);
   const effects = await deps.prisma.externalEffect.findMany({
-    where: { spaceId: actor.spaceId },
+    where: server.agentBotId
+      ? { spaceId: actor.spaceId, run: { botId: server.agentBotId } }
+      : { spaceId: actor.spaceId },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

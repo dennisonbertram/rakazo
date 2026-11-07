@@ -152,9 +152,14 @@ function fakeDb(seed: { bot?: Row; server?: Row; connection?: Row; effects?: Row
     integrationProviderConfig: { count: vi.fn(async () => 0) },
     bot,
     externalEffect: {
-      findMany: vi.fn(async ({ where }: { where?: Row } = {}) =>
-        state.effects.filter((effect) => !where?.spaceId || effect.spaceId === where.spaceId),
-      ),
+      findMany: vi.fn(async ({ where }: { where?: Row } = {}) => {
+        const botId = (where?.run as Row | undefined)?.botId;
+        return state.effects.filter(
+          (effect) =>
+            (!where?.spaceId || effect.spaceId === where.spaceId) &&
+            (!botId || (effect.runBotId ?? "bot-1") === botId),
+        );
+      }),
     },
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     $queryRaw: vi.fn(async () => []),
@@ -917,7 +922,7 @@ describe("brex cards read model", () => {
       category: "LODGING",
       expenseType: "CARD",
       receipts: [{ id: "rcpt_1" }],
-      complianceStatus: "COMPLETED",
+      complianceStatus: "DUE",
     },
   ];
   const TRANSACTIONS = [
@@ -1181,6 +1186,40 @@ describe("brex cards read model", () => {
     expect(cy).toMatchObject({ activeCardCount: 1, terminatedCardCount: 1 });
   });
 
+  it("counts the first days of a 92-day quarter toward quarterly card usage", async () => {
+    const t = deps(connectedDb(), fakeBrex(), { now: () => new Date("2025-09-30T12:00:00Z") });
+    mockReads(t, {
+      list_card_transactions: {
+        transactions: [
+          {
+            id: "txn_quarter_start",
+            cardId: "card_locked",
+            description: "Example Travel",
+            amountCents: 1_000,
+            currency: "USD",
+            postedAt: "2025-07-01",
+            type: "PURCHASE",
+            merchant: "Example Travel",
+            mcc: "7011",
+            expenseId: null,
+          },
+        ],
+      },
+    });
+
+    const result = await brexCardsView(t.deps, owner);
+    expect(result.cards.find((card) => card.cardId === "card_locked")?.usage).toMatchObject({
+      usedCents: 1_000,
+      limitCents: 80_000,
+    });
+    expect(t.callServerTool).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "list_card_transactions",
+      { postedAtStart: "2025-07-01" },
+    );
+  });
+
   it("filters spending by merchant and category and finds duplicate subscriptions across cards", async () => {
     const t = readDeps();
     const result = await brexCardsSpending(t.deps, owner, {
@@ -1207,6 +1246,16 @@ describe("brex cards read model", () => {
     ]);
   });
 
+  it("rejects spending ranges outside the shared 90-day window", async () => {
+    const t = readDeps();
+    await expect(brexCardsSpending(t.deps, owner, { from: "2024-01-01" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    await expect(brexCardsSpending(t.deps, owner, { from: "2025-03-20" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+
   it("returns expenses, reimbursements, accounts, trips and statements from their fixed read tools", async () => {
     const t = readDeps();
     const expenses = await brexCardsExpenses(t.deps, owner);
@@ -1220,6 +1269,10 @@ describe("brex cards read model", () => {
       expenseId: "exp_reimb_1",
       bucket: "travel",
       missingReceipt: true,
+    });
+    expect(expenses.expenses.find((expense) => expense.expenseId === "exp_travel")).toMatchObject({
+      missingReceipt: false,
+      missingMemo: false,
     });
 
     const accounts = await brexCardsAccounts(t.deps, owner);
@@ -1305,6 +1358,21 @@ describe("brex cards read model", () => {
           "direct",
           {
             route: { connectorId: "mcp", resourceId: "srv-other", toolName: "lock_card" },
+            args: { cardName: "Figma" },
+          },
+        ],
+      },
+      {
+        id: "eff_other_bot",
+        spaceId: "space",
+        runBotId: "bot-other",
+        status: "approved",
+        createdAt: new Date("2025-03-15T13:00:00Z"),
+        request: [
+          marker,
+          "direct",
+          {
+            route: { connectorId: "mcp", resourceId: "srv-existing", toolName: "lock_card" },
             args: { cardName: "Figma" },
           },
         ],
