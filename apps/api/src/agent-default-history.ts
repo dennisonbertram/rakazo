@@ -111,8 +111,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   legal: {
-    current: "2c6e80842e3eda409c0faec7e3a9f659bc66d6858c44a9ef5f334d14eaf94fee",
+    current: "5eab7b0830aabfbf4eecd07316bbfa2f6359c762e75f94708548dba9270252f8",
     past: [
+      "2c6e80842e3eda409c0faec7e3a9f659bc66d6858c44a9ef5f334d14eaf94fee",
       "37d7a6b2620b2bd1bcfc54d0c8540fc30bf5231427c10aa74af69b4cb76df025",
       "9fd34f46830609ddce30661942fa06a2de7be4d40faec243cf7212b5a817bd50",
       "6586882767e604dd103bb895ba129fdf0888bc14762b88db1a4836fd12f42228",
