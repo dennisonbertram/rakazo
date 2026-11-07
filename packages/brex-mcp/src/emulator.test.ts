@@ -216,6 +216,8 @@ describe("BrexApiEmulator", () => {
     expect(due.body.items.length).toBeGreaterThan(0);
     expect(due.body.items.length).toBeLessThan(all.body.items.length);
     expect(all.body.items.every((e: any) => e.expense_type !== "REIMBURSEMENT")).toBe(true);
+    expect(all.body.items.some((e: any) => e.category === "SERVERS")).toBe(true);
+    expect(txns.body.items.every((t: any) => typeof t.expense_id === "string")).toBe(true);
 
     const reimbursements = await api("/v1/expenses?expense_type[]=REIMBURSEMENT");
     expect(reimbursements.body.items.length).toBeGreaterThan(0);

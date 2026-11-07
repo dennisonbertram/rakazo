@@ -277,28 +277,25 @@ function seed() {
     const date = day(i);
     const cardId = ["card_figma", "card_ads", "card_team", "card_eur", "card_yearly"][i % 5]!;
     const userId = i % 3 === 0 ? "u_ben" : i % 3 === 1 ? "u_cy" : "u_ada";
-    let expenseId: string | null = null;
-    if (i % 3 === 0) {
-      expenseId = `exp_${String(i + 1).padStart(3, "0")}`;
-      const receipts = i % 4 === 0 ? [] : [{ id: `rcpt_${expenseId}` }];
-      const memo = i % 6 === 0 ? null : `${m.name} ${date}`;
-      expenses.push({
-        id: expenseId,
-        memo,
-        status: i % 5 === 0 ? "SUBMITTED" : "APPROVED",
-        payment_status: "CLEARED",
-        user_id: userId,
-        purchased_at: `${date}T12:00:00Z`,
-        billing_amount: USD(amount),
-        category: m.category,
-        expense_type: "CARD",
-        receipts,
-        review: {
-          compliance_status: receipts.length && memo ? "COMPLETED" : "DUE",
-        },
-        merchant: { raw_descriptor: m.name, mcc: m.mcc, country: "US" },
-      });
-    }
+    const expenseId = `exp_${String(i + 1).padStart(3, "0")}`;
+    const receipts = i % 4 === 0 ? [] : [{ id: `rcpt_${expenseId}` }];
+    const memo = i % 6 === 0 ? null : `${m.name} ${date}`;
+    expenses.push({
+      id: expenseId,
+      memo,
+      status: i % 5 === 0 ? "SUBMITTED" : "APPROVED",
+      payment_status: "CLEARED",
+      user_id: userId,
+      purchased_at: `${date}T12:00:00Z`,
+      billing_amount: USD(amount),
+      category: m.category,
+      expense_type: "CARD",
+      receipts,
+      review: {
+        compliance_status: receipts.length && memo ? "COMPLETED" : "DUE",
+      },
+      merchant: { raw_descriptor: m.name, mcc: m.mcc, country: "US" },
+    });
     transactions.push({
       id: `txn_${String(i + 1).padStart(3, "0")}`,
       card_id: cardId,
