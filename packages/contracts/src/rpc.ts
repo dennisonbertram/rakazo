@@ -387,6 +387,8 @@ import {
   NotificationSignalSchema,
 } from "./notification.js";
 import {
+  OmiCloudConnectInputSchema,
+  OmiCloudStatusSchema,
   OmiConnectInputSchema,
   OmiDisconnectInputSchema,
   OmiSegmentMoveInputSchema,
@@ -2043,6 +2045,14 @@ export const appContract = {
     discard: oc.input(z.object({ captureId: Id })).output(z.object({ ok: z.literal(true) })),
     /** The caller's recording or waiting capture, for the recording indicator. */
     active: oc.output(MeetingCaptureActiveSchema),
+  },
+  omiCloud: {
+    /** Checks the Omi Developer key with one list call, stores it, connects and queues a sync. Errors: "Omi rejected this key", "This is an MCP key. Create a Developer key in the Omi app.", "Could not reach Omi". */
+    connect: oc.input(OmiCloudConnectInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** The caller's Developer key route; null before a key was pasted. Never returns the key. */
+    status: oc.output(OmiCloudStatusSchema),
+    /** Deletes the stored key and stops the sync; stored meetings stay. */
+    disconnect: oc.output(z.object({ ok: z.literal(true) })),
   },
   omi: {
     /** Creates or reuses the caller's one Omi connection for this space and its agent. */

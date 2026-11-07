@@ -56,3 +56,70 @@ export const OmiSegmentsListInputSchema = z.object({
     .optional(),
 });
 export const OmiSegmentMoveInputSchema = z.object({ segmentId: Id, kind: OmiKind });
+
+/** Omi's Developer API; keys look like `omi_dev_...`. */
+export const OMI_CLOUD_API_BASE_URL = "https://api.omi.me";
+
+/** Connection.connectorId for an Omi Developer API key; the meeting provider is `omi_cloud`. */
+export const OMI_CLOUD_CONNECTOR_ID = "omi-cloud";
+export const OMI_CLOUD_PROVIDER = "omi_cloud";
+
+/** Omi MCP keys do not work on the REST API. */
+export const isOmiMcpKey = (key: string) => key.startsWith("omi_mcp_");
+
+/** One transcript segment of an Omi conversation. Extra fields are allowed. */
+export const OmiCloudSegmentSchema = z.object({
+  text: z.string(),
+  speaker: z.string().nullish(),
+  is_user: z.boolean().nullish(),
+  /** Seconds from the start of the conversation. */
+  start: z.number().nullish(),
+  end: z.number().nullish(),
+});
+export type OmiCloudSegment = z.infer<typeof OmiCloudSegmentSchema>;
+
+/** One conversation from `GET /v1/dev/user/conversations`. Extra fields are allowed. */
+export const OmiCloudConversationSchema = z.object({
+  id: z.string().min(1),
+  created_at: z.string().nullish(),
+  started_at: z.string().nullish(),
+  finished_at: z.string().nullish(),
+  structured: z
+    .object({
+      title: z.string().nullish(),
+      overview: z.string().nullish(),
+      /** Strings or objects with a description; read leniently. */
+      action_items: z
+        .array(
+          z.union([
+            z.string(),
+            z.object({ description: z.string().nullish(), text: z.string().nullish() }),
+          ]),
+        )
+        .nullish(),
+    })
+    .nullish(),
+  transcript_segments: z.array(OmiCloudSegmentSchema).nullish(),
+  transcript_included: z.boolean().nullish(),
+});
+export type OmiCloudConversation = z.infer<typeof OmiCloudConversationSchema>;
+
+export const OmiCloudConnectInputSchema = z.object({ apiKey: z.string().max(512) });
+export type OmiCloudConnectInput = z.infer<typeof OmiCloudConnectInputSchema>;
+
+/** The Developer key route; null until a key was pasted. Never carries the key. */
+export const OmiCloudStatusSchema = z
+  .object({
+    connectionId: Id,
+    /** `needs_reconnect`: Omi rejected the stored key during a sync. */
+    status: z.enum(["connected", "needs_reconnect", "disconnected"]),
+    /** Null until the first full sync has finished. */
+    syncedThrough: z.string().nullable(),
+    /** Set only when the last sync failed or is late. */
+    lastSyncedAt: z.string().nullable(),
+    /** Stored meetings synced from the cloud. */
+    syncedCount: z.number().int().nonnegative(),
+    agentBotId: Id.nullable(),
+  })
+  .nullable();
+export type OmiCloudStatus = z.infer<typeof OmiCloudStatusSchema>;

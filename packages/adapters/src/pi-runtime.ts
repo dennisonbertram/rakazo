@@ -486,6 +486,9 @@ export class PiAgentRuntime implements AgentRuntime {
               host.pendingShells,
               turn,
               turnSignal,
+              (results) =>
+                request.recordLateOutput?.(results.flatMap((r) => [r.stdout, r.stderr])) ??
+                Promise.resolve(),
             );
           },
           prepareNextTurnWithContext: async () => {
@@ -1773,6 +1776,9 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
         nestedHost.pendingShells,
         turn,
         turnSignal,
+        (results) =>
+          host.request.recordLateOutput?.(results.flatMap((r) => [r.stdout, r.stderr])) ??
+          Promise.resolve(),
       );
     },
     sessionId: conversationSessionId(host.request.threadId, host.request.botId, agentId),

@@ -4386,6 +4386,7 @@ describe("groups.archive", () => {
     const tx = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "group-1" }]),
       chatGroup: {
         findFirst: vi.fn().mockResolvedValue({

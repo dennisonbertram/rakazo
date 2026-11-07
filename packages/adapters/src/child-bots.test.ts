@@ -379,6 +379,7 @@ describe("destroyBot", () => {
       callback({
         externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+        runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         $queryRaw: queryRaw,
         chatGroup: {
           findMany: vi.fn().mockResolvedValue([
@@ -1738,6 +1739,7 @@ describe("archiveBot", () => {
       callback({
         externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+        runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
         ...groupCleanup,
         run: {
           updateMany: vi.fn().mockResolvedValue({ count: 1 }),
