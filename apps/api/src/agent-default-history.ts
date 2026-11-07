@@ -12,8 +12,9 @@ import { createHash } from "node:crypto";
  */
 export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: string[] }> = {
   carta: {
-    current: "efad8c04aaccbd157aad647461d0a5605613e0dba2216fc586ecf3119be7439a",
+    current: "cafda7d46465064d8df3f26bad7ec4bf6f87861db28c1dceb5fe50e4c835f48b",
     past: [
+      "efad8c04aaccbd157aad647461d0a5605613e0dba2216fc586ecf3119be7439a",
       "9c95c29e553466590b7993a001f99873c7bc1c1a689e395ad58df74564a57ff3",
       "a3792c6375371d1101d18f987e611c036db380a52331522e504f23a08d38fc41",
       "c7342384ac7bc13db68435f9af15f34443924c5f3b3391d71e508a769770c8bb",

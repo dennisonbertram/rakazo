@@ -44,7 +44,7 @@ const BUILT_IN_AGENTS = [
     kind: "carta",
     spawnKey: cartaAgentSpawnKey,
     current: CARTA_AGENT_INSTRUCTIONS,
-    previous: [PREVIOUS_CARTA_AGENT_INSTRUCTIONS],
+    previous: PREVIOUS_CARTA_AGENT_INSTRUCTIONS,
   },
   {
     kind: "company",
