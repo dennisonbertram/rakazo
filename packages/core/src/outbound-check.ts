@@ -28,8 +28,8 @@ const MAX_TEXT_CHARS = 200_000;
 const MAX_FRAGMENTS = 50_000;
 /**
  * A name is matched as a run of 1..16 outbound words so it can be looked up by hash.
- * ponytail: a name of more than 16 words is not kept; text repeating it still trips the passage
- * check, except where that passage is also public. Raise the cap if such names appear.
+ * ponytail: a longer name is kept as its first 16 words, so text repeating those 16 words is held
+ * even if the rest differs. Raise the cap if such names appear.
  */
 const MAX_NAME_WORDS = 16;
 
@@ -52,9 +52,8 @@ function words(text: string): string[] {
 }
 
 function normalizeName(name: string): string | undefined {
-  const joined = words(name).join(" ");
+  const joined = words(name).slice(0, MAX_NAME_WORDS).join(" ");
   // One short word ("Sam", "Acme") would match half of English; a name needs two words or length.
-  if (joined.split(" ").length > MAX_NAME_WORDS) return undefined;
   return joined.includes(" ") || joined.length >= 8 ? joined : undefined;
 }
 

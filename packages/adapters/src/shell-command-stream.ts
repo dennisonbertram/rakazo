@@ -51,7 +51,7 @@ export function formatFinishedShellCommand(result: FinishedShellCommand): string
  * output is skipped so the bot can relay a device code before the process ends.
  */
 export async function deliverFinishedShells(
-  followUp: (text: string) => void,
+  followUp: (text: string) => unknown,
   pending: Array<Promise<FinishedShellCommand>>,
   turn: { toolResults: Array<{ toolName?: string; details?: unknown }> },
   signal?: AbortSignal,
@@ -61,7 +61,7 @@ export async function deliverFinishedShells(
   const results = await Promise.all(batch.map((completion) => finishOrAbort(completion, signal)));
   const texts = results.filter((result): result is FinishedShellCommand => result !== undefined);
   if (texts.length === 0) return;
-  followUp(texts.map((result) => formatFinishedShellCommand(result)).join("\n\n"));
+  await followUp(texts.map((result) => formatFinishedShellCommand(result)).join("\n\n"));
 }
 
 function turnReturnedRunningShell(turn: {

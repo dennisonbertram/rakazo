@@ -519,15 +519,19 @@ function fixture({
     ),
   };
   const fragmentRows: Record<string, unknown>[] = [];
+  const fragmentFaults = { write: failFragmentWrites, load: false };
   const prisma = {
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
     runFragment: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-        if (failFragmentWrites) throw new Error("fragment write failed");
+        if (fragmentFaults.write) throw new Error("fragment write failed");
         fragmentRows.push(data);
         return data;
       }),
-      findMany: vi.fn(async () => fragmentRows),
+      findMany: vi.fn(async () => {
+        if (fragmentFaults.load) throw new Error("fragment load failed");
+        return fragmentRows;
+      }),
     },
     user: { findUnique: vi.fn(async () => ({ timezone: null })) },
     routine: {
@@ -552,6 +556,10 @@ function fixture({
       ),
       findMany: vi.fn(async () => []),
       findUniqueOrThrow: vi.fn(async () => run),
+      update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        Object.assign(run, data);
+        return run;
+      }),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
         Object.assign(run, data);
         return { count: 1 };
@@ -1000,6 +1008,8 @@ function fixture({
     web,
     fetchedUrls,
     fragmentRows,
+    fragmentFaults,
+    fragmentRecord: () => (run as Record<string, unknown>).fragmentRecord,
     forgetFragmentRecord: () => {
       (run as Record<string, unknown>).fragmentRecord = false;
     },
@@ -5009,6 +5019,72 @@ describe("what a run read is checked before it reaches an external bot", () => {
     await f.run();
     const third = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
     expect(await third.outbound!()).toBeUndefined();
+  });
+
+  it("stops trusting the stored record once an attempt could not load it", async () => {
+    sentBotMessages.calls.length = 0;
+    const f = fixture({ name: "message_bot", builtin: true, fragmentKey: "test-key" });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    expect(f.fragmentRecord()).toBe(true);
+    f.fragmentFaults.load = true;
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "again" }, executionId: "c2" }]);
+    await f.run();
+    expect(f.fragmentRecord()).toBe(false);
+    f.fragmentFaults.load = false;
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "third" }, executionId: "c3" }]);
+    await f.run();
+    const third = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect(await third.outbound!()).toBeUndefined();
+  });
+
+  it("records late shell output before it is handed to the model", async () => {
+    sentBotMessages.calls.length = 0;
+    const f = fixture({ name: "message_bot", builtin: true, fragmentKey: "test-key" });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    const options = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    const rowsBefore = f.fragmentRows.length;
+    await f.request()!.recordLateOutput!("Shell command finished.\nstdout:\ntotal 7654321");
+    expect(f.fragmentRows.length).toBe(rowsBefore + 1);
+    expect((await options.outbound!())!.matches("pay 7654321")).toContain("number");
+    f.fragmentFaults.write = true;
+    await expect(f.request()!.recordLateOutput!("stdout:\ntotal 8765432")).rejects.toThrow(
+      "fragment write failed",
+    );
+  });
+
+  it("keeps a relayed reply in the record after it leaves the history window", async () => {
+    sentBotMessages.calls.length = 0;
+    const history: { blocks: unknown[] }[] = [
+      {
+        blocks: [
+          {
+            kind: "bot_message_received",
+            fromBotId: "peer-1",
+            fromBotName: "Finance",
+            text: "Priya Shah at Halcyon Ventures committed the seed round.",
+            hop: 1,
+            intent: "result",
+            returnToMessageId: "m0",
+          },
+        ],
+      },
+    ];
+    const f = fixture({
+      name: "message_bot",
+      builtin: true,
+      knownBots: { "peer-1": "" },
+      history,
+      fragmentKey: "test-key",
+    });
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "hello" }, executionId: "c1" }]);
+    await f.run();
+    history.length = 0;
+    f.setCalls([{ args: { bot_id: "bot-ext", message: "again" }, executionId: "c2" }]);
+    await f.run();
+    const later = sentBotMessages.calls.at(-1)![4] as MessageBotOptions;
+    expect((await later.outbound!())!.matches("Our lead is priya shah.")).toContain("name");
   });
 
   it("does not return a tool result whose record could not be written", async () => {

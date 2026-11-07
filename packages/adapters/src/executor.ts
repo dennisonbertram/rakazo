@@ -2349,6 +2349,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             getLogger().warn("run fragments load failed", { error });
           }
         }
+        // This attempt cannot extend the stored record, so a later attempt must not trust it: the
+        // flag is cleared before anything reaches the model. If that write fails the attempt ends.
+        if (fence > 1 && run.fragmentRecord && !readsKnown) {
+          await deps.prisma.run.update({ where: { id: runId }, data: { fragmentRecord: false } });
+          run.fragmentRecord = false;
+        }
         // Rows are written only while the record is complete.
         const persistFragments = Boolean(fragmentHasher) && readsKnown;
         let fragmentWriteFailed = false;
@@ -9885,6 +9891,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // Stop during setup must not still open the model. A reclaimed lease can
         // leave status "running" under a new owner, and the stream loop only
         // notices cancellation after the provider request has started.
+        // What an external bot or an internal relay said is part of the record before the model sees
+        // the history, so a reply that later leaves the history window is still held.
+        await loadChainFragments();
+        await recordFragments();
         const beforeModel = await deps.prisma.run.findUnique({
           where: { id: runId },
           select: { status: true, leaseOwner: true, leaseFence: true },
@@ -10137,6 +10147,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     return fallbackModel;
                   }
                 : undefined,
+              recordLateOutput: async (text) => {
+                privateFragments.addPrivate(text);
+                await recordFragments();
+              },
               beforeModelRequest: async () => {
                 // A mark that arrives mid-run: from then on consent for this model is required and
                 // no backup model is used. Unmarked runs cost one row read per model request.

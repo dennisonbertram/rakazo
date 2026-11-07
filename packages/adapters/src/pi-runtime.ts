@@ -476,7 +476,8 @@ export class PiAgentRuntime implements AgentRuntime {
           },
           finishTurn: async (turn, turnSignal) => {
             await deliverFinishedShells(
-              (text) => {
+              async (text) => {
+                await request.recordLateOutput?.(text);
                 agent.followUp({
                   role: "user",
                   content: text,
@@ -1763,7 +1764,8 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
   nested = new Agent({
     finishTurn: async (turn, turnSignal) => {
       await deliverFinishedShells(
-        (text) => {
+        async (text) => {
+          await host.request.recordLateOutput?.(text);
           nested.followUp({
             role: "user",
             content: text,

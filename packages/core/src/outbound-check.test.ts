@@ -209,3 +209,21 @@ describe("hashed and restored records", () => {
     expect(JSON.stringify(f.takeDelta()!.entries)).not.toContain("1250000");
   });
 });
+
+describe("long names", () => {
+  it("still holds a 17-word name whose passages are all in the public text", () => {
+    const name = Array.from({ length: 17 }, (_, i) => `Word${String.fromCharCode(97 + i)}`).join(
+      " ",
+    );
+    const f = new PrivateFragments();
+    f.addPrivate(JSON.stringify({ name }));
+    // Every 8-word passage of the name is public, but never the name itself in one run.
+    const list = name.split(" ");
+    f.addPublic(
+      Array.from({ length: 10 }, (_, i) => `${list.slice(i, i + 8).join(" ")} filler${i}`).join(
+        " ",
+      ),
+    );
+    expect(f.matches(`Please note ${name} today`)).toContain("name");
+  });
+});

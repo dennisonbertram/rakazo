@@ -282,4 +282,17 @@ describe("deliverFinishedShells", () => {
     expect(followUps).toHaveLength(1);
     expect(followUps[0]).toContain("exit code: 0");
   });
+
+  it("waits for an async follow-up, and a failure reaches the caller", async () => {
+    const pending = [Promise.resolve({ stdout: "x", stderr: "", code: 0 })];
+    await expect(
+      deliverFinishedShells(
+        async () => {
+          throw new Error("not recorded");
+        },
+        pending,
+        { toolResults: [] },
+      ),
+    ).rejects.toThrow("not recorded");
+  });
 });
