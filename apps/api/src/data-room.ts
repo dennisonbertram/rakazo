@@ -116,6 +116,7 @@ const itemDto = (item: DataRoomItemRecord): DataRoomApiItem => ({
   name: item.name,
   mimeType: item.mimeType,
   size: Number(item.size),
+  sha256: item.sha256,
   folderId: item.folderId,
   source: item.source,
   sourceUrl: item.sourceUrl,
@@ -902,6 +903,11 @@ export function mountDataRoomRoutes(
 
     const name = DataRoomApiName.safeParse(c.req.query("name"));
     if (!name.success) return reject("Invalid file name", 400);
+    const source = c.req.query("source") ?? "upload";
+    if (source !== "upload" && source !== "scan") return reject("Invalid source", 400);
+    const expectedUserId = c.req.query("expectedUserId");
+    if (expectedUserId !== undefined && expectedUserId !== actor.userId)
+      return reject("The signed-in user changed", 400);
     const folderId = c.req.query("folderId") || null;
     if (
       folderId &&
@@ -921,7 +927,7 @@ export function mountDataRoomRoutes(
     const body = c.req.raw.body;
     try {
       const filed = await fileItem(actor, {
-        source: "upload",
+        source,
         name: name.data,
         mimeType: type,
         content: { stream: body ? streamChunks(body) : noContent() },

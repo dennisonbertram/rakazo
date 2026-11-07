@@ -8,6 +8,7 @@ import {
   companyImporterSpawnKey,
   financeAgentSpawnKey,
   GTM_AGENT_BUILTIN_TOOLS,
+  scannerAgentSpawnKey,
   VOICE_AGENT_BUILTIN_TOOLS,
   voiceAgentSpawnKey,
 } from "@rakazo/contracts";
@@ -178,7 +179,9 @@ async function runIdentityExecutor({
   trigger = "user",
   groupId = null,
   botUserId = "user-1",
+  botSpaceId = "space-1",
   channelRun = false,
+  unattended = false,
   meetingTaintedAt = null,
   calls = [],
   callBatches,
@@ -212,7 +215,9 @@ async function runIdentityExecutor({
   trigger?: string;
   groupId?: string | null;
   botUserId?: string;
+  botSpaceId?: string;
   channelRun?: boolean;
+  unattended?: boolean;
   meetingTaintedAt?: Date | null;
   calls?: Array<{ name: string; args: Record<string, unknown> }>;
   callBatches?: Array<Array<{ name: string; args: Record<string, unknown> }>>;
@@ -256,6 +261,7 @@ async function runIdentityExecutor({
     userId: "user-1",
     status: "queued",
     trigger,
+    ...(unattended ? { unattended: true } : {}),
     sourceMessageId: channelRun ? "channel-message-1" : null,
     leaseFence: 0,
     externalTaint: runExternalTaint,
@@ -396,7 +402,7 @@ async function runIdentityExecutor({
       findUniqueOrThrow: vi.fn(async () => ({
         id: run.botId,
         userId: botUserId,
-        spaceId: run.spaceId,
+        spaceId: botSpaceId,
         name: "Company agent",
         title: "Assistant",
         description: "Synthetic test agent",
@@ -510,7 +516,11 @@ async function runIdentityExecutor({
     },
     mcpServer: { findMany: vi.fn(async () => []) },
     capabilityInstall: { count: vi.fn(async () => 0) },
-    dataRoomItem: { findFirst: dataRoomItemFindFirst },
+    dataRoomItem: {
+      findFirst: dataRoomItemFindFirst,
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
+    $queryRaw: vi.fn(async () => []),
     dataRoomFolder: { findMany: vi.fn(async () => []) },
     dataRoomItemText: {
       findFirst: vi.fn(async () => (dataRoomItem ? { text: dataRoomItem.text } : null)),
@@ -5652,6 +5662,151 @@ describe("mail sorting line", () => {
     expect(MAIL_SORTING_LINE).not.toMatch(/in a minute|will appear in/);
     expect(MAIL_SORTING_LINE).toContain("answer first from what you can see");
     expect(PLAIN_CAPABILITY_GUIDANCE).toContain('Speak to the user as "you"');
+  });
+});
+
+describe("Scanner agent dispatch", () => {
+  const scan = {
+    id: "scan-1",
+    spaceId: "space-1",
+    userId: "user-1",
+    source: "scan",
+    name: "Scan.pdf",
+    mimeType: "application/pdf",
+    status: "ready",
+    folderId: null,
+    docType: null,
+    docDate: null,
+    parties: [],
+    tags: [],
+    summary: "Synthetic scan",
+    text: "Synthetic scan text",
+  };
+
+  it("allows an unattended Scanner read and metadata update after marking the run tainted", async () => {
+    const { request, toolResults, pauseRunForInput, prisma } = await runIdentityExecutor({
+      spawnKey: scannerAgentSpawnKey("user-1"),
+      trigger: "routine",
+      unattended: true,
+      dataRoomItem: scan,
+      calls: [
+        { name: "read_data_room_item", args: { item_id: scan.id } },
+        { name: "update_scan", args: { item_id: scan.id, name: "Reviewed.pdf" } },
+      ],
+    });
+
+    expect(request?.tools.map(({ name }) => name)).toEqual(
+      expect.arrayContaining(["read_data_room_item", "update_scan"]),
+    );
+    expect(toolResults[0]?.result).toMatchObject({
+      id: scan.id,
+      text: expect.stringContaining("<untrusted_content"),
+    });
+    expect(toolResults[1]?.result).toMatchObject({ ok: true, id: scan.id });
+    expect(prisma.run.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { externalTaint: true } }),
+    );
+    expect(prisma.dataRoomItem.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: scan.id,
+          spaceId: scan.spaceId,
+          userId: scan.userId,
+          source: "scan",
+        }),
+        data: { name: "Reviewed.pdf" },
+      }),
+    );
+    expect(pauseRunForInput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      context: "a different owner",
+      botUserId: "other-user",
+      spawnKey: scannerAgentSpawnKey("other-user"),
+    },
+    {
+      context: "a different space",
+      botSpaceId: "other-space",
+      spawnKey: scannerAgentSpawnKey("user-1"),
+    },
+    { context: "a group thread", groupId: "group-1", spawnKey: scannerAgentSpawnKey("user-1") },
+    {
+      context: "a messaging channel",
+      channelRun: true,
+      trigger: "messaging",
+      spawnKey: scannerAgentSpawnKey("user-1"),
+    },
+  ])("refuses scan tools in $context", async (options) => {
+    const { request, toolResults, dataRoomItemFindFirst, prisma } = await runIdentityExecutor({
+      ...options,
+      dataRoomItem: scan,
+      calls: [
+        { name: "read_data_room_item", args: { item_id: scan.id } },
+        { name: "update_scan", args: { item_id: scan.id, name: "Reviewed.pdf" } },
+      ],
+    });
+
+    expect(request?.tools.map(({ name }) => name)).not.toContain("read_data_room_item");
+    expect(request?.tools.map(({ name }) => name)).not.toContain("update_scan");
+    expect(toolResults).toHaveLength(2);
+    expect(toolResults.every(({ result }) => "error" in (result as object))).toBe(true);
+    expect(dataRoomItemFindFirst).not.toHaveBeenCalled();
+    expect(prisma.dataRoomItem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not grant ordinary agents the taint exemption or update_scan capability", async () => {
+    const { pauseRunForInput, toolResults: readResults } = await runIdentityExecutor({
+      spawnKey: null,
+      runExternalTaint: true,
+      dataRoomItem: scan,
+      calls: [{ name: "read_data_room_item", args: { item_id: scan.id } }],
+    });
+    expect(pauseRunForInput).toHaveBeenCalled();
+    expect(readResults[0]?.result).toHaveProperty("kind", "agent_tool_result");
+
+    const { toolResults } = await runIdentityExecutor({
+      spawnKey: null,
+      calls: [{ name: "update_scan", args: { item_id: scan.id, name: "Reviewed.pdf" } }],
+    });
+    expect(toolResults[0]?.result).toEqual({
+      error: "Tool update_scan is not available to this bot.",
+    });
+  });
+
+  it("offers only Scanner tools and rejects forged escape and free-text handoff calls", async () => {
+    const { request, toolResults, mailSend, connectorCall, webFetch } = await runIdentityExecutor({
+      spawnKey: scannerAgentSpawnKey("user-1"),
+      calls: [
+        { name: "mail_send", args: {} },
+        { name: "web_fetch", args: { url: "https://example.test" } },
+        { name: "run_subagent", args: {} },
+        {
+          name: "message_bot",
+          args: { bot_id: "page-agent", item_id: "scan-1", message: "Read this secret text" },
+        },
+      ],
+    });
+
+    expect(request?.tools.map(({ name }) => name).sort()).toEqual(
+      ["message_bot", "read_data_room_item", "search_data_room", "update_scan"].sort(),
+    );
+    expect(toolResults.map(({ name }) => name)).toEqual([
+      "mail_send",
+      "web_fetch",
+      "run_subagent",
+      "message_bot",
+    ]);
+    for (const { result } of toolResults.slice(0, 3)) {
+      expect(result).toMatchObject({ error: expect.stringMatching(/not available/i) });
+    }
+    expect(toolResults[3]?.result).toEqual({
+      error: "A page-agent handoff needs only bot_id and item_id.",
+    });
+    expect(mailSend).not.toHaveBeenCalled();
+    expect(connectorCall).not.toHaveBeenCalled();
+    expect(webFetch).not.toHaveBeenCalled();
   });
 });
 

@@ -16,6 +16,19 @@ vi.mock("./i18n", () => ({ t: (text: string) => text }));
 beforeEach(() => vi.mocked(rpc).mockReset());
 
 describe("mobile Data room RPCs", () => {
+  it("keeps scanner listings and searches source-filtered across pagination", async () => {
+    vi.mocked(rpc).mockResolvedValue({ results: [], nextCursor: null });
+    await listDataRoomItems({ source: "scan", cursor: "next" });
+    expect(rpc).toHaveBeenLastCalledWith(
+      "dataRoom/items/list",
+      expect.objectContaining({ source: "scan", cursor: "next" }),
+    );
+    await listDataRoomItems({ source: "scan", query: "contract" });
+    expect(rpc).toHaveBeenLastCalledWith(
+      "dataRoom/search",
+      expect.objectContaining({ filters: { source: "scan" } }),
+    );
+  });
   it("lists the same folder IDs and sends a folder and cursor to the scoped item RPC", async () => {
     vi.mocked(rpc).mockResolvedValue({ items: [], nextCursor: null });
     await listDataRoomFolders();

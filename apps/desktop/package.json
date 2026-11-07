@@ -7,7 +7,7 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "pnpm build && electron .",
-    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/bundle-main.mjs && node scripts/copy-static.mjs",
     "pack": "pnpm --filter @rakazo/web build && pnpm build && electron-builder --mac --win --linux",
     "pack:dir": "pnpm --filter @rakazo/web build && pnpm build && electron-builder --dir",
     "check": "tsc --noEmit -p tsconfig.json",
@@ -26,6 +26,7 @@
     "@rakazo/ui-tokens": "workspace:*",
     "electron": "44.3.0",
     "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
   },

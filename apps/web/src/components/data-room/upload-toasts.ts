@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import type { DataRoomApiImport } from "@rakazo/contracts";
+import type { DataRoomApiImport, DataRoomApiItem } from "@rakazo/contracts";
 import { enqueueNotificationToast, notificationToastManager } from "@rakazo/ui-web";
 import {
   DATA_ROOM_CHANGED,
@@ -33,6 +33,7 @@ const UPLOAD_FAILURES = [
 ];
 export type UploadToast = {
   id: number;
+  key?: string;
   name: string;
   state:
     | {
@@ -173,10 +174,15 @@ async function uploadOne(
   file: File,
   folderId: string | undefined,
   onUploaded?: (itemId: string) => void,
+  options?: DataRoomUploadOptions,
 ) {
-  const id = nextId++;
+  const id =
+    (options?.key ? toasts.find((toast) => toast.key === options.key)?.id : undefined) ?? nextId++;
   const mine = epoch;
-  const current = () => mine === epoch;
+  const current = () => {
+    sync();
+    return mine === epoch && !options?.signal?.aborted;
+  };
   // A retry must not file the document into whichever user or space is selected now.
   const sameScope = () => {
     sync();
@@ -184,19 +190,25 @@ async function uploadOne(
     showNoticeToast(t`Not retried: the space changed`);
     return false;
   };
-  toasts = [...toasts, { id, name: file.name, state: { kind: "uploading", fraction: 0 } }];
+  if (!current()) return false;
+  toasts = [
+    ...toasts.filter((toast) => toast.id !== id),
+    { id, key: options?.key, name: file.name, state: { kind: "uploading", fraction: 0 } },
+  ];
   notify();
   const fail = (reason: UploadFailure) => {
     const toTop =
-      reason === "folder-gone"
+      reason === "folder-gone" && !options?.scope
         ? () => {
             dismissUploadToast(id);
-            if (sameScope()) void uploadOne(file, undefined);
+            if (sameScope()) void uploadOne(file, undefined, onUploaded, options);
           }
         : undefined;
     update(id, { kind: "error", reason, ...(toTop ? { toTop } : {}) });
   };
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  options?.signal?.addEventListener("abort", abort, { once: true });
   let fraction = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const watch = () => {
@@ -214,7 +226,7 @@ async function uploadOne(
           cancel,
           retry: () => {
             cancel();
-            if (sameScope()) void uploadOne(file, folderId);
+            if (sameScope()) void uploadOne(file, folderId, onUploaded, options);
           },
         },
       });
@@ -232,16 +244,20 @@ async function uploadOne(
         watch();
       },
       controller.signal,
+      options?.scope,
     );
     clearTimeout(timer);
     // A zip is unpacked in the background: this card follows its import row from here.
     if (!("item" in uploaded)) {
+      if (options?.scope) throw new Error("A scan must be stored as one document");
       if (!current()) return;
       update(id, { kind: "importing", progress: null });
       dataRoomImportStarted();
       return await followImport(id, uploaded.importId, current);
     }
     const { item, duplicate } = uploaded;
+    if (!current()) return false;
+    await options?.onStored?.(item);
     const publish = (folder?: string) =>
       update(id, {
         kind: "uploaded",
@@ -256,7 +272,7 @@ async function uploadOne(
             }
           : {}),
       });
-    if (!current()) return;
+    if (!current()) return false;
     publish();
     onUploaded?.(item.id);
     window.dispatchEvent(new Event(DATA_ROOM_CHANGED));
@@ -270,6 +286,7 @@ async function uploadOne(
         .catch(() => undefined);
       if (path && current()) publish(path);
     }
+    return true;
   } catch (error) {
     clearTimeout(timer);
     // Cancelled or retried from the card: it has already gone.
@@ -281,7 +298,17 @@ async function uploadOne(
     fail(reason);
     // The open page still shows the deleted folder: reload, so it falls back to All items.
     if (reason === "folder-gone") window.dispatchEvent(new Event(DATA_ROOM_CHANGED));
+    return false;
+  } finally {
+    options?.signal?.removeEventListener("abort", abort);
   }
+}
+
+export interface DataRoomUploadOptions {
+  key?: string;
+  scope?: { source: "scan"; userId: string; spaceId: string };
+  signal?: AbortSignal;
+  onStored?: (item: DataRoomApiItem) => Promise<void>;
 }
 
 /** The folder the open Data room page shows, if any; uploads from anywhere go there. */
@@ -296,12 +323,16 @@ export function setOpenDataRoomFolder(folderId: string | undefined) {
  */
 export function uploadFilesToDataRoom(
   files: Iterable<File>,
-  folderId = openFolder,
+  folderId?: string,
   /** Called with the new item's id once a file is stored (not for zips). */
   onUploaded?: (itemId: string) => void,
+  options?: DataRoomUploadOptions,
 ) {
   sync();
-  for (const file of files) void uploadOne(file, folderId, onUploaded);
+  const destination = folderId ?? (options?.scope ? undefined : openFolder);
+  return Promise.all(
+    Array.from(files, (file) => uploadOne(file, destination, onUploaded, options)),
+  );
 }
 
 function showShortToast(name: string, state: UploadToast["state"]) {

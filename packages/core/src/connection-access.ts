@@ -12,6 +12,7 @@ import {
   isLegalAgentSpawnKey,
   isMailAgentSpawnKey,
   isMailThreadAgentSpawnKey,
+  isScannerAgentSpawnKey,
   isVoiceAgentSpawnKey,
 } from "@rakazo/contracts";
 
@@ -153,6 +154,7 @@ export function botUsesConnectorTools(spawnKey: string | null | undefined): bool
     isLegalAgentSpawnKey(spawnKey) ||
     isInvestorsAgentSpawnKey(spawnKey) ||
     isDataRoomAgentSpawnKey(spawnKey) ||
+    isScannerAgentSpawnKey(spawnKey) ||
     isVoiceAgentSpawnKey(spawnKey) ||
     isCartaAgentSpawnKey(spawnKey) ||
     isCompanyAgentSpawnKey(spawnKey) ||
@@ -165,6 +167,7 @@ export function botUsesConnectorTools(spawnKey: string | null | undefined): bool
 export function botUsesNativeGoogle(spawnKey: string | null | undefined): boolean {
   return !(
     isIntegrationAgentSpawnKey(spawnKey) ||
+    isScannerAgentSpawnKey(spawnKey) ||
     isVoiceAgentSpawnKey(spawnKey) ||
     isCompanyAgentSpawnKey(spawnKey) ||
     isCompanyImporterSpawnKey(spawnKey)

@@ -59,3 +59,14 @@ func listInputOmitsUnsetFilters() throws {
   #expect(object["status"] as? String == "failed")
   #expect(object["folderId"] == nil && object["cursor"] == nil)
 }
+
+@Test
+func scanListAndSearchPreserveSource() throws {
+  let list = try JSONEncoder().encode(DataRoomItemsListInput(source: "scan", cursor: "next"))
+  let listObject = try #require(JSONSerialization.jsonObject(with: list) as? [String: Any])
+  #expect(listObject["source"] as? String == "scan")
+  #expect(listObject["cursor"] as? String == "next")
+  let search = try JSONEncoder().encode(DataRoomSearchInput(query: "contract", filters: .init(source: "scan")))
+  let searchObject = try #require(JSONSerialization.jsonObject(with: search) as? [String: Any])
+  #expect((searchObject["filters"] as? [String: Any])?["source"] as? String == "scan")
+}

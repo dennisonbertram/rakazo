@@ -254,6 +254,7 @@ export default function Layout() {
                     <Stack.Screen name="inbox-attachment" options={{ title: "" }} />
                     <Stack.Screen name="artifacts" options={glassHeaderOptions(t("Artifacts"))} />
                     <Stack.Screen name="data-room" options={glassHeaderOptions(t("Data room"))} />
+                    <Stack.Screen name="scanner" options={glassHeaderOptions(t("Scanner"))} />
                     <Stack.Screen name="data-room-item" options={{ title: t("File") }} />
                     <Stack.Screen name="artifact" options={{ title: t("Artifact") }} />
                     <Stack.Screen name="agent-page" options={{ title: t("Page") }} />

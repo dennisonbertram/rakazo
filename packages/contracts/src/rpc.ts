@@ -2017,6 +2017,10 @@ export const appContract = {
       undo: oc.input(z.object({ batchId: Id })).output(AutoSortUndoOutputSchema),
     },
   },
+  scanner: {
+    /** Idempotent: creates the Scanner page agent; returns the bot to open. */
+    agent: oc.output(BotSchema),
+  },
   meetings: {
     /** Checks the Granola key with one list call, stores it, connects, provisions the agent and queues a sync. Trims the key. Errors: "Granola rejected this key", "Could not reach Granola". */
     connect: oc.input(MeetingConnectInputSchema).output(z.object({ ok: z.literal(true) })),

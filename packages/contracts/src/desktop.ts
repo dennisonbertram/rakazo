@@ -1,4 +1,5 @@
 import type { HexMeetingList, HexMeetingShow, HexResult } from "./hex.js";
+import type { RakazoDesktopScanner } from "./scanner.js";
 
 /**
  * `unsupported` covers an unpackaged build and a repository with no published releases, which is
@@ -88,6 +89,8 @@ export interface RakazoDesktop {
   hex?: RakazoDesktopHex;
   /** Optional: older desktops and builds without on-device speech do not have it. */
   speech?: RakazoDesktopSpeech;
+  /** Optional: local SANE scanner support on macOS and Linux. */
+  scanner?: RakazoDesktopScanner;
   oauth: {
     /**
      * Open system-browser auth. A redirect_uri must be HTTP loopback with state;

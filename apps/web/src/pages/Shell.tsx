@@ -244,6 +244,7 @@ import type { MissingBotSeen } from "../lib/route-bot";
 import { resolveRouteBot, shouldClearMissingBot, useGiveUpOnMissingBot } from "../lib/route-bot";
 import { rpc, selectedSpaceId, selectSpace } from "../lib/rpc";
 import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-storage";
+import { findScannerAgent, scannerAgentSuggestions } from "../lib/scanner-agent";
 import type { DataRoomRef } from "../lib/send-to-agent";
 import {
   acceptAttachments,
@@ -289,6 +290,7 @@ import { useNotificationsOff } from "../lib/use-notifications-off";
 import { useRefetchWhileOpen } from "../lib/use-refetch-while-open";
 import { useRememberedMessages } from "../lib/use-remembered-messages";
 import { useRunResumedAt } from "../lib/use-run-resumed-at";
+import { useScannerDelivery } from "../lib/use-scanner-delivery";
 import { NOTIFICATIONS_CHANGED_EVENT, useSidebarGlance } from "../lib/use-sidebar-glance";
 import { errorText } from "../lib/user-error";
 import { workingActivity } from "../lib/working-activity";
@@ -324,6 +326,7 @@ import {
   RoutineListRow,
   routineNeedsOneShotArm,
 } from "./RoutineEditor";
+import { ScannerPage } from "./Scanner";
 import type { SettingsSection } from "./SettingsOverlay";
 import type { PageDataUpdate, PageRemoteUpdate } from "./shell/bot-page-panel";
 import { BotPagePanel } from "./shell/bot-page-panel";
@@ -694,6 +697,9 @@ export function ShellPage() {
   const [dataRoomAgentOpen, setDataRoomAgentOpen] = useState(false);
   const [creatingDataRoomAgent, setCreatingDataRoomAgent] = useState(false);
   const [dataRoomAgentError, setDataRoomAgentError] = useState("");
+  const [scannerAgentOpen, setScannerAgentOpen] = useState(false);
+  const [creatingScannerAgent, setCreatingScannerAgent] = useState(false);
+  const [scannerAgentError, setScannerAgentError] = useState("");
   const [legalAgentOpen, setLegalAgentOpen] = useState(false);
   const [creatingLegalAgent, setCreatingLegalAgent] = useState(false);
   const [legalAgentError, setLegalAgentError] = useState("");
@@ -1185,6 +1191,14 @@ export function ShellPage() {
   const financeMode = useMatch("/app/finance/*") != null;
   const brexMode = useMatch("/app/brex/*") != null;
   const dataRoomMode = useMatch("/app/data-room") != null;
+  const scannerMode = useMatch("/app/scanner") != null;
+  useScannerDelivery(userId, bootstrapMe?.spaceId);
+  const scannerScope = useRef("");
+  scannerScope.current = JSON.stringify([userId, bootstrapMe?.spaceId]);
+  useEffect(() => {
+    setScannerAgentOpen(false);
+    if (scannerMode && userId && bootstrapMe?.spaceId) void createScannerAgent();
+  }, [scannerMode, userId, bootstrapMe?.spaceId]);
   const legalMode = useMatch("/app/legal") != null;
   const gtmMode = useMatch("/app/gtm") != null;
   const companyMode = useMatch("/app/company/*") != null;
@@ -1219,6 +1233,7 @@ export function ShellPage() {
     fundraisingMode ||
     integrationsMode ||
     dataRoomMode ||
+    scannerMode ||
     artifactsMode ||
     contactsMode ||
     meetingsMode ||
@@ -1271,17 +1286,19 @@ export function ShellPage() {
           ? findInboxAgent(bots, userId)
           : financeMode
             ? findFinanceAgent(bots, userId)
-            : dataRoomMode
-              ? findDataRoomAgent(bots, userId)
-              : legalMode
-                ? findLegalAgent(bots, userId)
-                : gtmMode
-                  ? findGtmAgent(bots, userId)
-                  : devinMode
-                    ? bots.find((bot) => bot.id === devinAgentId)
-                    : investorsMode || fundraisingMode
-                      ? findInvestorsAgent(bots, userId)
-                      : routeBot.bot;
+            : scannerMode
+              ? findScannerAgent(bots, userId)
+              : dataRoomMode
+                ? findDataRoomAgent(bots, userId)
+                : legalMode
+                  ? findLegalAgent(bots, userId)
+                  : gtmMode
+                    ? findGtmAgent(bots, userId)
+                    : devinMode
+                      ? bots.find((bot) => bot.id === devinAgentId)
+                      : investorsMode || fundraisingMode
+                        ? findInvestorsAgent(bots, userId)
+                        : routeBot.bot;
   // A bot made with "New bot" opens with only its name until it has answered a message.
   useEffect(() => {
     // The snapshot can still be the previous thread's for a render after the bot opens.
@@ -2458,6 +2475,7 @@ export function ShellPage() {
       { id: "meetings", label: t`Meetings`, icon: <Mic {...icon} /> },
       { id: "contacts", label: t`Contacts`, icon: <BookUser {...icon} /> },
       { id: "data-room", label: t`Data room`, icon: <FolderOpen {...icon} /> },
+      { id: "scanner", label: t`Scanner`, icon: <Files {...icon} /> },
       { id: "artifacts", label: t`Artifacts`, icon: <Files {...icon} /> },
       ...(bootstrapMe?.ticketBoardEnabled && glance.hasTickets
         ? [
@@ -3643,6 +3661,21 @@ export function ShellPage() {
     if (!active && !creatingDataRoomAgent) void createDataRoomAgent();
   }
 
+  async function createScannerAgent() {
+    const scope = scannerScope.current;
+    setCreatingScannerAgent(true);
+    setScannerAgentError("");
+    try {
+      await rpc.scanner.agent();
+      if (scannerScope.current === scope) await refreshBots();
+    } catch (error) {
+      if (scannerScope.current === scope)
+        setScannerAgentError(errorText(error, t`Could not create the Scanner agent`));
+    } finally {
+      if (scannerScope.current === scope) setCreatingScannerAgent(false);
+    }
+  }
+
   async function createLegalAgent() {
     setCreatingLegalAgent(true);
     setLegalAgentError("");
@@ -3906,73 +3939,86 @@ export function ShellPage() {
             error: financeAgentError,
             suggestions: financeAgentSuggestions(),
           }
-        : dataRoomMode
+        : scannerMode
           ? {
-              name: "data-room-agent",
-              testId: "data-room-agent-panel",
-              open: dataRoomAgentOpen,
-              collapse: () => setDataRoomAgentOpen(false),
-              collapseLabel: t`Collapse Data room agent`,
-              create: createDataRoomAgent,
-              createLabel: t`Create Data room agent`,
-              creating: creatingDataRoomAgent,
-              error: dataRoomAgentError,
-              suggestions: dataRoomAgentSuggestions(),
+              name: "scanner-agent",
+              testId: "scanner-agent-panel",
+              open: scannerAgentOpen,
+              collapse: () => setScannerAgentOpen(false),
+              collapseLabel: t`Collapse Scanner agent`,
+              create: createScannerAgent,
+              createLabel: t`Create Scanner agent`,
+              creating: creatingScannerAgent,
+              error: scannerAgentError,
+              suggestions: scannerAgentSuggestions(),
             }
-          : devinMode
+          : dataRoomMode
             ? {
-                name: "devin-agent",
-                testId: "devin-agent-panel",
-                open: devinAgentOpen,
-                collapse: () => setDevinAgentOpen(false),
-                collapseLabel: t`Collapse Devin agent`,
-                create: createDevinAgent,
-                createLabel: t`Create Devin agent`,
-                creating: creatingDevinAgent,
-                error: devinAgentError,
-                suggestions: [t`Anything merged today?`, t`What did Devin do this week?`],
+                name: "data-room-agent",
+                testId: "data-room-agent-panel",
+                open: dataRoomAgentOpen,
+                collapse: () => setDataRoomAgentOpen(false),
+                collapseLabel: t`Collapse Data room agent`,
+                create: createDataRoomAgent,
+                createLabel: t`Create Data room agent`,
+                creating: creatingDataRoomAgent,
+                error: dataRoomAgentError,
+                suggestions: dataRoomAgentSuggestions(),
               }
-            : legalMode
+            : devinMode
               ? {
-                  name: "legal-agent",
-                  testId: "legal-agent-panel",
-                  open: legalAgentOpen,
-                  collapse: () => setLegalAgentOpen(false),
-                  collapseLabel: t`Collapse Legal agent`,
-                  create: createLegalAgent,
-                  createLabel: t`Create Legal agent`,
-                  creating: creatingLegalAgent,
-                  error: legalAgentError,
+                  name: "devin-agent",
+                  testId: "devin-agent-panel",
+                  open: devinAgentOpen,
+                  collapse: () => setDevinAgentOpen(false),
+                  collapseLabel: t`Collapse Devin agent`,
+                  create: createDevinAgent,
+                  createLabel: t`Create Devin agent`,
+                  creating: creatingDevinAgent,
+                  error: devinAgentError,
+                  suggestions: [t`Anything merged today?`, t`What did Devin do this week?`],
                 }
-              : gtmMode
+              : legalMode
                 ? {
-                    name: "gtm-agent",
-                    testId: "gtm-agent-panel",
-                    open: gtmAgentOpen,
-                    collapse: () => setGtmAgentOpen(false),
-                    collapseLabel: t`Collapse GTM agent`,
-                    create: createGtmAgent,
-                    createLabel: t`Create GTM agent`,
-                    creating: creatingGtmAgent,
-                    error: gtmAgentError,
-                    suggestions: [t`Help me find our first 50 design partners`],
+                    name: "legal-agent",
+                    testId: "legal-agent-panel",
+                    open: legalAgentOpen,
+                    collapse: () => setLegalAgentOpen(false),
+                    collapseLabel: t`Collapse Legal agent`,
+                    create: createLegalAgent,
+                    createLabel: t`Create Legal agent`,
+                    creating: creatingLegalAgent,
+                    error: legalAgentError,
                   }
-                : investorsAgentPage
+                : gtmMode
                   ? {
-                      name: "investors-agent",
-                      testId: "investors-agent-panel",
-                      // Never an empty panel: it holds the agent, or the agent being created, or why it failed.
-                      open: investorsPanel.open,
-                      collapse: () => setCartaAgentCollapsedPref(true),
-                      collapseLabel: t`Collapse Investors agent`,
-                      // A failed creation is retried from the panel; the agent otherwise appears by itself.
-                      create: investorsAgentError ? createInvestorsAgent : undefined,
-                      createLabel: t`Try again`,
-                      creating: creatingInvestorsAgent,
-                      error: investorsAgentError,
-                      suggestions: investorsAgentSuggestions(),
+                      name: "gtm-agent",
+                      testId: "gtm-agent-panel",
+                      open: gtmAgentOpen,
+                      collapse: () => setGtmAgentOpen(false),
+                      collapseLabel: t`Collapse GTM agent`,
+                      create: createGtmAgent,
+                      createLabel: t`Create GTM agent`,
+                      creating: creatingGtmAgent,
+                      error: gtmAgentError,
+                      suggestions: [t`Help me find our first 50 design partners`],
                     }
-                  : null;
+                  : investorsAgentPage
+                    ? {
+                        name: "investors-agent",
+                        testId: "investors-agent-panel",
+                        // Never an empty panel: it holds the agent, or the agent being created, or why it failed.
+                        open: investorsPanel.open,
+                        collapse: () => setCartaAgentCollapsedPref(true),
+                        collapseLabel: t`Collapse Investors agent`,
+                        // A failed creation is retried from the panel; the agent otherwise appears by itself.
+                        create: investorsAgentError ? createInvestorsAgent : undefined,
+                        createLabel: t`Try again`,
+                        creating: creatingInvestorsAgent,
+                        error: investorsAgentError,
+                        suggestions: investorsAgentSuggestions(),
+                      }
+                    : null;
   // The toaster skips an approval toast for the agent whose panel is open.
   const dockedAgentId = agentPanel?.open ? active?.id : undefined;
   useEffect(() => {
@@ -4959,6 +5005,7 @@ export function ShellPage() {
         calendarMode={calendarMode}
         companyMode={companyMode}
         dataRoomMode={dataRoomMode}
+        scannerMode={scannerMode}
         artifactsMode={artifactsMode}
         hiddenPages={hiddenPages}
         addedPages={addedPages}
@@ -5259,6 +5306,11 @@ export function ShellPage() {
                 onOpenVoiceSettings={() => openSettings("voice")}
               />
             </ErrorBoundary>
+          ) : scannerMode ? (
+            <ScannerPage
+              spaceName={pageSpaceName}
+              onAskAgent={scannerAgentOpen ? undefined : () => setScannerAgentOpen(true)}
+            />
           ) : dataRoomMode ? (
             <DataRoomPage
               onAskAgent={dataRoomAgentOpen ? undefined : askDataRoomAgent}

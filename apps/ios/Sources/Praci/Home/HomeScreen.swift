@@ -228,6 +228,10 @@ struct HomeScreen: View {
         }
         .accessibilityIdentifier("pageDataRoom")
       }
+      if !hidden.contains("scanner") {
+        NavigationLink(value: Route.scanner) { PageRowView(title: "Scanner", systemImage: "scanner") }
+          .accessibilityIdentifier("pageScanner")
+      }
       if !hidden.contains("meetings") {
         NavigationLink(value: Route.meetings) {
           PageRowView(title: "Meetings", systemImage: "waveform")

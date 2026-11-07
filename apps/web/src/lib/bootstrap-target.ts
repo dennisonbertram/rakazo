@@ -17,6 +17,7 @@ const PAGE_SEGMENTS = new Set([
   "gtm",
   "devin",
   "data-room",
+  "scanner",
   "investors",
   "fundraising",
   "cap-table",

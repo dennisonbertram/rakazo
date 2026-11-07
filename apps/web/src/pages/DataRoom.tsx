@@ -8,7 +8,8 @@ import type {
   DataRoomConsentStatus,
 } from "@rakazo/contracts";
 import { Button, Dialog, DialogContent, Skeleton, Toggle } from "@rakazo/ui-web";
-import { ArrowLeft, ChartColumn, LayoutGrid, List, Plus, Upload } from "lucide-react";
+import { ArrowLeft, ChartColumn, LayoutGrid, List, Plus, ScanLine, Upload } from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
@@ -110,7 +111,15 @@ export function DataRoomPage({
   onOpenModelSettings,
   agents,
   onSendToAgent,
+  source,
+  headerActions,
+  headerMeta,
+  beforeList,
 }: {
+  source?: "scan";
+  headerActions?: ReactNode;
+  headerMeta?: ReactNode;
+  beforeList?: ReactNode;
   spaceName?: string;
   onAskAgent?: () => void;
   /** Where a model problem is fixed; without it Auto-sort only names the problem. */
@@ -165,8 +174,12 @@ export function DataRoomPage({
     }),
   );
   const filters = useMemo<Filters>(
-    () => (urlFolder ? { ...otherFilters, folderId: urlFolder } : otherFilters),
-    [otherFilters, urlFolder],
+    () => ({
+      ...otherFilters,
+      ...(urlFolder ? { folderId: urlFolder } : {}),
+      ...(source ? { source } : {}),
+    }),
+    [otherFilters, urlFolder, source],
   );
   // The sidebar badge links here while the page may already be open.
   const urlFailed = params.get("status") === "failed";
@@ -275,10 +288,10 @@ export function DataRoomPage({
   const nodes = useMemo(() => folderNodes(folders), [folders]);
   const subfolders = useMemo(
     () =>
-      searching || filters.folderId === undefined
+      source || searching || filters.folderId === undefined
         ? []
         : nodes.map(({ folder }) => folder).filter((f) => f.parentId === filters.folderId),
-    [nodes, searching, filters.folderId],
+    [nodes, source, searching, filters.folderId],
   );
   const folderPath = useCallback(
     (id: string | null) => nodes.find(({ folder }) => folder.id === id)?.path ?? "",
@@ -371,6 +384,7 @@ export function DataRoomPage({
       .item({ id: linkedItem })
       .then((item) => {
         if (!current || item.id !== linkedItem) return;
+        if (source && item.source !== source) throw new Error("Not a scan");
         // Show the folder the item is in, so the list and the preview agree.
         changeQuery("");
         setFilters(item.folderId ? { folderId: item.folderId } : {}, true);
@@ -394,7 +408,7 @@ export function DataRoomPage({
     return () => {
       current = false;
     };
-  }, [linkedItem]);
+  }, [linkedItem, source]);
 
   // When a new search, filter, folder or sort answers, keep the pinned item only if it is in the
   // results; otherwise close the preview. Another item is never picked for the user.
@@ -630,7 +644,9 @@ export function DataRoomPage({
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const hasFilters = Object.values(filters).some(Boolean);
+  const hasFilters = Object.entries(filters).some(
+    ([key, value]) => value && !(source && key === "source"),
+  );
   // Only rows that answer the query now asked count: for one render after a search is cleared, the
   // old empty results are still in hand, and must not flash the first-run screen.
   const empty =
@@ -675,7 +691,9 @@ export function DataRoomPage({
     />
   );
   /** A filter other than the folder is set. */
-  const filtered = Object.entries(filters).some(([key, value]) => key !== "folderId" && value);
+  const filtered = Object.entries(filters).some(
+    ([key, value]) => key !== "folderId" && !(source && key === "source") && value,
+  );
   const clearFilters = () => setFilters(filters.folderId ? { folderId: filters.folderId } : {});
   const openFolderPath = filters.folderId ? folderPath(filters.folderId) : "";
 
@@ -732,10 +750,12 @@ export function DataRoomPage({
         <PageHeader
           // The space name is in the sidebar; on a phone its own line pushes the first file below 160px.
           className="max-sm:[&_[data-page-header-meta]]:hidden"
-          title={<Trans>Data room</Trans>}
+          title={source === "scan" ? <Trans>Scanner</Trans> : <Trans>Data room</Trans>}
+          meta={headerMeta}
           spaceName={spaceName}
           actions={
             <>
+              {headerActions}
               {empty ? null : (
                 <>
                   {viewToggles("@max-[639px]/bd:hidden")}
@@ -764,17 +784,19 @@ export function DataRoomPage({
                       event.target.value = "";
                     }}
                   />
-                  <ImportSources
-                    compact
-                    folderId={filters.folderId ?? null}
-                    onDone={showNotice}
-                    onUpload={() => fileInput.current?.click()}
-                  />
+                  {!source && (
+                    <ImportSources
+                      compact
+                      folderId={filters.folderId ?? null}
+                      onDone={showNotice}
+                      onUpload={() => fileInput.current?.click()}
+                    />
+                  )}
                 </>
               )}
               {onAskAgent ? (
                 <AskBotButton
-                  botName="Data room agent"
+                  botName={source === "scan" ? "Scanner agent" : "Data room agent"}
                   onClick={() => {
                     // The agent panel takes the room the preview had.
                     setPinned(null);
@@ -787,22 +809,37 @@ export function DataRoomPage({
           }
         />
       </div>
+      {beforeList}
       {empty ? (
         <div className="flex justify-center px-6 pt-4">
           <PageEmptyState
-            className="w-full max-w-md rounded-xl border-2 border-dashed border-border"
-            icon={<Upload aria-hidden="true" className="size-8" strokeWidth={1.6} />}
-            title={<Trans>Drop files here</Trans>}
+            className={
+              source
+                ? "w-full max-w-md"
+                : "w-full max-w-md rounded-xl border-2 border-dashed border-border"
+            }
+            icon={
+              source ? (
+                <ScanLine aria-hidden="true" className="size-8" strokeWidth={1.6} />
+              ) : (
+                <Upload aria-hidden="true" className="size-8" strokeWidth={1.6} />
+              )
+            }
+            title={source === "scan" ? <Trans>No scans yet</Trans> : <Trans>Drop files here</Trans>}
             description={
-              <Trans>Keep contracts, board decks and investor documents in one place.</Trans>
+              source === "scan" ? undefined : (
+                <Trans>Keep contracts, board decks and investor documents in one place.</Trans>
+              )
             }
           >
-            <div className="flex flex-wrap justify-center gap-2">
-              <FileInputButton>
-                <Trans>Choose files</Trans>
-              </FileInputButton>
-              <ImportSources folderId={null} onDone={showNotice} />
-            </div>
+            {!source && (
+              <div className="flex flex-wrap justify-center gap-2">
+                <FileInputButton>
+                  <Trans>Choose files</Trans>
+                </FileInputButton>
+                <ImportSources folderId={null} onDone={showNotice} />
+              </div>
+            )}
           </PageEmptyState>
         </div>
       ) : (
@@ -815,26 +852,27 @@ export function DataRoomPage({
             query={queryInput}
             onQuery={changeQuery}
             searching={searching}
-            filters={filters}
+            filters={source ? { ...filters, source: undefined } : filters}
             onFilters={(next) => setFilters(next)}
             sort={sort}
             onSort={(next) => (searching ? setSearchSort(next) : next && setListSort(next))}
             types={options.types}
             parties={options.parties}
-            sources={options.sources}
+            sources={source ? [] : options.sources}
             hasDates={options.hasDates}
             folders={nodes}
             folderId={filters.folderId}
             onFolder={(folderId) => setFilters({ ...filters, folderId })}
-            onNewFolder={() => setCreatingFolder(true)}
-            onAutoSort={() => setAutoSorting(true)}
+            onNewFolder={source ? undefined : () => setCreatingFolder(true)}
+            onAutoSort={source ? undefined : () => setAutoSorting(true)}
+            folderTreeHidden={!!source}
             statsView={showStats}
             previewBeside={!!shown && !narrow && !showStats}
             trailing={viewToggles("@min-[640px]/bd:hidden")}
             leading={
               filters.status ? null : (
                 <FailedChip
-                  count={processing.processing?.failed ?? 0}
+                  count={source ? 0 : (processing.processing?.failed ?? 0)}
                   onClick={() =>
                     setParams((prev) => {
                       const next = new URLSearchParams(prev);
@@ -848,22 +886,24 @@ export function DataRoomPage({
           />
           <div ref={setBodyEl} className="relative flex min-h-0 flex-1 border-t border-border">
             {/* With a preview beside the list the tree needs a wider page, or file names get ~100px. */}
-            <div
-              className={`hidden self-stretch border-e border-border ${
-                shown && !narrow && !showStats ? "@min-[1100px]/bd:flex" : "@min-[800px]/bd:flex"
-              }`}
-            >
-              <ResizableFolders bounds={bodyEl}>
-                <FolderTree
-                  nodes={nodes}
-                  selected={filters.folderId}
-                  onSelect={(folderId) => setFilters({ ...filters, folderId })}
-                  onAction={(kind, folder) => setAction({ kind, item: folder })}
-                  onNewFolder={() => setCreatingFolder(true)}
-                  onAutoSort={() => setAutoSorting(true)}
-                />
-              </ResizableFolders>
-            </div>
+            {!source && (
+              <div
+                className={`hidden self-stretch border-e border-border ${
+                  shown && !narrow && !showStats ? "@min-[1100px]/bd:flex" : "@min-[800px]/bd:flex"
+                }`}
+              >
+                <ResizableFolders bounds={bodyEl}>
+                  <FolderTree
+                    nodes={nodes}
+                    selected={filters.folderId}
+                    onSelect={(folderId) => setFilters({ ...filters, folderId })}
+                    onAction={(kind, folder) => setAction({ kind, item: folder })}
+                    onNewFolder={() => setCreatingFolder(true)}
+                    onAutoSort={() => setAutoSorting(true)}
+                  />
+                </ResizableFolders>
+              </div>
+            )}
             {showStats ? (
               <div
                 data-testid="data-room-stats"
@@ -898,13 +938,19 @@ export function DataRoomPage({
                     onSelect={(folderId) => setFilters({ ...filters, folderId })}
                   />
                   <ImportActivity
-                    imports={importActivity.imports}
+                    imports={
+                      source
+                        ? importActivity.imports.filter((entry) => entry.source === source)
+                        : importActivity.imports
+                    }
                     onOpenItem={openImported}
                     onDismiss={importActivity.dismiss}
                     hideRunning={processing.active}
                   />
                   {/* A file that could not be read is flagged on its row and by the sidebar badge. */}
-                  {processing.processing && (processing.active || processing.finished) ? (
+                  {!source &&
+                  processing.processing &&
+                  (processing.active || processing.finished) ? (
                     <ProcessingStrip
                       importing={processing.active ? importProgress(importActivity.imports) : null}
                       processing={processing.processing}
@@ -968,7 +1014,7 @@ export function DataRoomPage({
                   ) : rows.length === 0 && !list.error && !subfolders.length ? (
                     <div className="flex flex-col items-center gap-3 p-6 text-center text-sm text-muted-foreground">
                       {/* An open folder with nothing in it is empty, not a search that found nothing. */}
-                      {!searching && !filtered ? (
+                      {!searching && !filtered && !source ? (
                         <>
                           <p>
                             <Trans>This folder is empty. Drop files here or add them.</Trans>

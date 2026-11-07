@@ -23,6 +23,7 @@ func openURLsMapToRoutes() {
   #expect(route("rakazo://open/legal") == .legal)
   #expect(route("rakazo://open/cap-table") == .capTable)
   #expect(route("rakazo://open/data-room") == .dataRoom)
+  #expect(route("rakazo://open/scanner") == .scanner)
   #expect(route("rakazo://open/meetings") == .meetings)
   #expect(route("rakazo://open/meeting/m1") == .meeting(id: "m1"))
 }
@@ -45,6 +46,7 @@ func appPathsFromAgentLinksMapToRoutes() {
   #expect(Route(appPath: "/app/artifacts/a1") == .artifact(artifactID: "a1"))
   #expect(Route(appPath: "/app/data-room?item=i1") == .dataRoomItem(itemID: "i1"))
   #expect(Route(appPath: "/app/data-room") == .dataRoom)
+  #expect(Route(appPath: "/app/scanner") == .scanner)
   #expect(Route(appPath: "/app/finance") == nil)
   #expect(Route(appPath: "/app/pages/b1") == nil)
   #expect(Route(appPath: "//evil.test/app/pages/b/p") == nil)

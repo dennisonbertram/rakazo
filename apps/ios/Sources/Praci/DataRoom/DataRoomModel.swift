@@ -19,6 +19,7 @@ final class DataRoomModel {
   }
 
   let folder: DataRoomFolder?
+  let source: String?
   var state: Loadable<Void> = .idle
   var subfolders: [DataRoomFolder] = []
   var items: [DataRoomItem] = []
@@ -37,7 +38,7 @@ final class DataRoomModel {
   @ObservationIgnored private var consentAsked = false
   @ObservationIgnored private var uploadTasks: [UUID: Task<Void, Never>] = [:]
 
-  init(folder: DataRoomFolder?) { self.folder = folder }
+  init(folder: DataRoomFolder?, source: String? = nil) { self.folder = folder; self.source = source }
 
   var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
@@ -65,8 +66,8 @@ final class DataRoomModel {
       let page: DataRoomItemsPage = try await app.call(
         "dataRoom/items/list",
         input: DataRoomItemsListInput(
-          folderId: folder?.id, status: failedOnly ? "failed" : nil))
-      subfolders = failedOnly ? [] : folders.filter { $0.parentId == folder?.id }
+          folderId: folder?.id, source: source, status: failedOnly ? "failed" : nil))
+      subfolders = failedOnly || source == "scan" ? [] : folders.filter { $0.parentId == folder?.id }
       items = page.items
       nextCursor = page.nextCursor
       state = .loaded(())
@@ -85,7 +86,7 @@ final class DataRoomModel {
       let page: DataRoomItemsPage = try await app.call(
         "dataRoom/items/list",
         input: DataRoomItemsListInput(
-          folderId: folder?.id, status: failedOnly ? "failed" : nil, cursor: cursor))
+          folderId: folder?.id, source: source, status: failedOnly ? "failed" : nil, cursor: cursor))
       items += page.items.filter { new in !items.contains { $0.id == new.id } }
       nextCursor = page.nextCursor
     } catch {
@@ -106,7 +107,7 @@ final class DataRoomModel {
         input: DataRoomSearchInput(
           query: text,
           filters: DataRoomSearchInput.Filters(
-            folderId: folder?.id, status: failedOnly ? "failed" : nil)))
+            folderId: folder?.id, source: source, status: failedOnly ? "failed" : nil)))
       results = page.results
       resultsCursor = page.nextCursor
     } catch is CancellationError {
@@ -125,7 +126,7 @@ final class DataRoomModel {
         input: DataRoomSearchInput(
           query: query.trimmingCharacters(in: .whitespaces),
           filters: DataRoomSearchInput.Filters(
-            folderId: folder?.id, status: failedOnly ? "failed" : nil),
+            folderId: folder?.id, source: source, status: failedOnly ? "failed" : nil),
           cursor: cursor))
       results = (results ?? []) + page.results
       resultsCursor = page.nextCursor

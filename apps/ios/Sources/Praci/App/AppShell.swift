@@ -92,6 +92,7 @@ struct AppShell: View {
     case .legal: LegalScreen()
     case .capTable: CapTableScreen()
     case .dataRoom: DataRoomScreen()
+    case .scanner: DataRoomScreen(source: "scan")
     case .dataRoomItem(let id): DataRoomItemLoader(itemID: id)
     case .meetings: MeetingsScreen()
     case .meeting(let id): MeetingDetailScreen(meetingID: id)
