@@ -1,4 +1,6 @@
 import * as z from "zod";
+import type { BrexSpendBucket } from "./brex-categories.js";
+import { BREX_SPEND_BUCKETS } from "./brex-categories.js";
 import { LEGAL_AGENT_MODEL } from "./legal.js";
 
 /**
@@ -238,3 +240,298 @@ export const BrexCardsListSchema = z.object({
   cards: z.array(BrexCardRowSchema),
 });
 export type BrexCardsList = z.infer<typeof BrexCardsListSchema>;
+
+// Owner-only read model for the Brex page. Amounts are integer cents; days are UTC YYYY-MM-DD.
+const AnyCents = z.number().int();
+const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const DateTime = z.string();
+export const BrexSpendBucketSchema = z.enum(BREX_SPEND_BUCKETS);
+export type { BrexSpendBucket };
+
+const ServerFields = {
+  serverId: z.string(),
+  agentBotId: z.string().nullable(),
+  writesEnabled: z.boolean(),
+};
+
+export const BrexSpendPointSchema = z.object({ day: Day, cents: AnyCents });
+export type BrexSpendPoint = z.infer<typeof BrexSpendPointSchema>;
+
+export const BrexMerchantSpendSchema = z.object({
+  merchant: z.string(),
+  cents: AnyCents,
+  count: z.number().int().nonnegative(),
+  partial: z.boolean(),
+});
+export type BrexMerchantSpend = z.infer<typeof BrexMerchantSpendSchema>;
+
+export const BrexCategorySpendSchema = z.object({
+  bucket: BrexSpendBucketSchema,
+  cents: AnyCents,
+  count: z.number().int().nonnegative(),
+  partial: z.boolean(),
+  merchants: z.array(BrexMerchantSpendSchema),
+});
+export type BrexCategorySpend = z.infer<typeof BrexCategorySpendSchema>;
+
+/** Card spend -> category -> merchant. Merchant cents sum to their category and to totalCents. */
+export const BrexSpendSankeySchema = z.object({
+  partial: z.boolean(),
+  totalCents: AnyCents,
+  categories: z.array(BrexCategorySpendSchema),
+});
+export type BrexSpendSankey = z.infer<typeof BrexSpendSankeySchema>;
+
+export const BrexNearLimitItemSchema = z.object({
+  kind: z.enum(["card", "spend_limit"]),
+  id: z.string(),
+  name: z.string(),
+  usedCents: AnyCents,
+  limitCents: AnyCents,
+  percent: z.number(),
+});
+export type BrexNearLimitItem = z.infer<typeof BrexNearLimitItemSchema>;
+
+export const BrexCardsOverviewSchema = z.object({
+  ...ServerFields,
+  partial: z.boolean(),
+  cash: z.object({
+    totalCents: AnyCents,
+    availableCents: AnyCents,
+    accountCount: z.number().int().nonnegative(),
+  }),
+  cardSpend: z.object({
+    partial: z.boolean(),
+    monthToDateCents: AnyCents,
+    previousMonthToDateCents: AnyCents,
+    changePercent: z.number().nullable(),
+    sparkline: z.array(BrexSpendPointSchema),
+  }),
+  cards: z.object({
+    active: z.number().int().nonnegative(),
+    locked: z.number().int().nonnegative(),
+    terminated: z.number().int().nonnegative(),
+  }),
+  nearLimit: z.object({
+    partial: z.boolean(),
+    count: z.number().int().nonnegative(),
+    items: z.array(BrexNearLimitItemSchema),
+  }),
+  sankey: BrexSpendSankeySchema,
+  topVendors: z.array(BrexMerchantSpendSchema),
+});
+export type BrexCardsOverview = z.infer<typeof BrexCardsOverviewSchema>;
+
+export const BrexCardViewSchema = BrexCardRowSchema.extend({
+  cardType: z.string().nullable(),
+  lockAfterDate: Day.nullable(),
+  allowedMerchants: z.array(z.string()),
+  blockedMerchants: z.array(z.string()),
+  ownerName: z.string().nullable(),
+  period: z.object({ start: Day, end: Day }),
+  periodSpendCents: AnyCents,
+  series: z.array(BrexSpendPointSchema),
+  usage: z.object({ usedCents: AnyCents, limitCents: AnyCents, percent: z.number() }).nullable(),
+  partial: z.boolean(),
+});
+export type BrexCardView = z.infer<typeof BrexCardViewSchema>;
+
+export const BrexCardsViewSchema = z.object({
+  ...ServerFields,
+  partial: z.boolean(),
+  cards: z.array(BrexCardViewSchema),
+});
+export type BrexCardsView = z.infer<typeof BrexCardsViewSchema>;
+
+export const BrexSpendingInputSchema = z
+  .object({
+    merchant: z.string().trim().min(1).max(200).optional(),
+    cardId: z.string().min(1).max(200).optional(),
+    userId: z.string().min(1).max(200).optional(),
+    category: BrexSpendBucketSchema.optional(),
+    from: Day.optional(),
+    to: Day.optional(),
+  })
+  .strict();
+export type BrexSpendingInput = z.infer<typeof BrexSpendingInputSchema>;
+
+export const BrexSpendTransactionSchema = z.object({
+  id: z.string(),
+  postedAt: DateTime,
+  day: Day,
+  cardId: z.string().nullable(),
+  cardName: z.string().nullable(),
+  cardLastFour: z.string().nullable(),
+  userId: z.string().nullable(),
+  userName: z.string().nullable(),
+  merchant: z.string().nullable(),
+  description: z.string(),
+  amountCents: AnyCents,
+  currency: z.string().nullable(),
+  bucket: BrexSpendBucketSchema,
+  expenseId: z.string().nullable(),
+});
+export type BrexSpendTransaction = z.infer<typeof BrexSpendTransactionSchema>;
+
+export const BrexDuplicateSubscriptionSchema = z.object({
+  merchant: z.string(),
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  cardIds: z.array(z.string()),
+  cardNames: z.array(z.string()),
+  cents: AnyCents,
+  count: z.number().int().nonnegative(),
+  partial: z.boolean(),
+});
+export type BrexDuplicateSubscription = z.infer<typeof BrexDuplicateSubscriptionSchema>;
+
+export const BrexSpendingSchema = z.object({
+  ...ServerFields,
+  partial: z.boolean(),
+  range: z.object({ from: Day, to: Day }),
+  totalCents: AnyCents,
+  transactions: z.array(BrexSpendTransactionSchema),
+  categories: z.array(BrexCategorySpendSchema),
+  sankey: BrexSpendSankeySchema,
+  duplicates: z.array(BrexDuplicateSubscriptionSchema),
+});
+export type BrexSpending = z.infer<typeof BrexSpendingSchema>;
+
+export const BrexSpendLimitViewSchema = z.object({
+  spendLimitId: z.string(),
+  name: z.string(),
+  status: z.string().nullable(),
+  period: z.string().nullable(),
+  startDate: Day.nullable(),
+  endDate: Day.nullable(),
+  limitCents: AnyCents.nullable(),
+  currency: z.string().nullable(),
+  usedCents: AnyCents.nullable(),
+  percent: z.number().nullable(),
+  memberUserIds: z.array(z.string()),
+  members: z.array(z.object({ userId: z.string(), name: z.string() })),
+});
+export type BrexSpendLimitView = z.infer<typeof BrexSpendLimitViewSchema>;
+
+export const BrexLimitsSchema = z.object({
+  ...ServerFields,
+  partial: z.boolean(),
+  limits: z.array(BrexSpendLimitViewSchema),
+});
+export type BrexLimits = z.infer<typeof BrexLimitsSchema>;
+
+export const BrexPersonSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  status: z.string().nullable(),
+  cards: z.array(
+    z.object({ cardId: z.string(), name: z.string(), lastFour: z.string(), status: z.string() }),
+  ),
+  activeCardCount: z.number().int().nonnegative(),
+  terminatedCardCount: z.number().int().nonnegative(),
+  spendLimitIds: z.array(z.string()),
+  spendLimitNames: z.array(z.string()),
+  monthSpendCents: AnyCents,
+  windowSpendCents: AnyCents,
+  partial: z.boolean(),
+});
+export type BrexPerson = z.infer<typeof BrexPersonSchema>;
+
+export const BrexPeopleSchema = z.object({
+  ...ServerFields,
+  partial: z.boolean(),
+  people: z.array(BrexPersonSchema),
+});
+export type BrexPeople = z.infer<typeof BrexPeopleSchema>;
+
+export const BrexExpenseViewSchema = z.object({
+  expenseId: z.string(),
+  purchasedAt: DateTime.nullable(),
+  day: Day.nullable(),
+  userId: z.string().nullable(),
+  userName: z.string().nullable(),
+  merchant: z.string().nullable(),
+  memo: z.string().nullable(),
+  status: z.string().nullable(),
+  paymentStatus: z.string().nullable(),
+  expenseType: z.string().nullable(),
+  category: z.string().nullable(),
+  bucket: BrexSpendBucketSchema,
+  amountCents: AnyCents.nullable(),
+  currency: z.string().nullable(),
+  receipts: z.array(z.object({ id: z.string() })),
+  missingReceipt: z.boolean(),
+  missingMemo: z.boolean(),
+  complianceStatus: z.string().nullable(),
+  cardId: z.string().nullable(),
+});
+export type BrexExpenseView = z.infer<typeof BrexExpenseViewSchema>;
+
+export const BrexExpensesSchema = z.object({
+  ...ServerFields,
+  partial: z.boolean(),
+  expenses: z.array(BrexExpenseViewSchema),
+  reimbursements: z.array(BrexExpenseViewSchema),
+});
+export type BrexExpenses = z.infer<typeof BrexExpensesSchema>;
+
+export const BrexAccountSchema = z.object({
+  cashAccountId: z.string(),
+  name: z.string().nullable(),
+  status: z.string().nullable(),
+  currentBalanceCents: AnyCents.nullable(),
+  availableBalanceCents: AnyCents.nullable(),
+  currency: z.string().nullable(),
+  primary: z.boolean().nullable(),
+});
+export type BrexAccount = z.infer<typeof BrexAccountSchema>;
+
+export const BrexStatementSchema = z.object({
+  statementId: z.string(),
+  accountKind: z.enum(["card", "cash"]),
+  cashAccountId: z.string().nullable(),
+  accountName: z.string().nullable(),
+  startDate: Day.nullable(),
+  endDate: Day.nullable(),
+  startBalanceCents: AnyCents.nullable(),
+  endBalanceCents: AnyCents.nullable(),
+});
+export type BrexStatement = z.infer<typeof BrexStatementSchema>;
+
+export const BrexAccountsSchema = z.object({
+  ...ServerFields,
+  accounts: z.array(BrexAccountSchema),
+  statements: z.array(BrexStatementSchema),
+});
+export type BrexAccounts = z.infer<typeof BrexAccountsSchema>;
+
+export const BrexTripSchema = z.object({
+  tripId: z.string(),
+  name: z.string().nullable(),
+  status: z.string().nullable(),
+  bookerUserId: z.string().nullable(),
+  bookerName: z.string().nullable(),
+  startsAt: DateTime.nullable(),
+  endsAt: DateTime.nullable(),
+});
+export type BrexTrip = z.infer<typeof BrexTripSchema>;
+
+export const BrexTripsSchema = z.object({
+  ...ServerFields,
+  trips: z.array(BrexTripSchema),
+});
+export type BrexTrips = z.infer<typeof BrexTripsSchema>;
+
+export const BrexActivitySchema = z.object({
+  ...ServerFields,
+  activities: z.array(
+    z.object({
+      effectId: z.string(),
+      at: DateTime,
+      action: z.string(),
+      target: z.string().nullable(),
+      status: z.string(),
+    }),
+  ),
+});
+export type BrexActivity = z.infer<typeof BrexActivitySchema>;
