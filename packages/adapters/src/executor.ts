@@ -184,6 +184,7 @@ import {
   contentHasOutboundChannel,
   FIREWALL_JUDGEABLE_WRITES,
   mailModifyTouchesFixedLabel,
+  pageWriteAddsChannel,
   planActionGate,
   privateDataAreas,
   promptInvokesSkill,
@@ -320,6 +321,7 @@ import type { AutoReviewChecker } from "./auto-review.js";
 import {
   autoReviewTimeoutMs,
   BACKGROUND_REVIEW_TIMEOUT_MS,
+  MAX_ARGS_CHARS,
   RUN_MODEL_REVIEW_TIMEOUT_MS,
   deploymentAutoReviewDefault,
   isAutoReviewCheckerConfigured,
@@ -597,7 +599,7 @@ import {
 } from "./model-vision.js";
 import { runNotifyUser } from "./notify-user.js";
 import { pageSourceToolFromTool } from "./page-sources.js";
-import { pageCardBlock, pageToolFromTool } from "./pages.js";
+import { pageCardBlock, pageToolFromTool, previewPageWrite } from "./pages.js";
 import type { CodexLiveCatalog } from "./pi-codex-catalog.js";
 import { codexLiveListsModel } from "./pi-codex-catalog.js";
 import { toOAuthCredential } from "./pi-credentials.js";
@@ -3015,10 +3017,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           );
         // A meeting-source agent sends meeting text to its own model, so consent is for the recipient
         // of this run's actual model on every trigger (not the Inbox agent's), and unknown means no.
-        const meetingConsentOk = async (): Promise<boolean> => {
+        const meetingConsentOk = async (model = effectiveRunModel): Promise<boolean> => {
           try {
             // The model that receives the text now: a backup model after a switch, not the first.
-            const { provider, id, baseUrl } = effectiveRunModel;
+            const { provider, id, baseUrl } = model;
             if (!provider || !id) return false;
             const recipient = aiRecipient({ provider, modelId: id, baseUrl, use: "model" });
             if (!recipient) return provider === "scripted";
@@ -3532,6 +3534,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           injected: AutoReviewProvider | undefined,
           checker: AutoReviewChecker | null | undefined,
           timeoutMs = autoReviewTimeoutMs(),
+          // Judge on the connection the run itself resolved, not another one of the same provider.
+          useRunConnection = false,
         ): Promise<AutoReviewProvider> => {
           let provider = injected;
           if (!provider) {
@@ -3539,21 +3543,22 @@ export function createRunExecutor(deps: ExecutorDeps) {
             if (kind === "jev" || kind === "scripted") {
               provider = createAutoReviewProvider(kind, { timeoutMs });
             } else {
-              const reviewCredential = await findModelCredential(
-                deps.prisma,
-                { userId: run.userId, spaceId: run.spaceId },
-                checker!.provider,
-                checker!.model,
-              );
-              const judgeKey = await resolveModelKey(
-                deps,
-                run.userId,
-                run.spaceId,
-                reviewCredential,
-                checker!.provider,
-                checker!.model,
-                (values) => runSecrets.push(...values),
-              );
+              const judgeKey = useRunConnection
+                ? resolved
+                : await resolveModelKey(
+                    deps,
+                    run.userId,
+                    run.spaceId,
+                    await findModelCredential(
+                      deps.prisma,
+                      { userId: run.userId, spaceId: run.spaceId },
+                      checker!.provider,
+                      checker!.model,
+                    ),
+                    checker!.provider,
+                    checker!.model,
+                    (values) => runSecrets.push(...values),
+                  );
               provider = createAutoReviewProvider("llm", {
                 llm: {
                   onUsage: (event) =>
@@ -5917,12 +5922,35 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // A Firewall agent's internal write may go to the judge when its content holds no URL,
           // image, link or HTML tag and the owner's own words exist to compare it with. Owner
           // decision; the sends, schedules, skills and message_bot stay with a person.
+          // The check compares the page as it would be saved with the page as it is, so an edit
+          // cannot change a URL that was already there. Writes too long for the judge to see in
+          // full ask instead. Unattended calls need the background switch, attended ones the main one.
+          const firewallWriteClean = async () => {
+            if (JSON.stringify(redactToolArgsForReview(args, runSecrets)).length > MAX_ARGS_CHARS) {
+              return false;
+            }
+            if (name === "page_create")
+              return !contentHasOutboundChannel(args) && args.kind !== "html";
+            if (name === "page_write" || name === "page_edit") {
+              const preview = await previewPageWrite(
+                { prisma: deps.prisma },
+                { spaceId: run.spaceId, botId: bot.id, userId: bot.userId },
+                name,
+                args,
+              ).catch(() => null);
+              return preview !== null && !pageWriteAddsChannel(preview.original, preview.result);
+            }
+            return !contentHasOutboundChannel(args);
+          };
           const firewallJudgeWrite =
             firewallAskCall &&
             FIREWALL_JUDGEABLE_WRITES.has(name) &&
-            !contentHasOutboundChannel(args) &&
-            (await loadAutoReviewPreferences()).enabled &&
-            (await loadOwnerWords()).trim() !== "";
+            (await (async () => {
+              const prefs = await loadAutoReviewPreferences();
+              return prefs.enabled && (run.unattended !== true || prefs.background);
+            })()) &&
+            (await loadOwnerWords()).trim() !== "" &&
+            (await firewallWriteClean());
           // A call the firewall lifted (see above) is not consequential: it sends nothing and only
           // changes mail the agent alone may change.
           const requiresApprovalByDefault =
@@ -6170,25 +6198,39 @@ export function createRunExecutor(deps: ExecutorDeps) {
             requiresMandatoryApproval || run.goalId || (run.unattended && !unattendedJudge)
               ? undefined
               : deps.autoReview;
+          const usesRunConnection = !isAutoReviewCheckerConfigured({});
           const checker =
             requiresMandatoryApproval || run.goalId || (run.unattended && !unattendedJudge)
               ? undefined
-              : !isAutoReviewCheckerConfigured({})
+              : usesRunConnection
                 ? // No checker is set in the environment: judge with the model this run uses.
                   { provider: runModelProvider, model: runModelId }
                 : resolveAutoReviewChecker();
+          // The run's own connection receives the call, so it needs the same recipient consent the
+          // run's model calls need; without it there is no judge and the card stays.
+          const runConnectionConsented =
+            usesRunConnection &&
+            Boolean(checker) &&
+            (await meetingConsentOk({
+              provider: runModelProvider,
+              id: runModelId,
+              baseUrl: resolved.baseUrl,
+              apiKey: resolved.apiKey,
+            }));
           const checkerConfigured =
             autoReviewPref &&
             (Boolean(injectedReview) ||
               (checker
-                ? isAutoReviewCheckerConfigured({}) ||
-                  Boolean(
-                    await findModelCredential(
-                      deps.prisma,
-                      { userId: run.userId, spaceId: run.spaceId },
-                      checker.provider,
-                    ),
-                  )
+                ? usesRunConnection
+                  ? runConnectionConsented
+                  : isAutoReviewCheckerConfigured({}) ||
+                    Boolean(
+                      await findModelCredential(
+                        deps.prisma,
+                        { userId: run.userId, spaceId: run.spaceId },
+                        checker.provider,
+                      ),
+                    )
                 : false));
           const plannedGate =
             requiresMandatoryApproval ||
@@ -6330,7 +6372,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 runId,
                 signal: AbortSignal.any([context.signal, AbortSignal.timeout(reviewTimeoutMs)]),
               };
-              const provider = await buildReviewProvider(injectedReview, checker, reviewTimeoutMs);
+              const provider = await buildReviewProvider(
+                injectedReview,
+                checker,
+                reviewTimeoutMs,
+                usesRunConnection,
+              );
               const judge = await provider.review(reviewRequest, reviewContext);
               if (context.signal.aborted) return;
               reviewReason = judge.reason;

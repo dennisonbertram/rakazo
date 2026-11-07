@@ -404,8 +404,6 @@ export const FIREWALL_JUDGEABLE_WRITES: ReadonlySet<string> = new Set([
   "page_write",
   "page_create",
   "pins_write",
-  "remember",
-  "save_memory",
 ]);
 
 const OUTBOUND_CHANNEL_PATTERNS = [
@@ -430,6 +428,37 @@ export function contentHasOutboundChannel(value: unknown): boolean {
       ([key, item]) => contentHasOutboundChannel(key) || contentHasOutboundChannel(item),
     );
   }
+  return false;
+}
+
+const HTML_TAG = /<\/?[a-z!][^>]*>/i;
+
+const OUTBOUND_TOKEN_PATTERNS = [
+  /(?:https?:)?\/\/[^\s)>\]"']+/gi,
+  /\bwww\.[^\s)>\]"']+/gi,
+  /!?\[[^\]]*\]\([^)]*\)/g,
+  /!?\[[^\]]*\]\[[^\]]*\]/g,
+  /\b[\w-]+\.(?:com|org|net|io|ai|dev|app|co|me|ly|xyz|info|gg|sh)\b[^\s)>\]"']*/gi,
+];
+
+/** Every URL, link, image and bare domain in the text, whole, as exact strings. */
+function outboundTokens(text: string): Set<string> {
+  const found = new Set<string>();
+  for (const pattern of OUTBOUND_TOKEN_PATTERNS) {
+    for (const match of text.matchAll(pattern)) found.add(match[0]);
+  }
+  return found;
+}
+
+/**
+ * True when saving `result` over `original` would put a new or changed URL, link, image or domain
+ * on the page, or leave any HTML in it. Comparing the saved result catches an edit that swaps
+ * private text into a URL that was already there. An empty original means any URL is new.
+ */
+export function pageWriteAddsChannel(original: string, result: string): boolean {
+  if (HTML_TAG.test(result)) return true;
+  const before = outboundTokens(original);
+  for (const token of outboundTokens(result)) if (!before.has(token)) return true;
   return false;
 }
 

@@ -7,6 +7,7 @@ import {
   backgroundAutoReviewAllowed,
   contentHasOutboundChannel,
   mailModifyTouchesFixedLabel,
+  pageWriteAddsChannel,
   botAllowsAllSites,
   buildApprovalTable,
   connectorKindFromToolName,
@@ -1298,5 +1299,22 @@ describe("mailModifyTouchesFixedLabel", () => {
     expect(mailModifyTouchesFixedLabel({ addLabels: ["trash"] })).toBe(true);
     expect(mailModifyTouchesFixedLabel({ addLabels: ["SPAM"] })).toBe(true);
     expect(mailModifyTouchesFixedLabel({ id: "m", archive: true })).toBe(false);
+  });
+});
+
+describe("pageWriteAddsChannel", () => {
+  const page = "Notes\n\n![logo](https://cdn.example.test/logo.png)\n";
+  it("allows plain edits and keeps existing links", () => {
+    expect(pageWriteAddsChannel(page, page.replace("Notes", "My notes"))).toBe(false);
+  });
+  it("catches private text swapped into an existing image URL", () => {
+    expect(
+      pageWriteAddsChannel(page, page.replace("logo.png", "logo.png?d=PLACEHOLDER-CUSTOMER")),
+    ).toBe(true);
+  });
+  it("rejects a new link, any HTML, and any URL on a new page", () => {
+    expect(pageWriteAddsChannel(page, `${page}\nsee https://evil.test`)).toBe(true);
+    expect(pageWriteAddsChannel("", "<b>hi</b>")).toBe(true);
+    expect(pageWriteAddsChannel("", "go to https://x.test")).toBe(true);
   });
 });
