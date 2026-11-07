@@ -905,6 +905,9 @@ export function mountDataRoomRoutes(
     if (!name.success) return reject("Invalid file name", 400);
     const source = c.req.query("source") ?? "upload";
     if (source !== "upload" && source !== "scan") return reject("Invalid source", 400);
+    const expectedUserId = c.req.query("expectedUserId");
+    if (expectedUserId !== undefined && expectedUserId !== actor.userId)
+      return reject("The signed-in user changed", 400);
     const folderId = c.req.query("folderId") || null;
     if (
       folderId &&

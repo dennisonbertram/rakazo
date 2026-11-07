@@ -49,6 +49,7 @@ import {
   PanelLeftOpen,
   PieChart,
   Scale,
+  ScanLine,
   Search,
   Settings,
   SquareKanban,
@@ -414,6 +415,7 @@ export type SpaceSidebarProps = {
   calendarMode: boolean;
   companyMode: boolean;
   dataRoomMode: boolean;
+  scannerMode?: boolean;
   artifactsMode: boolean;
   sidebarLayout: SidebarLayout;
   sidebarDragLabel: (dragId: string) => string;
@@ -532,6 +534,7 @@ export function SpaceSidebar({
   calendarMode,
   companyMode,
   dataRoomMode,
+  scannerMode = false,
   artifactsMode,
   sidebarLayout,
   sidebarDragLabel,
@@ -848,6 +851,7 @@ export function SpaceSidebar({
                 { key: "meetings", label: t`Meetings` },
                 { key: "contacts", label: t`Contacts` },
                 { key: "data-room", label: t`Data room` },
+                { key: "scanner", label: t`Scanner` },
                 { key: "artifacts", label: t`Artifacts` },
                 ...addedPages,
               ]}
@@ -1074,6 +1078,20 @@ export function SpaceSidebar({
                       navigate("/app/data-room?status=failed");
                     },
                   })}
+                />
+              )}
+              {hiddenPages.includes("scanner") ? null : (
+                <SidebarPageLink
+                  testId="sidebar-scanner"
+                  href="/app/scanner"
+                  current={scannerMode}
+                  icon={<ScanLine size={15} strokeWidth={1.8} aria-hidden="true" />}
+                  label={t`Scanner`}
+                  rail={rail}
+                  onOpen={() => {
+                    setMobileSidebarOpen(false);
+                    navigate("/app/scanner");
+                  }}
                 />
               )}
               {hiddenPages.includes("artifacts") ? null : (

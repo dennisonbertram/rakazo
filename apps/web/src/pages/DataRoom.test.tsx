@@ -181,11 +181,11 @@ function GoAll() {
   );
 }
 
-async function renderPage(entry = "/") {
+async function renderPage(entry = "/", source?: "scan") {
   await act(async () => {
     root.render(
       <MemoryRouter initialEntries={[entry]}>
-        <DataRoomPage />
+        <DataRoomPage source={source} />
         <GoToB />
         <GoFailed />
         <GoAll />
@@ -206,6 +206,21 @@ const settle = () =>
   act(async () => {
     await vi.advanceTimersByTimeAsync(10);
   });
+
+it("locks the Scanner list and facets to scan source even when a URL requests another source", async () => {
+  await renderPage("/app/scanner?source=upload", "scan");
+  expect(rpcMock.list).toHaveBeenCalledWith(expect.objectContaining({ source: "scan" }));
+  expect(rpcMock.facetValues).toHaveBeenCalledWith(expect.objectContaining({ source: "scan" }));
+  expect(container.querySelector("h1")?.textContent).toBe("Scanner");
+});
+
+it("rejects a non-scan item deep link on the Scanner page", async () => {
+  rpcMock.item.mockResolvedValue({ ...item("ordinary"), id: "ordinary" });
+  await renderPage("/app/scanner?item=ordinary", "scan");
+  await settle();
+  expect(toastTitles()).toContain("That document could not be found");
+  expect(container.querySelector('[role="dialog"]')).toBeNull();
+});
 
 /** Clicks the nth row, as a user choosing a file to preview. */
 const clickRow = (n: number) =>

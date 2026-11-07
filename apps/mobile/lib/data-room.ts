@@ -12,6 +12,7 @@ export function listDataRoomFolders(): Promise<DataRoomApiFolder[]> {
 
 export async function listDataRoomItems(input: {
   folderId?: string;
+  source?: "scan";
   query?: string;
   cursor?: string;
 }): Promise<DataRoomPage> {
@@ -22,7 +23,10 @@ export async function listDataRoomItems(input: {
       nextCursor: string | null;
     }>("dataRoom/search", {
       query,
-      filters: input.folderId ? { folderId: input.folderId } : {},
+      filters: {
+        ...(input.folderId ? { folderId: input.folderId } : {}),
+        ...(input.source ? { source: input.source } : {}),
+      },
       cursor: input.cursor,
       limit: 30,
     });
@@ -30,6 +34,7 @@ export async function listDataRoomItems(input: {
   }
   return rpc<DataRoomPage>("dataRoom/items/list", {
     folderId: input.folderId,
+    ...(input.source ? { source: input.source } : {}),
     cursor: input.cursor,
     limit: 30,
     sort: { field: "createdAt", direction: "desc" },

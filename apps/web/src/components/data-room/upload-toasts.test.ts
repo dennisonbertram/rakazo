@@ -41,6 +41,39 @@ const names = () => getUploadToasts().map((toast) => toast.name);
 const file = (name: string) => new File(["x"], name);
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
+it("keeps scanner uploads at their captured root and waits for checksum confirmation before success", async () => {
+  setUploadScope("u1");
+  setOpenDataRoomFolder("unrelated-folder");
+  const scope = { source: "scan" as const, userId: "u1", spaceId: "s1" };
+  hoisted.upload.mockResolvedValue({
+    item: { id: "i1", name: "Scan.pdf", sha256: "stored" },
+    duplicate: true,
+  });
+  const onStored = vi.fn().mockRejectedValue(new Error("checksum mismatch"));
+  await uploadFilesToDataRoom([file("Scan.pdf")], undefined, undefined, {
+    scope,
+    onStored,
+    key: "scanner:i1",
+  });
+  expect(hoisted.upload).toHaveBeenCalledWith(
+    expect.any(File),
+    undefined,
+    expect.any(Function),
+    expect.any(AbortSignal),
+    scope,
+  );
+  expect(onStored).toHaveBeenCalledWith(expect.objectContaining({ sha256: "stored" }));
+  expect(getUploadToasts()[0]?.state).toMatchObject({ kind: "error", reason: "failed" });
+  onStored.mockResolvedValue(undefined);
+  await uploadFilesToDataRoom([file("Scan.pdf")], undefined, undefined, {
+    scope,
+    onStored,
+    key: "scanner:i1",
+  });
+  expect(getUploadToasts()).toHaveLength(1);
+  expect(getUploadToasts()[0]?.state.kind).toBe("uploaded");
+});
+
 beforeEach(() => {
   vi.useFakeTimers();
   hoisted.space.id = "s1";
@@ -276,6 +309,7 @@ it("says a deleted folder is gone and offers to upload the same file to the top 
     undefined,
     expect.any(Function),
     expect.any(AbortSignal),
+    undefined,
   );
   expect(getUploadToasts().map((t) => t.state.kind)).toEqual(["uploaded"]);
   window.removeEventListener(DATA_ROOM_CHANGED, changed);

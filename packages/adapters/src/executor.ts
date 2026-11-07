@@ -127,6 +127,7 @@ import {
   assertTransition,
   attachToolNotes,
   BLOCKED_ACTION_MESSAGE,
+  backgroundAutoReviewAllowed,
   blocksToAgentHistoryText,
   botAllowsAllSites,
   botMayUseConnection,
@@ -144,6 +145,7 @@ import {
   connectorReadRequiresApproval,
   connectorToolRequiresApproval,
   containsSecret,
+  contentHasOutboundChannel,
   createStreamingRedactor,
   deniedConnectionIds,
   endsSentence,
@@ -151,6 +153,7 @@ import {
   externalOriginNotice,
   externalTaintAllowsTool,
   FIREWALL_CARD_REASON,
+  FIREWALL_JUDGEABLE_WRITES,
   findSkillByName,
   firewallAccessTools,
   firewallToolClass,
@@ -168,6 +171,7 @@ import {
   isMessagingChannelRun,
   isOneShotRoutineCrons,
   isTerminal,
+  mailModifyTouchesFixedLabel,
   mailOutcomeSummary,
   mailThreadPromptText,
   messagingChannelId,
@@ -181,15 +185,11 @@ import {
   outboundSiteGate,
   ownsLine,
   PrivateFragments,
+  pageWriteAddsChannel,
   parseGoalEvidence,
   parseSkillMd,
   plainRunError,
   plainTextFromMarkdown,
-  backgroundAutoReviewAllowed,
-  contentHasOutboundChannel,
-  FIREWALL_JUDGEABLE_WRITES,
-  mailModifyTouchesFixedLabel,
-  pageWriteAddsChannel,
   planActionGate,
   privateDataAreas,
   promptInvokesSkill,
@@ -330,10 +330,10 @@ import type { AutoReviewChecker } from "./auto-review.js";
 import {
   autoReviewTimeoutMs,
   BACKGROUND_REVIEW_TIMEOUT_MS,
-  MAX_ARGS_CHARS,
-  RUN_MODEL_REVIEW_TIMEOUT_MS,
   deploymentAutoReviewDefault,
   isAutoReviewCheckerConfigured,
+  MAX_ARGS_CHARS,
+  RUN_MODEL_REVIEW_TIMEOUT_MS,
   redactNestedReviewValue,
   redactToolArgsForReview,
   resolveAutoReviewChecker,
@@ -2602,6 +2602,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // The Data room agent gets a fixed list of built-ins and no connector tools.
         const dataRoomAgent = isDataRoomAgentSpawnKey(bot.spawnKey);
         const scannerOnly = bot.spawnKey === scannerAgentSpawnKey(bot.userId);
+        const scannerPrivateOwnerContext =
+          scannerOnly &&
+          run.userId === bot.userId &&
+          run.spaceId === bot.spaceId &&
+          thread.groupId === null &&
+          !messagingChannelRun;
+        const isScannerDataRoomOperation = (name: string) =>
+          scannerPrivateOwnerContext &&
+          (name === "search_data_room" || name === "read_data_room_item" || name === "update_scan");
         // The Investors agent gets a fixed list of built-ins and no connector tools (no MCP, no Composio).
         const investorsAgent = isInvestorsAgentSpawnKey(bot.spawnKey);
         // Connections limited to chosen agents stay out of this run unless the bot was granted access.
@@ -3957,17 +3966,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const dataRoomEnabled =
           Boolean(deps.artifacts) &&
           (!voiceAgent || voiceWorkspaceReadAllowed) &&
-          (scannerOnly ||
-            dataRoomToolsAllowed({
-              hasProvider: true,
-              groupId: thread.groupId,
-              runUserId: run.userId,
-              botUserId: bot.userId,
-              trigger: run.trigger,
-              messagingChannelRun,
-              ownerAgentPeer:
-                Boolean(omiConnection) && senderInScope && peerMessage?.ownerOrigin === true,
-            })) &&
+          (scannerOnly
+            ? scannerPrivateOwnerContext
+            : dataRoomToolsAllowed({
+                hasProvider: true,
+                groupId: thread.groupId,
+                runUserId: run.userId,
+                botUserId: bot.userId,
+                trigger: run.trigger,
+                messagingChannelRun,
+                ownerAgentPeer:
+                  Boolean(omiConnection) && senderInScope && peerMessage?.ownerOrigin === true,
+              })) &&
           // The Omi agent's Data room reads need the same AI data consent as meetings_*.
           (!omiConnection || (await meetingConsentOk()));
         // Owner-initiated runs only (the owner's message, or a bot_message from the owner's own
@@ -4214,7 +4224,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               (!gtmAgent || GTM_AGENT_TOOL_SET.has(tool.name)) &&
               (!legalOnly || legalToolSet.has(tool.name)) &&
               (!dataRoomAgent || dataRoomAgentToolSet.has(tool.name)) &&
-              (!scannerOnly || scannerToolAllowed(tool.name, run.trigger)) &&
+              (!scannerOnly ||
+                (scannerPrivateOwnerContext && scannerToolAllowed(tool.name, run.trigger))) &&
               (tool.name !== "update_scan" || scannerOnly) &&
               (!companyAgent || companyAgentToolSet.has(tool.name)) &&
               (!companyImporter || companyImporterToolSet.has(tool.name)) &&
@@ -4412,7 +4423,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // others exist, and a call to one is refused (see applyToolCall).
         const toolsBeforeAccess = [...baseTools, ...(gtmPostEligible ? [gtmPostTool] : [])].filter(
           (tool) =>
-            (!scannerOnly || scannerToolAllowed(tool.name, run.trigger)) &&
+            (!scannerOnly ||
+              (scannerPrivateOwnerContext && scannerToolAllowed(tool.name, run.trigger))) &&
             (tool.name !== "update_scan" || scannerOnly) &&
             (!bot.firewall ||
               firewallToolClass(
@@ -5191,7 +5203,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ) => {
           try {
             if (scannerOnly) {
-              if (!scannerToolAllowed(name, run.trigger)) {
+              if (!scannerPrivateOwnerContext || !scannerToolAllowed(name, run.trigger)) {
                 return { error: `Tool ${name} is not available to this bot.` };
               }
               if (name === "message_bot") {
@@ -5241,7 +5253,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           if (name === "update_scan" && !scannerOnly) {
             return { error: `Tool ${name} is not available to this bot.` };
           }
-          if (scannerOnly && !scannerToolAllowed(name, run.trigger)) {
+          if (
+            scannerOnly &&
+            (!scannerPrivateOwnerContext || !scannerToolAllowed(name, run.trigger))
+          ) {
             return { error: `Tool ${name} is not available to this bot.` };
           }
           if (voiceAgent && !offeredToolNames.has(name)) {
@@ -6016,10 +6031,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
             !viaConnector &&
             FINANCE_TOOL_NAMES.has(name) &&
             (await isOutsideContentSeen());
+          const scannerDataRoomOperation = isScannerDataRoomOperation(name);
           const requiresUnattendedApproval =
             financeAfterOutside ||
             (!publicResearchRead &&
               !ownBotRelay &&
+              !scannerDataRoomOperation &&
               unattendedToolRequiresApproval(
                 run.unattended,
                 name,
@@ -6386,7 +6403,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           // message claimed as steering mid-run counts from then on.
           // A firewalled agent follows its own profile instead: free tools run, listed asks card below.
           const externalTaintedCall =
-            !firewalled && runTainted && !externalTaintAllowsTool(name, policyArgs);
+            !firewalled &&
+            runTainted &&
+            !scannerDataRoomOperation &&
+            !externalTaintAllowsTool(name, policyArgs);
           // A tainted run's card would not show a stored draft either, as for a Firewall run.
           if (
             externalTaintedCall &&

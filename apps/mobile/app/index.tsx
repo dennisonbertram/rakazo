@@ -617,6 +617,12 @@ function Home() {
           onPress: () => router.push("/data-room"),
         },
         {
+          type: "button" as const,
+          accessibilityLabel: t("Scanner"),
+          icon: { type: "sfSymbol" as const, name: "scanner" },
+          onPress: () => router.push("/scanner"),
+        },
+        {
           type: "menu" as const,
           accessibilityLabel: t("Create"),
           icon: { type: "sfSymbol" as const, name: "plus" },
@@ -780,6 +786,9 @@ function Home() {
               onPress={() => router.push("/data-room")}
             >
               <NativeSymbol ios="folder" android="folder-outline" size={17} />
+            </HeaderButton>
+            <HeaderButton accessibilityLabel={t("Scanner")} onPress={() => router.push("/scanner")}>
+              <NativeSymbol ios="scanner" android="scan-outline" size={17} />
             </HeaderButton>
             <MenuView
               actions={[

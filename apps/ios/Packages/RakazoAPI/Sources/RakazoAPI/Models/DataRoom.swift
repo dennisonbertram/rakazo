@@ -120,13 +120,15 @@ public struct DataRoomOK: Sendable, Decodable {
 
 public struct DataRoomItemsListInput: Sendable, Encodable {
   public var folderId: String?
+  public var source: String?
   public var status: String?
   public var limit: Int
   public var cursor: String?
 
-  public init(folderId: String? = nil, status: String? = nil, limit: Int = 50, cursor: String? = nil)
+  public init(folderId: String? = nil, source: String? = nil, status: String? = nil, limit: Int = 50, cursor: String? = nil)
   {
     self.folderId = folderId
+    self.source = source
     self.status = status
     self.limit = limit
     self.cursor = cursor
@@ -136,9 +138,11 @@ public struct DataRoomItemsListInput: Sendable, Encodable {
 public struct DataRoomSearchInput: Sendable, Encodable {
   public struct Filters: Sendable, Encodable {
     public var folderId: String?
+    public var source: String?
     public var status: String?
-    public init(folderId: String? = nil, status: String? = nil) {
+    public init(folderId: String? = nil, source: String? = nil, status: String? = nil) {
       self.folderId = folderId
+      self.source = source
       self.status = status
     }
   }

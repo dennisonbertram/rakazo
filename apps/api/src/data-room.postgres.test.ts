@@ -1789,4 +1789,26 @@ describePostgres("Data room API (PostgreSQL)", () => {
       expect((await upload("a", `name=invalid.txt&source=${source}`, "rejected")).status).toBe(400);
     }
   });
+
+  it("rejects a scan upload if its captured user no longer owns the session", async () => {
+    const body = "%PDF-synthetic-scope-guard";
+    expect(
+      (
+        await upload(
+          "a",
+          `name=Scan.pdf&source=scan&expectedUserId=${actors.b.userId}`,
+          body,
+          "application/pdf",
+        )
+      ).status,
+    ).toBe(400);
+    const accepted = await upload(
+      "a",
+      `name=Scan.pdf&source=scan&expectedUserId=${actors.a.userId}`,
+      body,
+      "application/pdf",
+    );
+    expect(accepted.status).toBe(201);
+    expect((await accepted.json()).item.source).toBe("scan");
+  });
 });

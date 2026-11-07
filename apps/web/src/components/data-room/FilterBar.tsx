@@ -37,6 +37,7 @@ export { Tip };
 
 export const sourceLabels = () => ({
   upload: t`Upload`,
+  scan: t`Scanner`,
   drive: t`Google Drive`,
   box: t`Box`,
   gmail: t`Gmail`,
@@ -244,13 +245,15 @@ export function FilterBar({
   onNewFolder,
   onAutoSort,
   previewBeside = false,
+  folderTreeHidden = false,
 }: {
   /** Where the folder tree is hidden (a narrow page), this picker chooses the folder. */
   folders: FolderNode[];
   folderId: string | undefined;
   onFolder: (id: string | undefined) => void;
   /** Opens the New folder dialog; the folder tree's own button is hidden on this narrow page. */
-  onNewFolder: () => void;
+  onNewFolder?: () => void;
+  folderTreeHidden?: boolean;
   /** Opens Auto-sort; on this narrow page the folder tree's own button is hidden too. */
   onAutoSort?: () => void;
   /** A preview sits beside the list, so the tree hides below 1100px instead of 800px. */
@@ -368,7 +371,7 @@ export function FilterBar({
       ) : null}
       {/* Where the folder tree is hidden, this picks the folder; it sits with Sort, not the pills. */}
       <div
-        className={`order-2 flex min-h-8 min-w-0 items-center gap-1 ${previewBeside ? "@min-[1100px]/bd:hidden" : "@min-[800px]/bd:hidden"}`}
+        className={`order-2 flex min-h-8 min-w-0 items-center gap-1 ${folderTreeHidden ? "" : previewBeside ? "@min-[1100px]/bd:hidden" : "@min-[800px]/bd:hidden"}`}
       >
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -413,11 +416,13 @@ export function FilterBar({
             ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Tip label={t`New folder`}>
-          <Button variant="outline" size="icon" aria-label={t`New folder`} onClick={onNewFolder}>
-            <FolderPlus aria-hidden="true" />
-          </Button>
-        </Tip>
+        {onNewFolder && (
+          <Tip label={t`New folder`}>
+            <Button variant="outline" size="icon" aria-label={t`New folder`} onClick={onNewFolder}>
+              <FolderPlus aria-hidden="true" />
+            </Button>
+          </Tip>
+        )}
       </div>
       <div
         id="data-room-filters"

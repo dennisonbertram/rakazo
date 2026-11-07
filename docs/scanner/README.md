@@ -92,6 +92,10 @@ A page agent like the Legal agent: spawn key `scanner-agent:<userId>` (one per u
 
 ### Server
 
+The signed-in web shell delivers pending desktop documents even when the Scanner page is closed. It captures the user, space and destination, uses the shared upload toasts, and retries transient failures every 30 seconds and when the network returns. A missing or mismatched server digest stops automatic retries for that document; **Retry pending scans** tries it again. The server rejects an `expectedUserId` that no longer matches the session before accepting the bytes. Signing out, changing scope or leaving the page cancels the renderer's delivery; only `confirm` can remove a verified local bundle.
+
+The Scanner page reuses the Data room list, search, filters and preview with the source fixed to `scan`. Web and Windows show the same documents and agent without USB controls. Expo and native iOS expose a scan-filtered list and open the Scanner agent using their native navigation; they do not attempt to control hardware.
+
 - Let `POST /api/data-room/upload` take `source=scan` (only `upload` and `scan` are accepted from that route) so scans are marked at the source.
 - Add `sha256` to the Data room item returned by `POST /api/data-room/upload` and to `DataRoomApiItemSchema` (`packages/contracts/src/data-room-api.ts`, `itemDto` in `apps/api/src/data-room.ts`). The column already exists (`data_room_items.sha256`). No other server change: the route, storage, dedupe and ingest are reused.
 

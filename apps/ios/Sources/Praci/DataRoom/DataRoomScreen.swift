@@ -5,8 +5,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DataRoomScreen: View {
+  var source: String? = nil
   var body: some View {
-    DataRoomListView(folder: nil)
+    DataRoomListView(folder: nil, source: source)
   }
 }
 
@@ -60,6 +61,7 @@ enum DataRoomFiles {
 
 struct DataRoomListView: View {
   let folder: DataRoomFolder?
+  let source: String?
   @Environment(AppModel.self) private var app
   @State private var model: DataRoomModel
   @State private var showingImporter = false
@@ -71,9 +73,10 @@ struct DataRoomListView: View {
   @State private var folderToDelete: DataRoomFolder?
   @State private var importTask: Task<Void, Never>?
 
-  init(folder: DataRoomFolder?) {
+  init(folder: DataRoomFolder?, source: String? = nil) {
     self.folder = folder
-    _model = State(initialValue: DataRoomModel(folder: folder))
+    self.source = source
+    _model = State(initialValue: DataRoomModel(folder: folder, source: source))
   }
 
   var body: some View {
@@ -110,10 +113,15 @@ struct DataRoomListView: View {
       state: model.state, retry: { Task { await model.load(app) } },
       content: { _ in content })
     .background(Color.token(.background))
-    .navigationTitle(folder?.name ?? "Data room")
+    .navigationTitle(folder?.name ?? (source == "scan" ? "Scanner" : "Data room"))
     .navigationBarTitleDisplayMode(.inline)
     .searchable(text: $model.query, prompt: "Search")
     .task { await model.load(app) }
+    .task(id: "\(app.userID ?? ""):\(app.spaceID ?? "")") {
+      if source == "scan" {
+        let _: BotSummary? = try? await app.call("scanner/agent")
+      }
+    }
     .task(id: model.hasProcessing) { await model.pollWhileReading(app) }
     .task(id: model.query) {
       guard model.isSearching else { return model.results = nil }
@@ -165,7 +173,7 @@ struct DataRoomListView: View {
       if !model.subfolders.isEmpty {
         Section("Folders") {
           ForEach(model.subfolders) { sub in
-            NavigationLink { DataRoomListView(folder: sub) } label: { DataRoomFolderRow(folder: sub) }
+            NavigationLink { DataRoomListView(folder: sub, source: source) } label: { DataRoomFolderRow(folder: sub) }
               .swipeActions { deleteButton { folderToDelete = sub } }
           }
         }
@@ -193,6 +201,8 @@ struct DataRoomListView: View {
   private var emptyState: some View {
     if model.failedOnly {
       ContentUnavailableView("No failed files", systemImage: "checkmark.circle")
+    } else if source == "scan" {
+      ContentUnavailableView("No scans yet", systemImage: "scanner")
     } else {
       ContentUnavailableView {
         Label("No files yet", systemImage: "tray")
@@ -252,7 +262,22 @@ struct DataRoomListView: View {
       }
       .accessibilityIdentifier("dataRoomFilter")
     }
-    ToolbarItem(placement: .topBarTrailing) {
+    if source == "scan" {
+      ToolbarItem(placement: .primaryAction) {
+        Button {
+          Task {
+            let user = app.userID
+            let space = app.spaceID
+            do {
+              let bot: BotSummary = try await app.call("scanner/agent")
+              if user == app.userID && space == app.spaceID { app.open(.thread(.bot(bot.id))) }
+            } catch {
+              if user == app.userID && space == app.spaceID { model.errorMessage = settingsErrorText(error) }
+            }
+          }
+        } label: { Label("Ask Scanner agent", systemImage: "bubble.left") }
+      }
+    } else { ToolbarItem(placement: .topBarTrailing) {
       Menu {
         Button { showingImporter = true } label: { Label("Files", systemImage: "folder") }
           .accessibilityIdentifier("addFromFiles")
@@ -264,7 +289,7 @@ struct DataRoomListView: View {
         Label("Add", systemImage: "plus")
       }
       .accessibilityIdentifier("dataRoomAdd")
-    }
+    } }
   }
 
   /// Stops picks that are still loading and discards uploads of the previous account.

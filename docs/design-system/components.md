@@ -3,9 +3,9 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 348 of 348
-- Web and shared components: 885
-- Mobile components: 155 in 104 files, mobile — native story pending
+- Web and shared component files with stories: 350 of 350
+- Web and shared components: 887
+- Mobile components: 156 in 105 files, mobile — native story pending
 - SwiftUI views: 141 in 77 files, native story pending
 
 ## Chat markdown (packages/chat-ui)
@@ -440,6 +440,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | RoutineListHeader, RoutineListRow, RoutineEditor, MessageTriggerCard, WatchTriggerCard, InboundTriggerCard | [apps/web/src/pages/RoutineEditor.tsx](../../apps/web/src/pages/RoutineEditor.tsx) | [RoutineEditor.stories.tsx](../../apps/web/src/pages/RoutineEditor.stories.tsx) | web |
 | RoutineRunHistory | [apps/web/src/pages/RoutineRunHistory.tsx](../../apps/web/src/pages/RoutineRunHistory.tsx) | [RoutineRunHistory.stories.tsx](../../apps/web/src/pages/RoutineRunHistory.stories.tsx) | web |
 | RoutineSchedule | [apps/web/src/pages/RoutineSchedule.tsx](../../apps/web/src/pages/RoutineSchedule.tsx) | [RoutineSchedule.stories.tsx](../../apps/web/src/pages/RoutineSchedule.stories.tsx) | web |
+| ScannerPage | [apps/web/src/pages/Scanner.tsx](../../apps/web/src/pages/Scanner.tsx) | [Scanner.stories.tsx](../../apps/web/src/pages/Scanner.stories.tsx) | web |
 | ScratchpadItemMeta, ScratchpadSection | [apps/web/src/pages/ScratchpadSection.tsx](../../apps/web/src/pages/ScratchpadSection.tsx) | [ScratchpadSection.stories.tsx](../../apps/web/src/pages/ScratchpadSection.stories.tsx) | web |
 | SettingsOverlay | [apps/web/src/pages/SettingsOverlay.tsx](../../apps/web/src/pages/SettingsOverlay.tsx) | [SettingsOverlay.stories.tsx](../../apps/web/src/pages/SettingsOverlay.stories.tsx) | web |
 | SharedArtifactPage | [apps/web/src/pages/SharedArtifact.tsx](../../apps/web/src/pages/SharedArtifact.tsx) | [SharedArtifact.stories.tsx](../../apps/web/src/pages/SharedArtifact.stories.tsx) | web |
@@ -512,6 +513,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | NewSpace | [apps/mobile/app/new-space.tsx](../../apps/mobile/app/new-space.tsx) | mobile — native story pending | mobile |
 | NewBot | [apps/mobile/app/new.tsx](../../apps/mobile/app/new.tsx) | mobile — native story pending | mobile |
 | RoutineDetail | [apps/mobile/app/routine.tsx](../../apps/mobile/app/routine.tsx) | mobile — native story pending | mobile |
+| ScannerScreen | [apps/mobile/app/scanner.tsx](../../apps/mobile/app/scanner.tsx) | mobile — native story pending | mobile |
 | ServerScreen | [apps/mobile/app/server.tsx](../../apps/mobile/app/server.tsx) | mobile — native story pending | mobile |
 | SignIn | [apps/mobile/app/sign-in.tsx](../../apps/mobile/app/sign-in.tsx) | mobile — native story pending | mobile |
 | ThreadRoute, Thread, QuoteSheet, MessageRow, MessageBubble, MessageTextCard, AgentEventLabel, AskBlock | [apps/mobile/app/thread.tsx](../../apps/mobile/app/thread.tsx) | mobile — native story pending | mobile |
