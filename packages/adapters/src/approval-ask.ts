@@ -1,5 +1,10 @@
 import { MailProviderError } from "@rakazo/adapter-kit";
-import type { MailApproval, MailEdits, MailReplyFlag, MessageBlock } from "@rakazo/contracts";
+import type {
+  MailApproval,
+  MailEdits,
+  MailReplyFlag,
+  MessageBlock,
+} from "@rakazo/contracts";
 import {
   AI_DATA_DISCLOSURES,
   AI_DISCLOSURE_VERSION,
@@ -28,7 +33,11 @@ import {
   sanitizeMessagingLabel,
 } from "@rakazo/core";
 import { SITE_GATED_TOOLS, urlSite } from "@rakazo/core/egress";
-import { buildRawMessage, displayAddress, parseRecipients } from "./mail-compose.js";
+import {
+  buildRawMessage,
+  displayAddress,
+  parseRecipients,
+} from "./mail-compose.js";
 
 const MAX_APPROVAL_SUMMARY_LENGTH = 500;
 const MAX_APPROVAL_DETAIL_LENGTH = 4_000;
@@ -80,7 +89,11 @@ export function buildApprovalAskBlock(
   },
 ): MessageBlock {
   if (toolName === MAIL_REPLY_BATCH_TOOL) {
-    return buildMailBatchAskBlock(effectId, options?.mailBatch ?? [], options?.approvalReason);
+    return buildMailBatchAskBlock(
+      effectId,
+      options?.mailBatch ?? [],
+      options?.approvalReason,
+    );
   }
   if (toolName === PIPELINE_IMPORT_REVIEW_TOOL && options?.pipelineImport) {
     // Add is its own request from the web and desktop card; the phone apps show this text and Deny.
@@ -98,10 +111,9 @@ export function buildApprovalAskBlock(
   }
   if (toolName === "respond_agent_connection") {
     // Shows who asked, from what was captured before the effect was recorded, not from the model.
-    const name = sanitizeMessagingLabel(String(args.requester_name ?? "agent")).replace(
-      CARD_TITLE_ESCAPED,
-      "\\$&",
-    );
+    const name = sanitizeMessagingLabel(
+      String(args.requester_name ?? "agent"),
+    ).replace(CARD_TITLE_ESCAPED, "\\$&");
     return {
       kind: "ask",
       approvalEffectId: effectId,
@@ -123,8 +135,16 @@ export function buildApprovalAskBlock(
   const fetchSite = webFetchSite(toolName, args);
   const shareTarget =
     options?.shareTarget &&
-    sanitizeMessagingLabel(options.shareTarget).replace(CARD_TITLE_ESCAPED, "\\$&");
-  const shown = summaryArgs(toolName, args, options?.recipientBot, options?.timezone);
+    sanitizeMessagingLabel(options.shareTarget).replace(
+      CARD_TITLE_ESCAPED,
+      "\\$&",
+    );
+  const shown = summaryArgs(
+    toolName,
+    args,
+    options?.recipientBot,
+    options?.timezone,
+  );
   const summary =
     (shareTarget ? `sharing a meeting with ${shareTarget}` : undefined) ??
     options?.schedule?.summary ??
@@ -140,11 +160,14 @@ export function buildApprovalAskBlock(
     options?.integrationWriteTool !== undefined ||
     options?.imessage ||
     options?.schedule;
-  const _fullDetailOpen = options?.fullMail || options?.imessage || options?.schedule;
+  const _fullDetailOpen =
+    options?.fullMail || options?.imessage || options?.schedule;
   const detail = shareTarget
     ? `${shareTarget} will ask before every action after it reads the meeting.`
     : options?.schedule
-      ? [options.reviewReason?.trim(), options.schedule.detail].filter(Boolean).join("\n")
+      ? [options.reviewReason?.trim(), options.schedule.detail]
+          .filter(Boolean)
+          .join("\n")
       : options?.imessage
         ? imessageSendDetail(args, options.imessage, options.reviewReason)
         : options?.fullMail
@@ -187,7 +210,9 @@ export function buildApprovalAskBlock(
     ),
     // Raw tool arguments sit behind a Details disclosure; a card the person reads to decide stays open.
     detailFolded:
-      (options?.integrationWriteTool !== undefined || isSendMoney(toolName) || options?.schedule) &&
+      (options?.integrationWriteTool !== undefined ||
+        isSendMoney(toolName) ||
+        options?.schedule) &&
       !options?.fullMail &&
       !options?.imessage
         ? true
@@ -200,11 +225,13 @@ export function buildApprovalAskBlock(
       : undefined,
     mail: mailApproval(
       toolName,
-      options?.mailAccount && !(typeof args.account === "string" && args.account)
+      options?.mailAccount &&
+        !(typeof args.account === "string" && args.account)
         ? { ...args, account: options.mailAccount }
         : args,
       secrets,
       options?.mailChoices,
+      options?.fullMail,
     ),
     approvalReason: options?.approvalReason,
     ...(fetchSite ? { site: fetchSite } : {}),
@@ -233,7 +260,9 @@ export function buildApprovalAskBlock(
               : [
                   {
                     id: "always",
-                    label: fetchSite ? `Always allow ${fetchSite}` : "Always allow this tool",
+                    label: fetchSite
+                      ? `Always allow ${fetchSite}`
+                      : "Always allow this tool",
                   },
                 ]),
             ...(options?.routineAlways
@@ -295,8 +324,12 @@ function buildMailBatchAskBlock(
     text: mailBatchTitle(rows),
     detail: rows
       .map((row) => {
-        const to = [...bare(row.to), ...bare(row.cc), ...bare(row.bcc)].join(", ");
-        const flag = row.flags[0] ? ` (${MAIL_REPLY_FLAG_TEXT[row.flags[0]]})` : "";
+        const to = [...bare(row.to), ...bare(row.cc), ...bare(row.bcc)].join(
+          ", ",
+        );
+        const flag = row.flags[0]
+          ? ` (${MAIL_REPLY_FLAG_TEXT[row.flags[0]]})`
+          : "";
         return `${row.newEmail ? "New: " : ""}${to}: ${truncate(row.subject, 120)}${flag}`;
       })
       .join("\n"),
@@ -312,13 +345,20 @@ function mailBatchTitle(rows: readonly MailBatchCardRow[]): string {
   const replies = rows.length - fresh;
   return [
     fresh === 1 ? "1 new email" : fresh > 1 ? `${fresh} new emails` : "",
-    replies === 1 ? "1 reply" : replies > 1 || rows.length === 0 ? `${replies} replies` : "",
+    replies === 1
+      ? "1 reply"
+      : replies > 1 || rows.length === 0
+        ? `${replies} replies`
+        : "",
   ]
     .filter(Boolean)
     .join(" · ");
 }
 
-function webFetchSite(toolName: string, args: Record<string, unknown>): string | undefined {
+function webFetchSite(
+  toolName: string,
+  args: Record<string, unknown>,
+): string | undefined {
   return SITE_GATED_TOOLS.has(toolName) && typeof args.url === "string"
     ? urlSite(args.url)
     : undefined;
@@ -377,7 +417,10 @@ export function buildDesktopAppAskBlock(
  * The Carta, Inbox and email agents' mail_send: always asks, never from a saved rule or Auto Review, so
  * the founder sees the whole message on a card before investor or customer mail goes out.
  */
-export const isCartaMailSend = (botSpawnKey: string | null | undefined, toolName: string) =>
+export const isCartaMailSend = (
+  botSpawnKey: string | null | undefined,
+  toolName: string,
+) =>
   toolName === "mail_send" &&
   (isCartaAgentSpawnKey(botSpawnKey) ||
     isInvestorsAgentSpawnKey(botSpawnKey) ||
@@ -410,14 +453,16 @@ export const isIntegrationAgentWrite = (
   readOnly: boolean | undefined,
 ): boolean => {
   if (isGtmAgentSpawnKey(botSpawnKey)) {
-    if (route?.connectorId !== "mcp" || !isZernioEndpoint(route.endpoint)) return false;
+    if (route?.connectorId !== "mcp" || !isZernioEndpoint(route.endpoint))
+      return false;
     return !isReadTool(
       { name: route.toolName ?? "", annotations: { readOnlyHint: readOnly } },
       integrationPresetForEndpoint(route.endpoint),
     );
   }
   if (isCartaAgentSpawnKey(botSpawnKey)) {
-    if (route?.connectorId !== "mcp" || !isCartaEndpoint(route.endpoint)) return false;
+    if (route?.connectorId !== "mcp" || !isCartaEndpoint(route.endpoint))
+      return false;
     return !isReadTool(
       { name: route.toolName ?? "", annotations: { readOnlyHint: readOnly } },
       integrationPresetForEndpoint(route.endpoint),
@@ -438,8 +483,11 @@ export const isIntegrationAgentWrite = (
 };
 
 /** Whether a mail_send call carries the whole message (no draftId shortcut). */
-export function cartaMailSendIsComplete(args: Record<string, unknown>): boolean {
-  const filled = (value: unknown) => typeof value === "string" && value.trim() !== "";
+export function cartaMailSendIsComplete(
+  args: Record<string, unknown>,
+): boolean {
+  const filled = (value: unknown) =>
+    typeof value === "string" && value.trim() !== "";
   return (
     !filled(args.draftId) &&
     strings(args.to).length > 0 &&
@@ -462,7 +510,8 @@ function moneyDetail(
     `From account: ${names?.account ?? String(args.accountId ?? "not given")}`,
   );
   for (const key of ["note", "memo", "externalMemo"])
-    if (typeof args[key] === "string" && args[key]) lines.push(`Note: ${args[key]}`);
+    if (typeof args[key] === "string" && args[key])
+      lines.push(`Note: ${args[key]}`);
   return lines.join("\n");
 }
 
@@ -476,7 +525,9 @@ function integrationWriteDetail(
   lines.push(
     `tool: ${toolName}`,
     ...(rawTool === toolName ? [] : [`server tool: ${rawTool}`]),
-    ...(brexCardsPreview(rawTool, args) ?? [`arguments: ${JSON.stringify(args, null, 2)}`]),
+    ...(brexCardsPreview(rawTool, args) ?? [
+      `arguments: ${JSON.stringify(args, null, 2)}`,
+    ]),
   );
   return lines.join("\n");
 }
@@ -487,7 +538,8 @@ const quoted = (value: string) => JSON.stringify(value);
 const flat = (value: string) => value.replace(/\s+/g, " ").trim();
 const words = (value: string) => value.toLowerCase().replace(/_/g, " ");
 const dollars = (cents: number) => `${formatAmount(cents / 100, "USD")} USD`;
-const person = (m: { userId: string; name: string }) => `${quoted(m.name)} (${flat(m.userId)})`;
+const person = (m: { userId: string; name: string }) =>
+  `${quoted(m.name)} (${flat(m.userId)})`;
 const people = (list: { userId: string; name: string }[]) =>
   list.length ? list.map(person).join(", ") : "none";
 const merchants = (list: string[] | null) =>
@@ -498,13 +550,17 @@ const merchants = (list: string[] | null) =>
  * schema the server checks). Returns undefined when the tool is not a Brex write or the arguments
  * do not match, so the card falls back to the generic rendering.
  */
-function brexCardsPreview(rawTool: string, args: Record<string, unknown>): string[] | undefined {
+function brexCardsPreview(
+  rawTool: string,
+  args: Record<string, unknown>,
+): string[] | undefined {
   if (!Object.hasOwn(BREX_CARDS_WRITE_ARGS, rawTool)) return undefined;
   const tool = rawTool as keyof typeof BREX_CARDS_WRITE_ARGS;
   const parsed = BREX_CARDS_WRITE_ARGS[tool].safeParse(args);
   if (!parsed.success) return undefined;
   const a = parsed.data as Record<string, any>;
-  const card = () => `Card: ${quoted(a.cardName)} ••${a.lastFour} (${flat(a.cardId)})`;
+  const card = () =>
+    `Card: ${quoted(a.cardName)} ••${a.lastFour} (${flat(a.cardId)})`;
   const optional = (label: string, value: unknown, text?: string) =>
     value === undefined ? [] : [`${label}: ${text ?? value}`];
   switch (tool) {
@@ -514,19 +570,43 @@ function brexCardsPreview(rawTool: string, args: Record<string, unknown>): strin
         `Card: ${quoted(a.cardName)}`,
         `Owner: ${person({ userId: a.ownerUserId, name: a.ownerName })}`,
         `Limit: ${dollars(a.amountCents)}, ${words(a.duration)}`,
-        ...optional("Allowed merchants", a.allowedMerchants, merchants(a.allowedMerchants)),
-        ...optional("Blocked merchants", a.blockedMerchants, merchants(a.blockedMerchants)),
+        ...optional(
+          "Allowed merchants",
+          a.allowedMerchants,
+          merchants(a.allowedMerchants),
+        ),
+        ...optional(
+          "Blocked merchants",
+          a.blockedMerchants,
+          merchants(a.blockedMerchants),
+        ),
         ...optional("Locks after", a.lockAfterDate),
       ];
     case "update_card":
       return [
         "Update card",
         card(),
-        ...optional("Limit", a.amountCents, a.amountCents && dollars(a.amountCents)),
+        ...optional(
+          "Limit",
+          a.amountCents,
+          a.amountCents && dollars(a.amountCents),
+        ),
         ...optional("Period", a.duration, a.duration && words(a.duration)),
-        ...optional("Locks after", a.lockAfterDate, a.lockAfterDate ?? "none (cleared)"),
-        ...optional("Allowed merchants", a.allowedMerchants, merchants(a.allowedMerchants)),
-        ...optional("Blocked merchants", a.blockedMerchants, merchants(a.blockedMerchants)),
+        ...optional(
+          "Locks after",
+          a.lockAfterDate,
+          a.lockAfterDate ?? "none (cleared)",
+        ),
+        ...optional(
+          "Allowed merchants",
+          a.allowedMerchants,
+          merchants(a.allowedMerchants),
+        ),
+        ...optional(
+          "Blocked merchants",
+          a.blockedMerchants,
+          merchants(a.blockedMerchants),
+        ),
       ];
     case "lock_card":
       return ["Lock card", card(), `Reason: ${words(a.reason)}`];
@@ -550,11 +630,23 @@ function brexCardsPreview(rawTool: string, args: Record<string, unknown>): strin
       return [
         "Update spend limit",
         `Spend limit: ${quoted(a.spendLimitName)} (${flat(a.spendLimitId)})`,
-        ...optional("Limit", a.amountCents, a.amountCents && dollars(a.amountCents)),
+        ...optional(
+          "Limit",
+          a.amountCents,
+          a.amountCents && dollars(a.amountCents),
+        ),
         ...optional("Ends", a.endDate),
         ...optional("Status", a.status, a.status && words(a.status)),
-        ...optional("Add members", a.addMembers, a.addMembers && people(a.addMembers)),
-        ...optional("Remove members", a.removeMembers, a.removeMembers && people(a.removeMembers)),
+        ...optional(
+          "Add members",
+          a.addMembers,
+          a.addMembers && people(a.addMembers),
+        ),
+        ...optional(
+          "Remove members",
+          a.removeMembers,
+          a.removeMembers && people(a.removeMembers),
+        ),
       ];
     case "update_expense_memo":
       return [
@@ -573,10 +665,15 @@ function imessageSendDetail(
 ): string {
   const lines = reviewReason?.trim() ? [reviewReason.trim()] : [];
   lines.push(`to: ${target.recipient}`, `line: ${target.line}`);
-  if (target.disclosure) lines.push(`first message also sends: ${target.disclosure}`);
+  if (target.disclosure)
+    lines.push(`first message also sends: ${target.disclosure}`);
   lines.push(`text: ${String(args.text ?? "")}`);
   return lines.join("\n");
 }
+
+/** "Name <a@b.c>" as "a@b.c": the model writes the display name, and a name can say anything. */
+const bareAddress = (entry: string) =>
+  entry.match(/<([^>]+)>\s*$/)?.[1] ?? entry;
 
 /**
  * The sending account, every recipient (Bcc included) as a bare address, the subject, the whole
@@ -588,15 +685,17 @@ function fullMailDetail(
   account?: string,
 ): string {
   const lines = reviewReason?.trim() ? [reviewReason.trim()] : [];
-  const from = typeof args.account === "string" && args.account ? args.account : account;
+  const from =
+    typeof args.account === "string" && args.account ? args.account : account;
   if (from) lines.push(`from: ${from}`);
   for (const key of ["to", "cc", "bcc"]) {
-    const list = strings(args[key]).map((entry) => entry.match(/<([^>]+)>\s*$/)?.[1] ?? entry);
+    const list = strings(args[key]).map(bareAddress);
     lines.push(`${key}: ${list.length ? list.join(", ") : "(none)"}`);
   }
   const body = String(args.body ?? "");
   lines.push(`subject: ${String(args.subject ?? "")}`, `body: ${body}`);
-  const isReply = typeof args.replyToId === "string" && args.replyToId.trim() !== "";
+  const isReply =
+    typeof args.replyToId === "string" && args.replyToId.trim() !== "";
   const flags = [
     ...(isReply ? [] : [MAIL_REPLY_FLAG_TEXT.new_recipient]),
     ...(bodyHasLink(body) ? [MAIL_REPLY_FLAG_TEXT.has_link] : []),
@@ -606,7 +705,8 @@ function fullMailDetail(
 }
 
 /** A bank's request to send money, whichever server slug the tool sits under. */
-export const isSendMoney = (toolName: string) => /(^|__)requestSendMoney$/.test(toolName);
+export const isSendMoney = (toolName: string) =>
+  /(^|__)requestSendMoney$/.test(toolName);
 
 export type MoneyNames = { recipient?: string; account?: string };
 
@@ -617,15 +717,26 @@ export type MoneyNames = { recipient?: string; account?: string };
 export async function resolveMoneyNames(
   toolName: string,
   args: Record<string, unknown>,
-  read: (tool: "getRecipient" | "getAccount", args: Record<string, string>) => Promise<unknown>,
+  read: (
+    tool: "getRecipient" | "getAccount",
+    args: Record<string, string>,
+  ) => Promise<unknown>,
 ): Promise<MoneyNames | undefined> {
   if (!isSendMoney(toolName)) return undefined;
-  const nameOf = async (tool: "getRecipient" | "getAccount", key: string, id: unknown) => {
+  const nameOf = async (
+    tool: "getRecipient" | "getAccount",
+    key: string,
+    id: unknown,
+  ) => {
     if (typeof id !== "string" || !id) return undefined;
     try {
-      const row = (await read(tool, { [key]: id })) as Record<string, unknown> | undefined;
+      const row = (await read(tool, { [key]: id })) as
+        Record<string, unknown> | undefined;
       // An account goes by its nickname; a payee by its legal name.
-      const name = tool === "getAccount" ? row?.nickname || row?.name : row?.name || row?.nickname;
+      const name =
+        tool === "getAccount"
+          ? row?.nickname || row?.name
+          : row?.name || row?.nickname;
       return typeof name === "string" && name.trim() ? name.trim() : undefined;
     } catch {
       return undefined;
@@ -646,18 +757,25 @@ export function describeApprovalAction(
   moneyNames?: MoneyNames,
 ): string {
   if (isSendMoney(toolName)) {
-    const amount = args.amount == null ? "money" : formatAmount(args.amount, args.currency);
+    const amount =
+      args.amount == null ? "money" : formatAmount(args.amount, args.currency);
     // A failed lookup shows the id, never a vague "a recipient".
-    const idOf = (id: unknown, fallback: string) => (typeof id === "string" && id ? id : fallback);
+    const idOf = (id: unknown, fallback: string) =>
+      typeof id === "string" && id ? id : fallback;
     return `Send ${amount} to ${moneyNames?.recipient ?? idOf(args.recipientId, "a recipient")} from ${moneyNames?.account ?? idOf(args.accountId, "an account")}`;
   }
   if (toolName === "mail_send" || toolName === "mail_draft") {
     const [first, ...rest] = strings(args.to);
-    const to = first ? ` to ${first}${rest.length ? ` and ${rest.length} more` : ""}` : "";
-    return toolName === "mail_send" ? `sending email${to}` : `saving a draft${to}`;
+    const to = first
+      ? ` to ${first}${rest.length ? ` and ${rest.length} more` : ""}`
+      : "";
+    return toolName === "mail_send"
+      ? `sending email${to}`
+      : `saving a draft${to}`;
   }
   if (toolName === "imessage_send") {
-    const to = typeof args.to === "string" && args.to ? args.to : "a conversation";
+    const to =
+      typeof args.to === "string" && args.to ? args.to : "a conversation";
     return `sending iMessage to ${to}`;
   }
   if (toolName === "destination.write") {
@@ -667,7 +785,9 @@ export function describeApprovalAction(
   }
   if (toolName === "delete_bot" || toolName === "archive_bot") {
     const name = args.confirm_name ?? args.confirmName;
-    return name ? `${toolName.replace("_", " ")} (${String(name)})` : toolName.replace("_", " ");
+    return name
+      ? `${toolName.replace("_", " ")} (${String(name)})`
+      : toolName.replace("_", " ");
   }
   if (toolName === "create_space") {
     const name = args.name ? String(args.name) : "Untitled";
@@ -730,7 +850,9 @@ function formatApprovalDetail(
     ] as const) {
       const value = args[key];
       if (value == null || value === "") continue;
-      lines.push(`${label}: ${key === "name" ? String(value) : formatAmount(value, "USD")}`);
+      lines.push(
+        `${label}: ${key === "name" ? String(value) : formatAmount(value, "USD")}`,
+      );
     }
     return lines.join("\n") || undefined;
   }
@@ -741,12 +863,24 @@ function formatApprovalDetail(
       ? ["name", "email", "organization", "kind", "notes"]
       : SITE_GATED_TOOLS.has(toolName)
         ? ["url"]
-        : ["collection", "title", "to", "subject", "amount", "body", "message", "range"]);
+        : [
+            "collection",
+            "title",
+            "to",
+            "subject",
+            "amount",
+            "body",
+            "message",
+            "range",
+          ]);
   for (const key of keys) {
     const value = args[key];
     if (value == null || value === "") continue;
-    const text = typeof value === "object" ? JSON.stringify(value) : String(value);
-    lines.push(`${key}: ${READ_SCOPE_KEYS[toolName] ? truncate(text, 300) : text}`);
+    const text =
+      typeof value === "object" ? JSON.stringify(value) : String(value);
+    lines.push(
+      `${key}: ${READ_SCOPE_KEYS[toolName] ? truncate(text, 300) : text}`,
+    );
   }
   if (lines.length === 0) return undefined;
   return lines.join("\n");
@@ -765,7 +899,10 @@ function summaryArgs(
   timezone?: string | null,
 ): Record<string, unknown> {
   if (toolName === "message_bot") {
-    const message = typeof args.message === "string" ? args.message.trim().split(/\r?\n/)[0] : "";
+    const message =
+      typeof args.message === "string"
+        ? args.message.trim().split(/\r?\n/)[0]
+        : "";
     return {
       ...args,
       to: (recipientBot
@@ -779,9 +916,12 @@ function summaryArgs(
   }
   if (CALENDAR_READS.has(toolName)) {
     const [from, to] =
-      toolName === "calendar_agenda" ? [args.from, args.to] : [args.timeMin, args.timeMax];
+      toolName === "calendar_agenda"
+        ? [args.from, args.to]
+        : [args.timeMin, args.timeMax];
     const { from: _f, to: _t, timeMin: _a, timeMax: _b, ...rest } = args;
-    const part = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+    const part = (value: unknown) =>
+      typeof value === "string" && value ? value : undefined;
     const f = part(from);
     const t = part(to);
     const range =
@@ -818,10 +958,19 @@ function readableTime(value: string, timezone?: string | null): string {
 }
 
 function pickScopeLabel(args: Record<string, unknown>): string | undefined {
-  for (const key of ["to", "title", "collection", "subject", "amount", "range"]) {
+  for (const key of [
+    "to",
+    "title",
+    "collection",
+    "subject",
+    "amount",
+    "range",
+  ]) {
     const value = args[key];
     if (value == null || value === "") continue;
-    return key === "amount" ? formatAmount(value, args.currency) : String(value);
+    return key === "amount"
+      ? formatAmount(value, args.currency)
+      : String(value);
   }
   return undefined;
 }
@@ -829,10 +978,17 @@ function pickScopeLabel(args: Record<string, unknown>): string | undefined {
 /** "1200" becomes "$1,200.00"; a value that is not a number, or an unknown currency, stays as written. */
 function formatAmount(value: unknown, currency: unknown): string {
   const number = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(number) || typeof value === "boolean") return String(value);
-  const code = typeof currency === "string" && /^[A-Za-z]{3}$/.test(currency) ? currency : "USD";
+  if (!Number.isFinite(number) || typeof value === "boolean")
+    return String(value);
+  const code =
+    typeof currency === "string" && /^[A-Za-z]{3}$/.test(currency)
+      ? currency
+      : "USD";
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: code }).format(number);
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: code,
+    }).format(number);
   } catch {
     return String(value);
   }
@@ -843,7 +999,9 @@ function truncate(value: string, maxLength: number): string {
 }
 
 const strings = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 
 /**
  * The fields of a mail_draft or mail_send call, for the inline mail card. A send of a saved draft
@@ -854,9 +1012,11 @@ function mailApproval(
   args: Record<string, unknown>,
   secrets: string[],
   choices?: MailApproval["choices"],
+  bare = false,
 ): MailApproval | undefined {
   if (toolName !== "mail_draft" && toolName !== "mail_send") return undefined;
-  const text = (value: unknown) => (typeof value === "string" ? redactSecrets(value, secrets) : "");
+  const text = (value: unknown) =>
+    typeof value === "string" ? redactSecrets(value, secrets) : "";
   const body = text(args.body);
   if (body.length > MAX_COMPOSE_BODY) return undefined;
   return {
@@ -865,14 +1025,24 @@ function mailApproval(
       ? { account: redactSecrets(args.account, secrets) }
       : {}),
     ...(choices?.length ? { choices } : {}),
-    to: strings(args.to).map((item) => redactSecrets(item, secrets)),
-    cc: strings(args.cc).map((item) => redactSecrets(item, secrets)),
-    bcc: strings(args.bcc).map((item) => redactSecrets(item, secrets)),
+    to: strings(args.to).map((item) =>
+      redactSecrets(bare ? bareAddress(item) : item, secrets),
+    ),
+    cc: strings(args.cc).map((item) =>
+      redactSecrets(bare ? bareAddress(item) : item, secrets),
+    ),
+    bcc: strings(args.bcc).map((item) =>
+      redactSecrets(bare ? bareAddress(item) : item, secrets),
+    ),
     subject: text(args.subject),
     body,
-    ...(typeof args.replyToId === "string" && args.replyToId.trim() ? { reply: true } : {}),
+    ...(typeof args.replyToId === "string" && args.replyToId.trim()
+      ? { reply: true }
+      : {}),
     // Replacing a saved draft is not something the card can edit.
-    ...(typeof args.draftId === "string" && args.draftId.trim() ? { locked: true } : {}),
+    ...(typeof args.draftId === "string" && args.draftId.trim()
+      ? { locked: true }
+      : {}),
   };
 }
 
@@ -897,7 +1067,8 @@ export function normalizeMailEdits(
     const lists: Pick<NormalizedMailEdits, "to" | "cc" | "bcc"> = {};
     for (const key of ["to", "cc", "bcc"] as const) {
       const value = edits[key];
-      if (value !== undefined) lists[key] = parseRecipients(value).map(displayAddress);
+      if (value !== undefined)
+        lists[key] = parseRecipients(value).map(displayAddress);
     }
     const checked = {
       to: parseRecipients((lists.to ?? []).join(", ")),
@@ -918,13 +1089,17 @@ export function normalizeMailEdits(
       },
     };
   } catch (error) {
-    if (error instanceof MailProviderError) return { ok: false, error: error.message };
+    if (error instanceof MailProviderError)
+      return { ok: false, error: error.message };
     throw error;
   }
 }
 
 /** The checks the mail tools apply when they run, on a whole call's arguments. True when they pass. */
-export function mailRequestIsValid(kind: string, request: Record<string, unknown>): boolean {
+export function mailRequestIsValid(
+  kind: string,
+  request: Record<string, unknown>,
+): boolean {
   try {
     buildRawMessage(
       {
