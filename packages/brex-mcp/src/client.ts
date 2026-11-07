@@ -4,8 +4,16 @@ import * as z from "zod";
 // Response schemas keep only the fields this package reads (and drop the rest on purpose: card
 // numbers, account and routing numbers never enter memory). Field names are from the Brex OpenAPI
 // specs (team, budgets, expenses, transactions, travel); unknown extra fields are ignored.
-const Money = z.object({ amount: z.number().int(), currency: z.string().nullish() });
+const Money = z.object({
+  amount: z.number().int(),
+  currency: z.string().nullish(),
+});
 const Merchant = z.object({ name: z.string() });
+const MerchantDetails = z.object({
+  raw_descriptor: z.string(),
+  mcc: z.string().nullish(),
+  country: z.string().nullish(),
+});
 
 const SpendControl = z.object({
   spend_limit: Money.nullish(),
@@ -44,6 +52,13 @@ export const BrexSpendLimitSchema = z.object({
   period_recurrence_type: z.string(),
   start_date: z.string().nullish(),
   end_date: z.string().nullish(),
+  current_period_balance: z
+    .object({
+      start_date: z.string().nullish(),
+      end_date: z.string().nullish(),
+      amount_spent: Money.nullish(),
+    })
+    .nullish(),
   authorization_settings: z
     .object({
       base_limit: Money,
@@ -71,7 +86,11 @@ export const BrexExpenseSchema = z.object({
   purchased_at: z.string().nullish(),
   billing_amount: Money.nullish(),
   user_id: z.string().nullish(),
-  merchant: z.object({ raw_descriptor: z.string() }).nullish(),
+  category: z.string().nullish(),
+  expense_type: z.string().nullish(),
+  receipts: z.array(z.object({ id: z.string() })).nullish(),
+  review: z.object({ compliance_status: z.string().nullish() }).nullish(),
+  merchant: MerchantDetails.nullish(),
 });
 export type BrexExpense = z.infer<typeof BrexExpenseSchema>;
 
@@ -83,7 +102,7 @@ export const BrexTransactionSchema = z.object({
   posted_at_date: z.string(),
   initiated_at_date: z.string().nullish(),
   type: z.string().nullish(),
-  merchant: z.object({ raw_descriptor: z.string() }).nullish(),
+  merchant: MerchantDetails.nullish(),
   expense_id: z.string().nullish(),
 });
 export type BrexTransaction = z.infer<typeof BrexTransactionSchema>;
@@ -240,7 +259,10 @@ export function createBrexClient(options: BrexClientOptions) {
     item: z.ZodType<T>,
     query: Query = {},
   ): Promise<Paged<T>> {
-    const Page = z.object({ next_cursor: z.string().nullish(), items: z.array(item) });
+    const Page = z.object({
+      next_cursor: z.string().nullish(),
+      items: z.array(item),
+    });
     const items: T[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < MAX_PAGES; page++) {
@@ -263,7 +285,11 @@ export function createBrexClient(options: BrexClientOptions) {
         };
       cursor = result.next_cursor;
     }
-    return { items, complete: false, error: new BrexError("incomplete", "Too many pages") };
+    return {
+      items,
+      complete: false,
+      error: new BrexError("incomplete", "Too many pages"),
+    };
   }
 
   const id = encodeURIComponent;
@@ -279,23 +305,37 @@ export function createBrexClient(options: BrexClientOptions) {
     updateCard: (cardId: string, body: object, key?: string) =>
       request("PUT", `/v2/cards/${id(cardId)}`, BrexCardSchema, { body, key }),
     lockCard: (cardId: string, body: object, key?: string) =>
-      request("POST", `/v2/cards/${id(cardId)}/lock`, BrexCardSchema, { body, key }),
+      request("POST", `/v2/cards/${id(cardId)}/lock`, BrexCardSchema, {
+        body,
+        key,
+      }),
     terminateCard: (cardId: string, body: object, key?: string) =>
-      request("POST", `/v2/cards/${id(cardId)}/terminate`, BrexCardSchema, { body, key }),
+      request("POST", `/v2/cards/${id(cardId)}/terminate`, BrexCardSchema, {
+        body,
+        key,
+      }),
 
     listUsers: (q: { name?: string; email?: string } = {}) =>
       // `email[]` is the current filter; the legacy `email` cannot be combined with `name`.
-      paginate("/v2/users", BrexUserSchema, { name: q.name, "email[]": q.email }),
+      paginate("/v2/users", BrexUserSchema, {
+        name: q.name,
+        "email[]": q.email,
+      }),
     getUser: (userId: string) => request("GET", `/v2/users/${id(userId)}`, BrexUserSchema),
 
     listSpendLimits: (q: { memberUserId?: string } = {}) =>
-      paginate("/v2/spend_limits", BrexSpendLimitSchema, { "member_user_id[]": q.memberUserId }),
+      paginate("/v2/spend_limits", BrexSpendLimitSchema, {
+        "member_user_id[]": q.memberUserId,
+      }),
     getSpendLimit: (limitId: string) =>
       request("GET", `/v2/spend_limits/${id(limitId)}`, BrexSpendLimitSchema),
     createSpendLimit: (body: object, key: string) =>
       request("POST", "/v2/spend_limits", BrexSpendLimitSchema, { body, key }),
     updateSpendLimit: (limitId: string, body: object, key: string) =>
-      request("PUT", `/v2/spend_limits/${id(limitId)}`, BrexSpendLimitSchema, { body, key }),
+      request("PUT", `/v2/spend_limits/${id(limitId)}`, BrexSpendLimitSchema, {
+        body,
+        key,
+      }),
 
     listExpenses: (
       q: {
@@ -313,7 +353,19 @@ export function createBrexClient(options: BrexClientOptions) {
         "compliance_status[]": q.complianceStatus,
       }),
     updateExpenseMemo: (expenseId: string, memo: string) =>
-      request("PUT", `/v1/expenses/card/${id(expenseId)}`, BrexExpenseSchema, { body: { memo } }),
+      request("PUT", `/v1/expenses/card/${id(expenseId)}`, BrexExpenseSchema, {
+        body: { memo },
+      }),
+    listReimbursements: (
+      q: { userId?: string; purchasedAtStart?: string; purchasedAtEnd?: string } = {},
+    ) =>
+      paginate("/v1/expenses", BrexExpenseSchema, {
+        "expand[]": "merchant",
+        "user_id[]": q.userId,
+        purchased_at_start: q.purchasedAtStart,
+        purchased_at_end: q.purchasedAtEnd,
+        "expense_type[]": "REIMBURSEMENT",
+      }),
 
     /** Settled card transactions only; Brex does not expose pending ones. */
     listCardTransactions: (q: { userId?: string; postedAtStart?: string } = {}) =>

@@ -104,6 +104,14 @@ const spendLimitView = (s: BrexSpendLimit) => ({
   period: s.period_recurrence_type,
   startDate: s.start_date ?? null,
   endDate: s.end_date ?? null,
+  currentPeriodBalance: s.current_period_balance
+    ? {
+        startDate: s.current_period_balance.start_date ?? null,
+        endDate: s.current_period_balance.end_date ?? null,
+        amountSpentCents: s.current_period_balance.amount_spent?.amount ?? null,
+        currency: s.current_period_balance.amount_spent?.currency ?? null,
+      }
+    : null,
   baseLimitCents: s.authorization_settings?.base_limit.amount ?? null,
   currency: s.authorization_settings?.base_limit.currency ?? null,
   authorizationType: s.authorization_settings?.authorization_type ?? null,
@@ -122,6 +130,11 @@ const expenseView = (e: BrexExpense) => ({
   currency: e.billing_amount?.currency ?? null,
   userId: e.user_id ?? null,
   merchant: e.merchant?.raw_descriptor ?? null,
+  merchantMcc: e.merchant?.mcc ?? null,
+  category: e.category ?? null,
+  expenseType: e.expense_type ?? null,
+  receipts: e.receipts?.map((receipt) => ({ id: receipt.id })) ?? [],
+  complianceStatus: e.review?.compliance_status ?? null,
 });
 
 const transactionView = (t: BrexTransaction) => ({
@@ -133,6 +146,7 @@ const transactionView = (t: BrexTransaction) => ({
   postedAt: t.posted_at_date,
   type: t.type ?? null,
   merchant: t.merchant?.raw_descriptor ?? null,
+  mcc: t.merchant?.mcc ?? null,
   expenseId: t.expense_id ?? null,
 });
 
@@ -168,7 +182,11 @@ export function createBrexCardsServer({
     // to a schema passed through here; the schema and callback are typed together above.
     server.registerTool(
       name,
-      { description, inputSchema: schema, annotations: { ...annotations, openWorldHint: true } },
+      {
+        description,
+        inputSchema: schema,
+        annotations: { ...annotations, openWorldHint: true },
+      },
       callback as never,
     );
   };
@@ -269,7 +287,10 @@ export function createBrexCardsServer({
     "List Brex spend limits, optionally those a user is a member of.",
     z.object({ memberUserId: Id.optional() }).strict(),
     read,
-    async (q) => text({ spendLimits: whole(await client.listSpendLimits(q)).map(spendLimitView) }),
+    async (q) =>
+      text({
+        spendLimits: whole(await client.listSpendLimits(q)).map(spendLimitView),
+      }),
   );
   register(
     "get_spend_limit",
@@ -302,7 +323,31 @@ export function createBrexCardsServer({
         ...(missingReceipt ? { complianceStatus: ["DUE", "OVERDUE"] } : {}),
       });
       if (!paged.complete && paged.error?.kind === "auth") throw paged.error;
-      return text({ expenses: paged.items.map(expenseView), incomplete: !paged.complete });
+      return text({
+        expenses: paged.items.map(expenseView),
+        incomplete: !paged.complete,
+      });
+    },
+  );
+
+  register(
+    "list_reimbursements",
+    "List Brex reimbursements. This is read-only: approvals and payments happen in Brex.",
+    z
+      .object({
+        userId: Id.optional(),
+        purchasedAtStart: Iso.optional(),
+        purchasedAtEnd: Iso.optional(),
+      })
+      .strict(),
+    read,
+    async (q) => {
+      const paged = await client.listReimbursements(q);
+      if (!paged.complete && paged.error?.kind === "auth") throw paged.error;
+      return text({
+        reimbursements: paged.items.map(expenseView),
+        incomplete: !paged.complete,
+      });
     },
   );
 
@@ -310,14 +355,21 @@ export function createBrexCardsServer({
     "list_card_transactions",
     "List settled card transactions only. Brex does not expose pending transactions through its API and settled ones can appear late, so a card with no transactions here is not proof it is unused. If incomplete is true, do not draw conclusions from what is missing.",
     z
-      .object({ cardId: Id.optional(), userId: Id.optional(), postedAtStart: Iso.optional() })
+      .object({
+        cardId: Id.optional(),
+        userId: Id.optional(),
+        postedAtStart: Iso.optional(),
+      })
       .strict(),
     read,
     async ({ cardId, ...q }) => {
       const paged = await client.listCardTransactions(q);
       if (!paged.complete && paged.error?.kind === "auth") throw paged.error;
       const items = cardId ? paged.items.filter((t) => t.card_id === cardId) : paged.items;
-      return text({ transactions: items.map(transactionView), incomplete: !paged.complete });
+      return text({
+        transactions: items.map(transactionView),
+        incomplete: !paged.complete,
+      });
     },
   );
 
@@ -387,7 +439,9 @@ export function createBrexCardsServer({
       if (!checked.ok) return refuse(checked.reason);
       await matchMembers([{ userId: args.ownerUserId, name: args.ownerName }]);
 
-      const reservation = await store.reserveCard({ maxCardsPerDay: controls.maxCardsPerDay });
+      const reservation = await store.reserveCard({
+        maxCardsPerDay: controls.maxCardsPerDay,
+      });
       if (!reservation.ok) return refuse(reservation.reason);
       let created: BrexCard;
       try {
@@ -402,10 +456,14 @@ export function createBrexCardsServer({
               spend_duration: args.duration,
               ...(args.lockAfterDate ? { lock_after_date: args.lockAfterDate } : {}),
               ...(args.allowedMerchants
-                ? { allowed_merchant_details: args.allowedMerchants.map((name) => ({ name })) }
+                ? {
+                    allowed_merchant_details: args.allowedMerchants.map((name) => ({ name })),
+                  }
                 : {}),
               ...(args.blockedMerchants
-                ? { blocked_merchant_details: args.blockedMerchants.map((name) => ({ name })) }
+                ? {
+                    blocked_merchant_details: args.blockedMerchants.map((name) => ({ name })),
+                  }
                 : {}),
             },
           },
@@ -450,7 +508,10 @@ export function createBrexCardsServer({
           args.cardId,
           {
             spend_controls: {
-              spend_limit: { amount: next.amountCents, currency: next.currency },
+              spend_limit: {
+                amount: next.amountCents,
+                currency: next.currency,
+              },
               spend_duration: next.duration,
               lock_after_date: next.lockAfterDate,
               allowed_merchant_details: names(next.allowedMerchants),

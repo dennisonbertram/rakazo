@@ -196,4 +196,30 @@ describe("createBrexClient", () => {
     expect((await failure(wrong.me())).message).not.toContain(TOKEN);
     for (const spy of spies) expect(spy).not.toHaveBeenCalled();
   });
+
+  it("reads transaction MCCs, expense details, spend-limit usage and reimbursements", async () => {
+    const { client } = await setup();
+    const transactions = await client.listCardTransactions();
+    expect(transactions.items.some((t) => t.merchant?.mcc && /^\d{4}$/.test(t.merchant.mcc))).toBe(
+      true,
+    );
+
+    const expenses = await client.listExpenses();
+    const categorized = expenses.items.find((e) => e.category);
+    expect(categorized).toMatchObject({
+      category: expect.any(String),
+      expense_type: "CARD",
+      receipts: expect.any(Array),
+    });
+    expect(categorized?.review?.compliance_status).toEqual(expect.any(String));
+
+    const limits = await client.listSpendLimits();
+    expect(
+      limits.items.some((s) => s.current_period_balance?.amount_spent?.amount !== undefined),
+    ).toBe(true);
+
+    const reimbursements = await client.listReimbursements();
+    expect(reimbursements.items.length).toBeGreaterThan(0);
+    expect(reimbursements.items.every((e) => e.expense_type === "REIMBURSEMENT")).toBe(true);
+  });
 });

@@ -547,6 +547,14 @@ describe("reads", () => {
     expect((await call("list_card_transactions", {})).isError).toBe(true);
   });
 
+  it("whole() reads still fail when paging is incomplete", async () => {
+    const { emulator, call } = await setup({ maxPageSize: 2 });
+    emulator.failNext.push({ path: "/v2/spend_limits", status: 500, after: 1 });
+    const result = await call("list_spend_limits", {});
+    expect(result.isError).toBe(true);
+    expect(result.text).toMatch(/Brex is unavailable/);
+  });
+
   it("list_expenses has no card filter and maps missingReceipt to the compliance filter", async () => {
     const { emulator, call, mcp } = await setup();
     const tool = (await mcp.listTools()).tools.find((t) => t.name === "list_expenses");
@@ -557,6 +565,35 @@ describe("reads", () => {
     expect(last?.query).toContain("compliance_status");
     expect(missing.json.expenses.length).toBeGreaterThan(0);
     expect(missing.json.expenses.length).toBeLessThan(all.json.expenses.length);
+  });
+
+  it("returns the new expense, transaction and spend-limit fields, and lists reimbursements", async () => {
+    const { call, mcp } = await setup();
+    const expenses = (await call("list_expenses", {})).json.expenses;
+    const categorized = expenses.find((e: any) => e.category);
+    expect(categorized).toMatchObject({
+      category: expect.any(String),
+      expenseType: "CARD",
+      complianceStatus: expect.any(String),
+      receipts: expect.any(Array),
+    });
+
+    const transactions = (await call("list_card_transactions", {})).json.transactions;
+    expect(transactions.some((t: any) => /^\d{4}$/.test(t.mcc ?? ""))).toBe(true);
+
+    const limits = (await call("list_spend_limits", {})).json.spendLimits;
+    expect(
+      limits.some((s: any) => typeof s.currentPeriodBalance?.amountSpentCents === "number"),
+    ).toBe(true);
+
+    const reimbursements = await call("list_reimbursements", {});
+    expect(reimbursements.isError).toBe(false);
+    expect(reimbursements.json.reimbursements.length).toBeGreaterThan(0);
+    expect(
+      reimbursements.json.reimbursements.every((e: any) => e.expenseType === "REIMBURSEMENT"),
+    ).toBe(true);
+    const tool = (await mcp.listTools()).tools.find((t) => t.name === "list_reimbursements");
+    expect(tool?.annotations?.readOnlyHint).toBe(true);
   });
 
   it("list_cash_accounts leaves out account and routing numbers", async () => {
@@ -697,6 +734,7 @@ describe("regression", () => {
       ["list_spend_limits", {}],
       ["get_spend_limit", { spendLimitId: "sl_template" }],
       ["list_expenses", {}],
+      ["list_reimbursements", {}],
       ["list_card_transactions", {}],
       ["list_trips", {}],
       ["list_cash_accounts", {}],
