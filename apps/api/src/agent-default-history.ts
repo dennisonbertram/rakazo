@@ -63,8 +63,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   gtm: {
-    current: "7bf878b17c4b5c666b7a12788a97591ee5bb1f0cc0bf89982346852069142c0c",
+    current: "ae8b52feb9e042cd0acb32e843984336751a33cf370e4d3d90a25f1ac0c644e0",
     past: [
+      "7bf878b17c4b5c666b7a12788a97591ee5bb1f0cc0bf89982346852069142c0c",
       "6798cc163ef3f57b9c9b937a3e194ce99096c179d88fc9b99bca6cb3563c9850",
       "cf98649335031c2ef6088da54922dd4aaf7d865dd9592df6d54960de0a76c023",
     ],
