@@ -27,6 +27,8 @@ export interface BrexCardsDeps {
 }
 
 const REJECTED = "Brex rejected this token";
+const MISSING_PERMISSION =
+  "This token is missing a Brex permission. Check the permissions and try again.";
 const UNREACHABLE = "Could not reach Brex";
 const CONFLICT_MESSAGE = "Brex cards are already connected in this space";
 const NOT_CONNECTED_MESSAGE = "Brex cards are not connected in this space";
@@ -59,9 +61,9 @@ async function checkToken(deps: BrexCardsDeps, token: string): Promise<string> {
     }
     if (!res.ok) {
       await res.body?.cancel().catch(() => undefined);
-      throw res.status === 401 || res.status === 403
-        ? new ORPCError("BAD_REQUEST", { message: REJECTED })
-        : unreachable();
+      if (res.status === 401) throw new ORPCError("BAD_REQUEST", { message: REJECTED });
+      if (res.status === 403) throw new ORPCError("BAD_REQUEST", { message: MISSING_PERMISSION });
+      throw unreachable();
     }
     return res;
   };

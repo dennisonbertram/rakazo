@@ -300,6 +300,12 @@ msgid "{0} API key"
 msgstr "{0} API key"
 
 #. placeholder {0}: bot.name
+#. placeholder {1}: capabilityNames[id] ?? id
+#: src/pages/shell/BotAccessSection.tsx
+msgid "{0} can ask to use {1}"
+msgstr "{0} can ask to use {1}"
+
+#. placeholder {0}: bot.name
 #. placeholder {1}: row.name
 #. placeholder {2}: row.address ?? ""
 #: src/pages/shell/BotAccessSection.tsx
@@ -1702,6 +1708,10 @@ msgid "Always allowed for this routine"
 msgstr "Always allowed for this routine"
 
 #: src/components/AskCard.tsx
+msgid "Always for this agent"
+msgstr "Always for this agent"
+
+#: src/components/AskCard.tsx
 msgid "Always for this routine"
 msgstr "Always for this routine"
 
@@ -2570,6 +2580,7 @@ msgstr "Cadence"
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/Gtm.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/BotAccessSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Calendar"
 msgstr "Calendar"
@@ -3765,6 +3776,7 @@ msgid "Connecting to tools"
 msgstr "Connecting to tools"
 
 #: src/components/finance/AddAccountDialog.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/DevinConnectDialog.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
@@ -3809,6 +3821,7 @@ msgstr "Contact"
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/BotAccessSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Contacts"
 msgstr "Contacts"
@@ -5117,6 +5130,7 @@ msgstr "Dark"
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/DataRoom.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/BotAccessSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Data room"
 msgstr "Data room"
@@ -5806,6 +5820,10 @@ msgstr "Drafts for you"
 msgid "Drag, drop, or paste an image"
 msgstr "Drag, drop, or paste an image"
 
+#: src/pages/shell/BotAccessSection.tsx
+msgid "Drive"
+msgstr "Drive"
+
 #: src/pages/DataRoom.tsx
 msgid "Drop files here"
 msgstr "Drop files here"
@@ -6166,6 +6184,10 @@ msgstr "Every 6 hours"
 #: src/components/integrations/AppDetail.tsx
 msgid "Every bot loses access to {name}."
 msgstr "Every bot loses access to {name}."
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Every change waits for your approval."
+msgstr "Every change waits for your approval."
 
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
@@ -7195,8 +7217,8 @@ msgid "In"
 msgstr "In"
 
 #: src/components/integrations/BrexCardsConnectDialog.tsx
-msgid "In Brex, Settings → Developer, create a user token with the scopes cards, budgets, companies.readonly, users.readonly, expenses.card, transactions.card.readonly, travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add cards.pan."
-msgstr "In Brex, Settings → Developer, create a user token with the scopes cards, budgets, companies.readonly, users.readonly, expenses.card, transactions.card.readonly, travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add cards.pan."
+msgid "In Brex: Settings → Developer → Create API token."
+msgstr "In Brex: Settings → Developer → Create API token."
 
 #: src/components/data-room/ImportFromEmail.tsx
 msgid "In Data room"
@@ -7694,6 +7716,10 @@ msgstr "Learned"
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Leave"
 msgstr "Leave"
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Leave Card Numbers Read and Send off."
+msgstr "Leave Card Numbers Read and Send off."
 
 #: src/components/PipelineImportCard.tsx
 msgid "Leave Referred by empty"
@@ -10470,6 +10496,10 @@ msgstr "Per month"
 msgid "Period"
 msgstr "Period"
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Permissions for the token"
+msgstr "Permissions for the token"
+
 #: src/components/legal/LegalGraph.tsx
 msgid "Person"
 msgstr "Person"
@@ -10970,6 +11000,10 @@ msgstr "Read"
 msgid "Read and searchable"
 msgstr "Read and searchable"
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Read and write: Cards, Budgets, Card Expenses"
+msgstr "Read and write: Cards, Budgets, Card Expenses"
+
 #: src/components/finance/AddAccountDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 msgid "Read balances and transactions"
@@ -10987,6 +11021,10 @@ msgstr "Read cards, expenses and bills"
 #: src/components/integrations/FinanceSection.tsx
 msgid "Read exchange balances"
 msgstr "Read exchange balances"
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Read only: Users, Companies, Card Transactions, Trips, Business Accounts Data, Business Accounts Statements"
+msgstr "Read only: Users, Companies, Card Transactions, Trips, Business Accounts Data, Business Accounts Statements"
 
 #: src/components/integrations/IntegrationsHome.tsx
 msgid "Read posts, DMs and bookmarks"
@@ -12222,6 +12260,7 @@ msgid "Saving..."
 msgstr "Saving..."
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/GroupPanel.tsx
@@ -14941,6 +14980,10 @@ msgstr "Use a Google Sheet"
 #: src/components/gtm/EmailItemCard.tsx
 msgid "Use a subject up to 200 characters, recipients up to 200, and a body up to 4,000."
 msgstr "Use a subject up to 200 characters, recipients up to 200, and a body up to 4,000."
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Use a token for the same Brex account."
+msgstr "Use a token for the same Brex account."
 
 #: src/pages/Onboarding.tsx
 msgid "Use an API key instead"
