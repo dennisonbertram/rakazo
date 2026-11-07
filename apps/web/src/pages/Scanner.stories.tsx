@@ -1,6 +1,6 @@
 import type { RakazoDesktop, RakazoDesktopScanner, ScannerState } from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { mockRpc } from "../lib/__mocks__/rpc";
 import { items } from "../stories/fixtures/data-room";
 import { ScannerPage } from "./Scanner";
@@ -31,7 +31,7 @@ function load(kind?: ScannerState["kind"], empty = false) {
     scan: async () => update({ kind: "scanning" }),
     cancel: async () => update({ kind: "ready" }),
     setAutoScan: async (autoScan) => update({ autoScan }),
-    setFolder: async (folder) => update({ folder }),
+    setFolder: fn(async (folder) => update({ folder })),
     setScope: async () => undefined,
     pending: async () => [],
     confirm: async () => ({ ok: true }),
@@ -96,5 +96,73 @@ export const ScanAndCancel: Story = {
     await userEvent.click(await canvas.findByRole("button", { name: "Scan" }));
     await userEvent.click(await canvas.findByRole("button", { name: "Cancel scan" }));
     await expect(canvas.findByRole("button", { name: "Scan" })).resolves.toBeEnabled();
+  },
+};
+
+async function openDestination(canvasElement: HTMLElement) {
+  const screen = within(canvasElement.ownerDocument.body);
+  const settings = canvasElement.querySelector<HTMLButtonElement>(
+    'button[data-slot="dropdown-menu-trigger"]',
+  );
+  if (!settings) throw new Error("Scanner settings menu is missing");
+  await userEvent.click(settings);
+  await userEvent.click((await screen.findAllByRole("menuitem"))[0]!);
+  return within(await screen.findByRole("dialog"));
+}
+
+export const DestinationValidation: Story = {
+  beforeEach: () => load("ready"),
+  play: async ({ canvasElement }) => {
+    const screen = within(canvasElement.ownerDocument.body);
+    let dialog = await openDestination(canvasElement);
+    await userEvent.clear(dialog.getByLabelText("Folder"));
+    await userEvent.type(dialog.getByLabelText("Folder"), "Operations//Invoices");
+    await userEvent.click(dialog.getByRole("button", { name: "Save" }));
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    await expect(screen.getAllByRole("alert")).toHaveLength(1);
+    await expect(window.rakazoDesktop?.scanner?.setFolder).not.toHaveBeenCalled();
+    await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+
+    dialog = await openDestination(canvasElement);
+    await expect(dialog.getByLabelText("Folder")).toHaveValue("Scans");
+    await expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+    await userEvent.clear(dialog.getByLabelText("Folder"));
+    await userEvent.type(dialog.getByLabelText("Folder"), "Operations//Invoices");
+    await userEvent.click(dialog.getByRole("button", { name: "Save" }));
+    await userEvent.clear(dialog.getByLabelText("Folder"));
+    await expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+    await userEvent.type(dialog.getByLabelText("Folder"), " Operations / Invoices ");
+    await userEvent.click(dialog.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await expect(window.rakazoDesktop?.scanner?.setFolder).toHaveBeenCalledWith([
+      "Operations",
+      "Invoices",
+    ]);
+
+    dialog = await openDestination(canvasElement);
+    await expect(dialog.getByLabelText("Folder")).toHaveValue("Operations/Invoices");
+    await userEvent.type(dialog.getByLabelText("Folder"), "//");
+    await userEvent.click(dialog.getByRole("button", { name: "Save" }));
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    dialog = await openDestination(canvasElement);
+    await expect(dialog.getByLabelText("Folder")).toHaveValue("Operations/Invoices");
+    await expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
+  },
+};
+
+export const DestinationKeepsScannerError: Story = {
+  beforeEach: () => load("error"),
+  play: async ({ canvasElement }) => {
+    const screen = within(canvasElement.ownerDocument.body);
+    const dialog = await openDestination(canvasElement);
+    await userEvent.type(dialog.getByLabelText("Folder"), "//");
+    await userEvent.click(dialog.getByRole("button", { name: "Save" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(1));
+    await expect(
+      screen.getByText("Paper jam. Clear the feeder and retry the whole batch."),
+    ).toBeVisible();
   },
 };

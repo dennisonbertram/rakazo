@@ -36,6 +36,7 @@ export function ScannerPage({
   const [pending, setPending] = useState(false);
   const [editingFolder, setEditingFolder] = useState(false);
   const [folder, setFolder] = useState("");
+  const [folderError, setFolderError] = useState("");
   useEffect(() => {
     if (!scanner) return;
     let live = true;
@@ -59,6 +60,10 @@ export function ScannerPage({
     } finally {
       setPending(false);
     }
+  };
+  const editFolder = (open: boolean) => {
+    setFolderError("");
+    setEditingFolder(open);
   };
   const status =
     state?.kind === "ready"
@@ -116,7 +121,7 @@ export function ScannerPage({
                     disabled={!state || pending}
                     onClick={() => {
                       setFolder(state?.folder.join("/") ?? "Scans");
-                      setEditingFolder(true);
+                      editFolder(true);
                     }}
                   >
                     <Trans>Destination…</Trans>
@@ -146,7 +151,7 @@ export function ScannerPage({
         }
       />
       {scanner && (
-        <Dialog open={editingFolder} onOpenChange={setEditingFolder}>
+        <Dialog open={editingFolder} onOpenChange={editFolder}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
@@ -156,14 +161,15 @@ export function ScannerPage({
             <form
               onSubmit={(event) => {
                 event.preventDefault();
+                setFolderError("");
                 const path = folder.trim() ? folder.split("/").map((part) => part.trim()) : [];
                 if (!isScannerFolderPath(path)) {
-                  setError(t`Enter a valid folder path`);
+                  setFolderError(t`Enter a valid folder path`);
                   return;
                 }
                 void run(async () => {
                   await scanner.setFolder(path);
-                  setEditingFolder(false);
+                  editFolder(false);
                 });
               }}
             >
@@ -173,17 +179,20 @@ export function ScannerPage({
               <Input
                 id="scanner-folder"
                 value={folder}
-                onChange={(event) => setFolder(event.target.value)}
+                onChange={(event) => {
+                  setFolder(event.target.value);
+                  setFolderError("");
+                }}
                 placeholder="Scans"
                 autoFocus
               />
-              {error && (
+              {(folderError || error) && (
                 <p role="alert" className="mt-2 text-sm text-destructive">
-                  {error}
+                  {folderError || error}
                 </p>
               )}
               <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setEditingFolder(false)}>
+                <Button type="button" variant="outline" onClick={() => editFolder(false)}>
                   <Trans>Cancel</Trans>
                 </Button>
                 <Button type="submit" disabled={pending}>
