@@ -54,6 +54,12 @@ msgstr ""
 msgid "{0, plural, one {# change} other {# changes}}"
 msgstr ""
 
+#. placeholder {0}: data.savedContacts.length
+#. placeholder {0}: result.savedContacts
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# contact already saved} other {# contacts already saved}}"
+msgstr ""
+
 #. placeholder {0}: counts.unreviewedDocuments
 #: src/pages/Legal.tsx
 msgid "{0, plural, one {# Data room document not yet checked by Legal} other {# Data room documents not yet checked by Legal}}"
@@ -107,14 +113,35 @@ msgstr "{0, plural, one {# model} other {# model}}"
 msgid "{0, plural, one {# needs you} other {# need you}}"
 msgstr ""
 
+#. placeholder {0}: data.newContacts.length
+#. placeholder {0}: result.newContacts
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# new contact} other {# new contacts}}"
+msgstr ""
+
 #. placeholder {0}: glance.legalDueSoon
 #: src/pages/shell/space-sidebar.tsx
 msgid "{0, plural, one {# overdue or due in the next 7 days} other {# overdue or due in the next 7 days}}"
 msgstr ""
 
+#. placeholder {0}: data.existing.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# prospect already in Fundraising} other {# prospects already in Fundraising}}"
+msgstr ""
+
+#. placeholder {0}: data.noPerson.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# prospect with no person yet} other {# prospects with no person yet}}"
+msgstr ""
+
 #. placeholder {0}: rows.length
 #: src/pages/Inbox.tsx
 msgid "{0, plural, one {# result} other {# results}}"
+msgstr ""
+
+#. placeholder {0}: result.failed.length
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {# row failed} other {# rows failed}}"
 msgstr ""
 
 #. placeholder {0}: counted.length
@@ -137,9 +164,19 @@ msgstr ""
 msgid "{0, plural, one {#+ result} other {#+ results}}"
 msgstr ""
 
+#. placeholder {0}: data.add
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Add # prospect to Fundraising} other {Add # prospects to Fundraising}}"
+msgstr ""
+
 #. placeholder {0}: state.count
 #: src/components/data-room/DropZone.tsx
 msgid "{0, plural, one {Added # file} other {Added # files}}"
+msgstr ""
+
+#. placeholder {0}: result.added
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Added # prospect to Fundraising} other {Added # prospects to Fundraising}}"
 msgstr ""
 
 #. placeholder {0}: chosen.length
@@ -170,6 +207,11 @@ msgstr ""
 msgid "{0, plural, one {Last full month} other {Last # full months}}"
 msgstr ""
 
+#. placeholder {0}: question.referred
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {referred # prospect} other {referred # prospects}}"
+msgstr ""
+
 #. placeholder {0}: finishedRuns.length
 #: src/pages/ActivityList.tsx
 msgid "{0, plural, one {Show # finished run} other {Show # finished runs}}"
@@ -183,6 +225,21 @@ msgstr ""
 #. placeholder {0}: linked.safes
 #: src/components/ContactDeleteConfirm.tsx
 msgid "{0, plural, one {the link to # SAFE} other {the links to # SAFEs}}"
+msgstr ""
+
+#. placeholder {0}: data.update
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Update # prospect in Fundraising} other {Update # prospects in Fundraising}}"
+msgstr ""
+
+#. placeholder {0}: data.update
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Update # prospect} other {Update # prospects}}"
+msgstr ""
+
+#. placeholder {0}: result.updated
+#: src/components/PipelineImportCard.tsx
+msgid "{0, plural, one {Updated # prospect in Fundraising} other {Updated # prospects in Fundraising}}"
 msgstr ""
 
 #. placeholder {0}: Math.ceil(oauth.expiresInSeconds / 60)
@@ -209,18 +266,8 @@ msgstr ""
 msgid "{0} ({1}) was not added. Attachments can be up to {MAX_COMPOSE_ATTACHMENT_MB} MB in total."
 msgstr ""
 
-#. placeholder {0}: file.name
-#: src/pages/Shell.tsx
-msgid "{0} (max {ATTACHMENT_MAX_COUNT} attachments)"
-msgstr "{0} (en fazla {ATTACHMENT_MAX_COUNT} ek)"
-
-#. placeholder {0}: file.name
-#: src/pages/Shell.tsx
-msgid "{0} (over 10 MB)"
-msgstr ""
-
 #. placeholder {0}: fullDay(due)
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "{0} (overdue)"
 msgstr ""
 
@@ -242,9 +289,39 @@ msgstr ""
 msgid "{0} {1} SAFE will be removed."
 msgstr ""
 
+#. placeholder {0}: source.name
+#: src/components/integrations/SourceDetail.tsx
+msgid "{0} agent"
+msgstr ""
+
 #. placeholder {0}: selected.name
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "{0} API key"
+msgstr ""
+
+#. placeholder {0}: bot.name
+#. placeholder {1}: capabilityNames[id] ?? id
+#: src/pages/shell/BotAccessSection.tsx
+msgid "{0} can ask to use {1}"
+msgstr ""
+
+#. placeholder {0}: bot.name
+#. placeholder {1}: row.name
+#. placeholder {2}: row.address ?? ""
+#: src/pages/shell/BotAccessSection.tsx
+msgid "{0} can make changes in {1} {2}"
+msgstr ""
+
+#. placeholder {0}: bot.name
+#: src/components/integrations/parts.tsx
+msgid "{0} can make changes in {appName}"
+msgstr ""
+
+#. placeholder {0}: bot.name
+#. placeholder {1}: row.name
+#. placeholder {2}: row.address ?? ""
+#: src/pages/shell/BotAccessSection.tsx
+msgid "{0} can use {1} {2}"
 msgstr ""
 
 #. placeholder {0}: bot.name
@@ -415,6 +492,11 @@ msgstr ""
 msgid "{0}: delivery unknown"
 msgstr ""
 
+#. placeholder {0}: row.name
+#: src/pages/Fundraising.tsx
+msgid "{0}: Interest set to Out, status moved to Passed"
+msgstr ""
+
 #. placeholder {0}: active.name
 #: src/pages/Shell.tsx
 msgid "{0}' computer"
@@ -431,6 +513,10 @@ msgstr ""
 
 #: src/components/finance/ui.tsx
 msgid "{accounts} + stablecoins"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "{adding, plural, one {Add # prospect} other {Add # prospects}}"
 msgstr ""
 
 #: src/components/compose/RecipientField.tsx
@@ -482,6 +568,7 @@ msgid "{count, plural, one {access to # shared document} other {access to # shar
 msgstr ""
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 msgid "{count, plural, one {Synced # meeting} other {Synced # meetings}}"
 msgstr ""
 
@@ -565,6 +652,10 @@ msgstr ""
 msgid "{folders, plural, one {# folder} other {# folders}}"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "{fresh} new emails"
+msgstr ""
+
 #: src/pages/shell/transcript.tsx
 msgid "{from} handed off to {to}"
 msgstr ""
@@ -621,6 +712,10 @@ msgstr ""
 msgid "{late, plural, one {Overdue by # day} other {Overdue by # days}}"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "{left} left to choose"
+msgstr ""
+
 #: src/pages/Fundraising.tsx
 msgid "{legalSafes} SAFEs found in Legal"
 msgstr ""
@@ -642,6 +737,14 @@ msgstr ""
 msgid "{n} of {goal}"
 msgstr ""
 
+#: src/pages/Shell.tsx
+msgid "{name} (max {ATTACHMENT_MAX_COUNT} attachments)"
+msgstr ""
+
+#: src/pages/Shell.tsx
+msgid "{name} (over 10 MB)"
+msgstr ""
+
 #: src/components/integrations/AppDetail.tsx
 msgid "{name} agent"
 msgstr ""
@@ -654,12 +757,16 @@ msgstr ""
 msgid "{name} isn't available on this server."
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "{name}, paid with {paidWith}"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx
 msgid "{newCount, plural, one {# new message} other {# new messages}}"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{notSent} not sent"
 msgstr ""
 
 #: src/pages/Legal.tsx
@@ -690,6 +797,10 @@ msgstr ""
 msgid "{remaining} left · bot is watching, not acting"
 msgstr "{remaining} kaldı · bot yalnızca izliyor"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "{replies} replies"
+msgstr ""
+
 #: src/pages/finance/FinanceBurn.tsx
 msgid "{runMonths} mo"
 msgstr ""
@@ -708,6 +819,10 @@ msgstr ""
 
 #: src/components/inbox/InboxCleanup.tsx
 msgid "{senderCount, plural, one {Skipping inbox for # sender} other {Skipping inbox for # senders}}"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "{sent} sent"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -762,6 +877,10 @@ msgstr ""
 msgid "{title}, {label}"
 msgstr "{title}, {label}"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "{unknown} unknown"
+msgstr ""
+
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "{unpriced} unpriced"
 msgstr ""
@@ -801,6 +920,7 @@ msgstr ""
 msgid "+{0} more"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/legal/LegalContracts.tsx
 msgid "+{count} more"
 msgstr ""
@@ -818,6 +938,10 @@ msgstr ""
 msgid "+{unnamed} more"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "$100K–$500K"
+msgstr ""
+
 #: src/components/finance/WalletDialog.tsx
 msgid "0x… or name.eth"
 msgstr ""
@@ -830,6 +954,10 @@ msgstr ""
 msgid "1 folder"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "1 new email"
+msgstr ""
+
 #: src/pages/Finance.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "1 non-USD transaction not counted"
@@ -837,6 +965,10 @@ msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "1 read tool"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "1 reply"
 msgstr ""
 
 #: src/components/fundraising/MercuryLine.tsx
@@ -857,7 +989,7 @@ msgstr ""
 msgid "3-mo avg, after revenue"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "3-mo change"
 msgstr ""
 
@@ -882,6 +1014,10 @@ msgstr ""
 
 #: src/lib/meeting-capture/controller.ts
 msgid "A recording is already running."
+msgstr ""
+
+#: src/components/ApprovalRulesSettings.tsx
+msgid "A routine"
 msgstr ""
 
 #: src/components/finance/WalletDialog.tsx
@@ -919,6 +1055,13 @@ msgstr ""
 msgid "About spaces"
 msgstr ""
 
+#: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/IntegrationAgentSection.tsx
+#: src/components/integrations/McpDetail.tsx
+#: src/pages/shell/BotAccessSection.tsx
+msgid "Access"
+msgstr ""
+
 #: src/pages/CompanyImport.tsx
 msgid "Access denied"
 msgstr ""
@@ -927,10 +1070,10 @@ msgstr ""
 msgid "Access token"
 msgstr ""
 
+#: src/components/inbox/InboxAccountTabs.tsx
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/finance/FinanceBurn.tsx
-#: src/pages/Inbox.tsx
 msgid "Account"
 msgstr "Hesap"
 
@@ -964,6 +1107,7 @@ msgid "Action items"
 msgstr ""
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/pages/shell/composer.tsx
 msgid "Actions"
@@ -974,7 +1118,7 @@ msgstr ""
 #. placeholder {0}: contact.name
 #: src/components/cap-table/CapTableEditor.tsx
 #: src/components/cap-table/HoldingsTable.tsx
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/Investors.tsx
@@ -1018,6 +1162,8 @@ msgid "Activity {0}"
 msgstr ""
 
 #: src/components/finance/WalletDialog.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/ModelBackupsSettings.tsx
@@ -1199,6 +1345,10 @@ msgstr ""
 msgid "Add speech to text"
 msgstr ""
 
+#: src/pages/CompanyContext.tsx
+msgid "Add the first section"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add the header name."
 msgstr ""
@@ -1227,6 +1377,10 @@ msgstr ""
 msgid "Add to routine"
 msgstr "Rutine ekle"
 
+#: src/pages/shell/page-card.tsx
+msgid "Add to sidebar"
+msgstr ""
+
 #: src/components/gtm/EmailItemCard.tsx
 msgid "Add unsubscribe instructions"
 msgstr ""
@@ -1235,6 +1389,11 @@ msgstr ""
 #: src/components/integrations/FinanceSection.tsx
 #: src/pages/finance/FinanceCrypto.tsx
 msgid "Add wallet"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Add who referred {0}"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -1270,6 +1429,11 @@ msgstr ""
 
 #: src/pages/shell/working-label.ts
 msgid "Adding a contact"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+#: src/pages/shell/working-label.ts
+msgid "Adding prospects"
 msgstr ""
 
 #: src/components/integrations/IMessageSection.tsx
@@ -1319,15 +1483,20 @@ msgstr ""
 msgid "AI data sharing off"
 msgstr ""
 
+#: src/components/inbox/InboxAccountTabs.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/parts.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/finance/FinanceSpend.tsx
-#: src/pages/Inbox.tsx
 msgid "All"
 msgstr ""
 
 #: src/pages/CompanyImport.tsx
 msgid "All accessible items"
+msgstr ""
+
+#: src/components/integrations/parts.tsx
+msgid "All agents"
 msgstr ""
 
 #. placeholder {0}: item.name
@@ -1414,13 +1583,22 @@ msgstr ""
 msgid "Allow AI models"
 msgstr ""
 
+#: src/components/AskCard.tsx
+msgid "Allow all sites for this agent"
+msgstr ""
+
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/parts.tsx
+#: src/components/integrations/SourceDetail.tsx
+#: src/pages/shell/BotAccessSection.tsx
 msgid "Allow changes"
 msgstr ""
 
 #. placeholder {0}: confirmingWrites?.displayName ?? name
+#. placeholder {0}: source.name
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Allow changes in {0}?"
 msgstr ""
 
@@ -1464,6 +1642,10 @@ msgstr ""
 msgid "Allowed durations"
 msgstr ""
 
+#: src/components/AskCard.tsx
+msgid "Allowed for all sites"
+msgstr ""
+
 #: src/pages/Auth.tsx
 msgid "Already have an account?"
 msgstr "Zaten hesabın var mı?"
@@ -1488,8 +1670,16 @@ msgstr ""
 msgid "Already in your Data room as {name}"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Already sent a few minutes ago"
+msgstr ""
+
 #: src/components/data-room/AutoSortDialog.tsx
 msgid "Already tidy."
+msgstr ""
+
+#: src/components/AutoReviewSettings.tsx
+msgid "Also in background runs"
 msgstr ""
 
 #: src/components/inbox/InboxCleanup.tsx
@@ -1517,12 +1707,25 @@ msgstr ""
 msgid "Always allowed"
 msgstr "Her zaman izinli"
 
+#: src/components/AskCard.tsx
+msgid "Always allowed for this routine"
+msgstr ""
+
+#: src/components/AskCard.tsx
+msgid "Always for this agent"
+msgstr ""
+
+#: src/components/AskCard.tsx
+msgid "Always for this routine"
+msgstr ""
+
 #: src/components/cap-table/SafeRows.tsx
 #: src/components/data-room/Preview.tsx
 #: src/components/finance/ui.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 #: src/components/fundraising/SafeDialog.tsx
 #: src/pages/CompanyFactDetail.tsx
-#: src/pages/Finance.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Amount"
 msgstr ""
@@ -1533,6 +1736,10 @@ msgstr ""
 
 #: src/components/HideAmountsToggle.tsx
 msgid "Amounts hidden · Show"
+msgstr ""
+
+#: src/components/ApprovalRulesSettings.tsx
+msgid "An agent"
 msgstr ""
 
 #: src/lib/model-connection-preflight.ts
@@ -1582,6 +1789,10 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "Answers questions about what Devin is working on."
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Any"
 msgstr ""
 
 #: src/pages/Paywall.tsx
@@ -2002,6 +2213,10 @@ msgstr "Yetkilendir"
 msgid "Authorize this server so bots can use its tools. A popup opens."
 msgstr ""
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Auto Review"
+msgstr ""
+
 #: src/pages/legal/LegalContracts.tsx
 msgid "Auto-renews"
 msgstr ""
@@ -2092,7 +2307,7 @@ msgid "Back to sign in"
 msgstr "Oturum açmaya geri dön"
 
 #: src/components/ApprovalRulesSettings.tsx
-msgid "Background runs always ask before they send, change or run anything."
+msgid "Background runs ask before they send, change or run anything, unless you always allowed it, allowed it for one routine, or Auto Review approved it."
 msgstr ""
 
 #: src/pages/ModelBackupsSettings.tsx
@@ -2164,8 +2379,12 @@ msgstr "Bearer token"
 msgid "Before"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "bill"
+msgstr ""
+
+#: src/pages/finance/FinanceLists.tsx
+msgid "Bill"
 msgstr ""
 
 #: src/pages/SettingsOverlay.tsx
@@ -2267,7 +2486,9 @@ msgid "Bots lose access to its tools."
 msgstr ""
 
 #. placeholder {0}: server.name
+#. placeholder {0}: source.name
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Bots lose access to the tools of {0}."
 msgstr ""
 
@@ -2308,7 +2529,7 @@ msgstr ""
 msgid "Breakdown"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "Brex bill, not paid yet"
 msgstr ""
 
@@ -2367,6 +2588,7 @@ msgstr ""
 #: src/pages/CompanyCalendar.tsx
 #: src/pages/Gtm.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/BotAccessSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Calendar"
 msgstr ""
@@ -2377,6 +2599,15 @@ msgstr ""
 
 #: src/pages/shell/composer.tsx
 msgid "Call Elio"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Call logged"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/pages/Fundraising.tsx
+msgid "Call logged. {0} moved to Met"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -2406,6 +2637,7 @@ msgstr "Sunucuya ulaşılamıyor."
 #: src/components/finance/RenameAccountDialog.tsx
 #: src/components/finance/StatementImport.tsx
 #: src/components/finance/WalletDialog.tsx
+#: src/components/fundraising/LogCall.tsx
 #: src/components/fundraising/MercuryDialogs.tsx
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/fundraising/SafeDialog.tsx
@@ -2427,11 +2659,13 @@ msgstr "Sunucuya ulaşılamıyor."
 #: src/components/markdown-link-prompt.tsx
 #: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
+#: src/components/PipelineImportCard.tsx
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/components/teach/TeachRecordingChrome.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/CompanyImportScope.tsx
@@ -2511,7 +2745,7 @@ msgstr ""
 msgid "Card balance owed"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "card bill"
 msgstr ""
 
@@ -2732,8 +2966,6 @@ msgstr ""
 msgid "Check queue"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
 #: src/pages/Investors.tsx
 msgid "Check size"
 msgstr ""
@@ -2879,6 +3111,7 @@ msgstr ""
 msgid "Cleanup"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
 #: src/pages/Inbox.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Clear"
@@ -2903,6 +3136,7 @@ msgstr ""
 msgid "Clear all"
 msgstr ""
 
+#: src/components/AskCard.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Clear conversation"
@@ -2915,12 +3149,15 @@ msgstr ""
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/components/data-room/DataRoomStats.tsx
 #: src/components/finance/ui.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/DataRoom.tsx
 #: src/pages/devin/DevinSessions.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
@@ -2930,6 +3167,10 @@ msgstr ""
 
 #: src/components/compose/RichTextEditor.tsx
 msgid "Clear formatting"
+msgstr ""
+
+#: src/pages/shell/goal.tsx
+msgid "Clear goal"
 msgstr ""
 
 #: src/components/ListControls.tsx
@@ -3140,6 +3381,10 @@ msgstr "Renk"
 msgid "Color {color}"
 msgstr "Renk {color}"
 
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Columns"
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Comfortable"
 msgstr ""
@@ -3157,7 +3402,8 @@ msgstr "Komut değişkeni"
 msgid "Comment"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Committed"
 msgstr ""
 
@@ -3316,6 +3562,7 @@ msgstr ""
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 #: src/pages/memory-providers/SupermemorySettingsForm.tsx
@@ -3537,10 +3784,12 @@ msgid "Connecting to tools"
 msgstr ""
 
 #: src/components/finance/AddAccountDialog.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
 #: src/components/integrations/CustomConnectionDialog.tsx
 #: src/components/integrations/DevinConnectDialog.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
 #: src/components/integrations/IntegrationSetup.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 #: src/components/integrations/OmiPage.tsx
 #: src/components/integrations/parts.tsx
 #: src/pages/Finance.tsx
@@ -3580,6 +3829,7 @@ msgstr ""
 #: src/pages/Contacts.tsx
 #: src/pages/Investors.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/BotAccessSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Contacts"
 msgstr ""
@@ -3591,6 +3841,7 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/inbox/EmailSidePanel.tsx
 #: src/components/inbox/InboxMessageDialog.tsx
+#: src/pages/Company.tsx
 msgid "Context"
 msgstr ""
 
@@ -3678,6 +3929,10 @@ msgstr ""
 msgid "Could not add"
 msgstr "Eklenemedi"
 
+#: src/pages/Fundraising.tsx
+msgid "Could not add {name}"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Could not add the connection"
 msgstr ""
@@ -3705,6 +3960,10 @@ msgstr ""
 #. placeholder {0}: contact.name
 #: src/pages/Investors.tsx
 msgid "Could not change access for {0}"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not change interest"
 msgstr ""
 
 #: src/pages/AccountSettingsOverlay.tsx
@@ -3742,6 +4001,10 @@ msgstr ""
 #: src/pages/shell/dialogs.tsx
 msgid "Could not clear conversation"
 msgstr "Sohbet temizlenemedi"
+
+#: src/pages/Shell.tsx
+msgid "Could not clear the goal"
+msgstr ""
 
 #: src/pages/Fundraising.tsx
 msgid "Could not close the round"
@@ -3802,6 +4065,7 @@ msgstr "Devam edilemedi"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Could not create agent"
 msgstr ""
 
@@ -3978,6 +4242,10 @@ msgstr ""
 msgid "Could not load"
 msgstr "Yüklenemedi"
 
+#: src/pages/shell/BotAccessSection.tsx
+msgid "Could not load access"
+msgstr ""
+
 #: src/pages/ActivityList.tsx
 #: src/pages/McpConnectionActivity.tsx
 msgid "Could not load activity"
@@ -4131,6 +4399,10 @@ msgstr ""
 msgid "Could not load voice settings"
 msgstr "Ses ayarları yüklenemedi"
 
+#: src/pages/Fundraising.tsx
+msgid "Could not log the call"
+msgstr ""
+
 #. placeholder {0}: prospect.name
 #: src/pages/Fundraising.tsx
 msgid "Could not mark {0} waiting"
@@ -4145,7 +4417,7 @@ msgid "Could not mark sent"
 msgstr ""
 
 #. placeholder {0}: names.join(", ")
-#. placeholder {0}: prospect.name
+#. placeholder {0}: row.name
 #: src/pages/DataRoom.tsx
 #: src/pages/Fundraising.tsx
 msgid "Could not move {0}"
@@ -4179,6 +4451,10 @@ msgstr ""
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
 msgid "Could not reach Granola"
+msgstr ""
+
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Could not reach Omi"
 msgstr ""
 
 #: src/components/inbox/EmailAgentPanel.tsx
@@ -4235,6 +4511,7 @@ msgid "Could not remember"
 msgstr ""
 
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 #: src/pages/ScratchpadSection.tsx
 msgid "Could not remove"
 msgstr "Kaldırılamadı"
@@ -4251,8 +4528,13 @@ msgstr "Kural kaldırılamadı"
 msgid "Could not remove the credential"
 msgstr ""
 
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Could not remove the key"
+msgstr ""
+
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Could not rename"
 msgstr ""
 
@@ -4347,6 +4629,10 @@ msgstr "Bu konuşma modeli kaydedilemedi"
 msgid "Could not save that voice"
 msgstr "Bu ses kaydedilemedi"
 
+#: src/pages/Fundraising.tsx
+msgid "Could not save the amount"
+msgstr ""
+
 #: src/pages/McpConnectionsPanel.tsx
 msgid "Could not save the change"
 msgstr ""
@@ -4357,6 +4643,14 @@ msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Could not save the embedding model"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not save the next call"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not save the next step"
 msgstr ""
 
 #: src/pages/shell/bot-page-panel.tsx
@@ -4376,6 +4670,7 @@ msgid "Could not save the SAFE"
 msgstr ""
 
 #: src/components/AutoFileEmailSetting.tsx
+#: src/components/AutoReviewSettings.tsx
 msgid "Could not save the setting"
 msgstr ""
 
@@ -4385,6 +4680,14 @@ msgstr "Bu seçim kaydedilemedi"
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Could not save time zone"
+msgstr ""
+
+#: src/pages/Fundraising.tsx
+msgid "Could not save who referred"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "Could not save:"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -4442,6 +4745,8 @@ msgstr ""
 
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
+#: src/components/PipelineImportCard.tsx
 #: src/pages/Shell.tsx
 msgid "Could not submit this answer"
 msgstr "Bu yanıt gönderilemedi"
@@ -4475,17 +4780,21 @@ msgstr "Güncellenemedi"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/components/integrations/OmiPage.tsx
+#: src/components/integrations/SourceDetail.tsx
+#: src/pages/shell/BotAccessSection.tsx
 msgid "Could not update access"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/components/integrations/OmiPage.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Could not update bot access"
 msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Could not update changes"
 msgstr ""
 
@@ -4578,6 +4887,10 @@ msgstr ""
 msgid "Couldn't read this file"
 msgstr ""
 
+#: src/pages/Inbox.tsx
+msgid "Couldn't restore {count}"
+msgstr ""
+
 #: src/components/inbox/AttachmentReviewDialog.tsx
 msgid "Couldn't review this attachment."
 msgstr ""
@@ -4627,6 +4940,11 @@ msgstr ""
 msgid "Create"
 msgstr "Oluştur"
 
+#. placeholder {0}: query.trim()
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Create “{0}”"
+msgstr ""
+
 #. placeholder {0}: bot.name
 #: src/pages/shell/dialogs.tsx
 msgid "Create a folder and move {0} into it."
@@ -4651,6 +4969,7 @@ msgstr "Hesap oluştur"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Create agent"
 msgstr ""
 
@@ -4766,6 +5085,10 @@ msgstr ""
 msgid "Crypto is left out of cash and this runway."
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Current"
+msgstr ""
+
 #: src/components/AccountAccess.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Current password"
@@ -4809,6 +5132,10 @@ msgstr ""
 msgid "Daily check-in"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Daily limit for new recipients reached. Retry later."
+msgstr ""
+
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Dark"
 msgstr "Koyu"
@@ -4816,6 +5143,7 @@ msgstr "Koyu"
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/DataRoom.tsx
 #: src/pages/Shell.tsx
+#: src/pages/shell/BotAccessSection.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Data room"
 msgstr ""
@@ -4833,8 +5161,10 @@ msgstr ""
 #: src/components/fundraising/SafeDialog.tsx
 #: src/components/fundraising/SafeList.tsx
 #: src/pages/CompanyFactDetail.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
+#: src/pages/Investors.tsx
 #: src/pages/Meetings.tsx
 msgid "Date"
 msgstr ""
@@ -4881,6 +5211,7 @@ msgid "Decline"
 msgstr ""
 
 #: src/components/cap-table/HoldingsTable.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/avatar-studio-popover.tsx
@@ -4908,6 +5239,7 @@ msgstr "Varsayılan ({0})"
 #: src/components/integrations/OmiPage.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/BotContextMenu.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/Fundraising.tsx
 #: src/pages/Investors.tsx
 #: src/pages/KnowledgeSection.tsx
@@ -4942,6 +5274,7 @@ msgstr "{0} sil"
 #. placeholder {0}: item.name
 #: src/components/ContactDeleteConfirm.tsx
 #: src/components/data-room/ItemDialogs.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/shell/BotSkillsSection.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Delete {0}?"
@@ -5143,7 +5476,8 @@ msgstr ""
 msgid "Digest"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Diligence"
 msgstr ""
 
@@ -5162,6 +5496,7 @@ msgstr ""
 #: src/components/ComposeEmail.tsx
 #: src/components/finance/StatementReviewCard.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/gtm/GtmPlan.tsx
@@ -5178,6 +5513,7 @@ msgid "Discard this import?"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Discarded"
@@ -5243,12 +5579,14 @@ msgstr ""
 #: src/components/data-room/DropZone.tsx
 #: src/components/data-room/ImportActivity.tsx
 #: src/components/finance/StatementImport.tsx
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/meeting-capture/RecordingPill.tsx
 #: src/components/teach/TeachComputerOverlay.tsx
 #: src/pages/Legal.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 #: src/pages/shell/composer.tsx
+#: src/pages/shell/goal.tsx
 #: src/pages/shell/message-cards.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Dismiss"
@@ -5332,6 +5670,7 @@ msgstr ""
 #: src/components/investors/ActionItems.tsx
 #: src/components/ListControls.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 #: src/components/sidebar-glance.tsx
 #: src/components/tour/TourPopover.tsx
 #: src/lib/ticket-status.ts
@@ -5495,6 +5834,10 @@ msgstr ""
 msgid "Drag, drop, or paste an image"
 msgstr "Görüntüyü sürükleyip bırakın veya yapıştırın"
 
+#: src/pages/shell/BotAccessSection.tsx
+msgid "Drive"
+msgstr ""
+
 #: src/pages/DataRoom.tsx
 msgid "Drop files here"
 msgstr ""
@@ -5511,7 +5854,7 @@ msgstr ""
 msgid "Drop to add to Data room"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Due"
@@ -5528,6 +5871,10 @@ msgstr ""
 
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Due date"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Due now · {due}"
 msgstr ""
 
 #: src/pages/legal/LegalDeadlines.tsx
@@ -5570,6 +5917,8 @@ msgstr ""
 
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyReview.tsx
 #: src/pages/ContactDetail.tsx
@@ -5596,7 +5945,7 @@ msgstr "Önce düzenle"
 msgid "Edit limit"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/RowSheet.tsx
 msgid "Edit prospect"
 msgstr ""
 
@@ -5686,6 +6035,7 @@ msgid "Embedding model"
 msgstr ""
 
 #: src/components/data-room/folders.ts
+#: src/components/fundraising/PipelineFilter.tsx
 msgid "Empty"
 msgstr ""
 
@@ -5757,9 +6107,9 @@ msgstr "Maksimum çıktı token sayısı için 1 ile {MAX_MODEL_MAX_TOKENS} aras
 msgid "Enter a whole number from 1 to 1000 for the image limit."
 msgstr "Görüntü sınırı için 1 ile 1000 arasında bir tam sayı girin."
 
-#: src/components/ContactDialog.tsx
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/fundraising/SafeDialog.tsx
+#: src/pages/Fundraising.tsx
 msgid "Enter an amount"
 msgstr ""
 
@@ -5847,6 +6197,10 @@ msgstr ""
 
 #: src/components/integrations/AppDetail.tsx
 msgid "Every bot loses access to {name}."
+msgstr ""
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Every change waits for your approval."
 msgstr ""
 
 #: src/pages/RoutineEditor.tsx
@@ -6028,6 +6382,10 @@ msgstr "Hata yönetimi"
 msgid "Fee"
 msgstr ""
 
+#: src/components/ApprovalRulesSettings.tsx
+msgid "Fetches any site"
+msgstr ""
+
 #: src/pages/shell/BotSkillsSection.tsx
 msgid "Fetching…"
 msgstr ""
@@ -6048,9 +6406,14 @@ msgstr ""
 msgid "Filing"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/Inbox.tsx
 msgid "Filter"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Filter · {active}"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -6077,6 +6440,7 @@ msgstr ""
 #: src/pages/finance/FinanceAccounts.tsx
 #: src/pages/finance/FinanceBurn.tsx
 #: src/pages/finance/FinanceCrypto.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceNotFound.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
@@ -6153,6 +6517,10 @@ msgstr "MCP bağlantısı tamamlanıyor…"
 
 #: src/pages/McpOAuthCallback.tsx
 msgid "Finishing sign-in…"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Firewall is on, so this agent can only reply."
 msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
@@ -6261,6 +6629,10 @@ msgstr ""
 msgid "From URL"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "From your list"
+msgstr ""
+
 #: src/components/data-room/PreviewActions.tsx
 msgid "Full screen"
 msgstr ""
@@ -6273,6 +6645,11 @@ msgstr "Tam ekran"
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/pages/Investors.tsx
 msgid "Fully diluted"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Fund details"
 msgstr ""
 
 #: src/components/fundraising/RoundCard.tsx
@@ -6290,6 +6667,12 @@ msgstr ""
 #: src/pages/Shell.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Fundraising"
+msgstr ""
+
+#. placeholder {0}: record.name
+#. placeholder {1}: pipelineStatusNames()[record.status]
+#: src/pages/ContactDetail.tsx
+msgid "Fundraising: {0} · {1}"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -6405,7 +6788,21 @@ msgid "Go to Praci"
 msgstr ""
 
 #: src/pages/Gtm.tsx
+#: src/pages/shell/composer.tsx
+#: src/pages/shell/goal.tsx
 msgid "Goal"
+msgstr ""
+
+#: src/pages/shell/goal.tsx
+msgid "Goal blocked"
+msgstr ""
+
+#: src/pages/shell/goal.tsx
+msgid "Goal met"
+msgstr ""
+
+#: src/pages/shell/goal.tsx
+msgid "Goal stopped"
 msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
@@ -6489,6 +6886,14 @@ msgstr ""
 
 #: src/lib/call-session.ts
 msgid "Hang up, then enter the code on screen."
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Has a link"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Has a next step"
 msgstr ""
 
 #: src/components/inbox/InboxRow.tsx
@@ -6579,6 +6984,7 @@ msgstr "Dökümü gizle"
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "High"
 msgstr "Yüksek"
 
@@ -6589,6 +6995,7 @@ msgstr "Yüksek"
 
 #: src/components/inbox/CleanupHistory.tsx
 #: src/pages/Company.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/CompanyHistory.tsx
 msgid "History"
 msgstr ""
@@ -6796,6 +7203,10 @@ msgstr ""
 msgid "Important"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Important sender"
+msgstr ""
+
 #: src/components/finance/StatementReviewCard.tsx
 msgid "Imported"
 msgstr ""
@@ -6814,12 +7225,13 @@ msgstr ""
 msgid "Importing {done} of {total}"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "In"
 msgstr ""
 
 #: src/components/integrations/BrexCardsConnectDialog.tsx
-msgid "In Brex, Settings → Developer, create a user token with the scopes cards, budgets, companies.readonly, users.readonly, expenses.card, transactions.card.readonly, travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add cards.pan."
+msgid "In Brex: Settings → Developer → Create API token."
 msgstr ""
 
 #: src/components/data-room/ImportFromEmail.tsx
@@ -6863,8 +7275,20 @@ msgstr ""
 msgid "Inbox & email"
 msgstr ""
 
+#: src/components/inbox/InboxPileTabs.tsx
+msgid "Inbox pile"
+msgstr ""
+
 #: src/pages/CompanyImportScope.tsx
 msgid "INBOX, SENT"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Include new email to {first}"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Include reply to {first}"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
@@ -6935,10 +7359,27 @@ msgstr ""
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
 #: src/components/integrations/OmiPage.tsx
+#: src/components/integrations/SourceDetail.tsx
 #: src/components/tour/FirstRunTour.tsx
 #: src/pages/Shell.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Integrations"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Interest"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Interest of {0}: {name}"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Interest: {0}"
 msgstr ""
 
 #: src/pages/shell/bot-panel.tsx
@@ -6958,8 +7399,14 @@ msgstr "Aralık miktarı"
 msgid "Interval unit"
 msgstr "Aralık birimi"
 
-#: src/components/ContactDialog.tsx
-msgid "Intro"
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Intro made"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Intro requested"
 msgstr ""
 
 #: src/components/cap-table/CapTableEditor.tsx
@@ -7060,6 +7507,11 @@ msgstr "az önce"
 msgid "Keep"
 msgstr ""
 
+#. placeholder {0}: dayLabel(kept)
+#: src/components/fundraising/LogCall.tsx
+msgid "Keep {0}"
+msgstr ""
+
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Keep {name}"
 msgstr ""
@@ -7076,6 +7528,10 @@ msgstr ""
 #: src/pages/shell/dialogs.tsx
 msgid "Keep memories"
 msgstr "Hafızayı koru"
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Keep mine"
+msgstr ""
 
 #: src/pages/CompanyReview.tsx
 msgid "Keep separate"
@@ -7147,7 +7603,13 @@ msgstr ""
 msgid "Last 90 days"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Last call"
+msgstr ""
+
+#: src/components/finance/UpcomingSubscriptions.tsx
+#: src/pages/finance/FinanceLists.tsx
 msgid "Last charge"
 msgstr ""
 
@@ -7235,6 +7697,7 @@ msgid "Last used"
 msgstr ""
 
 #: src/components/DesktopUpdates.tsx
+#: src/components/fundraising/PipelineFilter.tsx
 msgid "Later"
 msgstr ""
 
@@ -7270,6 +7733,18 @@ msgstr ""
 
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Leave"
+msgstr ""
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Leave Card Numbers Read and Send off."
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "Leave Referred by empty"
+msgstr ""
+
+#: src/components/fundraising/LogCall.tsx
+msgid "Left message"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
@@ -7407,6 +7882,7 @@ msgstr "Web görsellerini otomatik yükle"
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Finance.tsx
 #: src/pages/Shell.tsx
@@ -7513,6 +7989,24 @@ msgstr ""
 msgid "Locked fields"
 msgstr ""
 
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Log"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Log a call with {0}"
+msgstr ""
+
+#: src/components/fundraising/RowSheet.tsx
+msgid "Log call"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/RowSheet.tsx
+msgid "Log call: {0}"
+msgstr ""
+
 #: src/pages/Paywall.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Log out"
@@ -7528,6 +8022,7 @@ msgstr ""
 
 #: src/lib/ticket-priority.ts
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Low"
 msgstr "Düşük"
 
@@ -7774,11 +8269,16 @@ msgstr "Maksimum çıktı token sayısı"
 msgid "May already be delivered. Send again?"
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Maybe"
+msgstr ""
+
 #: src/pages/memory-providers/SerenitySettingsForm.tsx
 msgid "MCP endpoint"
 msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
+#: src/pages/shell/bot-panel.tsx
 msgid "Medium"
 msgstr "Orta"
 
@@ -7787,13 +8287,17 @@ msgstr "Orta"
 msgid "Medium"
 msgstr "Orta"
 
-#: src/components/ContactDialog.tsx
 #: src/components/integrations/OmiSegments.tsx
 msgid "Meeting"
 msgstr ""
 
 #: src/lib/meeting-capture/title.ts
 msgid "Meeting {time}"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Meeting booked"
 msgstr ""
 
 #: src/lib/slash-skills.ts
@@ -7940,6 +8444,11 @@ msgstr ""
 
 #: src/pages/shell/working-label.ts
 msgid "Messaging you"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Met"
 msgstr ""
 
 #: src/components/fundraising/SafeDialog.tsx
@@ -8094,6 +8603,7 @@ msgstr ""
 #: src/components/integrations/OmiSegments.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/shell/transcript.tsx
 msgid "More"
@@ -8184,7 +8694,6 @@ msgstr ""
 msgid "Move them to your shared memory."
 msgstr "Bunları ortak hafızana taşı."
 
-#: src/components/fundraising/Pipeline.tsx
 #: src/pages/BotContextMenu.tsx
 msgid "Move to"
 msgstr "Taşı"
@@ -8214,8 +8723,8 @@ msgstr ""
 msgid "Moved \"{0}\" to Inbox"
 msgstr ""
 
-#. placeholder {0}: prospect.name
-#. placeholder {1}: contactStageNames()[stage]
+#. placeholder {0}: row.name
+#. placeholder {1}: statusNames()[status]
 #: src/pages/Fundraising.tsx
 msgid "Moved {0} to {1}"
 msgstr ""
@@ -8248,13 +8757,17 @@ msgstr "Sesi kapat"
 #: src/components/data-room/ItemRows.tsx
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/integrations/BrexCardsSection.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Artifacts.tsx
 #: src/pages/Auth.tsx
 #: src/pages/Company.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/Contacts.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/GroupPanel.tsx
 #: src/pages/Investors.tsx
 #: src/pages/McpConnectionsPanel.tsx
@@ -8297,10 +8810,12 @@ msgid "Needs agent-desktop: <0>npm install -g agent-desktop</0>"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 #: src/pages/ActivityList.tsx
 msgid "Needs approval"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/shell/bot-credentials.tsx
 msgid "Needs attention"
 msgstr ""
@@ -8316,6 +8831,10 @@ msgstr ""
 #: src/components/inbox/InboxRow.tsx
 #: src/pages/Inbox.tsx
 msgid "Needs reply"
+msgstr ""
+
+#: src/components/inbox/CleanupSenderRow.tsx
+msgid "Needs reply stopped"
 msgstr ""
 
 #: src/pages/shell/composer.tsx
@@ -8352,6 +8871,7 @@ msgstr ""
 msgid "Net {0}"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
 #: src/pages/McpConnectionsPanel.tsx
 msgid "Never"
 msgstr ""
@@ -8364,6 +8884,7 @@ msgstr ""
 msgid "new"
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/components/investors/ActionItems.tsx
 #: src/components/PageAgentsRow.tsx
 #: src/components/sidebar-glance.tsx
@@ -8382,6 +8903,14 @@ msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "New Bot"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "New contact"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "New email"
 msgstr ""
 
 #: src/components/data-room/FilterBar.tsx
@@ -8422,6 +8951,7 @@ msgid "New mail"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
+#: src/components/MailReplyBatchCard.tsx
 msgid "New message"
 msgstr ""
 
@@ -8443,6 +8973,14 @@ msgstr ""
 #: src/pages/Auth.tsx
 msgid "New password"
 msgstr "Yeni parola"
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "New recipient"
+msgstr ""
+
+#: src/pages/CompanyContext.tsx
+msgid "New section"
+msgstr ""
 
 #: src/pages/shell/bot-picker.tsx
 #: src/pages/shell/dialogs.tsx
@@ -8481,8 +9019,33 @@ msgstr ""
 msgid "Next 30 days"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Next 7 days"
+msgstr ""
+
 #: src/components/inbox/MailAttachments.tsx
 msgid "Next attachment"
+msgstr ""
+
+#: src/components/fundraising/LogCall.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Next call"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Next call {label}"
+msgstr ""
+
+#: src/components/fundraising/LogCall.tsx
+msgid "Next call date"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Next call with {0}"
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -8510,15 +9073,22 @@ msgstr ""
 msgid "Next run {nextRun}"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 msgid "Next step"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Next step of {0}"
 msgstr ""
 
 #: src/pages/Gtm.tsx
 msgid "Next wakeup in {minutes} min"
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
 #: src/components/gtm/GtmCalendar.tsx
 msgid "Next week"
 msgstr ""
@@ -8537,6 +9107,10 @@ msgstr ""
 
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "No agent connections yet."
+msgstr ""
+
+#: src/components/fundraising/LogCall.tsx
+msgid "No answer"
 msgstr ""
 
 #: src/pages/Artifacts.tsx
@@ -8670,6 +9244,10 @@ msgstr ""
 msgid "no email"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "No email"
+msgstr ""
+
 #: src/pages/CompanyImport.tsx
 msgid "No extraction model"
 msgstr ""
@@ -8727,11 +9305,13 @@ msgstr ""
 
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/components/finance/ui.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Calendar.tsx
 #: src/pages/Company.tsx
 #: src/pages/Contacts.tsx
 #: src/pages/devin/DevinSessions.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/Investors.tsx
 #: src/pages/KnowledgeSection.tsx
 #: src/pages/legal/LegalContracts.tsx
@@ -8742,6 +9322,14 @@ msgstr ""
 
 #: src/pages/shell/composer.tsx
 msgid "No matches. Press Escape to send as typed."
+msgstr ""
+
+#: src/pages/shell/BotAccessSection.tsx
+msgid "No matching accounts"
+msgstr ""
+
+#: src/components/integrations/parts.tsx
+msgid "No matching agents"
 msgstr ""
 
 #: src/components/integrations/ConnectAppsStep.tsx
@@ -8811,7 +9399,7 @@ msgstr ""
 msgid "No people yet"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
 msgid "No prospects yet"
 msgstr ""
 
@@ -8841,6 +9429,10 @@ msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "No remote MCP servers found"
+msgstr ""
+
+#: src/components/inbox/InboxRow.tsx
+msgid "No reply needed"
 msgstr ""
 
 #: src/components/integrations/IMessageSection.tsx
@@ -8918,7 +9510,18 @@ msgstr ""
 msgid "No wallets yet. Add a wallet address to see its balances here."
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "No-reply address"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Nobody"
+msgstr ""
+
 #: src/components/data-room/Preview.tsx
+#: src/components/fundraising/LogCall.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/integrations/parts.tsx
 msgid "None"
 msgstr ""
 
@@ -8927,6 +9530,7 @@ msgid "None yet"
 msgstr "Henüz yok"
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceLists.tsx
 msgid "None yet. A vendor shows here after three similar monthly charges."
 msgstr ""
 
@@ -9016,6 +9620,15 @@ msgstr ""
 msgid "Not now"
 msgstr "Şimdi değil"
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Not on this thread"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
+msgid "Not reached"
+msgstr ""
+
 #: src/components/data-room/ItemRows.tsx
 msgid "Not read"
 msgstr ""
@@ -9045,13 +9658,20 @@ msgstr ""
 msgid "Not searchable"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 msgid "Not sent"
 msgstr ""
 
 #: src/components/ComposeEmail.tsx
 msgid "Not sent. {text}"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Not set"
 msgstr ""
 
 #: src/components/AskCard.tsx
@@ -9083,15 +9703,21 @@ msgstr ""
 msgid "Not tagged. Praci can't read your documents."
 msgstr ""
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Not used by firewalled or external agents"
+msgstr ""
+
 #: src/pages/shell/bot-credentials.tsx
 msgid "Not used yet"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 msgid "Not waiting for approval"
 msgstr ""
 
 #: src/components/finance/charts.tsx
+#: src/components/fundraising/LogCall.tsx
 #: src/components/integrations/OmiSegments.tsx
 msgid "Note"
 msgstr ""
@@ -9111,7 +9737,12 @@ msgid "nothing"
 msgstr ""
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceLists.tsx
 msgid "Nothing due in the next 30 days"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "Nothing else changed."
 msgstr ""
 
 #: src/components/ComputerUpdateProgress.tsx
@@ -9200,6 +9831,7 @@ msgstr ""
 msgid "Obligation"
 msgstr ""
 
+#: src/components/integrations/parts.tsx
 #: src/components/MeetingRecordingSettings.tsx
 #: src/pages/Investors.tsx
 #: src/pages/shell/bot-panel.tsx
@@ -9222,12 +9854,24 @@ msgstr ""
 msgid "OK"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Older"
+msgstr ""
+
 #: src/components/data-room/FilterBar.tsx
 msgid "Omi"
 msgstr ""
 
 #: src/components/integrations/OmiPage.tsx
 msgid "Omi agent"
+msgstr ""
+
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Omi developer key"
+msgstr ""
+
+#: src/components/integrations/parts.tsx
+msgid "On"
 msgstr ""
 
 #. placeholder {0}: call.botName
@@ -9319,6 +9963,10 @@ msgstr ""
 msgid "Open again"
 msgstr ""
 
+#: src/components/integrations/IntegrationsHome.tsx
+msgid "Open agent"
+msgstr ""
+
 #: src/pages/CompanyImport.tsx
 msgid "Open Company"
 msgstr ""
@@ -9368,6 +10016,7 @@ msgid "Open in Brex"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 msgid "Open in composer"
 msgstr ""
 
@@ -9400,7 +10049,8 @@ msgstr ""
 msgid "Open link"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 msgid "Open Mercury"
 msgstr ""
 
@@ -9455,6 +10105,10 @@ msgstr ""
 
 #: src/components/computer/TerminalApp.tsx
 msgid "Opened {path}"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Opened in composer"
 msgstr ""
 
 #: src/pages/shell/transcript.tsx
@@ -9529,8 +10183,8 @@ msgstr "Orijinal mesaj kullanılamıyor"
 msgid "Other"
 msgstr ""
 
-#: src/components/integrations/IntegrationAgentSection.tsx
-msgid "Other agents can read {service}; changes still go through this agent."
+#: src/components/integrations/parts.tsx
+msgid "Other agents"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -9557,12 +10211,27 @@ msgstr ""
 
 #: src/components/finance/charts.tsx
 #: src/components/finance/ui.tsx
+#: src/components/fundraising/PipelineControls.tsx
 #: src/pages/finance/FinanceBurn.tsx
 msgid "Out"
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
+msgid "Outcome"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Over $500K"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
 #: src/pages/legal/LegalDeadlines.tsx
 msgid "Overdue"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Overdue: {label}"
 msgstr ""
 
 #: src/pages/Company.tsx
@@ -9613,6 +10282,7 @@ msgstr ""
 msgid "Pages"
 msgstr ""
 
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Paid with"
 msgstr ""
@@ -9654,8 +10324,13 @@ msgstr ""
 msgid "Party"
 msgstr ""
 
-#: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/pages/ContactDetail.tsx
 msgid "Passed"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Passed · {passed}"
 msgstr ""
 
 #: src/components/PasskeySettings.tsx
@@ -9685,6 +10360,10 @@ msgstr "Parola güncellendi"
 #: src/pages/Auth.tsx
 msgid "Passwords do not match"
 msgstr "Parolalar eşleşmiyor"
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Past 7 days"
+msgstr ""
 
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Past charges"
@@ -9748,6 +10427,7 @@ msgstr ""
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/RoutineEditor.tsx
+#: src/pages/shell/goal.tsx
 msgid "Paused"
 msgstr ""
 
@@ -9762,6 +10442,10 @@ msgstr ""
 #: src/components/integrations/OmiPage.tsx
 msgid "Paused · {0} of {1} min saved"
 msgstr ""
+
+#: src/pages/RoutineEditor.tsx
+msgid "Paused: model connection out of credit"
+msgstr "Duraklatıldı: model bağlantısının kredisi bitti"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Paused: no access"
@@ -9799,13 +10483,14 @@ msgstr ""
 msgid "Pendant recordings, meetings and notes"
 msgstr ""
 
+#: src/components/finance/UpcomingSubscriptions.tsx
 #: src/components/pages/PageSourcesDialog.tsx
-#: src/pages/Finance.tsx
 msgid "pending"
 msgstr ""
 
 #: src/components/finance/ui.tsx
 #: src/components/fundraising/RoundCard.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Pending"
 msgstr ""
@@ -9820,13 +10505,18 @@ msgstr ""
 msgid "Per model and documents"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Per month"
 msgstr ""
 
 #: src/components/finance/ui.tsx
 msgid "Period"
+msgstr ""
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Permissions for the token"
 msgstr ""
 
 #: src/components/legal/LegalGraph.tsx
@@ -9858,6 +10548,10 @@ msgstr "Listeden bir model seç veya bu uç noktanın sunduğu bir model kimliğ
 msgid "Pick a provider below and connect it."
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
+msgid "Pick date"
+msgstr ""
+
 #: src/components/sidebar-folders/SidebarDnd.tsx
 msgid "Picked up {item}."
 msgstr ""
@@ -9866,7 +10560,7 @@ msgstr ""
 msgid "Pin"
 msgstr "Sabitle"
 
-#: src/pages/Fundraising.tsx
+#: src/components/fundraising/PipelineTable.tsx
 msgid "Pipeline"
 msgstr ""
 
@@ -9910,6 +10604,21 @@ msgstr ""
 
 #: src/components/CopyLinkDialog.tsx
 msgid "Portal link"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Possible amount"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Possible amount of {0}"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Possible duplicate"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
@@ -10152,6 +10861,10 @@ msgstr ""
 msgid "Pro rata side letter"
 msgstr ""
 
+#: src/pages/shell/bot-panel.tsx
+msgid "Proactive"
+msgstr ""
+
 #: src/components/data-room/ProcessingStrip.tsx
 msgid "Processing"
 msgstr ""
@@ -10187,6 +10900,7 @@ msgid "Promotions"
 msgstr ""
 
 #: src/components/ContactDialog.tsx
+#: src/components/fundraising/PipelineTable.tsx
 msgid "Prospect"
 msgstr ""
 
@@ -10305,6 +11019,10 @@ msgstr ""
 msgid "Read and searchable"
 msgstr ""
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Read and write: Cards, Budgets, Card Expenses"
+msgstr ""
+
 #: src/components/finance/AddAccountDialog.tsx
 #: src/components/integrations/FinanceSection.tsx
 msgid "Read balances and transactions"
@@ -10321,6 +11039,10 @@ msgstr ""
 
 #: src/components/integrations/FinanceSection.tsx
 msgid "Read exchange balances"
+msgstr ""
+
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Read only: Users, Companies, Card Transactions, Trips, Business Accounts Data, Business Accounts Statements"
 msgstr ""
 
 #: src/components/integrations/IntegrationsHome.tsx
@@ -10491,6 +11213,10 @@ msgstr ""
 msgid "Recent activity"
 msgstr ""
 
+#: src/components/AutoReviewSettings.tsx
+msgid "Recently approved by Auto Review"
+msgstr ""
+
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Recipients"
 msgstr ""
@@ -10534,6 +11260,7 @@ msgid "Reconnect Mercury"
 msgstr ""
 
 #: src/components/integrations/GranolaMeetingsCard.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 msgid "Reconnect needed"
 msgstr ""
 
@@ -10622,12 +11349,22 @@ msgstr "Çalışmayan bir bilgisayarı yeniden oluşturun."
 msgid "Recreating the computer"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "recurring"
+msgstr ""
+
+#: src/pages/finance/FinanceLists.tsx
+msgid "Recurring"
 msgstr ""
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Redirect URI"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Referred by"
 msgstr ""
 
 #: src/App.tsx
@@ -10720,6 +11457,7 @@ msgstr ""
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/FinanceSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 #: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
@@ -10737,6 +11475,7 @@ msgstr "Kaldır"
 #: src/components/ComposeEmail.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 #: src/pages/shell/composer.tsx
 msgid "Remove {0}"
 msgstr "{0} kaldır"
@@ -10748,6 +11487,7 @@ msgstr "{0} kaldır"
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/IntegrationsHome.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 #: src/components/pages/PageSourcesDialog.tsx
 #: src/components/PasskeySettings.tsx
 #: src/pages/finance/FinanceCrypto.tsx
@@ -10788,6 +11528,7 @@ msgid "Remove filter {label}"
 msgstr ""
 
 #: src/components/SidebarPages.tsx
+#: src/pages/shell/page-card.tsx
 msgid "Remove from sidebar"
 msgstr ""
 
@@ -10798,11 +11539,6 @@ msgstr ""
 #: src/components/compose/RichTextEditor.tsx
 msgid "Remove link"
 msgstr ""
-
-#. placeholder {0}: mention.name
-#: src/pages/shell/composer.tsx
-msgid "Remove mention {0}"
-msgstr "{0} bahsini kaldır"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Remove message trigger"
@@ -10872,6 +11608,7 @@ msgid "Removes the audio, transcripts and meetings from Praci."
 msgstr ""
 
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Removes the connection and bot access."
 msgstr ""
 
@@ -10887,6 +11624,7 @@ msgstr ""
 #: src/components/data-room/ItemMenu.tsx
 #: src/components/integrations/AppDetail.tsx
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 #: src/components/sidebar-folders/FolderHeader.tsx
 #: src/pages/BotContextMenu.tsx
 #: src/pages/finance/FinanceAccounts.tsx
@@ -11015,6 +11753,10 @@ msgstr ""
 msgid "Research & writing"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Researched"
+msgstr ""
+
 #: src/pages/Investors.tsx
 msgid "Resend link"
 msgstr ""
@@ -11082,6 +11824,7 @@ msgid "Restart to update"
 msgstr ""
 
 #: src/components/integrations/OmiSegments.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/Legal.tsx
 #: src/pages/shell/space-sidebar.tsx
 msgid "Restore"
@@ -11127,11 +11870,11 @@ msgstr ""
 #: src/components/integrations/BrexCardsSection.tsx
 #: src/components/integrations/BrexControlsForm.tsx
 #: src/components/integrations/HexCard.tsx
-#: src/components/MailApprovalCard.tsx
 #: src/components/pages/PageLiveBlocks.tsx
 #: src/pages/Auth.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyCalendar.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/CompanyImport.tsx
 #: src/pages/CompanyImportScope.tsx
 #: src/pages/CompanyPrivacy.tsx
@@ -11141,10 +11884,12 @@ msgstr ""
 #: src/pages/investors/UpdateEditor.tsx
 #: src/pages/Legal.tsx
 #: src/pages/ModelBackupsSettings.tsx
+#: src/pages/shell/BotAccessSection.tsx
 #: src/pages/shell/composer-error.tsx
 msgid "Retry"
 msgstr "Yeniden dene"
 
+#: src/components/MailReplyBatchCard.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Retry failed"
 msgstr ""
@@ -11172,6 +11917,7 @@ msgstr "Praci'ya dön"
 msgid "Revenue"
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
 #: src/pages/Company.tsx
 #: src/pages/CompanyImport.tsx
 msgid "Review"
@@ -11179,6 +11925,10 @@ msgstr ""
 
 #: src/components/gtm/EmailItemCard.tsx
 msgid "Review again"
+msgstr ""
+
+#: src/components/MailReplyBatchCard.tsx
+msgid "Review all ({count})"
 msgstr ""
 
 #: src/lib/model-connection-preflight.ts
@@ -11371,6 +12121,10 @@ msgstr ""
 msgid "Same person?"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "Same text as others"
+msgstr ""
+
 #: src/pages/CompanyImport.tsx
 msgid "Sample · up to 25 items per source"
 msgstr ""
@@ -11392,6 +12146,8 @@ msgstr ""
 #: src/components/finance/charts.tsx
 #: src/components/finance/RenameAccountDialog.tsx
 #: src/components/finance/WalletDialog.tsx
+#: src/components/fundraising/LogCall.tsx
+#: src/components/fundraising/PipelineControls.tsx
 #: src/components/fundraising/RoundCard.tsx
 #: src/components/gtm/EmailItemCard.tsx
 #: src/components/integrations/AlchemyConnectDialog.tsx
@@ -11401,6 +12157,7 @@ msgstr ""
 #: src/components/integrations/IMessageSection.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/Board.tsx
+#: src/pages/CompanyContext.tsx
 #: src/pages/CompanyFactDetail.tsx
 #: src/pages/CompanyImportScope.tsx
 #: src/pages/ExternalConversationSettings.tsx
@@ -11482,9 +12239,21 @@ msgstr "Kaydedildi"
 msgid "Saved {0}"
 msgstr ""
 
+#: src/components/PipelineImportCard.tsx
+msgid "Saved contacts are not overwritten."
+msgstr ""
+
+#: src/pages/shell/BotAccessSection.tsx
+msgid "Saved, but another account of this app limits access"
+msgstr ""
+
 #: src/pages/ScratchpadSection.tsx
 msgid "Saved, but list refresh failed"
 msgstr "Kaydedildi ama liste yenilenemedi"
+
+#: src/pages/shell/BotAccessSection.tsx
+msgid "Saved, but the list could not be refreshed"
+msgstr ""
 
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Saved."
@@ -11502,6 +12271,10 @@ msgstr ""
 msgid "Saving results…"
 msgstr ""
 
+#: src/pages/shell/working-label.ts
+msgid "Saving the round"
+msgstr ""
+
 #: src/components/ComputerUpdateProgress.tsx
 msgid "Saving your workspace"
 msgstr ""
@@ -11511,6 +12284,7 @@ msgid "Saving..."
 msgstr ""
 
 #: src/components/AskCard.tsx
+#: src/components/integrations/BrexCardsConnectDialog.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/teach/SkillDraftCard.tsx
 #: src/pages/GroupPanel.tsx
@@ -11601,8 +12375,16 @@ msgstr ""
 msgid "Search"
 msgstr "Ara"
 
+#: src/pages/shell/BotAccessSection.tsx
+msgid "Search accounts"
+msgstr ""
+
 #: src/pages/ActivityList.tsx
 msgid "Search activity"
+msgstr ""
+
+#: src/components/integrations/parts.tsx
+msgid "Search agents"
 msgstr ""
 
 #: src/pages/DataRoom.tsx
@@ -11627,6 +12409,10 @@ msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Search by domain"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Search contacts"
 msgstr ""
 
 #: src/pages/legal/LegalContracts.tsx
@@ -11692,6 +12478,10 @@ msgstr ""
 msgid "Search pages, bots, groups, documents and artifacts"
 msgstr ""
 
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Search prospects"
+msgstr ""
+
 #: src/pages/ModelSettingsOverlay.tsx
 msgid "Search providers"
 msgstr "Sağlayıcı ara"
@@ -11704,12 +12494,20 @@ msgstr ""
 msgid "Search sessions"
 msgstr ""
 
+#: src/pages/finance/FinanceLists.tsx
+msgid "Search subscriptions"
+msgstr ""
+
 #: src/components/integrations/CustomConnectionDialog.tsx
 msgid "Search the directory"
 msgstr ""
 
 #: src/components/finance/ui.tsx
 msgid "Search transactions"
+msgstr ""
+
+#: src/pages/finance/FinanceLists.tsx
+msgid "Search upcoming"
 msgstr ""
 
 #: src/pages/DataRoom.tsx
@@ -11732,6 +12530,11 @@ msgstr ""
 #: src/components/cap-table/HoldingsTable.tsx
 #: src/pages/Inbox.tsx
 msgid "Security"
+msgstr ""
+
+#. placeholder {0}: list.total
+#: src/components/CappedList.tsx
+msgid "See all ({0})"
 msgstr ""
 
 #: src/pages/Shell.tsx
@@ -11777,6 +12580,7 @@ msgstr "Bağlı bir model seçin"
 #: src/components/data-room/AutoSortDialog.tsx
 #: src/components/data-room/ItemRows.tsx
 #: src/components/inbox/InboxCleanup.tsx
+#: src/components/MailReplyBatchCard.tsx
 msgid "Select all"
 msgstr ""
 
@@ -11864,13 +12668,19 @@ msgid "Send reset link"
 msgstr "Sıfırlama bağlantısı gönder"
 
 #: src/components/fundraising/MercuryDialogs.tsx
-#: src/components/fundraising/Pipeline.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/fundraising/SafeDialog.tsx
 msgid "Send SAFE"
 msgstr ""
 
 #: src/components/MailApprovalCard.tsx
 msgid "Send saved draft"
+msgstr ""
+
+#. placeholder {0}: ticked.length
+#: src/components/MailReplyBatchCard.tsx
+msgid "Send selected ({0})"
 msgstr ""
 
 #: src/components/data-room/SelectionBar.tsx
@@ -11902,6 +12712,7 @@ msgstr ""
 #: src/components/AskCard.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailOutbox.tsx
+#: src/components/MailReplyBatchCard.tsx
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Sending…"
 msgstr "Gönderiliyor…"
@@ -11915,6 +12726,7 @@ msgstr ""
 #: src/components/inbox/InboxMessageDialog.tsx
 #: src/components/MailApprovalCard.tsx
 #: src/components/MailOutbox.tsx
+#: src/components/MailReplyBatchCard.tsx
 #: src/pages/ContactDetail.tsx
 #: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
@@ -11974,6 +12786,14 @@ msgstr ""
 
 #: src/components/integrations/IMessageSection.tsx
 msgid "Set by server"
+msgstr ""
+
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Set date"
+msgstr ""
+
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Set interest"
 msgstr ""
 
 #: src/components/integrations/ConnectAppsStep.tsx
@@ -12094,6 +12914,7 @@ msgid "Shell"
 msgstr "Kabuk"
 
 #: src/components/HiddenBotsList.tsx
+#: src/components/integrations/parts.tsx
 msgid "Show"
 msgstr ""
 
@@ -12114,10 +12935,6 @@ msgstr ""
 msgid "Show all {0} changes"
 msgstr ""
 
-#: src/pages/Finance.tsx
-msgid "Show all {total}"
-msgstr ""
-
 #: src/pages/Legal.tsx
 msgid "Show closed"
 msgstr ""
@@ -12130,8 +12947,8 @@ msgstr ""
 msgid "Show in sidebar"
 msgstr ""
 
+#: src/components/CappedList.tsx
 #: src/components/MailApprovalCard.tsx
-#: src/pages/Finance.tsx
 msgid "Show less"
 msgstr ""
 
@@ -12319,7 +13136,7 @@ msgid "Signed out. Reconnect to keep reading this account's mail."
 msgstr ""
 
 #. placeholder {0}: other.name
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "Similar to {0}"
 msgstr ""
 
@@ -12383,6 +13200,10 @@ msgstr ""
 msgid "Skip or deploy key"
 msgstr "Atla veya dağıtım anahtarı kullan"
 
+#: src/components/PipelineImportCard.tsx
+msgid "Skip this row"
+msgstr ""
+
 #: src/components/SkipToContent.tsx
 msgid "Skip to content"
 msgstr ""
@@ -12395,8 +13216,14 @@ msgstr ""
 msgid "Skip tour"
 msgstr ""
 
+#: src/components/AskCard.tsx
+#: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
+msgid "Skipped"
+msgstr ""
+
 #. placeholder {0}: failed.join(", ")
-#. placeholder {0}: skipped.join(", ")
+#. placeholder {0}: notSent.join(", ")
 #: src/pages/Shell.tsx
 msgid "Skipped {0}"
 msgstr "{0} atlandı"
@@ -12462,6 +13289,10 @@ msgstr "Bir şeyler ters gitti. Tekrar deneyin."
 
 #: src/components/ListControls.tsx
 msgid "Sort ascending"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Sort by"
 msgstr ""
 
 #: src/components/ListControls.tsx
@@ -12596,6 +13427,10 @@ msgstr ""
 msgid "Spent this month"
 msgstr ""
 
+#: src/components/fundraising/LogCall.tsx
+msgid "Spoke"
+msgstr ""
+
 #: src/lib/slash-skills.ts
 msgid "Spot scam tokens and look-alike addresses in your wallets."
 msgstr ""
@@ -12615,12 +13450,6 @@ msgstr ""
 
 #: src/components/finance/CountCryptoButton.tsx
 msgid "Stablecoins only"
-msgstr ""
-
-#: src/components/ContactDialog.tsx
-#: src/pages/ContactDetail.tsx
-#: src/pages/Investors.tsx
-msgid "Stage"
 msgstr ""
 
 #: src/pages/Inbox.tsx
@@ -12651,6 +13480,10 @@ msgstr ""
 msgid "Start recording"
 msgstr "Kaydı başlat"
 
+#: src/pages/CompanyContext.tsx
+msgid "Start with one product or topic."
+msgstr ""
+
 #: src/pages/ActivityList.tsx
 #: src/pages/shell/transcript.tsx
 msgid "Starting"
@@ -12679,15 +13512,30 @@ msgstr ""
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/ItemRows.tsx
 #: src/components/finance/ui.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
+#: src/components/fundraising/PipelineFilter.tsx
+#: src/components/fundraising/PipelineTable.tsx
+#: src/components/fundraising/RowSheet.tsx
 #: src/components/integrations/BrexCardsSection.tsx
+#: src/components/integrations/IntegrationsHome.tsx
 #: src/pages/ActivityList.tsx
 #: src/pages/Board.tsx
 #: src/pages/devin/DevinSessions.tsx
-#: src/pages/Finance.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 #: src/pages/gtm/GtmChannels.tsx
+#: src/pages/Investors.tsx
 #: src/pages/legal/LegalContracts.tsx
 msgid "Status"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/components/fundraising/PipelineControls.tsx
+msgid "Status of {0}: {name}"
+msgstr ""
+
+#. placeholder {0}: candidate.stays
+#: src/components/PipelineImportCard.tsx
+msgid "Stays on {0}"
 msgstr ""
 
 #. placeholder {0}: stepIndex + 1
@@ -12790,6 +13638,11 @@ msgstr ""
 msgid "Stopped"
 msgstr ""
 
+#. placeholder {0}: status.sender
+#: src/pages/Inbox.tsx
+msgid "Stopped Needs reply for {0}"
+msgstr ""
+
 #. placeholder {0}: live.lastTestNote
 #: src/components/teach/SkillDraftCard.tsx
 msgid "Stopped: {0}"
@@ -12821,6 +13674,7 @@ msgstr "alt ajan"
 
 #: src/components/ComposeEmail.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/pages/Investors.tsx
 #: src/pages/investors/UpdateEditor.tsx
 msgid "Subject"
 msgstr ""
@@ -12840,6 +13694,7 @@ msgid "Subscription required"
 msgstr ""
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceSpend.tsx
 #: src/pages/finance/FinanceTransaction.tsx
 msgid "Subscriptions"
@@ -12913,6 +13768,7 @@ msgstr ""
 #: src/components/inbox/TodoCard.tsx
 #: src/components/integrations/GranolaMeetingsCard.tsx
 #: src/components/integrations/HexCard.tsx
+#: src/components/integrations/OmiCloudKeyCard.tsx
 msgid "Syncing"
 msgstr ""
 
@@ -12956,7 +13812,6 @@ msgstr ""
 msgid "Talks to people outside your company. Anything private it would share waits for your approval. Private tools are turned off."
 msgstr ""
 
-#: src/components/ContactDialog.tsx
 #: src/components/fundraising/RoundCard.tsx
 msgid "Target"
 msgstr ""
@@ -13067,6 +13922,8 @@ msgid "the {month} statement"
 msgstr ""
 
 #: src/components/integrations/IntegrationAgentSection.tsx
+#: src/components/integrations/parts.tsx
+#: src/pages/shell/BotAccessSection.tsx
 msgid "The agent asks you before each change."
 msgstr ""
 
@@ -13075,7 +13932,9 @@ msgid "The agent did not finish a draft"
 msgstr ""
 
 #. placeholder {0}: confirmingWrites?.displayName ?? name
+#. placeholder {0}: source.name
 #: src/components/integrations/AppDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "The agent will be able to change your {0} data. It asks before each change."
 msgstr ""
 
@@ -13230,7 +14089,7 @@ msgstr ""
 msgid "The transactions read add up to the closing balance"
 msgstr ""
 
-#: src/pages/Finance.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 msgid "The usual charge scaled to a month, or for usage-based vendors the average of recent full months. The vendor page shows the same figure."
 msgstr ""
 
@@ -13309,6 +14168,7 @@ msgid "This computer"
 msgstr ""
 
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "This connection no longer exists."
 msgstr ""
 
@@ -13364,6 +14224,10 @@ msgstr ""
 
 #: src/components/finance/ui.tsx
 msgid "This page doesn't exist or was removed."
+msgstr ""
+
+#: src/pages/shell/page-card.tsx
+msgid "This page is no longer available."
 msgstr ""
 
 #: src/components/AccountAccess.tsx
@@ -13455,6 +14319,11 @@ msgstr ""
 msgid "Tickets track work for your bots. Bots add them when you ask them to track a task, or press New ticket."
 msgstr ""
 
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/RowSheet.tsx
+msgid "Time"
+msgstr ""
+
 #: src/pages/RoutineSchedule.tsx
 msgid "Time of day"
 msgstr "Günün saati"
@@ -13504,6 +14373,8 @@ msgid "To-dos"
 msgstr ""
 
 #: src/components/EmailCards.tsx
+#: src/components/fundraising/PipelineControls.tsx
+#: src/components/fundraising/PipelineFilter.tsx
 #: src/components/gtm/GtmCalendar.tsx
 #: src/components/inbox/TodoCard.tsx
 #: src/components/integrations/OmiSegments.tsx
@@ -13751,6 +14622,7 @@ msgstr ""
 #: src/components/data-room/Preview.tsx
 #: src/components/finance/WalletDialog.tsx
 #: src/pages/Artifacts.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/legal/LegalContracts.tsx
 #: src/pages/McpConnectionsPanel.tsx
 #: src/pages/shell/bot-credentials.tsx
@@ -13804,6 +14676,10 @@ msgstr ""
 msgid "Uncategorized"
 msgstr ""
 
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Under $100K"
+msgstr ""
+
 #: src/components/compose/RichTextEditor.tsx
 msgid "Underline"
 msgstr ""
@@ -13839,6 +14715,7 @@ msgstr ""
 
 #: src/components/finance/ui.tsx
 #: src/components/MailApprovalCard.tsx
+#: src/components/MailReplyBatchCard.tsx
 #: src/lib/devin-format.ts
 #: src/pages/CompanyImport.tsx
 #: src/pages/legal/LegalContracts.tsx
@@ -13941,6 +14818,7 @@ msgid "Upcoming"
 msgstr ""
 
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceLists.tsx
 msgid "Upcoming · 30 days"
 msgstr ""
 
@@ -14038,6 +14916,18 @@ msgstr ""
 msgid "Updating…"
 msgstr ""
 
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade"
+msgstr ""
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade system prompt"
+msgstr ""
+
+#: src/components/InstructionsUpgradeNotice.tsx
+msgid "Upgrade this agent's system prompt?"
+msgstr ""
+
 #: src/components/computer/FilesApp.tsx
 #: src/components/data-room/FilterBar.tsx
 #: src/components/finance/StatementReminderBanner.tsx
@@ -14127,8 +15017,16 @@ msgstr ""
 msgid "Use a subject up to 200 characters, recipients up to 200, and a body up to 4,000."
 msgstr ""
 
+#: src/components/integrations/BrexCardsConnectDialog.tsx
+msgid "Use a token for the same Brex account."
+msgstr ""
+
 #: src/pages/Onboarding.tsx
 msgid "Use an API key instead"
+msgstr ""
+
+#: src/components/integrations/OmiCloudKeyCard.tsx
+msgid "Use an Omi key"
 msgstr ""
 
 #: src/components/integrations/CustomConnectionDialog.tsx
@@ -14196,10 +15094,7 @@ msgstr "Kendi anahtarınızı kullanın"
 msgid "Used {0}"
 msgstr ""
 
-#: src/components/integrations/AppDetail.tsx
-#: src/components/integrations/IntegrationAgentSection.tsx
 #: src/components/integrations/IntegrationsHome.tsx
-#: src/components/integrations/McpDetail.tsx
 msgid "Used by"
 msgstr ""
 
@@ -14237,7 +15132,9 @@ msgid "Values are encrypted and never shown again."
 msgstr "Değerler şifrelenir ve bir daha gösterilmez."
 
 #: src/components/ContactDialog.tsx
+#: src/components/finance/UpcomingSubscriptions.tsx
 #: src/pages/Finance.tsx
+#: src/pages/finance/FinanceLists.tsx
 #: src/pages/finance/FinanceSpend.tsx
 msgid "Vendor"
 msgstr ""
@@ -14285,6 +15182,10 @@ msgstr "Sohbeti görüntüle"
 
 #: src/pages/CompanyReview.tsx
 msgid "View evidence"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "View in Pipeline"
 msgstr ""
 
 #: src/pages/CompanyRefresh.tsx
@@ -14348,8 +15249,9 @@ msgstr ""
 msgid "Waiting for approval"
 msgstr ""
 
-#: src/components/fundraising/Pipeline.tsx
-msgid "Waiting for Mercury · {waiting}"
+#. placeholder {0}: dayLabel(row.waitingSince.slice(0, 10))
+#: src/components/fundraising/PipelineTable.tsx
+msgid "Waiting for Mercury · {0}"
 msgstr ""
 
 #: src/components/data-room/ProcessingStrip.tsx
@@ -14394,6 +15296,7 @@ msgstr ""
 
 #: src/components/BotTodos.tsx
 #: src/pages/ActivityList.tsx
+#: src/pages/shell/goal.tsx
 msgid "Waiting on you"
 msgstr ""
 
@@ -14428,6 +15331,10 @@ msgstr ""
 
 #: src/pages/RoutineEditor.tsx
 msgid "Watches {host}"
+msgstr ""
+
+#: src/components/fundraising/PipelineFilter.tsx
+msgid "Wave"
 msgstr ""
 
 #: src/lib/devin-format.ts
@@ -14501,6 +15408,10 @@ msgstr ""
 msgid "What did we spend last month?"
 msgstr ""
 
+#: src/pages/CompanyContext.tsx
+msgid "What is it?"
+msgstr ""
+
 #: src/lib/finance-agent.ts
 msgid "What is our runway?"
 msgstr ""
@@ -14516,6 +15427,10 @@ msgstr ""
 #: src/components/teach/TeachComputerOverlay.tsx
 msgid "What result will you demonstrate?"
 msgstr "Hangi sonucu göstereceksin?"
+
+#: src/pages/CompanyContext.tsx
+msgid "What should every agent know?"
+msgstr ""
 
 #: src/pages/Shell.tsx
 msgid "What should I do first this week?"
@@ -14574,12 +15489,24 @@ msgstr ""
 msgid "Where to find your key"
 msgstr ""
 
+#: src/components/integrations/parts.tsx
+msgid "Which agents can use this account."
+msgstr ""
+
+#: src/components/integrations/parts.tsx
+msgid "Which agents can use this connection."
+msgstr ""
+
 #: src/components/PageAgentIntro.tsx
 msgid "Which bills are unpaid?"
 msgstr ""
 
 #: src/components/integrations/AgentStep.tsx
 msgid "Which bots can use {appName}?"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "Which contact is this?"
 msgstr ""
 
 #: src/components/PageAgentIntro.tsx
@@ -14601,6 +15528,10 @@ msgstr ""
 #: src/lib/investors-agent.ts
 #: src/pages/Shell.tsx
 msgid "Who are our investors?"
+msgstr ""
+
+#: src/components/PipelineImportCard.tsx
+msgid "Who made these introductions?"
 msgstr ""
 
 #: src/components/PageAgentIntro.tsx
@@ -14764,6 +15695,10 @@ msgstr "Kontrol sende"
 msgid "You read most of these, so keep them unless you are sure"
 msgstr ""
 
+#: src/components/MailReplyBatchCard.tsx
+msgid "You said no reply needed"
+msgstr ""
+
 #: src/lib/meeting-capture/controller.ts
 msgid "You were signed out."
 msgstr ""
@@ -14799,7 +15734,9 @@ msgid "Your crypto ({0}) is in Accounts. Add a bank account to see cash, burn, r
 msgstr ""
 
 #. placeholder {0}: server.name
+#. placeholder {0}: source.name
 #: src/components/integrations/McpDetail.tsx
+#: src/components/integrations/SourceDetail.tsx
 msgid "Your data in {0} is not deleted."
 msgstr ""
 

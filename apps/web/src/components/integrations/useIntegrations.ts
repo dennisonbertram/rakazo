@@ -20,7 +20,14 @@ import { rpc, selectedSpaceId } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 
 /** The stored grant, which the access switches edit and save. */
-export type ConnectionAccess = { allAgents: boolean; botIds: string[] };
+/** What the toggles save. */
+export type AccessValue = { allAgents: boolean; botIds: string[] };
+/** The server's answer; agentShared is the "Let other agents use it" switch. */
+export type ConnectionAccess = AccessValue & {
+  agentShared: boolean;
+  /** Granted agents that may also make changes (each still asks), while the connection allows changes. */
+  writeBotIds?: string[];
+};
 /** The stored grant plus who can really use the connection, as computed by the server. */
 export type ConnectionAccessState = ConnectionAccess & {
   effectiveAccess: { shared: "all" | "some" | "none"; botIds: string[] };
@@ -138,9 +145,14 @@ export function useIntegrations(): IntegrationsData {
               [
                 row.id,
                 {
-                  ...(await rpc.connections
-                    .access({ connectionId: row.id })
-                    .catch((): ConnectionAccess => ({ allAgents: true, botIds: [] }))),
+                  ...(await rpc.connections.access({ connectionId: row.id }).catch(
+                    (): ConnectionAccess => ({
+                      allAgents: true,
+                      botIds: [],
+                      agentShared: true,
+                      writeBotIds: [],
+                    }),
+                  )),
                   effectiveAccess: effective[row.id] ?? { shared: "none", botIds: [] },
                 },
               ] as const,

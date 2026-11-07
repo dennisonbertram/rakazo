@@ -3,21 +3,45 @@ import { describe, expect, it, vi } from "vitest";
 import { fundraisingToolFromTool, fundraisingToolsAllowed } from "./fundraising-tools.js";
 
 const scope = { spaceId: "s", userId: "u" };
-const row = (extra: Record<string, unknown>) => ({
-  id: "c",
-  name: "Harbor Angels",
+/** A contact as the overview reads it: its pipeline fields come from its record. */
+const row = ({ id = "c", name = "Harbor Angels", ...record }: Record<string, unknown>) => ({
+  id,
+  name,
   email: "h@example.test",
   organization: null,
   kind: "prospect",
   notes: null,
-  stage: "committed",
-  checkSizeCents: 5_000_000n,
-  nextStep: "Send SAFE",
-  roundId: "r1",
   bot: null,
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z"),
-  ...extra,
+  pipelinePeople: [
+    {
+      record: {
+        id: `r-${id}`,
+        name,
+        status: "committed",
+        amountCents: 5_000_000n,
+        nextStep: "Send SAFE",
+        roundId: "r1",
+        waitingSince: null,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        ...record,
+      },
+    },
+  ],
+});
+/** The pipeline tables behind those contacts. */
+const pipelineOf = (rows: ReturnType<typeof row>[]) => ({
+  pipelineEvent: { findMany: async () => [] },
+  pipelineRecord: { findMany: async () => rows.map((r) => r.pipelinePeople[0]?.record) },
+  pipelineRecordPerson: {
+    findMany: async () =>
+      rows.map((r) => ({
+        recordId: r.pipelinePeople[0]?.record.id,
+        contactId: r.id,
+        contact: { kind: r.kind },
+      })),
+  },
 });
 const round = (extra: Record<string, unknown>) => ({
   id: "r1",
@@ -31,10 +55,11 @@ const round = (extra: Record<string, unknown>) => ({
 describe("fundraising_read", () => {
   it("returns the open round, pending and each prospect, read with the run owner's scope", async () => {
     const roundFind = vi.fn(async () => round({}));
-    const contactFind = vi.fn(async () => [
+    const contacts = [
       row({}),
-      row({ id: "d", name: "Old Fund", roundId: "r0", checkSizeCents: null, stage: "committed" }),
-    ]);
+      row({ id: "d", name: "Old Fund", roundId: "r0", amountCents: null, status: "committed" }),
+    ];
+    const contactFind = vi.fn(async () => contacts);
     const safeFind = vi.fn(async () => [
       {
         id: "s1",
@@ -56,10 +81,12 @@ describe("fundraising_read", () => {
       fundraiseRound: { findFirst: roundFind },
       contact: { findMany: contactFind },
       safe: { findMany: safeFind },
+      ...pipelineOf(contacts),
     } as never;
     const result = await fundraisingToolFromTool("fundraising_read", { prisma, scope });
     expect(result).toEqual({
       round: {
+        id: "r1",
         name: "Seed",
         status: "open",
         targetUsd: 2_000_000,
@@ -93,7 +120,7 @@ describe("fundraising_read", () => {
     expect(roundFind).toHaveBeenCalledWith({ where: { ...scope, closedAt: null } });
     expect(safeFind).toHaveBeenCalledWith(expect.objectContaining({ where: scope }));
     expect(contactFind).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { ...scope, kind: "prospect" } }),
+      expect.objectContaining({ where: expect.objectContaining(scope) }),
     );
   });
 
@@ -104,6 +131,7 @@ describe("fundraising_read", () => {
       fundraiseRound: { findFirst: find },
       contact: { findMany: async () => [row({})] },
       safe: { findMany: async () => [] },
+      ...pipelineOf([row({})]),
     } as never;
     expect(await fundraisingToolFromTool("fundraising_read", { prisma, scope })).toMatchObject({
       round: { status: "closed", closedAt: closedAt.toISOString() },
@@ -114,6 +142,7 @@ describe("fundraising_read", () => {
       fundraiseRound: { findFirst: async () => null },
       contact: { findMany: async () => [] },
       safe: { findMany: async () => [] },
+      ...pipelineOf([]),
     } as never;
     expect(await fundraisingToolFromTool("fundraising_read", { prisma: empty, scope })).toEqual({
       round: null,
@@ -128,8 +157,9 @@ describe("fundraising_read", () => {
   it("lists a prospect saved without a stage at Target", async () => {
     const prisma = {
       fundraiseRound: { findFirst: async () => null },
-      contact: { findMany: async () => [row({ stage: null, checkSizeCents: null })] },
+      contact: { findMany: async () => [{ ...row({}), pipelinePeople: [] }] },
       safe: { findMany: async () => [] },
+      ...pipelineOf([]),
     } as never;
     expect(await fundraisingToolFromTool("fundraising_read", { prisma, scope })).toMatchObject({
       prospects: [{ stage: "target" }],
@@ -150,5 +180,96 @@ describe("fundraising_read", () => {
     expect(fundraisingToolsAllowed({ ...base, botSpawnKey: "carta-agent:u" })).toBe(false);
     expect(fundraisingToolsAllowed({ ...base, botSpawnKey: null })).toBe(false);
     expect(fundraisingToolsAllowed({ ...base, trigger: "bot_message" })).toBe(false);
+  });
+});
+
+describe("fundraising_round_save", () => {
+  const stored = (data: Record<string, unknown>) => ({
+    id: "r9",
+    ...data,
+    closedAt: null,
+  });
+
+  it("stores dollars as cents through saveRound, scoped to the run owner", async () => {
+    const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => stored(data));
+    const prisma = { fundraiseRound: { create } } as never;
+    const result = await fundraisingToolFromTool(
+      "fundraising_round_save",
+      { prisma, scope },
+      // Extra keys a model might add are not stored.
+      { name: " Seed ", targetUsd: 3_000_000, postMoneyCapUsd: 15_000_000, spaceId: "other" },
+    );
+    expect(create).toHaveBeenCalledWith({
+      data: { ...scope, name: "Seed", targetCents: 300_000_000, capCents: 1_500_000_000 },
+    });
+    expect(result).toEqual({
+      ok: true,
+      round: {
+        id: "r9",
+        name: "Seed",
+        status: "open",
+        targetUsd: 3_000_000,
+        postMoneyCapUsd: 15_000_000,
+      },
+    });
+  });
+
+  it("edits the open round by id and refuses a closed or foreign one", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const findUniqueOrThrow = vi.fn(async () =>
+      stored({ name: "Seed", targetCents: 1n, capCents: 2n }),
+    );
+    const prisma = { fundraiseRound: { updateMany, findUniqueOrThrow } } as never;
+    await fundraisingToolFromTool(
+      "fundraising_round_save",
+      { prisma, scope },
+      { id: "r9", name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 },
+    );
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "r9", ...scope, closedAt: null },
+      data: { name: "Seed", targetCents: 100, capCents: 200 },
+    });
+    updateMany.mockResolvedValueOnce({ count: 0 });
+    expect(
+      await fundraisingToolFromTool(
+        "fundraising_round_save",
+        { prisma, scope },
+        { id: "r9", name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 },
+      ),
+    ).toEqual({ error: "That round was not found, or it is closed and cannot be edited." });
+  });
+
+  it("tells the agent a round is already open instead of returning a raw error", async () => {
+    const create = vi.fn(async () => {
+      throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+    });
+    const result = await fundraisingToolFromTool(
+      "fundraising_round_save",
+      { prisma: { fundraiseRound: { create } } as never, scope },
+      { name: "Seed", targetUsd: 3_000_000, postMoneyCapUsd: 15_000_000 },
+    );
+    expect(result).toEqual({
+      error: expect.stringContaining("A round is already open. Call fundraising_read"),
+    });
+    expect(JSON.stringify(result)).not.toContain("Unique constraint");
+  });
+
+  it("rejects missing, zero, negative and text amounts without writing", async () => {
+    const create = vi.fn();
+    const prisma = { fundraiseRound: { create } } as never;
+    for (const bad of [
+      { name: "Seed", targetUsd: 0, postMoneyCapUsd: 1 },
+      { name: "Seed", targetUsd: -5, postMoneyCapUsd: 1 },
+      { name: "Seed", targetUsd: "$3M", postMoneyCapUsd: 1 },
+      { name: "", targetUsd: 5, postMoneyCapUsd: 1 },
+      { name: "Seed", targetUsd: 5 },
+    ]) {
+      expect(
+        await fundraisingToolFromTool("fundraising_round_save", { prisma, scope }, bad),
+      ).toEqual({
+        error: "Pass name, targetUsd and postMoneyCapUsd as whole US dollars above zero.",
+      });
+    }
+    expect(create).not.toHaveBeenCalled();
   });
 });

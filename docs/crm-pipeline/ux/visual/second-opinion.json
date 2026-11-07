@@ -1,0 +1,329 @@
+{
+  "mode": "inspect",
+  "images": [
+    "pipeline-1440x900-light.png",
+    "pipeline-768x1024-light.png",
+    "pipeline-375x812-light.png",
+    "pipeline-1440x900-dark.png",
+    "i-filter-two-1440.png",
+    "invite-confirm-1440x900-light.png",
+    "gtm-leads-1440x900-light.png",
+    "investor-timeline-1440x900-light.png"
+  ],
+  "results": [
+    {
+      "model": "meta/muse-wonder",
+      "ok": true,
+      "seconds": 56,
+      "costUsd": 0.17264,
+      "result": {
+        "verdict": "Do not ship: excellent at 1440 and thoughtfully recomposed at 375, but the 9-column table catastrophically collapses at 768, filtered-to-zero has no state, and density/empty-cell/overdue signalling break the stated rules at scale.",
+        "findings": [
+          {
+            "level": "layout",
+            "element": "Pipeline table - all 9 columns (Investor through Next call)",
+            "problem": "Columns do not reflow: Investor truncates to 'Sample ...', Status pill overlaps Interest toggle, Interest overlaps Referred by ('Maybe' over 'Sam E...'), Possible amount collides with Fund details ('$250,000Seed lead'), Last call/Next step truncate to 'Oct...' / 'Send the deck...'. Unreadable and untappable.",
+            "norm": "Responsive tables must reprioritise, hide secondary columns behind disclosure, or switch to the 375 card pattern well before content overlaps; tablet is a primary breakpoint in the brief.",
+            "severity": "P0",
+            "screenshot": "pipeline-768x1024-light.png",
+            "fix": "At <=1024px abandon the 9-column grid: use the 375 stacked row, or freeze Investor + show Status, Interest, Next call only, moving Referred by/Fund details/Last call/Next step into row expansion."
+          },
+          {
+            "level": "page",
+            "element": "Pipeline body below column headers after 'Status: Called' + 'Next call: Overdue' filters",
+            "problem": "Zero rows are rendered with no empty-state, result count, loading indicator or clear-filters action — just a large blank card. Header still reads '2 overdue / 2 today', contradicting the empty result. A first-time user cannot tell bug from no-match.",
+            "norm": "Every filtered list needs an explicit zero state: 'No investors match', which filters caused it, and a Clear filters action.",
+            "severity": "P0",
+            "screenshot": "i-filter-two-1440.png",
+            "fix": "Add centred empty state with count '0 of 140', list the two active filters, and 'Clear all' button; suppress or annotate the '2 overdue / 2 today' summary while filters are active."
+          },
+          {
+            "level": "component",
+            "element": "'Status: Called' and 'Next call: Overdue' filter pills",
+            "problem": "Active pills are visually indistinguishable in weight from inactive dropdown pills except for the x, there is no 'Clear all', and the Status pill carries an unexplained heavy double outline. State relies on reading the label text only.",
+            "norm": "Applied filters should be a distinct filled/chip treatment with count and one global reset, per standard faceted-search conventions.",
+            "severity": "P1",
+            "screenshot": "i-filter-two-1440.png",
+            "fix": "Fill active pills in ink with white text, keep the x, add 'Clear all (2)' at the end of the row, and remove the stray double border unless it is a persistent focus ring."
+          },
+          {
+            "level": "layout",
+            "element": "Phone Pipeline rows for Sample Street Capital / Placeholder Partners etc.",
+            "problem": "Graceful column drop goes too far: Referred by, Possible amount (partly retained inline), Fund details, Last call and crucially Next step ('Send the deck before the call') disappear entirely with no expansion affordance except an unexplained '...' menu. The user's next action is invisible on phone.",
+            "norm": "Progressive disclosure must keep the task-critical field (Next step) reachable in one tap on the row, not buried or dropped.",
+            "severity": "P1",
+            "screenshot": "pipeline-375x812-light.png",
+            "fix": "Add a second line 'Next: Send the deck before the call', make the whole row tap through to the investor timeline, and label the '...' menu's contents on first use."
+          },
+          {
+            "level": "component",
+            "element": "Interest control on phone — 'Maybe v' / 'In v' / 'Interest v' pills",
+            "problem": "The 1-tap 3-way In/Maybe/Out toggle degrades to a dropdown needing 2 taps, and the unset state reads 'Interest' — identical to the column/filter name — so it looks like a label, not an unset control. In/Maybe picks also look identical in weight to each other.",
+            "norm": "Segmented control state should remain one-tap and unscored state should read as an action ('Set interest'), distinct from a field label.",
+            "severity": "P1",
+            "screenshot": "pipeline-375x812-light.png",
+            "fix": "Keep a compact 3-segment control under the investor name, or render unset as '+ Interest' in the same dashed/outline style as '+ Add' used for Referred by on desktop."
+          },
+          {
+            "level": "group",
+            "element": "Desktop Pipeline rows (Investor two-line + Fund details two-line + wrapping Next step)",
+            "problem": "Rows run roughly 56-64px with uneven heights because Next step wraps ('Follow up after the round has a lead') while other cells sit on one line; status/interest pills top-align against two-line neighbours. This breaches the brief's 28-44px dense-tool target.",
+            "norm": "Dense CRM lists hold a fixed 32-44px row with single-line truncation + tooltip/detail view; variable two-line rows are for consumer feeds.",
+            "severity": "P1",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Fix row height at 40px, truncate Next step and Fund details to one line with ellipsis, move the second line of Investor/Fund details into the detail view, and vertically centre all pills."
+          },
+          {
+            "level": "page",
+            "element": "'See all (140)' footer link under 10 visible rows",
+            "problem": "Only path to 130 of 140 investors is one small right-aligned text link; no count of shown vs total in the header, no pagination, search-position or scroll strategy. At current row height 140 rows would be ~8,400px of scrolling.",
+            "norm": "Lists >25 rows need explicit pagination/virtualisation cues and 'Showing 10 of 140' labelling next to the list heading.",
+            "severity": "P1",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Label 'Pipeline - 10 of 140', make See all a full-width bordered button, and on the expanded view add sticky header + virtualised rows at 40px."
+          },
+          {
+            "level": "group",
+            "element": "Seed summary progress bar vs Funded $0 / Signed $0 / Pending $750,000 / Target $3,000,000 legend",
+            "problem": "A single ~25% grey bar sits above four legend states with four different dot fills (black, dark grey, light grey, hollow), but the bar shows only one segment, so it is impossible to tell whether 25% means Pending (750k/3M) or something funded — especially as Funded and Signed are $0.",
+            "norm": "Stacked progress must segment in the same colours/order as its legend, or a single-metric bar must be labelled with that metric.",
+            "severity": "P1",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Render the bar as stacked Funded/Signed/Pending segments matching the dot greys and add '25% pending of target' caption; if it is Pending only, use one dot in the legend."
+          },
+          {
+            "level": "component",
+            "element": "Interest In/Maybe/Out segmented toggle vs Status badge menu (e.g. 'Intro made v', 'Left message v')",
+            "problem": "Hierarchy is inverted: selected Interest gets solid black fill — the strongest element in every row, forming a noisy black stripe down the table — while workflow Status is a faint grey pill. Users will read Interest as the primary state and miss stage changes; three black-filled cells per screen also fight the black 'Send invite' CTA elsewhere.",
+            "norm": "In monochrome systems solid ink is reserved for the single most important state/primary action; secondary classifications use outline or grey, consistently.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Give Status the stronger treatment (ink text + border + chevron), reduce selected Interest to light-grey fill with ink text and dot, keeping black fill only for the page's primary buttons."
+          },
+          {
+            "level": "component",
+            "element": "'Next call' values 'Nov 2, 10:00' and 'Nov 3' in red, plus '2 overdue' in Pipeline header",
+            "problem": "Overdue is signalled by red text colour alone — no 'Overdue' label, icon or bold — so it fails colour-only accessibility and is ambiguous against the monochrome rule: a new user cannot tell if red means overdue, selected, or a link. '2 today' beside it is black, so today vs overdue differ only by hue.",
+            "norm": "Status colours are allowed for destructive/warning, but WCAG requires a non-colour cue (icon/text label) alongside hue.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Prefix overdue dates with a small clock/alert glyph and append 'overdue' in the detail/phone view; keep the red, and make the header read '2 overdue - 2 due today' as filter buttons."
+          },
+          {
+            "level": "group",
+            "element": "Filter pill row: Status, Interest, Referred by, Possible amount, Fund details, Last call, Next step, Next call, Wave",
+            "problem": "Nine identical-weight pills duplicate the nine column headers directly below them, doubling cognitive load, and 'Wave' filters on an attribute that has no visible column — users cannot verify a Wave filter's effect in any row. At 1440 the row only just fits; any active-filter label (Status: Called) pushes it to overflow.",
+            "norm": "Filters should be fewer than columns, grouped under a Filters control with active-count, and every filterable attribute should be visible or explicitly summarised in the row.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Collapse to Search + 4 primary pills (Status, Interest, Next call, Possible amount) + 'More filters' containing Referred by/Fund details/Last call/Next step/Wave; add a Wave tag into Fund details cell or drop the filter."
+          },
+          {
+            "level": "component",
+            "element": "Empty cells: Example Peak Ventures Possible amount, Test Harbor Fund Possible amount/Fund details/Last call, Summit Fund 35 Fund details/Last call",
+            "problem": "Missing data is rendered as pure whitespace, indistinguishable from a rendering/loading failure and breaking column scanning — the eye loses the row's rhythm, and 'Test Harbor Fund' reads as a broken row. Desktop uses '+ Add' for Referred by but nothing for equally editable amount/fund cells, an inconsistent affordance.",
+            "norm": "Empty table cells need an explicit placeholder (em dash in muted grey) and, if editable, a consistent hover/tap '+ Add' affordance.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Render '—' muted for read-only empties and '+ Add' for Possible amount/Fund details/Last call exactly as Referred by does; on phone, omit the '· $amount' segment cleanly rather than leaving gaps."
+          },
+          {
+            "level": "component",
+            "element": "Pipeline table in dark mode — Status pills, Last call dates, Fund details secondary lines ('Researched', 'From your list')",
+            "problem": "Status pills are near-background dark grey with grey text, column headers and secondary lines sit at very low contrast on the charcoal card, and overdue red shifts to salmon-pink. The Interest toggle (white fill) becomes the only readable control, worsening the hierarchy inversion.",
+            "norm": "Dark mode must preserve at least 4.5:1 for body text and keep interactive pills distinguishable from the surface without relying on the single inverted toggle.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-dark.png",
+            "fix": "Lift pill background one step and use near-white text, raise secondary text to the same grey as Last call values in light mode, and verify the overdue red against the dark surface for contrast."
+          },
+          {
+            "level": "component",
+            "element": "'Send invite' dialog — Attendees list: Morgan Example with 'No email: add one' input, Google Meet link toggle",
+            "problem": "Morgan has a selectable checkbox despite having no email, with an inline text input competing in the same row; the Meet toggle is ON (black) but no link or explanation appears, so the sender cannot confirm what will be sent. Background blur also stops partway down — Summit Fund 35 / Maple Ventures 21 rows below the dialog render sharp, leaking context and weakening modal focus.",
+            "norm": "Uncontactable attendees are disabled with reason, toggles reveal their consequence, and modal scrims uniformly obscure the page behind.",
+            "severity": "P2",
+            "screenshot": "invite-confirm-1440x900-light.png",
+            "fix": "Disable Morgan's checkbox until the email field validates, show 'Meet link will be added to the invite' under the toggle, and apply one full-page scrim/blur behind the dialog."
+          },
+          {
+            "level": "component",
+            "element": "GTM Pipeline — search field placeholder 'Search companys' and Fit toggle 'Good fit / Maybe / No fit'",
+            "problem": "'Companys' is a spelling error in the primary control of the reused pattern, undermining the minimal-copy rule; the wider Fit labels make the segmented toggle noticeably wider than Fundraising's In/Maybe/Out, tightening an already saturated 9-column row in the sibling product.",
+            "norm": "Shared table patterns must keep copy proofread and control widths budgeted so reuse does not break the grid in the second surface.",
+            "severity": "P2",
+            "screenshot": "gtm-leads-1440x900-light.png",
+            "fix": "Correct to 'Search companies', shorten Fit segments to 'Fit / Maybe / No' with full labels in tooltip/detail, and hold the toggle to the Fundraising width."
+          },
+          {
+            "level": "component",
+            "element": "Phone row trailing controls — Interest pill + '...' button on every row",
+            "problem": "The '...' target is small, unlabelled and unexplained next to the Interest dropdown; two competing controls of different shapes sit at the same right edge with inconsistent pill widths ('Maybe' vs 'Interest'), so first-time users cannot predict which edits interest and which opens actions like Send invite.",
+            "norm": "Mobile list rows allow one obvious trailing action; overflow menus need a minimum 44px target and predictable placement separate from inline editors.",
+            "severity": "P3",
+            "screenshot": "pipeline-375x812-light.png",
+            "fix": "Fix the Interest pill to a uniform width, enlarge '...' to a 44px hit area, and move row actions into the row-tap detail view if the menu only duplicates them."
+          },
+          {
+            "level": "component",
+            "element": "Investor detail — People list 'Morgan Example / No email' and top-right 'Ask' button",
+            "problem": "'No email' is dead text with no inline add action (unlike the invite dialog's add field), blocking the exact task the timeline shows being done (sending invites); 'Ask' beside Edit has no object or icon explanation, ambiguous next to Log a call/Add note.",
+            "norm": "A known data gap shown in context should be fixable in place, and top-level actions need verb+object labels a first-time user can predict.",
+            "severity": "P3",
+            "screenshot": "investor-timeline-1440x900-light.png",
+            "fix": "Make 'No email' a '+ Add email' link opening the same field as the invite dialog, and rename Ask to 'Ask AI' with a one-line tooltip, or remove it from this header."
+          }
+        ],
+        "excellent": [
+          "pipeline-1440x900-light.png — 9 columns do fit and read cleanly at 1440: consistent left alignment, bold Investor with muted contact sub-line, tabular amounts, and a single sortable header 'Next call ^' keeping sort affordance honest.",
+          "pipeline-375x812-light.png — exemplary breakpoint recomposition: filters collapse to Search + Filters, Seed summary restacks 2x2, and rows become scannable name/status/next-call stacks rather than a squeezed table.",
+          "pipeline-1440x900-light.png — restrained monochrome discipline: ink is reserved for selected Interest and primary actions, grey dots alone differentiate Funded/Signed/Pending/Target, and red is used only for overdue, matching the stated status-colour rule.",
+          "invite-confirm-1440x900-light.png — dialog copy is precise and reassuring: the CTA counts the actual recipients ('Send invite to 1 person'), Title is prefilled and focused, and Date/Time/Length mirror the row's Next call value.",
+          "investor-timeline-1440x900-light.png — progressive disclosure done right: left rail carries every table field (Status, Interest, Possible amount, Referred by, Next step/call, People, Fund details) while the reverse-chronological Timeline with type icons makes the Sample Street Capital history legible in one screen."
+        ]
+      }
+    },
+    {
+      "model": "google/gemini-4-argon",
+      "ok": true,
+      "seconds": 193,
+      "costUsd": 0.13481,
+      "result": {
+        "verdict": "A disciplined, high-craft monochrome CRM concept with strong information architecture on desktop detail views, but undermined by a P0 responsive table collision at 768px, an inverted visual hierarchy between the high-contrast Interest toggle and muted Status pill, 60px multi-line rows that violate the 28–44px density target for 140 investors, an empty filter state with zero feedback, and a clipped modal backdrop.",
+        "findings": [
+          {
+            "level": "layout",
+            "element": "Pipeline 9-column table (`Investor`, `Status`, `Interest`, `Referred by`, `Possible amount`, `Fund details`, `Last call`, `Next step`, `Next call`)",
+            "problem": "At 768px width, all 9 desktop columns are forced into a ~700px container without horizontal scrolling or responsive column hiding. The `Interest` segmented control (`In | Maybe | Out`) physically overlaps the `Referred by` column text in every row (e.g., `Out` collides directly over `Sam E...`, `+ Add`, `Jordan...`, `Riley Pl...`), `Status` badges collide with `Interest`, `Possible amount` runs directly into `Fund details` with 0px gap (`$250,000Seed lead...`), `Last call` truncates to useless 2-letter fragments (`Oct...`, `No...`), and `Next step` clips mid-word (`introductio`).",
+            "norm": "Data tables at tablet breakpoints (768px) must either wrap inside an explicit horizontal scroll container (`overflow-x: auto`) with a sticky first column (`Investor`) or progressively hide secondary columns (`Referred by`, `Fund details`, `Last call`) behind row expansion.",
+            "severity": "P0",
+            "screenshot": "pipeline-768x1024-light.png",
+            "fix": "Hide lower-priority columns (`Referred by`, `Fund details`, `Last call`) at the 768px breakpoint, or enforce `min-width` per column inside a horizontal scroll container with `Investor` pinned left."
+          },
+          {
+            "level": "page",
+            "element": "Pipeline table body below active filters (`Status: Called`, `Next call: Overdue`)",
+            "problem": "When multiple filters yield zero matching records, the table body collapses entirely below the column header row with no empty state message, no illustration/icon, and no quick action to clear filters. The card terminates abruptly right under the header text, looking like a rendering bug.",
+            "norm": "Zero-result filter states must explicitly communicate that no records match the current criteria and provide a one-click `Clear filters` action.",
+            "severity": "P1",
+            "screenshot": "i-filter-two-1440.png",
+            "fix": "Render a dedicated empty-state row spanning all 9 columns (e.g., 'No investors match Status: Called and Next call: Overdue' with a `Reset filters` button) and add a `Clear all` link at the end of the filter bar whenever one or more filters are active."
+          },
+          {
+            "level": "layout",
+            "element": "Modal backdrop overlay behind `Send invite` dialog",
+            "problem": "The translucent backdrop blur/dimming layer terminates abruptly at 900px viewport height just above row 9, leaving the bottom two table rows (`Summit Fund 35` and `Maple Ventures 21`) and `See all (140)` completely unblurred and un-dimmed below the overlay edge.",
+            "norm": "Modal overlays must use `position: fixed; inset: 0` (covering 100vw by 100vh across scroll positions) so background content is uniformly obscured.",
+            "severity": "P1",
+            "screenshot": "invite-confirm-1440x900-light.png",
+            "fix": "Set the modal backdrop overlay to `position: fixed; inset: 0` rather than sizing it to an inner container or static 900px height."
+          },
+          {
+            "level": "component",
+            "element": "`Interest` 3-way segmented toggle (`In | Maybe | Out`) and `Fit` toggle (`Good fit | Maybe | No fit`) vs. `Status` dropdown badge",
+            "problem": "In a monochrome UI, solid ink fill (`#111` in light mode, `#FFF` in dark mode) carries the highest visual weight on the page. Because `Interest` renders as a permanently expanded 3-segment switch with a solid ink active pill while `Status` (`Committed`, `Meeting booked`, `Intro made`) uses a low-contrast muted gray fill, visual hierarchy is inverted: secondary qualification (`Maybe`) dominates primary pipeline progression (`Status`). Furthermore, unset rows repeat all three unselected labels (`In | Maybe | Out`) down the column, and in GTM Leads (`Example Freight Labs`), a dead lead with `Status: Lost` and `Fit: No fit` gets a solid black `No fit` badge—giving a disqualified row maximum visual prominence.",
+            "norm": "Primary workflow status (`Status`) should command at least equal or greater visual hierarchy than secondary disposition (`Interest`/`Fit`), unset cells should not repeat 3-option chrome on every row, and negative states (`Out` / `No fit`) should look recessed rather than primary-filled.",
+            "severity": "P1",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Convert `Interest` (`In / Maybe / Out`) in table rows to a compact single-value pill (matching the cleaner mobile pattern in `pipeline-375x812-light.png`) or only expand the 3-way segmented control on row hover; style `In` with high-contrast ink/border, `Maybe` with subtle outline, `Out`/`No fit` with muted strikethrough/recessed gray, and unset rows as a minimal ghost trigger."
+          },
+          {
+            "level": "group",
+            "element": "Pipeline table rows (10 rows displayed out of `See all (140)`)",
+            "problem": "Every table row measures ~58–62px tall because three columns stack secondary lines (`Investor` stacks firm + contact name, `Fund details` stacks stage/check + provenance, `Next step` wraps prose onto two lines, and `Next call` stacks `✓ Invited`). This violates the 28–44px dense tool surface rule and allows only 9–10 of 140 investors to fit in a 900px viewport. Worse, truncating 140 rows behind a tiny `See all (140)` footer link without sticky headers or virtualized scrolling hinders rapid pipeline triage.",
+            "norm": "High-density B2B CRM tables managing 100+ records require single-line 32–40px rows so 18–22 records are visible at once without scrolling.",
+            "severity": "P1",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Compress rows to 36–40px single-line height: display contact count inline (`Sample Street Capital · Alex +2`), drop the repetitive second line (`From your list` / `Researched`) from `Fund details` (since provenance is already filterable via `Wave`/source), single-line truncate `Next step` with hover tooltip, and place the `✓` invited icon inline next to the `Next call` time."
+          },
+          {
+            "level": "group",
+            "element": "Mobile investor row item (`pipeline-375x812-light.png`)",
+            "problem": "On mobile (375px), the collapsed 3-line row shows Firm Name, `Status · Possible amount`, and `Next call`, while placing the `Interest` dropdown (`Maybe v`, `Interest v`, `In v`) on the right. This creates three usability issues: (1) Essential on-the-go context—who the contact person is (`Alex Sample`) and what the `Next step` action is (`Send the deck before the call`)—is completely hidden; (2) `Status` is flattened into plain non-interactive subtitle text while `Interest` takes the primary interactive button slot; (3) Unset `Interest v` pills render with the same visual weight as active `Maybe v` / `In v` pills and create a ragged left alignment edge due to varying pill widths.",
+            "norm": "Mobile CRM rows should surface the actionable next step or primary contact for call prep, keep the primary stage (`Status`) tappable, and avoid noisy placeholder buttons on unset fields.",
+            "severity": "P2",
+            "screenshot": "pipeline-375x812-light.png",
+            "fix": "Include the primary contact name or `Next step` on line 2/3, make the `Status` badge tappable on mobile, and replace unset `Interest v` pills with a subtle muted icon or ghost chip so active `In` / `Maybe` states stand out cleanly."
+          },
+          {
+            "level": "page",
+            "element": "Top-left header of Investor Detail view (`SC Sample Street Capital`)",
+            "problem": "The investor detail screen has no breadcrumb, back button (`← Fundraising` / `Pipeline`), or sidebar navigation to return to the 140-investor pipeline table.",
+            "norm": "Drill-down detail views in web applications must provide an explicit in-app back link or breadcrumb trail (`Fundraising / Sample Street Capital`) rather than relying solely on browser history.",
+            "severity": "P2",
+            "screenshot": "investor-timeline-1440x900-light.png",
+            "fix": "Add a `← Fundraising` breadcrumb or back button above or to the left of the `SC Sample Street Capital` header."
+          },
+          {
+            "level": "component",
+            "element": "Search input placeholder (`Q Search companys`)",
+            "problem": "The search input placeholder contains a spelling error: `Search companys` instead of `Search companies`.",
+            "norm": "UI copy in production B2B software must use grammatically correct pluralization.",
+            "severity": "P2",
+            "screenshot": "gtm-leads-1440x900-light.png",
+            "fix": "Replace naive string concatenation (`${entity}s`) with proper pluralization (`Search companies`)."
+          },
+          {
+            "level": "group",
+            "element": "Filter bar (`Status`, `Interest`, `Referred by`, `Possible amount`, `Fund details`, `Last call`, `Next step`, `Next call`, `Wave`) and header counters (`2 overdue`, `2 today`)",
+            "problem": "Nine filter pills sit directly above nine identically named table column headers, creating repetitive visual clutter and questioning why free-text columns like `Next step` (`Send the deck before the call`) have discrete dropdown filters, or why `Wave` is a filter pill when no `Wave` column exists in the table. Meanwhile, `2 overdue` and `2 today` in the card header look like static text labels rather than interactive quick-filter chips, forcing users to open `Next call v` -> `Overdue` to filter overdue calls. Additionally, in `i-filter-two-1440.png`, the active `Status: Called | x` pill has an asymmetric focus ring drawn only around the label half and clipping the `x` button.",
+            "norm": "Filter bars should prioritize high-frequency facets (`Status`, `Interest`, `Wave`, `Next call`) or consolidate column-level filtering/sorting into interactive column headers, while summary counters (`2 overdue`, `2 today`) should act as one-click toggle pills.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Turn `2 overdue` and `2 today` into clickable filter pills, remove low-utility dropdown pills that duplicate freeform columns (`Next step`, `Fund details`) in favor of an `+ Add filter` menu or interactive column header menus, and apply focus rings to the entire filter chip container in `i-filter-two-1440.png`."
+          },
+          {
+            "level": "component",
+            "element": "Empty table cells across `Referred by`, `Possible amount`, `Fund details`, `Last call`, and `Next step`",
+            "problem": "Empty states across columns follow three conflicting patterns: empty `Referred by` cells permanently display a visible `+ Add` text button on every empty row (repeating `+ Add` 4 times in 10 rows); empty `Interest` cells render the full 3-button `[In | Maybe | Out]` control; and empty `Possible amount`, `Fund details`, `Last call`, and `Next step` cells are left completely blank. In row 4 (`Test Harbor Fund`), three adjacent blank columns create a ~420px empty horizontal gap that breaks scanline tracking.",
+            "norm": "Data tables should use a uniform muted placeholder (`—`) for empty scalar cells at rest and reveal inline creation affordances (`+ Add`) on cell or row hover.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Render a subtle muted em-dash (`—`) in empty cells across `Referred by`, `Possible amount`, `Fund details`, `Last call`, and `Next step` at rest, and only reveal `+ Add` on row/cell hover."
+          },
+          {
+            "level": "component",
+            "element": "`Next call` column dates (`Nov 2, 10:00`, `Nov 3`, `Nov 4, 15:30`, `Nov 4`, `Nov 6, 11:00`)",
+            "problem": "Using destructive red strictly for overdue timestamps (`Nov 2, 10:00` and `Nov 3`) works well against the monochrome palette, but distinguishing 'today' (`Nov 4, 15:30`, `Nov 4`) from upcoming future dates (`Nov 6, 11:00`, `Nov 10`) relies solely on a barely perceptible font-weight difference (`500` vs `400`) on absolute calendar dates. Furthermore, colorblind users have no non-color indicator (such as `Today` or `2d overdue` relative labels or an icon) to separate overdue `Nov 3` from today's `Nov 4`.",
+            "norm": "Status and temporal urgency should not rely on color or subtle font weight alone; relative day labels (`Today, 15:30`, `Yesterday`) improve scan speed and accessibility.",
+            "severity": "P2",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Render today's calls with an explicit `Today` prefix (`Today, 15:30`) or subtle dot indicator, and optionally support relative overdue phrasing (`Nov 2 · 2d late`) so urgency is unmistakable even without color vision."
+          },
+          {
+            "level": "component",
+            "element": "`Possible amount` and `Deal value` columns (`$250,000`, `$500,000`, `$750,000`, `$100,000`)",
+            "problem": "Currency values in `Possible amount` (`pipeline-1440x900-light.png`) and `Deal value` (`gtm-leads-1440x900-light.png`) are left-aligned, making magnitude comparisons (`$100,000` vs `$12,000` vs `$750,000`) harder to scan vertically and leaving an uneven gap before `Fund details`.",
+            "norm": "Numeric and currency columns in financial/CRM tables should use `font-variant-numeric: tabular-nums` and right-align (or align decimal/thousands places) within a constrained column width.",
+            "severity": "P3",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Right-align `Possible amount` / `Deal value` header and cell values with `tabular-nums` and add generous right padding before `Fund details`."
+          },
+          {
+            "level": "component",
+            "element": "`Send invite` modal (`Date` field `11/06/2026`, `Time` field `10:00 AM`, and `Attendees` list)",
+            "problem": "Inside the `Send invite` dialog: (1) `Date` switches to numeric slash format (`11/06/2026`, ambiguous between Nov 6 and June 11 internationally) whereas the entire app uses `Nov 6`; (2) `Time` (`10:00 AM`) omits the timezone (`PT` / `ET` / `UTC`), which is risky when scheduling investor calls; (3) `Drew Sample Researched` places the provenance label right next to the contact's last name without badge styling; and (4) `Morgan Example` has an enabled-looking checkbox next to `No email: add one` without indicating that checking the box requires entering an email first.",
+            "norm": "Date formatting should remain consistent across table and modal surfaces (`Nov 6, 2026`), calendar invites must display the active timezone, and inline validation states for missing attendee emails should disable the checkbox until valid or auto-check upon typing.",
+            "severity": "P3",
+            "screenshot": "invite-confirm-1440x900-light.png",
+            "fix": "Format the date picker as `Nov 6, 2026`, append the timezone abbreviation (e.g., `10:00 AM PST`) to the time picker or section label, style `Researched` as a subtle pill badge, and visually disable `Morgan Example`'s checkbox until an email address is entered."
+          },
+          {
+            "level": "component",
+            "element": "`Seed` summary card progress bar and legend (`Funded $0`, `Signed $0`, `Pending $750,000`, `Target $3,000,000`)",
+            "problem": "The progress bar uses three shades of monochrome gray for `Funded`, `Signed`, and `Pending`. Because `Funded` and `Signed` are currently `$0`, the 25% medium-gray bar for `Pending ($750,000)` starts at the far left directly above the `Funded $0` label, visually reading at first glance as 25% funded.",
+            "norm": "Multi-segment monochrome progress bars need distinct pattern/hatching or clear segment dividers so a pending-only fill is not misread as funded.",
+            "severity": "P3",
+            "screenshot": "pipeline-1440x900-light.png",
+            "fix": "Use a diagonal stripe or dotted fill pattern for the `Pending` segment on the progress bar (matching the `Pending` legend dot) and solid dark ink for `Funded`."
+          }
+        ],
+        "excellent": [
+          "High-signal red overdue exception handling (`pipeline-1440x900-light.png`, `pipeline-1440x900-dark.png`): Reserving semantic red strictly for `2 overdue` and overdue `Next call` timestamps (`Nov 2, 10:00`, `Nov 3`) in an otherwise pure monochrome UI makes urgent follow-ups pop immediately without visual noise.",
+          "Investor Timeline split-pane layout (`investor-timeline-1440x900-light.png`): Cleanly separates current mutable CRM state, people, and fund thesis on the left from the chronological activity stream (Granola call summaries, agent status transitions, and email threads) on the right.",
+          "Contextual workflow bridging (`investor-timeline-1440x900-light.png`, `invite-confirm-1440x900-light.png`): Surfacing `Send invite` directly beside `Next call: Nov 6, 10:00` and pre-populating firm attendees with inline missing-email capture (`No email: add one`) eliminates calendar context-switching.",
+          "Dark mode surface calibration (`pipeline-1440x900-dark.png`): Elevated charcoal surfaces, subtle 1px hairline dividers, and desaturated coral-red overdue text maintain crisp hierarchy and legibility without harsh pure-black contrast halation."
+        ]
+      }
+    }
+  ]
+}

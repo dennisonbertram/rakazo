@@ -450,6 +450,7 @@ const TOOL_VERBS: Record<string, readonly [string, string]> = {
 
 const MAIL_WRITE_PENDING: Record<string, string> = {
   "mail send": "Email to send",
+  "mail reply batch": "Emails to send",
   "mail draft": "Draft to save",
 };
 

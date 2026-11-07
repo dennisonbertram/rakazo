@@ -51,7 +51,7 @@ import { PageEmptyState } from "../components/PageEmptyState";
 import { PAGE_GUTTER_X, PageHeader } from "../components/PageHeader";
 import { StillLoading } from "../components/ShellSkeleton";
 import { artifactDisplayName as displayName } from "../lib/artifact-name";
-import { bytesToBase64, decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
+import { bytesToBase64, decodeArtifactBase64, openArtifactBytes } from "../lib/artifact-open";
 import { sortBy, useListParams } from "../lib/list-params";
 import { formatRelativeTime } from "../lib/relative-time";
 import { rpc } from "../lib/rpc";
@@ -1315,7 +1315,11 @@ function PreviewPane({
                 size="sm"
                 aria-label={t`Download`}
                 onClick={() =>
-                  downloadArtifactBytes(state.artifact.name, state.artifact.mimeType, state.bytes)
+                  void openArtifactBytes(
+                    state.artifact.name,
+                    state.artifact.mimeType,
+                    () => state.bytes,
+                  )
                 }
               >
                 <Download className="sm:me-1.5" size={15} strokeWidth={1.9} />

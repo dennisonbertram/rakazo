@@ -103,12 +103,20 @@ export type RunPhase = z.infer<typeof RunPhaseSchema>;
 export const BotAudienceSchema = z.enum(["internal", "external"]);
 export type BotAudience = z.infer<typeof BotAudienceSchema>;
 
+/** How far an agent goes beyond the request. Only the owner's settings set it; it never changes approvals. */
+export const BotProactivitySchema = z.enum(["low", "medium", "high"]);
+export type BotProactivity = z.infer<typeof BotProactivitySchema>;
+
 /** Only a bot the owner made can be external; page and integration agents hold private data by design. */
 /** A page the person asked for by hand: the server picks this key, so a client cannot claim it. */
 export const customPageSpawnKey = (id: string) => `custom-page:${id}`;
 
 export const isCustomPageSpawnKey = (spawnKey: string | null | undefined) =>
   Boolean(spawnKey?.startsWith(customPageSpawnKey("")));
+
+/** What the web sends as the instructions of a new page agent; the server compares against it for upgrades. */
+export const NEW_PAGE_INSTRUCTIONS =
+  "You build and keep this page. Ask the user what the page should show, then name yourself after the page with update_bot and write it with page_write: lead with what matters, use charts and tables where they help, and keep it current when asked. Keep chat replies short and put the substance on the page.";
 
 export const botAudienceEditable = (spawnKey: string | null | undefined) => !spawnKey;
 
@@ -156,6 +164,11 @@ export const BotSchema = z.object({
   appControl: BotAppControlSchema.optional(),
   disabledBuiltinTools: z.array(z.string()).default([]),
   audience: BotAudienceSchema.default("internal"),
+  /** Agent firewall: everything the agent reads is untrusted. Only the owner's settings set it. */
+  firewall: z.boolean().default(false),
+  /** Capabilities a firewalled agent may ask to use (each use still asks). Owner-only. */
+  firewallAskCapabilities: z.array(z.string()).default([]),
+  proactivity: BotProactivitySchema.default("medium"),
   /** An external bot may message only these internal bots. */
   externalMessageTargets: z.array(Id).default([]),
   /** An external bot has the browser and computer tools only when this is on. */
@@ -450,6 +463,9 @@ export const UpdateBotInput = z
     appControl: UpdateBotAppControlSchema.optional(),
     disabledBuiltinTools: DisabledBuiltinToolsSchema.optional(),
     audience: BotAudienceSchema.optional(),
+    firewall: z.boolean().optional(),
+    firewallAskCapabilities: z.array(z.string().max(64)).max(20).optional(),
+    proactivity: BotProactivitySchema.optional(),
     externalMessageTargets: z.array(Id).max(200).optional(),
     externalComputerTools: z.boolean().optional(),
     runsOn: ComputerHostSchema.nullable().optional(),
@@ -887,11 +903,34 @@ export const MemoryDocumentSchema = z.object({
 });
 export type MemoryDocument = z.infer<typeof MemoryDocumentSchema>;
 
+/** One company context section: a memory document of scope "company". */
+export const CompanyContextSectionSchema = z.object({
+  id: Id,
+  /** Stable slug; it does not change when the section is renamed. */
+  slug: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  text: z.string(),
+  revision: z.number().int(),
+  updatedAt: z.string(),
+});
+export type CompanyContextSection = z.infer<typeof CompanyContextSectionSchema>;
+
+export const CompanyContextRevisionSchema = z.object({
+  revision: z.number().int(),
+  title: z.string(),
+  text: z.string(),
+  createdAt: z.string(),
+});
+export type CompanyContextRevision = z.infer<typeof CompanyContextRevisionSchema>;
+
 export const ConnectionSchema = z.object({
   id: Id,
   connectorId: z.string(),
   provider: z.string(),
   displayName: z.string(),
+  /** The account's own address (the mailbox), when known: what tells two accounts of one app apart. */
+  account: z.string().optional(),
   status: z.enum(["pending", "connected", "revoked", "error"]),
   /** Short user-safe reason when status is "error"; null otherwise. */
   error: z.string().nullable(),
@@ -966,6 +1005,9 @@ export const ActionApprovalRuleSchema = z.object({
   matchValue: z.string(),
   /** null for a space-wide rule; a bot id for that bot's override. */
   botId: Id.nullable().optional(),
+  /** Set on an "Always for this routine" rule, with the routine's name. */
+  routineId: Id.nullable().optional(),
+  routineName: z.string().optional(),
   createdAt: z.string(),
 });
 export type ActionApprovalRule = z.infer<typeof ActionApprovalRuleSchema>;
@@ -1001,9 +1043,19 @@ export type ApprovalTableRow = z.infer<typeof ApprovalTableRowSchema>;
 
 export const ActionAutoReviewSettingsSchema = z.object({
   enabled: z.boolean(),
+  /** Also judge calls in background runs that read nothing from outside. */
+  background: z.boolean(),
   checkerAvailable: z.boolean(),
 });
 export type ActionAutoReviewSettings = z.infer<typeof ActionAutoReviewSettingsSchema>;
+
+export const ActionAutoReviewRecentSchema = z.object({
+  id: z.string(),
+  tool: z.string(),
+  reason: z.string().nullable(),
+  at: z.string(),
+});
+export type ActionAutoReviewRecent = z.infer<typeof ActionAutoReviewRecentSchema>;
 
 export const CapabilityInstallSchema = z.object({
   id: Id,
@@ -1015,6 +1067,14 @@ export const CapabilityInstallSchema = z.object({
   secretConfigured: z.boolean(),
   config: z.record(z.string(), z.unknown()),
   createdAt: z.string(),
+  /** Tool sources (MCP, API, GraphQL) only: the source's own agent and who else may use it. */
+  agentBotId: Id.nullable().optional(),
+  allAgents: z.boolean().optional(),
+  agentShared: z.boolean().optional(),
+  writesEnabled: z.boolean().optional(),
+  /** Agents that can really use the source, and the ones among them allowed to make changes. */
+  usableBotIds: z.array(Id).optional(),
+  writeBotIds: z.array(Id).optional(),
 });
 export type CapabilityInstall = z.infer<typeof CapabilityInstallSchema>;
 
@@ -1236,7 +1296,16 @@ export const UsageRecordSchema = z.object({
   callId: z.string().nullable().optional(),
   operationId: z.string().nullable().optional(),
   operationKind: z
-    .enum(["answer", "setup", "retrieval", "subagent", "compaction", "triage", "company_import"])
+    .enum([
+      "answer",
+      "setup",
+      "retrieval",
+      "subagent",
+      "compaction",
+      "triage",
+      "company_import",
+      "goal_check",
+    ])
     .optional(),
   parentRunId: z.string().nullable().optional(),
   agentId: z.string().nullable().optional(),
@@ -1362,6 +1431,21 @@ export const ThreadMessagePageSchema = z.object({
 });
 export type ThreadMessagePage = z.infer<typeof ThreadMessagePageSchema>;
 
+/** The open goal (active or paused) of a bot's thread; ended goals are not sent. */
+export const ThreadGoalSchema = z.object({
+  id: Id,
+  text: z.string(),
+  status: z.enum(["active", "paused", "met", "blocked", "stopped", "cleared"]),
+  stopReason: z
+    .enum(["runs", "time", "spend", "stalled", "owner", "check_failed", "model_error"])
+    .nullable(),
+  /** Why the latest check said what it said; null before the first check. */
+  lastReason: z.string().nullable(),
+  continuations: z.number().int().nonnegative(),
+  startedAt: z.string(),
+});
+export type ThreadGoal = z.infer<typeof ThreadGoalSchema>;
+
 export const ThreadSnapshotSchema = z.object({
   threadId: Id,
   cursor: z.number().int().min(-1),
@@ -1382,6 +1466,7 @@ export const ThreadSnapshotSchema = z.object({
     .array(z.object({ messageId: z.string(), id: Id, name: z.string() }))
     .optional(),
   computer: ComputerStatusSchema.optional(),
+  goal: ThreadGoalSchema.nullable().optional(),
 });
 export type ThreadSnapshot = z.infer<typeof ThreadSnapshotSchema>;
 

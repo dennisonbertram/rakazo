@@ -63,17 +63,22 @@ import {
   useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import { ArtifactFileCard } from "../../components/ArtifactFileCard";
 import { AskCard } from "../../components/AskCard";
 import { ActiveBotGlyph, CollaborationMarker } from "../../components/ai/CollaborationMarker";
 import { BotToolControlsContext } from "../../components/BotToolControls";
 import { CloudAgentCard } from "../../components/CloudAgentCard";
 import { VoiceChatCard } from "../../components/call/VoiceChatCard";
+import type { SendTarget } from "../../components/data-room/SendToAgent";
+import { SendToAgentMenu } from "../../components/data-room/SendToAgent";
 import { EmailCards } from "../../components/EmailCards";
 import { FinanceCardGroup } from "../../components/FinanceCards";
 import { MailApprovalCard } from "../../components/MailApprovalCard";
+import { MailReplyBatchCard } from "../../components/MailReplyBatchCard";
 import { MailThreadCard } from "../../components/MailThreadCard";
 import { MessageHoverMetadata } from "../../components/MessageHoverMetadata";
+import { PipelineImportCard } from "../../components/PipelineImportCard";
 import {
   LIVE_TOOL_STEP_WINDOW,
   StandaloneToolActivity,
@@ -104,11 +109,11 @@ import {
   transcriptShouldSnap,
   transcriptUserJustSent,
 } from "../../lib/transcript-scroll";
-import { useMailAccounts } from "../../lib/use-mail-accounts";
 import type { RememberControls } from "../../lib/use-remembered-messages";
 import { useAttended } from "../../lib/use-sidebar-glance";
 import type { WorkingActivity } from "../../lib/working-activity";
 import { previewMessageText, ReplyLine, TimeSeparator } from "./chat-context";
+import { GoalBlockView } from "./goal";
 import {
   AppConnectCard,
   ArtifactImageGrid,
@@ -117,6 +122,7 @@ import {
   McpApprovalCard,
   ResultCard,
 } from "./message-cards";
+import { PageCard } from "./page-card";
 import { toolActionLabel } from "./working-label";
 
 /** Opens an in-app path through the router; unset outside the page, where links load normally. */
@@ -174,6 +180,8 @@ export const Transcript = memo(function Transcript({
   onAnswer,
   onReply,
   onMarkUnread,
+  sendTargets,
+  onSendFiles,
   onQuote,
   onReact,
   remember,
@@ -229,6 +237,9 @@ export const Transcript = memo(function Transcript({
   ) => Promise<void>;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread?: (message: ThreadMessage) => void;
+  /** Agents a message's files can be sent to; with `onSendFiles`, adds Send to agent to the More menu. */
+  sendTargets?: SendTarget[];
+  onSendFiles?: (message: ThreadMessage, agent: SendTarget) => void;
   onQuote: (message: ThreadMessage, quote: string) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
   remember?: RememberControls;
@@ -941,6 +952,8 @@ export const Transcript = memo(function Transcript({
                         hideOnTouch={cardOnly}
                         onReply={onReply}
                         onMarkUnread={onMarkUnread}
+                        sendTargets={sendTargets}
+                        onSendFiles={onSendFiles}
                         onReact={onReact}
                         remember={remember}
                         tabbable={message.id === tabbableMoreId}
@@ -1226,12 +1239,18 @@ const CARD_CONTROL_KINDS: ReadonlySet<string> = new Set([
   "emails",
 ]);
 
+/** A block that carries a stored file the person can forward to another agent. */
+export const isForwardableBlock = (block: { kind: string }) =>
+  block.kind === "file" || block.kind === "image";
+
 function MessageHoverActions({
   message,
   side,
   hasReactions = false,
   onReply,
   onMarkUnread,
+  sendTargets,
+  onSendFiles,
   onReact,
   remember,
   below,
@@ -1246,6 +1265,8 @@ function MessageHoverActions({
   hasReactions?: boolean;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread?: (message: ThreadMessage) => void;
+  sendTargets?: SendTarget[];
+  onSendFiles?: (message: ThreadMessage, agent: SendTarget) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
   remember?: RememberControls;
   tabbable?: boolean;
@@ -1417,6 +1438,16 @@ function MessageHoverActions({
               <Copy size={14} strokeWidth={1.7} />
               <Trans>Copy</Trans>
             </DropdownMenuItem>
+            {onSendFiles && message.blocks.some(isForwardableBlock) ? (
+              <SendToAgentMenu
+                menu="dropdown"
+                agents={sendTargets}
+                onPick={(agent) => {
+                  setMoreOpen(false);
+                  onSendFiles(message, agent);
+                }}
+              />
+            ) : null}
             {canRemember ? (
               <DropdownMenuItem
                 disabled={remembered}
@@ -1557,18 +1588,6 @@ const MessageView = memo(function MessageView({
   useHideAmounts();
   const { t } = useLingui();
   const botToolControls = useContext(BotToolControlsContext);
-  // A pending mail approval that names no sender: the card lists the accounts so the person can pick.
-  const mailAccounts = useMailAccounts(
-    canAnswer &&
-      message.blocks.some(
-        (block) =>
-          block.kind === "ask" &&
-          block.status !== "answered" &&
-          block.mail !== undefined &&
-          !block.mail.account &&
-          isApprovalAskBlock(block),
-      ),
-  );
   const isNarration =
     message.role === "bot" &&
     message.blocks.length > 0 &&
@@ -1751,6 +1770,7 @@ const MessageView = memo(function MessageView({
             </div>
           );
         }
+        if (block.kind === "goal") return <GoalBlockView key={i} block={block} />;
         if (block.kind === "meta") {
           return (
             <div
@@ -1759,6 +1779,11 @@ const MessageView = memo(function MessageView({
             >
               <span className="text-warning">◷</span>
               <span>{maskCurrencyWhenHidden(block.text)}</span>
+              {block.link?.href.startsWith("/app/") ? (
+                <Link to={block.link.href} className="underline underline-offset-2">
+                  {block.link.label}
+                </Link>
+              ) : null}
             </div>
           );
         }
@@ -1852,6 +1877,13 @@ const MessageView = memo(function MessageView({
                   : block.title || t`Opened its thread.`}
               </div>
             </button>
+          );
+        }
+        if (block.kind === "page") {
+          return (
+            <div key={i} className="flex justify-start">
+              <PageCard botId={block.botId} pageId={block.pageId} title={block.title} />
+            </div>
           );
         }
         if (block.kind === "choice") {
@@ -1965,15 +1997,58 @@ const MessageView = memo(function MessageView({
         if (block.kind === "ask") {
           // A card after text in the same message sits one message-gap (20 px) below it.
           const gap = i > 0 ? "mt-5" : undefined;
+          if (block.pipelineImport && block.approvalEffectId && message.botId) {
+            return (
+              <div key={i} className={gap}>
+                <PipelineImportCard
+                  block={block}
+                  botId={message.botId}
+                  message={message}
+                  canAnswer={canAnswer}
+                  onAnswer={(text) => onAnswer(message, text)}
+                  fallback={
+                    <AskCard
+                      // Its detail is the phone apps' text: it sends the reader here.
+                      block={{ ...block, detail: undefined }}
+                      requestedAt={message.createdAt}
+                      canAnswer={canAnswer}
+                      ownerOnly={ownerOnly}
+                      onAnswer={(text, username) => onAnswer(message, text, username)}
+                    />
+                  }
+                />
+              </div>
+            );
+          }
+          if (block.mailBatch && block.approvalEffectId && message.botId) {
+            return (
+              <div key={i} className={gap}>
+                <MailReplyBatchCard
+                  block={block}
+                  botId={message.botId}
+                  message={message}
+                  canAnswer={canAnswer}
+                  onAnswer={(text) => onAnswer(message, text)}
+                  onOpenComposer={botToolControls?.openComposer}
+                  fallback={
+                    <AskCard
+                      block={block}
+                      requestedAt={message.createdAt}
+                      canAnswer={canAnswer}
+                      ownerOnly={ownerOnly}
+                      onAnswer={(text, username) => onAnswer(message, text, username)}
+                    />
+                  }
+                />
+              </div>
+            );
+          }
           if (block.mail && isApprovalAskBlock(block)) {
             return (
               <div key={i} className={gap}>
                 <MailApprovalCard
                   mail={block.mail}
                   reason={block.approvalReason}
-                  accounts={mailAccounts.accounts}
-                  accountsStatus={mailAccounts.status}
-                  onRetryAccounts={mailAccounts.retry}
                   status={block.status === "answered" ? "answered" : "pending"}
                   answer={block.answer}
                   canAnswer={canAnswer}

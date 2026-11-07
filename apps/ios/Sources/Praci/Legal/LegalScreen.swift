@@ -44,7 +44,7 @@ struct LegalScreen: View {
       }
     }
     .safeAreaInset(edge: .bottom) { undoBanner }
-    .task { await model.load(app) }
+    .task(id: app.settingsClosings) { await model.load(app) }
     .onDisappear { model.stop() }
   }
 
@@ -52,7 +52,7 @@ struct LegalScreen: View {
   private func statusSection(_ overview: LegalOverview) -> some View {
     if model.needsModel {
       Section {
-        Button { app.showingSettings = true } label: {
+        Button { app.openSettings(.models) } label: {
           Label("Add your OpenRouter key", systemImage: "key")
         }
         .accessibilityIdentifier("legalModelBlocker")
@@ -145,21 +145,25 @@ struct LegalScreen: View {
       }
     }
     if !model.later.isEmpty {
-      Section("Later") { ForEach(model.later) { DeadlineRow(deadline: $0, model: model) } }
+      CappedSection(
+        title: "Later", items: model.later,
+        spec: deadlinesSpec(model.later, today: model.today)
+      ) { DeadlineRow(deadline: $0, model: model) }
     }
     if !model.done.isEmpty {
-      Section("Done") {
-        ForEach(model.done) { deadline in
-          HStack {
-            VStack(alignment: .leading) {
-              Text(deadline.title).strikethrough()
-              Text(LegalDay.display(deadline.dueDate)).font(.footnote)
-                .foregroundStyle(Color.token(.mutedForeground))
-            }
-            Spacer()
-            Button("Reopen") { Task { await model.reopen(deadline, app) } }
-              .buttonStyle(.borderless)
+      CappedSection(
+        title: "Done", items: model.done,
+        spec: deadlinesSpec(model.done, today: model.today, latestFirst: true)
+      ) { deadline in
+        HStack {
+          VStack(alignment: .leading) {
+            Text(deadline.title).strikethrough()
+            Text(LegalDay.display(deadline.dueDate)).font(.footnote)
+              .foregroundStyle(Color.token(.mutedForeground))
           }
+          Spacer()
+          Button("Reopen") { Task { await model.reopen(deadline, app) } }
+            .buttonStyle(.borderless)
         }
       }
     }

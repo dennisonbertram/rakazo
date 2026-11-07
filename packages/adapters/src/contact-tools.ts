@@ -50,7 +50,14 @@ export function capTableToolsAllowed(
 type ContactToolDeps = {
   prisma: Pick<
     PrismaClient,
-    "$transaction" | "contact" | "capTableSnapshot" | "fundraiseRound" | "safe"
+    | "$transaction"
+    | "contact"
+    | "capTableSnapshot"
+    | "fundraiseRound"
+    | "safe"
+    | "pipelineRecord"
+    | "pipelineRecordPerson"
+    | "pipelineEvent"
   >;
   /** From the run (the bot owner), never from model input. */
   scope: { spaceId: string; userId: string };
@@ -77,7 +84,14 @@ export async function contactToolFromTool(
     }
     if (name === "contacts_add") {
       // The pipeline stage is the founder's to change from the Fundraising page, never an agent's.
-      const { id: _id, stage: _stage, checkSizeCents: _check, nextStep: _next, ...rest } = args;
+      const {
+        id: _id,
+        stage: _stage,
+        checkSizeCents: _check,
+        nextStep: _next,
+        pipelineRecordId: _record,
+        ...rest
+      } = args;
       const input = ContactSaveInputSchema.safeParse(rest);
       if (!input.success) return { error: input.error.issues.map((i) => i.message).join("; ") };
       const { contact, created } = await addContactIfNew(
@@ -164,7 +178,14 @@ export async function contactToolFromTool(
     if (name === "contacts_save") {
       // The tool never updates by id and never creates: it changes the contact with this email.
       // The pipeline stage is the founder's to change from the Fundraising page, never an agent's.
-      const { id: _id, stage: _stage, checkSizeCents: _check, nextStep: _next, ...rest } = args;
+      const {
+        id: _id,
+        stage: _stage,
+        checkSizeCents: _check,
+        nextStep: _next,
+        pipelineRecordId: _record,
+        ...rest
+      } = args;
       const input = ContactSaveInputSchema.safeParse(rest);
       if (!input.success) return { error: input.error.issues.map((i) => i.message).join("; ") };
       const existing = input.data.email
@@ -179,9 +200,18 @@ export async function contactToolFromTool(
         : null;
       if (!existing)
         return { error: "No contact with this email. Use contacts_add for new people." };
-      return {
-        contact: await saveContact(deps.prisma, deps.scope, { ...input.data, id: existing.id }),
-      };
+      const contact = await saveContact(deps.prisma, deps.scope, {
+        ...input.data,
+        id: existing.id,
+      });
+      // Who changed it, so a Firewall agent's edit is untrusted text to whoever reads it later.
+      if (deps.botId) {
+        await deps.prisma.contact.update({
+          where: { id: existing.id },
+          data: { lastEditedByBotId: deps.botId },
+        });
+      }
+      return { contact };
     }
     return { error: `Unknown contact tool ${name}` };
   } catch (error) {

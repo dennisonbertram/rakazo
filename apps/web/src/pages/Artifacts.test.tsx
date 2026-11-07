@@ -20,7 +20,7 @@ vi.mock("../lib/rpc", () => ({ rpc: { artifacts: api, artifactShares: shares } }
 vi.mock("../lib/artifact-open", () => ({
   bytesToBase64: vi.fn(),
   decodeArtifactBase64: vi.fn(),
-  downloadArtifactBytes: vi.fn(),
+  openArtifactBytes: vi.fn(),
 }));
 vi.mock("../lib/relative-time", () => ({ formatRelativeTime: () => "just now" }));
 vi.mock("@lingui/react/macro", () => {

@@ -64,7 +64,12 @@ describePostgres("MCP personal access tokens (PostgreSQL, runtime login)", () =>
       await prisma.$disconnect();
       await db.pool.end();
     };
-    mountMcpServer(app, { prisma, auth: {} as never, baseUrl: "http://127.0.0.1:3200", jwksUrl: "x" });
+    mountMcpServer(app, {
+      prisma,
+      auth: {} as never,
+      baseUrl: "http://127.0.0.1:3200",
+      jwksUrl: "x",
+    });
     await prisma.user.createMany({
       data: [alice, bob].map((id) => ({ id, name: id, email: `${id}@x.test` })),
     });

@@ -840,6 +840,7 @@ export async function updateScheduleFromTool(
     where: { id: existing.id },
     data: {
       prompt,
+      promptUpdatedAt: new Date(),
       // A prompt-only edit leaves the timing alone, so a run that advanced the routine meanwhile
       // keeps its advance.
       ...(timingChanged
@@ -960,7 +961,12 @@ export async function scheduleRunsFromTool(
   };
 }
 
-export type ScheduleApproval = { summary: string; detail: string };
+export type ScheduleApproval = {
+  summary: string;
+  detail: string;
+  /** A one-time schedule: the card shows it when something else asks, but it does not make the call ask. */
+  oneShot?: true;
+};
 
 /**
  * What the owner must approve for a schedule tool call, or undefined when it needs no approval.
@@ -1020,7 +1026,8 @@ export async function scheduleApproval(
     (isScheduleValueProvided(args.prompt) || (Boolean(args.watch) && Boolean(existing?.watch)));
   // Judged on the routine as it is now; the edit's own timing is covered by newlyRepeats.
   const existingRepeats = Boolean(existing) && routineRepeats(existing!);
-  if (!newlyRepeats && !(promptChanges && existingRepeats)) return undefined;
+  const oneShotCreate = create && resolved?.ok === true && resolved.oneShot;
+  if (!newlyRepeats && !oneShotCreate && !(promptChanges && existingRepeats)) return undefined;
 
   const name = create ? String(args.name ?? "").trim() : (existing?.name ?? "");
   const crons = resolved?.ok ? [resolved.cron] : (existing?.crons ?? []);
@@ -1040,7 +1047,11 @@ export async function scheduleApproval(
         })
       : null;
   if (nextWatch && !nextWatch.ok) return undefined;
-  const when = nextWatch?.ok ? describeWatch(nextWatch.watch) : crons.map(formatCron).join("; ");
+  const when = nextWatch?.ok
+    ? describeWatch(nextWatch.watch)
+    : oneShotCreate && resolved?.ok
+      ? `Once, ${formatLocal(resolved.nextRunAt, timezone)}`
+      : crons.map(formatCron).join("; ");
   const lines: string[] = [`time zone: ${timezone}`];
   if (resolved?.ok) lines.push(`next run: ${formatLocal(resolved.nextRunAt, timezone)}`);
   if (isScheduleValueProvided(args.prompt)) lines.push(`prompt: ${String(args.prompt).trim()}`);
@@ -1058,6 +1069,7 @@ export async function scheduleApproval(
   return {
     summary: create ? `${when}, ${where}` : `Changing “${name}”: ${when}, ${where}`,
     detail: lines.join("\n"),
+    ...(oneShotCreate ? { oneShot: true as const } : {}),
   };
 }
 

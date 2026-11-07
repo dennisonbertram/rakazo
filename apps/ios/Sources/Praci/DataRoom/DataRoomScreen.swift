@@ -114,6 +114,7 @@ struct DataRoomListView: View {
     .navigationBarTitleDisplayMode(.inline)
     .searchable(text: $model.query, prompt: "Search")
     .task { await model.load(app) }
+    .task(id: model.hasProcessing) { await model.pollWhileReading(app) }
     .task(id: model.query) {
       guard model.isSearching else { return model.results = nil }
       try? await Task.sleep(for: .milliseconds(300))
@@ -144,6 +145,14 @@ struct DataRoomListView: View {
 
   private var browseList: some View {
     List {
+      if model.hasProcessing, let needed = model.consentNeeded {
+        Section {
+          Button("Allow AI to read files") { model.consent = needed }
+            .accessibilityIdentifier("dataRoomAllowReading")
+        } footer: {
+          Text("Files wait to be read until you allow it.")
+        }
+      }
       if !model.uploads.isEmpty {
         Section("Uploading") {
           ForEach(model.uploads) { upload in
@@ -188,8 +197,7 @@ struct DataRoomListView: View {
       ContentUnavailableView {
         Label("No files yet", systemImage: "tray")
       } actions: {
-        Button("Add files") { showingImporter = true }
-          .buttonStyle(.borderedProminent)
+        PrimaryActionButton("Add files") { showingImporter = true }
           .accessibilityIdentifier("addFiles")
       }
     }

@@ -69,6 +69,13 @@ const spendLimit = (id: string, name: string, over: Row = {}): Row => ({
   name,
   status: "ACTIVE",
   period_recurrence_type: "PER_MONTH",
+  start_date: "2026-11-01",
+  end_date: "2026-11-30",
+  current_period_balance: {
+    start_date: "2026-11-01",
+    end_date: "2026-11-30",
+    amount_spent: USD(0),
+  },
   authorization_settings: {
     base_limit: USD(100_000),
     authorization_type: "HARD",
@@ -87,134 +94,252 @@ const spendLimit = (id: string, name: string, over: Row = {}): Row => ({
   ...over,
 });
 
-const transaction = (n: number, cardId: string, amount: number, date: string): Row => ({
-  id: `txn_${n}`,
-  card_id: cardId,
-  description: n % 2 ? "Figma" : "Example Ads",
-  amount: USD(amount),
-  initiated_at_date: date,
-  posted_at_date: date,
-  type: "PURCHASE",
-  merchant: { raw_descriptor: n % 2 ? "FIGMA" : "EXAMPLE ADS", mcc: "5734", country: "US" },
-  expense_id: `exp_${n}`,
-});
-
 function seed() {
+  const day = (i: number) => new Date(Date.UTC(2026, 7, 4 + i)).toISOString().slice(0, 10);
+  const merchants = [
+    { name: "Figma", mcc: "5734", category: "RECURRING_SOFTWARE_AND_SAAS" },
+    { name: "Example Cloud", mcc: "7371", category: "SERVERS" },
+    { name: "Example Travel", mcc: "7011", category: "LODGING" },
+    { name: "Cafe Example", mcc: "5812", category: "RESTAURANTS" },
+    { name: "Example Ads", mcc: "7311", category: "ADVERTISING_AND_MARKETING" },
+    { name: "Office Example", mcc: "7299", category: "OFFICE_SUPPLIES" },
+  ];
+  const users = [
+    {
+      id: "u_ada",
+      first_name: "Ada",
+      last_name: "Example",
+      email: "ada@example.test",
+      status: "ACTIVE",
+    },
+    {
+      id: "u_ben",
+      first_name: "Ben",
+      last_name: "Sample",
+      email: "ben@example.test",
+      status: "ACTIVE",
+    },
+    {
+      id: "u_cy",
+      first_name: "Cy",
+      last_name: "Demo",
+      email: "cy@example.test",
+      status: "ACTIVE",
+    },
+  ] as Row[];
+  const cards = [
+    card("card_figma", "Figma", "4242", {
+      spend_controls: {
+        spend_limit: USD(50_000),
+        spend_duration: "MONTHLY",
+        allowed_merchant_details: [{ name: "Figma" }],
+      },
+    }),
+    card("card_ads", "Ad spend", "5555", {
+      owner: { type: "USER", user_id: "u_ben" },
+      spend_controls: {
+        spend_limit: USD(100_000),
+        spend_duration: "ONE_TIME",
+        lock_after_date: "2026-12-31",
+      },
+    }),
+    card("card_team", "Ada team card", "1111", { limit_type: "USER" }),
+    card("card_eur", "Berlin tools", "2222", {
+      spend_controls: {
+        spend_limit: { amount: 20_000, currency: "EUR" },
+        spend_duration: "MONTHLY",
+      },
+    }),
+    card("card_locked", "Locked travel", "3333", {
+      status: "LOCKED",
+      owner: { type: "USER", user_id: "u_ben" },
+      spend_controls: { spend_limit: USD(80_000), spend_duration: "QUARTERLY" },
+    }),
+    card("card_ended", "Old ads", "4444", {
+      status: "TERMINATED",
+      owner: { type: "USER", user_id: "u_cy" },
+      spend_controls: { spend_limit: USD(25_000), spend_duration: "ONE_TIME" },
+    }),
+    card("card_yearly", "Yearly cloud", "6666", {
+      owner: { type: "USER", user_id: "u_cy" },
+      spend_controls: { spend_limit: USD(250_000), spend_duration: "YEARLY" },
+    }),
+    card("card_onetime", "Launch", "7777", {
+      owner: { type: "USER", user_id: "u_ada" },
+      spend_controls: { spend_limit: USD(40_000), spend_duration: "ONE_TIME" },
+    }),
+  ] as Row[];
+  const balance = (start: string, end: string, amount: number) => ({
+    start_date: start,
+    end_date: end,
+    amount_spent: USD(amount),
+  });
+  const spendLimits = [
+    spendLimit("sl_template", "Software template", {
+      expense_visibility: "PRIVATE",
+      authorization_visibility: "PRIVATE",
+      limit_increase_setting: "ENABLED",
+      spend_type: "NON_BUDGET_PROVISIONED_CARDS_ALLOWED",
+      current_period_balance: balance("2026-11-01", "2026-11-30", 18_400),
+    }),
+    spendLimit("sl_soft", "Soft travel", {
+      authorization_settings: {
+        base_limit: USD(100_000),
+        authorization_type: "SOFT",
+        rollover_refresh_rate: "OFF",
+      },
+      current_period_balance: balance("2026-11-01", "2026-11-30", 7_900),
+    }),
+    spendLimit("sl_auto", "Everyone", {
+      auto_create_limit_cards_setting: "ALL_MEMBERS",
+      current_period_balance: balance("2026-11-01", "2026-11-30", 42_300),
+    }),
+    spendLimit("sl_buffered", "Buffered limit", {
+      authorization_settings: {
+        base_limit: USD(100_000),
+        limit_buffer_percentage: 10,
+        authorization_type: "HARD",
+        rollover_refresh_rate: "OFF",
+      },
+      current_period_balance: balance("2026-11-01", "2026-11-30", 3_100),
+    }),
+    spendLimit("sl_quarterly", "Travel quarter", {
+      period_recurrence_type: "PER_QUARTER",
+      start_date: "2026-10-01",
+      end_date: "2026-12-31",
+      current_period_balance: balance("2026-10-01", "2026-12-31", 64_000),
+    }),
+    spendLimit("sl_yearly", "Cloud year", {
+      period_recurrence_type: "PER_YEAR",
+      start_date: "2026-01-01",
+      end_date: "2026-12-31",
+      current_period_balance: balance("2026-01-01", "2026-12-31", 212_000),
+    }),
+    spendLimit("sl_one_time", "Launch", {
+      period_recurrence_type: "ONE_TIME",
+      start_date: "2026-11-01",
+      end_date: "2026-12-15",
+      current_period_balance: balance("2026-11-01", "2026-12-15", 12_500),
+    }),
+  ] as Row[];
+  const expenses: Row[] = [
+    {
+      id: "exp_1",
+      memo: null,
+      status: "SUBMITTED",
+      payment_status: "CLEARED",
+      user_id: "u_ada",
+      purchased_at: "2026-11-01T10:00:00Z",
+      billing_amount: USD(1200),
+      category: "RECURRING_SOFTWARE_AND_SAAS",
+      expense_type: "CARD",
+      receipts: [],
+      review: { compliance_status: "DUE" },
+      merchant: { raw_descriptor: "Figma", mcc: "5734", country: "US" },
+    },
+    {
+      id: "exp_missing_memo",
+      memo: null,
+      status: "APPROVED",
+      payment_status: "CLEARED",
+      user_id: "u_ben",
+      purchased_at: "2026-10-28T10:00:00Z",
+      billing_amount: USD(2450),
+      category: "RESTAURANTS",
+      expense_type: "CARD",
+      receipts: [{ id: "rcpt_missing_memo" }],
+      review: { compliance_status: "DUE" },
+      merchant: { raw_descriptor: "Cafe Example", mcc: "5812", country: "US" },
+    },
+    {
+      id: "exp_complete",
+      memo: "Client dinner",
+      status: "APPROVED",
+      payment_status: "CLEARED",
+      user_id: "u_cy",
+      purchased_at: "2026-10-20T10:00:00Z",
+      billing_amount: USD(8700),
+      category: "LODGING",
+      expense_type: "CARD",
+      receipts: [{ id: "rcpt_complete" }],
+      review: { compliance_status: "COMPLETED" },
+      merchant: {
+        raw_descriptor: "Example Travel",
+        mcc: "7011",
+        country: "US",
+      },
+    },
+  ];
+  const transactions: Row[] = [];
+  for (let i = 0; i < 90; i += 1) {
+    const m = merchants[i % merchants.length]!;
+    const amount = 900 + ((i * 791) % 46_000);
+    const date = day(i);
+    const cardId = ["card_figma", "card_ads", "card_team", "card_eur", "card_yearly"][i % 5]!;
+    const userId = i % 3 === 0 ? "u_ben" : i % 3 === 1 ? "u_cy" : "u_ada";
+    const expenseId = `exp_${String(i + 1).padStart(3, "0")}`;
+    const receipts = i % 4 === 0 ? [] : [{ id: `rcpt_${expenseId}` }];
+    const memo = i % 6 === 0 ? null : `${m.name} ${date}`;
+    expenses.push({
+      id: expenseId,
+      memo,
+      status: i % 5 === 0 ? "SUBMITTED" : "APPROVED",
+      payment_status: "CLEARED",
+      user_id: userId,
+      purchased_at: `${date}T12:00:00Z`,
+      billing_amount: USD(amount),
+      category: m.category,
+      expense_type: "CARD",
+      receipts,
+      review: {
+        compliance_status: receipts.length && memo ? "COMPLETED" : "DUE",
+      },
+      merchant: { raw_descriptor: m.name, mcc: m.mcc, country: "US" },
+    });
+    transactions.push({
+      id: `txn_${String(i + 1).padStart(3, "0")}`,
+      card_id: cardId,
+      description: m.name,
+      amount: USD(amount),
+      initiated_at_date: date,
+      posted_at_date: date,
+      type: "PURCHASE",
+      merchant: { raw_descriptor: m.name, mcc: m.mcc, country: "US" },
+      expense_id: expenseId,
+    });
+  }
+  const reimbursements = [
+    ["REIMBURSEMENTS", "Taxi Example", "4121", "OTHER_TRAVEL_EXPENSES", "u_ada", "DUE", false],
+    ["Client meals", "Cafe Example", "5812", "RESTAURANTS", "u_ben", "COMPLETED", true],
+    ["Laptop repair", "Office Example", "5734", "SOFTWARE_NON_RECURRING", "u_cy", "OVERDUE", false],
+    ["Hotel", "Example Travel", "7011", "LODGING", "u_ada", "COMPLETED", true],
+    ["Ads", "Example Ads", "7311", "ADVERTISING_AND_MARKETING", "u_ben", "DUE", false],
+  ] as const;
+  reimbursements.forEach(
+    ([merchant, descriptor, mcc, category, userId, compliance, hasReceipt], i) => {
+      const id = `exp_reimb_${i + 1}`;
+      expenses.push({
+        id,
+        memo: i === 1 ? null : merchant,
+        status: i % 2 ? "APPROVED" : "SUBMITTED",
+        payment_status: i % 2 ? "CLEARED" : "AWAITING_PAYMENT",
+        user_id: userId,
+        purchased_at: `2026-10-${String(12 + i).padStart(2, "0")}T15:00:00Z`,
+        billing_amount: USD(4200 + i * 1300),
+        category,
+        expense_type: "REIMBURSEMENT",
+        receipts: hasReceipt ? [{ id: `rcpt_${id}` }] : [],
+        review: { compliance_status: compliance },
+        merchant: { raw_descriptor: descriptor, mcc, country: "US" },
+      });
+    },
+  );
   return {
-    users: [
-      {
-        id: "u_ada",
-        first_name: "Ada",
-        last_name: "Example",
-        email: "ada@example.test",
-        status: "ACTIVE",
-      },
-      {
-        id: "u_ben",
-        first_name: "Ben",
-        last_name: "Sample",
-        email: "ben@example.test",
-        status: "ACTIVE",
-      },
-      {
-        id: "u_cy",
-        first_name: "Cy",
-        last_name: "Demo",
-        email: "cy@example.test",
-        status: "ACTIVE",
-      },
-    ] as Row[],
-    cards: [
-      card("card_figma", "Figma", "4242", {
-        spend_controls: {
-          spend_limit: USD(50_000),
-          spend_duration: "MONTHLY",
-          allowed_merchant_details: [{ name: "Figma" }],
-        },
-      }),
-      card("card_ads", "Ad spend", "5555", {
-        owner: { type: "USER", user_id: "u_ben" },
-        spend_controls: {
-          spend_limit: USD(100_000),
-          spend_duration: "ONE_TIME",
-          lock_after_date: "2026-12-31",
-        },
-      }),
-      card("card_team", "Ada team card", "1111", { limit_type: "USER" }),
-      card("card_eur", "Berlin tools", "2222", {
-        spend_controls: {
-          spend_limit: { amount: 20_000, currency: "EUR" },
-          spend_duration: "MONTHLY",
-        },
-      }),
-    ] as Row[],
-    spendLimits: [
-      // The template differs from the settings the server forces, so a copy is observable.
-      spendLimit("sl_template", "Software template", {
-        expense_visibility: "PRIVATE",
-        authorization_visibility: "PRIVATE",
-        limit_increase_setting: "ENABLED",
-        spend_type: "NON_BUDGET_PROVISIONED_CARDS_ALLOWED",
-      }),
-      spendLimit("sl_soft", "Soft travel", {
-        authorization_settings: {
-          base_limit: USD(100_000),
-          authorization_type: "SOFT",
-          rollover_refresh_rate: "OFF",
-        },
-      }),
-      spendLimit("sl_auto", "Everyone", { auto_create_limit_cards_setting: "ALL_MEMBERS" }),
-      spendLimit("sl_buffered", "Buffered limit", {
-        authorization_settings: {
-          base_limit: USD(100_000),
-          limit_buffer_percentage: 10,
-          authorization_type: "HARD",
-          rollover_refresh_rate: "OFF",
-        },
-      }),
-    ] as Row[],
-    expenses: [
-      {
-        id: "exp_1",
-        memo: null,
-        status: "SUBMITTED",
-        payment_status: "CLEARED",
-        user_id: "u_ada",
-        purchased_at: "2026-10-02T10:00:00Z",
-        billing_amount: USD(1200),
-        merchant: { raw_descriptor: "FIGMA", mcc: "5734", country: "US" },
-        _compliance: "DUE",
-      },
-      {
-        id: "exp_2",
-        memo: "Team seats",
-        status: "APPROVED",
-        payment_status: "CLEARED",
-        user_id: "u_ada",
-        purchased_at: "2026-10-05T10:00:00Z",
-        billing_amount: USD(4500),
-        merchant: { raw_descriptor: "EXAMPLE ADS", mcc: "7311", country: "US" },
-        _compliance: "COMPLIANT",
-      },
-      {
-        id: "exp_3",
-        memo: null,
-        status: "SUBMITTED",
-        payment_status: "CLEARED",
-        user_id: "u_ben",
-        purchased_at: "2026-10-09T10:00:00Z",
-        billing_amount: USD(900),
-        merchant: { raw_descriptor: "FIGMA", mcc: "5734", country: "US" },
-        _compliance: "OVERDUE",
-      },
-    ] as Row[],
-    transactions: [
-      transaction(1, "card_figma", 1200, "2026-10-02"),
-      transaction(2, "card_ads", 4500, "2026-10-05"),
-      transaction(3, "card_figma", 1200, "2026-10-12"),
-      transaction(4, "card_ads", 2500, "2026-10-19"),
-      transaction(5, "card_figma", 1200, "2026-10-26"),
-    ] as Row[],
+    users,
+    cards,
+    spendLimits,
+    expenses,
+    transactions,
     trips: [
       {
         id: "trip_1",
@@ -227,9 +352,30 @@ function seed() {
         created_at: "2026-10-01T00:00:00Z",
         updated_at: "2026-10-01T00:00:00Z",
       },
+      {
+        id: "trip_2",
+        name: "Customer visit",
+        status: "APPROVED",
+        booker_user_id: "u_ben",
+        starts_at: "2026-09-14T08:00:00Z",
+        ends_at: "2026-09-16T18:00:00Z",
+        version: 1,
+        created_at: "2026-08-20T00:00:00Z",
+        updated_at: "2026-08-20T00:00:00Z",
+      },
+      {
+        id: "trip_3",
+        name: "Conference",
+        status: "CANCELLED",
+        booker_user_id: "u_cy",
+        starts_at: "2026-08-10T08:00:00Z",
+        ends_at: "2026-08-12T18:00:00Z",
+        version: 1,
+        created_at: "2026-07-01T00:00:00Z",
+        updated_at: "2026-07-15T00:00:00Z",
+      },
     ] as Row[],
     cashAccounts: [
-      // Fake numbers: the package must never return them.
       {
         id: "ca_1",
         name: "Operating",
@@ -240,19 +386,41 @@ function seed() {
         routing_number: "000000000",
         primary: true,
       },
+      {
+        id: "ca_2",
+        name: "Payroll",
+        status: "ACTIVE",
+        current_balance: USD(480_000),
+        available_balance: USD(480_000),
+        account_number: "000987654321",
+        routing_number: "000000000",
+        primary: false,
+      },
     ] as Row[],
     cardStatements: [
       {
         id: "st_card_1",
         start_balance: USD(0),
         end_balance: USD(31_000),
-        period: { start_date: "2026-09-01", end_date: "2026-09-30" },
+        period: { start_date: "2026-08-01", end_date: "2026-08-31" },
       },
       {
         id: "st_card_2",
         start_balance: USD(31_000),
         end_balance: USD(52_000),
+        period: { start_date: "2026-09-01", end_date: "2026-09-30" },
+      },
+      {
+        id: "st_card_3",
+        start_balance: USD(52_000),
+        end_balance: USD(88_400),
         period: { start_date: "2026-10-01", end_date: "2026-10-31" },
+      },
+      {
+        id: "st_card_4",
+        start_balance: USD(88_400),
+        end_balance: USD(91_800),
+        period: { start_date: "2026-11-01", end_date: "2026-11-30" },
       },
     ] as Row[],
     cashStatements: [
@@ -261,6 +429,12 @@ function seed() {
         start_balance: USD(1_000_000),
         end_balance: USD(1_234_500),
         period: { start_date: "2026-10-01", end_date: "2026-10-31" },
+      },
+      {
+        id: "st_cash_2",
+        start_balance: USD(480_000),
+        end_balance: USD(480_000),
+        period: { start_date: "2026-11-01", end_date: "2026-11-30" },
       },
     ] as Row[],
   };
@@ -334,7 +508,10 @@ export class BrexApiEmulator {
           body = undefined;
         }
         const [status, payload, headers] = this.handle(req.method ?? "GET", url, req.headers, body);
-        res.writeHead(status, { "content-type": "application/json", ...headers });
+        res.writeHead(status, {
+          "content-type": "application/json",
+          ...headers,
+        });
         res.end(JSON.stringify(payload));
       });
     });
@@ -410,7 +587,10 @@ export class BrexApiEmulator {
       const target = at(this.cards, c);
       if (parts.length === 3 && method === "GET") return found(target);
       if (parts.length === 3 && method === "PUT" && target) {
-        target.spend_controls = { ...target.spend_controls, ...b.spend_controls };
+        target.spend_controls = {
+          ...target.spend_controls,
+          ...b.spend_controls,
+        };
         return [200, target];
       }
       if (
@@ -455,21 +635,44 @@ export class BrexApiEmulator {
       if (parts.length === 3 && method === "GET") return found(target);
       if (parts.length === 3 && method === "PUT" && target) return this.updateSpendLimit(target, b);
     }
+    if (v === "v1" && a === "expenses" && parts.length === 2 && method === "GET") {
+      const wanted = q.getAll("expense_type[]");
+      const compliance = q.getAll("compliance_status[]");
+      const users = q.getAll("user_id[]");
+      const purchasedStart = q.get("purchased_at_start");
+      const purchasedEnd = q.get("purchased_at_end");
+      const rows = this.expenses
+        .filter((x) => !wanted.length || wanted.includes(x.expense_type))
+        .filter((x) => !compliance.length || compliance.includes(x.review?.compliance_status))
+        .filter((x) => !users.length || users.includes(x.user_id))
+        .filter(
+          (x) =>
+            (!purchasedStart || x.purchased_at >= purchasedStart) &&
+            (!purchasedEnd || x.purchased_at <= purchasedEnd),
+        );
+      return this.page(rows, q);
+    }
     if (v === "v1" && a === "expenses" && c === "card") {
       if (parts.length === 3 && method === "GET") {
         const wanted = q.getAll("compliance_status[]");
         const users = q.getAll("user_id[]");
+        const purchasedStart = q.get("purchased_at_start");
+        const purchasedEnd = q.get("purchased_at_end");
         const rows = this.expenses
-          .filter((x) => !wanted.length || wanted.includes(x._compliance))
+          .filter((x) => x.expense_type !== "REIMBURSEMENT")
+          .filter((x) => !wanted.length || wanted.includes(x.review?.compliance_status))
           .filter((x) => !users.length || users.includes(x.user_id))
-          .map(({ _compliance, ...rest }) => rest);
+          .filter(
+            (x) =>
+              (!purchasedStart || x.purchased_at >= purchasedStart) &&
+              (!purchasedEnd || x.purchased_at <= purchasedEnd),
+          );
         return this.page(rows, q);
       }
       const target = at(this.expenses, d);
       if (parts.length === 4 && method === "PUT" && target) {
         if (typeof b.memo === "string") target.memo = b.memo;
-        const { _compliance, ...rest } = target;
-        return [200, rest];
+        return [200, target];
       }
     }
     if (v === "v2" && a === "transactions" && c === "card" && d === "primary" && method === "GET") {
@@ -544,7 +747,10 @@ export class BrexApiEmulator {
       return [400, { error: "unknown_expense_policy" }];
     const created = spendLimit(`sl_new_${++this.sequence}`, b.name, {
       ...b,
-      authorization_settings: { ...settings, limit_with_increases: settings.base_limit },
+      authorization_settings: {
+        ...settings,
+        limit_with_increases: settings.base_limit,
+      },
       owner_user_ids: b.owner_user_ids ?? [],
       member_user_ids: b.member_user_ids ?? [],
     });

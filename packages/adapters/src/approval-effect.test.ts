@@ -653,7 +653,7 @@ describe("payment outcome wording for the model", () => {
   });
 
   it("speaks to the person in the second person after a denial", () => {
-    expect(DENIED_ACTION_MESSAGE).toContain("you denied");
+    expect(DENIED_ACTION_MESSAGE).toContain("you declined it");
     expect(DENIED_ACTION_MESSAGE).not.toMatch(/the user denied/i);
   });
 

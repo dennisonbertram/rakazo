@@ -12,6 +12,7 @@ import {
   ensureCartaAgent,
   isCartaSyncing,
   onMcpServerConnected,
+  PREVIOUS_CARTA_AGENT_INSTRUCTIONS,
   startCartaSync,
 } from "./carta-agent.js";
 
@@ -125,9 +126,15 @@ describe("ensureCartaAgent", () => {
     await ensureCartaAgent(deps, actor);
     const current = (createBot.mock.calls[0] as unknown as [Actor, { instructions: string }])[1]
       .instructions;
-    const earlier = current.replace(/ A SAFE is not a Carta change[^.]*\./, "");
-    expect(earlier).not.toBe(current);
+    const [last, earlier] = PREVIOUS_CARTA_AGENT_INSTRUCTIONS as [string, string];
+    expect(last).not.toBe(current);
+    expect(earlier).not.toContain("A SAFE is not a Carta change");
+    expect(last).toContain("A SAFE is not a Carta change");
     const replace = deps.repos.replaceBotInstructions;
+    createBot.mockResolvedValueOnce({ id: "bot-1", instructions: last } as never);
+    await ensureCartaAgent(deps, actor);
+    expect(replace).toHaveBeenCalledWith(actor, "bot-1", { from: last, to: current });
+    replace.mockClear();
     createBot.mockResolvedValueOnce({ id: "bot-1", instructions: earlier } as never);
     await ensureCartaAgent(deps, actor);
     expect(replace).toHaveBeenCalledWith(actor, "bot-1", { from: earlier, to: current });

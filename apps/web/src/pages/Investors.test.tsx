@@ -1454,6 +1454,40 @@ it("keeps a draft in Action items and in Updates until it is sent or deleted", a
   expect(container.querySelector("[aria-label='Updates']")?.textContent).toContain("Sent");
 });
 
+it("filters Updates by status and sorts them by date from the URL", async () => {
+  rpcMock.updatesList.mockResolvedValue([
+    update({
+      id: "a",
+      subject: "Alpha note",
+      status: "sent",
+      sentAt: "2026-07-02T09:00:00.000Z",
+    }),
+    update({
+      id: "b",
+      subject: "Beta note",
+      status: "posted",
+      sentAt: "2026-10-02T09:00:00.000Z",
+    }),
+    update({ id: "c", subject: "Gamma note", status: "sent", sentAt: "2026-09-02T09:00:00.000Z" }),
+  ]);
+  const subjects = () =>
+    [
+      ...(container.querySelector("[aria-label='Updates']")?.textContent ?? "").matchAll(
+        /(Alpha|Beta|Gamma) note/g,
+      ),
+    ].map((m) => m[1]);
+  await show("/app/investors?tab=updates");
+  expect(subjects()).toEqual(["Beta", "Gamma", "Alpha"]);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await show("/app/investors?tab=updates&updates-sort=date&updates-dir=asc");
+  expect(subjects()).toEqual(["Alpha", "Gamma", "Beta"]);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await show("/app/investors?tab=updates&updates-status=sent");
+  expect(subjects()).toEqual(["Gamma", "Alpha"]);
+});
+
 it("starts an investors update with New update", async () => {
   rpcMock.updatesSave.mockResolvedValue(update({ id: "new1" }));
   await show("/app/investors?tab=updates");
@@ -1840,7 +1874,7 @@ it("shows one section per tab, keeps the tab in the URL, and falls back to Cap t
   expect(container.querySelector('section[aria-label="Contacts"]')).toBeNull();
 });
 
-it("sorts the Contacts tab by organization and stage and filters by stage", async () => {
+it("sorts the Contacts tab by organization and has no Stage filter or sort", async () => {
   rpcMock.list.mockResolvedValue([
     {
       ...contact("c1", "Ada", "investor"),
@@ -1869,11 +1903,11 @@ it("sorts the Contacts tab by organization and stage and filters by stage", asyn
   expect(names()).toEqual(["Ada", "Bo", "Cy"]);
   await show("/app/investors?tab=contacts&sort=organization");
   expect(names()).toEqual(["Bo", "Ada", "Cy"]);
-  await show("/app/investors?tab=contacts&sort=stage&dir=desc");
-  expect(names()).toEqual(["Ada", "Cy", "Bo"]);
   await show("/app/investors?tab=contacts&sort=check&dir=desc");
   expect(names()).toEqual(["Ada", "Bo", "Cy"]);
+  // An old link's stage filter no longer narrows the list.
   await show("/app/investors?tab=contacts&stage=meeting");
-  expect(names()).toEqual(["Ada", "Cy"]);
+  expect(names()).toEqual(["Ada", "Bo", "Cy"]);
+  expect(button("Stage")).toBeUndefined();
   expect(button("Sort: Name")).toBeDefined();
 });

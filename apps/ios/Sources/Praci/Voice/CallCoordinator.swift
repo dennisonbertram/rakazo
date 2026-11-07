@@ -21,7 +21,7 @@ final class CallCoordinator {
   var isActive: Bool { session?.state != nil }
 
   func begin(app: AppModel, botID: String, name: String, color: String?) async {
-    guard !starting, !isActive else { return }
+    guard !starting, !isActive, !VoiceAudio.meetingActive else { return }
     starting = true
     failure = nil
     let started = epoch

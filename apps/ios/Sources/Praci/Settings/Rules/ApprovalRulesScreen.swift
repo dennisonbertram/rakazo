@@ -120,7 +120,7 @@ struct ApprovalRulesScreen: View {
           if let error = model.error {
             Text(error).foregroundStyle(Color.token(.destructive))
           } else {
-            Text("Background runs always ask before they send, change or run anything.")
+            Text("Background runs always ask before they send, change or run anything, except mail changes you always allowed.")
           }
         }
       }

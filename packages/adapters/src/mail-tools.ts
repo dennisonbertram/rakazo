@@ -40,6 +40,7 @@ export const MAIL_TOOL_NAMES = new Set([
   "mail_draft",
   "mail_modify",
   "mail_send",
+  "mail_reply_batch",
 ]);
 
 const SEARCH_TTL_MS = 24 * 3_600_000;
@@ -64,6 +65,18 @@ export type MailToolDeps = {
   jobs: JobPublisher;
   /** Connected accounts of the bot owner. Memoized per run by the caller. */
   accounts: () => Promise<MailAccount[]>;
+  /**
+   * Every connected account of the owner, including ones this agent may not use. Only read to tell
+   * "not connected" from "not allowed" when the model names an account. Never offered for use.
+   */
+  ownerAccounts?: () => Promise<MailAccount[]>;
+  /** The accounts this agent may read, to tell "read only" from "no access" on a refused change. */
+  readableAccounts?: () => Promise<MailAccount[]>;
+  /**
+   * A firewalled agent's support label id for an account, from the grant. Searches of that account
+   * are filtered by it at the provider and any message without it is dropped.
+   */
+  scopeLabelIds?: (accountId: string) => string | undefined;
   /** From the run, never from model input. */
   scope: { spaceId: string; userId: string; botId: string };
   /** Puts blocks in the run's thread. Without it show_emails is unavailable. */
@@ -77,6 +90,13 @@ export type MailToolDeps = {
   writesDisabled?: boolean;
   /** Stable per tool call, from the run; mail_send keys its send record on it so a replay never sends twice. */
   idempotencyKey?: string;
+  /**
+   * A reply batch's send: a failed record is never claimed (only the owner's Retry makes it sendable
+   * again), and every attempt overwrites the draft with the approved message right before the send,
+   * so a draft changed in the mailbox after a failed attempt is not what goes out. Nothing waits for
+   * a mail sync between rows.
+   */
+  sendOnce?: boolean;
   deadlineMs?: number;
   /** How long the inbox overview waits for the queued sync; defaults to 8 seconds. */
   syncWaitMs?: number;
@@ -179,6 +199,8 @@ export const OWNER_INITIATED_TRIGGERS = new Set([
   "routine",
   "skill",
   "call_end",
+  // A goal run continues the owner's own /goal request.
+  "goal",
 ]);
 
 /** Owner only: the bot's owner started the run, in a direct thread, outside a messaging channel. */
@@ -267,8 +289,23 @@ export function findAccount(accounts: MailAccount[], wanted: string): MailAccoun
   return named.length === 1 ? named[0] : undefined;
 }
 
-function noAccount(wanted: string) {
-  return { error: `No connected mail account ${wanted.trim().slice(0, 200)}` };
+async function noAccount(
+  deps: Pick<MailToolDeps, "ownerAccounts" | "readableAccounts">,
+  usable: MailAccount[],
+  wanted: string,
+) {
+  const owned = deps.ownerAccounts ? await deps.ownerAccounts().catch(() => []) : [];
+  const forbidden = findAccount(owned, wanted);
+  if (!forbidden) return { error: `No connected mail account ${wanted.trim().slice(0, 200)}` };
+  const readable = deps.readableAccounts ? await deps.readableAccounts().catch(() => []) : [];
+  if (readable.some((account) => account.accountRef === forbidden.accountRef))
+    return {
+      error: `This agent can read but not change ${accountName(forbidden)}. Change that under Access on that account's Integrations page.`,
+    };
+  const can = usable.length > 0 ? ` It can use: ${usable.map(accountName).join(", ")}.` : "";
+  return {
+    error: `This agent isn't allowed to use ${accountName(forbidden)}.${can} Give it access on that account's Integrations page.`,
+  };
 }
 
 async function findOwnedSearch(deps: MailToolDeps, id: unknown) {
@@ -301,7 +338,7 @@ function parseResume(value: unknown): ResumeEntry[] {
   });
 }
 
-type Task = { account: MailAccount; query: string; start?: ResumeEntry };
+type Task = { account: MailAccount; query: string; start?: ResumeEntry; labelIds?: string[] };
 
 async function mailSearch(
   deps: MailToolDeps,
@@ -339,13 +376,17 @@ async function mailSearch(
     let chosen = accounts;
     if (typeof args.account === "string" && args.account.trim()) {
       const account = findAccount(accounts, args.account);
-      if (!account) return noAccount(args.account);
+      if (!account) return await noAccount(deps, accounts, args.account);
       chosen = [account];
     }
     if (chosen.length === 0) return { error: "No connected mail account" };
     tasks = chosen.flatMap((account) => queries.map((query) => ({ account, query })));
   }
 
+  tasks = tasks.map((task) => {
+    const labelId = deps.scopeLabelIds?.(task.account.id);
+    return labelId ? { ...task, labelIds: [labelId] } : task;
+  });
   const involved = [...new Map(tasks.map((task) => [task.account.id, task.account])).values()];
   const maxMessages = clampInt(args.maxMessages, 1, MAX_MESSAGES, DEFAULT_MAX_MESSAGES);
   const share = Math.ceil(maxMessages / involved.length);
@@ -379,6 +420,8 @@ async function mailSearch(
           deps.progress,
           () => left,
           (message) => {
+            const required = deps.scopeLabelIds?.(account.id);
+            if (required && !message.labelIds.includes(required)) return false;
             if (seen.has(message.id)) return false;
             seen.add(message.id);
             saved.push({ account, message });
@@ -426,12 +469,22 @@ async function mailSearch(
     text: tasks.length > 1 ? `${found(rows.length)} in total` : found(rows.length),
     summary: `Searched mail · ${rows.length === 0 ? "none found" : `${rows.length} found`}${failed.size > 0 ? " · incomplete" : ""}`,
   });
-  const summary = summarizeResults({
-    rows,
-    accounts: involved.map(accountName),
-    queries: outcomes,
-    failedAccounts: [...failed],
-  });
+  const scopedLabels = Object.fromEntries(
+    involved.flatMap((account) => {
+      const labelId = deps.scopeLabelIds?.(account.id);
+      return labelId ? [[accountName(account), labelId]] : [];
+    }),
+  );
+  const summary = {
+    ...summarizeResults({
+      rows,
+      accounts: involved.map(accountName),
+      queries: outcomes,
+      failedAccounts: [...failed],
+    }),
+    // Which label filter each account's results went through; a firewalled mail_grep reads it.
+    ...(Object.keys(scopedLabels).length > 0 ? { scopedLabels } : {}),
+  };
 
   const createdAt = currentTime(deps);
   const expiresAt = new Date(createdAt.getTime() + SEARCH_TTL_MS);
@@ -469,6 +522,8 @@ async function runTask(
   save: (message: MailMessageSummary) => boolean,
 ): Promise<{ outcome: MailQueryOutcome; resume?: ResumeEntry; reason?: string }> {
   const { account, query } = task;
+  // Cached metadata keeps only some labels, so a label-scoped search always reads the provider.
+  const labelIds = task.labelIds ? { labelIds: task.labelIds, useCache: false } : {};
   let ids = task.start?.unhydratedIds ?? [];
   let token = task.start?.pageToken;
   // A fresh query, or a resumed one that still has a page to list.
@@ -515,12 +570,17 @@ async function runTask(
       const listed = fromIds
         ? await mail.listMessages(
             account,
-            { query, pageSize: PAGE_SIZE, ids: ids.slice(0, room) },
+            { query, ...labelIds, pageSize: PAGE_SIZE, ids: ids.slice(0, room) },
             context,
           )
         : await mail.listMessages(
             account,
-            { query, pageSize: Math.min(PAGE_SIZE, room), ...(token ? { pageToken: token } : {}) },
+            {
+              query,
+              ...labelIds,
+              pageSize: Math.min(PAGE_SIZE, room),
+              ...(token ? { pageToken: token } : {}),
+            },
             context,
           );
       for (const message of listed.messages) {
@@ -586,6 +646,12 @@ async function mailGrep(deps: MailToolDeps, args: Record<string, unknown>) {
   const search = await findOwnedSearch(deps, args.searchId);
   if (!search) return NO_SEARCH;
   if (search.expiresAt <= currentTime(deps)) return EXPIRED;
+  // Rows saved from an account the agent can no longer use are not readable: fail closed.
+  const allowed = new Set((await deps.accounts()).map(accountName));
+  const saved = (search.summary as { accounts?: unknown } | null)?.accounts;
+  if (Array.isArray(saved) && saved.some((name) => !allowed.has(String(name)))) {
+    return { error: "A mailbox in these results is no longer available to this agent." };
+  }
 
   const patterns = Array.isArray(args.patterns) ? args.patterns : undefined;
   const dateFrom = datePrefix(args.dateFrom);
@@ -685,14 +751,14 @@ export async function recoveryMailAccount(
 }
 
 /** The account named by `args.account`, the only connected one, or the one the message is in. */
-async function resolveAccount(
-  deps: MailToolDeps,
+export async function resolveAccount(
+  deps: Pick<MailToolDeps, "accounts" | "ownerAccounts" | "readableAccounts" | "prisma" | "scope">,
   args: Record<string, unknown>,
 ): Promise<{ account: MailAccount } | { error: string }> {
   const accounts = await deps.accounts();
   if (typeof args.account === "string" && args.account.trim()) {
     const account = findAccount(accounts, args.account);
-    return account ? { account } : noAccount(args.account);
+    return account ? { account } : await noAccount(deps, accounts, args.account);
   }
   const owner = { spaceId: deps.scope.spaceId, userId: deps.scope.userId };
   const inferred = await inferMailAccount(deps.prisma, owner, accounts, args);
@@ -967,6 +1033,28 @@ const CHECK_SENT = "Check the Sent folder before trying again.";
  * replayed call reports the earlier outcome instead of sending again. A send whose outcome is unclear
  * is never repeated. Same record and states as the Inbox composer's send (`ComposeSend`).
  */
+/**
+ * True when no send of this call reached the provider (no record, or one still draft or failed),
+ * so an interrupted call can be run again. A pending, unknown or sent record is not retryable.
+ */
+export async function mailSendNotDispatched(
+  prisma: PrismaClient,
+  scope: { spaceId: string; userId: string },
+  idempotencyKey: string,
+): Promise<boolean> {
+  const row = await prisma.composeSend.findUnique({
+    where: {
+      spaceId_userId_clientId: {
+        spaceId: scope.spaceId,
+        userId: scope.userId,
+        clientId: `agent:${idempotencyKey}`,
+      },
+    },
+    select: { state: true },
+  });
+  return !row || row.state === "draft" || row.state === "failed";
+}
+
 async function mailSend(
   deps: MailToolDeps,
   context: AdapterContext,
@@ -999,7 +1087,7 @@ async function mailSend(
     select: { id: true, connectionId: true, draftId: true, state: true },
   });
   const claim = await table.updateMany({
-    where: { id: row.id, state: { in: ["draft", "failed"] } },
+    where: { id: row.id, state: { in: deps.sendOnce ? ["draft"] : ["draft", "failed"] } },
     data: { state: "pending" },
   });
   if (claim.count === 0) {
@@ -1016,6 +1104,19 @@ async function mailSend(
   let sending = false;
   try {
     let draftId = given || row.draftId;
+    if (deps.sendOnce && draftId) {
+      await allowWrite(deps, account);
+      draftId = await deps.mail
+        .updateDraft(account, draftId, draft, writeContext(deps, account, context))
+        .then(
+          (saved) => saved.draftId,
+          (error: unknown) => {
+            // Gone from the mailbox: a new draft below.
+            if (error instanceof MailProviderError && error.kind === "not_found") return null;
+            throw error;
+          },
+        );
+    }
     if (!draftId) {
       await allowWrite(deps, account);
       draftId = (await deps.mail.createDraft(account, draft, writeContext(deps, account, context)))
@@ -1032,11 +1133,16 @@ async function mailSend(
       threadId: sent.threadId || null,
     });
     // So the Inbox shows the reply in its conversation, and the thread leaves Needs reply.
-    await syncAfterSend({ prisma: deps.prisma, jobs: deps.jobs }, account, {
-      ...context,
-      spaceId: deps.scope.spaceId,
-      userId: deps.scope.userId,
-    });
+    await syncAfterSend(
+      { prisma: deps.prisma, jobs: deps.jobs },
+      account,
+      {
+        ...context,
+        spaceId: deps.scope.spaceId,
+        userId: deps.scope.userId,
+      },
+      deps.sendOnce ? 0 : undefined,
+    );
     return {
       ok: true,
       account: accountName(account),

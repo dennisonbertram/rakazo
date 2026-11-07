@@ -8,9 +8,8 @@ struct ThreadScreen: View {
   @State private var model: ThreadModel
   @State private var attempt = 0
   @State private var atBottom = true
-  @State private var scrolledToDivider = false
-  /// The latest measured position; read after a programmatic scroll that may not change the geometry.
-  @State private var edgeNearBottom = true
+  /// True while a finger is on the thread or it is still coasting from a drag.
+  @State private var userScrolling = false
   @State private var confirmingArchive = false
 
   init(target: ThreadTarget) {
@@ -59,8 +58,16 @@ struct ThreadScreen: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 8) {
           if snapshot.olderCursor != nil {
-            ProgressView().frame(maxWidth: .infinity)
-              .onAppear { Task { await model.loadOlder(app) } }
+            if model.olderError != nil {
+              Button("Couldn’t load earlier messages. Try again") {
+                model.olderError = nil
+                Task { await model.loadOlder(app) }
+              }
+              .font(.footnote).frame(maxWidth: .infinity)
+            } else {
+              ProgressView().frame(maxWidth: .infinity)
+                .onAppear { Task { await model.loadOlder(app) } }
+            }
           }
           if let error = model.refreshError {
             Text("Couldn’t refresh. Showing the last loaded messages.")
@@ -79,6 +86,7 @@ struct ThreadScreen: View {
                 || messages[index + 1].botId != message.botId
             )
             .id(message.id)
+            .modifier(DismissesKeyboardOnTap(enabled: !message.hasInput))
           }
           PendingSendsView(model: model)
           footer
@@ -86,17 +94,25 @@ struct ThreadScreen: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        // A layer behind the rows: only the gaps between them reach it, never a field on top.
+        .background { Color.clear.contentShape(Rectangle()).modifier(DismissesKeyboardOnTap(enabled: true)) }
       }
       .defaultScrollAnchor(.bottom)
+      .scrollDismissesKeyboard(.interactively)
+      .onScrollPhaseChange { _, phase in
+        userScrolling = phase == .tracking || phase == .interacting || phase == .decelerating
+      }
       .accessibilityIdentifier("threadList")
       .onScrollGeometryChange(for: ScrollEdge.self) { geometry in
         ScrollEdge(
           nearBottom: geometry.visibleRect.maxY >= geometry.contentSize.height - 48,
           height: geometry.contentSize.height)
       } action: { old, new in
-        edgeNearBottom = new.nearBottom
-        if new.height != old.height && atBottom {
-          // New content makes the bottom move away; keep following when the reader was there.
+        if BottomFollow.shouldFollow(
+          heightChanged: new.height != old.height, atBottom: atBottom, userScrolling: userScrolling)
+        {
+          // New content makes the bottom move away; keep following unless the reader is dragging.
+          // Otherwise a streaming reply pulls every drag back down.
           proxy.scrollTo(Self.bottomID, anchor: .bottom)
         } else {
           atBottom = new.nearBottom
@@ -111,16 +127,6 @@ struct ThreadScreen: View {
       }
       .onChange(of: model.runningRuns.count) { _, _ in
         if atBottom { withAnimation { proxy.scrollTo(Self.bottomID, anchor: .bottom) } }
-      }
-      .task(id: divider) {
-        guard let divider, !scrolledToDivider else { return }
-        scrolledToDivider = true
-        atBottom = false
-        try? await Task.sleep(for: .milliseconds(150))
-        proxy.scrollTo(divider, anchor: .top)
-        // A short thread does not move, so no geometry change reports that it is still at the bottom.
-        try? await Task.sleep(for: .milliseconds(350))
-        atBottom = edgeNearBottom
       }
       .overlay(alignment: .bottomTrailing) {
         if !atBottom {
@@ -238,6 +244,13 @@ extension ThreadTarget {
   fileprivate var isGroup: Bool { if case .group = self { true } else { false } }
 }
 
+enum BottomFollow {
+  /// Follow new content to the bottom only when the reader is at the bottom and not dragging.
+  static func shouldFollow(heightChanged: Bool, atBottom: Bool, userScrolling: Bool) -> Bool {
+    heightChanged && atBottom && !userScrolling
+  }
+}
+
 private struct ScrollEdge: Equatable {
   var nearBottom: Bool
   var height: CGFloat
@@ -257,5 +270,29 @@ private struct UnreadDivider: View {
 
   private var line: some View {
     Rectangle().fill(Color.token(.border)).frame(height: 1)
+  }
+}
+
+/// Taps on read-only content close the keyboard. Cards with answer fields are left out so a tap
+/// on a field is never competing with this one.
+private struct DismissesKeyboardOnTap: ViewModifier {
+  let enabled: Bool
+
+  func body(content: Content) -> some View {
+    if enabled {
+      content.onTapGesture {
+        UIApplication.shared.sendAction(
+          #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+      }
+    } else {
+      content
+    }
+  }
+}
+
+extension ThreadMessage {
+  /// True when a block can hold a text field (an answer, a username or a password).
+  fileprivate var hasInput: Bool {
+    blocks.contains { [.ask, .choice, .mcpApproval, .appConnect, .connect, .card].contains($0.kind) }
   }
 }

@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
+import { CappedList } from "../components/capped-list";
 import { MenuPicker } from "../components/menu-picker";
 import { NativeSymbol } from "../components/native-symbol";
 import { SandboxedHtmlPreview } from "../components/sandboxed-html-preview";
@@ -148,7 +149,10 @@ export default function AgentPageScreen() {
             : t("No data yet");
   const cellText = ({ text, usd }: LiveCell) => (usd ? maskAmountsWhenHidden(text) : text);
   const warning = (status: string) => (
-    <View accessible accessibilityLabel={status === "paused" ? t("Source paused") : t("Source failed")}>
+    <View
+      accessible
+      accessibilityLabel={status === "paused" ? t("Source paused") : t("Source failed")}
+    >
       <NativeSymbol
         ios="exclamationmark.triangle.fill"
         android="warning-outline"
@@ -222,7 +226,9 @@ export default function AgentPageScreen() {
           <View key={index}>
             <View style={styles.row}>
               <Text style={styles.rowTitle}>{block.label}</Text>
-              {block.status === "failed" || block.status === "paused" ? warning(block.status) : null}
+              {block.status === "failed" || block.status === "paused"
+                ? warning(block.status)
+                : null}
               <Text style={styles.value}>
                 {block.value ? cellText(block.value) : placeholder(block.status)}
               </Text>
@@ -236,16 +242,24 @@ export default function AgentPageScreen() {
             <Text style={styles.caption}>{block.name}</Text>
             {block.hasRows ? (
               <View style={styles.group}>
-                {block.rows.map((row, rowIndex) => (
-                  <View key={rowIndex} style={styles.tableRow}>
-                    <Text style={styles.rowTitle}>{cellText(row.title)}</Text>
-                    {row.details.length > 0 ? (
-                      <Text style={styles.detail}>
-                        {row.details.map((detail) => cellText(detail)).join(" · ")}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
+                <CappedList
+                  items={block.rows.map((row, rowIndex) => ({ row, rowIndex }))}
+                  title={block.name}
+                  keyOf={({ rowIndex }) => String(rowIndex)}
+                  searchFields={({ row }) =>
+                    [row.title, ...row.details].map((cell) => cellText(cell))
+                  }
+                  renderItem={({ row }) => (
+                    <View style={styles.tableRow}>
+                      <Text style={styles.rowTitle}>{cellText(row.title)}</Text>
+                      {row.details.length > 0 ? (
+                        <Text style={styles.detail}>
+                          {row.details.map((detail) => cellText(detail)).join(" · ")}
+                        </Text>
+                      ) : null}
+                    </View>
+                  )}
+                />
               </View>
             ) : (
               <Text style={styles.detail}>{placeholder(block.status)}</Text>

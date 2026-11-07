@@ -520,7 +520,8 @@ export async function runDataRoomClassify(deps: DataRoomJobDeps, payload: Payloa
   const repo = createDataRoomRepos(deps.prisma);
   const actor = actorOf(payload);
   await runStep(deps, "classify", payload, async (item, revision) => {
-    const text = (await repo.getItemText(actor, item.id)) ?? "";
+    // A meeting's facets are set when it is filed, so it needs no model call.
+    const text = item.source === "meeting" ? "" : ((await repo.getItemText(actor, item.id)) ?? "");
     const ai = text ? await deps.resolveAi(payload) : null;
     if (!ai?.model || !ai.allowed) {
       // Skipped: filed nowhere and no facets until consent or a model arrives.

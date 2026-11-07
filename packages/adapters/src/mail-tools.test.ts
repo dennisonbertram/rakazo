@@ -119,6 +119,7 @@ describe("selectMailTools", () => {
       "mail_get",
       "mail_grep",
       "mail_modify",
+      "mail_reply_batch",
       "mail_search",
       "mail_send",
       "show_emails",
@@ -193,6 +194,30 @@ describe("mail_search arguments", () => {
       }),
     ).toEqual({ error: "No connected mail account nobody@example.test" });
   });
+
+  it("says an owner account is not allowed, listing the accounts the agent can use", async () => {
+    const { deps } = setup({
+      a: [{ ...base, id: "m1", date: "2026-01-01T00:00:00Z", subject: "Hi" }],
+      b: [],
+    });
+    const b = account("b", "b@example.test");
+    const restricted = {
+      ...deps,
+      accounts: async () => (await deps.accounts()).filter((a) => a.accountRef !== "b"),
+      ownerAccounts: async () => [...(await deps.accounts()), b],
+    };
+    const wanted = { queries: ["hi"], account: "b@example.test" };
+    expect(await mailToolFromTool("mail_search", restricted, context(), wanted)).toEqual({
+      error:
+        "This agent isn't allowed to use b@example.test. It can use: a@example.test. Give it access on that account's Integrations page.",
+    });
+    expect(
+      await mailToolFromTool("mail_search", restricted, context(), {
+        ...wanted,
+        account: "nobody@example.test",
+      }),
+    ).toEqual({ error: "No connected mail account nobody@example.test" });
+  });
 });
 
 describe("mail_get", () => {
@@ -219,6 +244,25 @@ describe("mail_get", () => {
       text: `${"x".repeat(200)}   \n\n`,
     },
   ];
+
+  it("tells a read-only agent how to allow changes on the account", async () => {
+    const { deps } = setup({ a: [], b: [] });
+    const b = account("b", "b@example.test");
+    const readOnly = {
+      ...deps,
+      accounts: async () => [],
+      ownerAccounts: async () => [b],
+      readableAccounts: async () => [b],
+    };
+    const result = await mailToolFromTool("mail_search", readOnly, context(), {
+      queries: ["hi"],
+      account: "b@example.test",
+    });
+    expect(result).toEqual({
+      error:
+        "This agent can read but not change b@example.test. Change that under Access on that account's Integrations page.",
+    });
+  });
 
   it("returns the header block and strips the quoted reply", async () => {
     const { deps } = setup({ a: messages });
@@ -936,6 +980,20 @@ describe("mail progress", () => {
       "Looking at more results (page 2)",
       "Found 2 messages",
     ]);
+  });
+
+  it("lists a label-scoped search by label id and never from the metadata cache", async () => {
+    const { deps } = withProgress();
+    const listMessages = vi.fn().mockResolvedValue({ messages: [] });
+    deps.mail = { ...deps.mail, listMessages } as never;
+    const [account] = await deps.accounts();
+    deps.scopeLabelIds = (id) => (id === account?.id ? "L1" : undefined);
+    await mailToolFromTool("mail_search", deps, context(), { queries: ["x"] });
+    expect(listMessages).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ query: "x", labelIds: ["L1"], useCache: false }),
+      expect.anything(),
+    );
   });
 
   it("reports a rate limit as a retry line", async () => {

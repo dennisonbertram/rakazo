@@ -21,6 +21,12 @@ enum VoiceAudio {
     recognizer()?.supportsOnDeviceRecognition == true
   }
 
+  static let meetingMicDenied = "Allow microphone access in Settings to record meetings."
+
+  /// True while a meeting is being recorded. Calls and dictation must not touch the audio session
+  /// then: `activate()` and `deactivate()` do nothing, so the recording keeps its input.
+  nonisolated(unsafe) static var meetingActive = false
+
   static let dictationUnavailable = "Dictation isn't available on this device."
 
   /// Asks for speech recognition. False when denied or the device cannot recognise speech.
@@ -40,6 +46,7 @@ enum VoiceAudio {
 
   /// Play and record together, with the system's echo cancellation for speech.
   static func activate() throws {
+    if meetingActive { return }
     let session = AVAudioSession.sharedInstance()
     #if targetEnvironment(simulator)
       // The simulator's audio host cannot start voice-processing input; plain recording works.
@@ -52,6 +59,20 @@ enum VoiceAudio {
   }
 
   static func deactivate() {
+    if meetingActive { return }
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  }
+}
+
+extension VoiceAudio {
+  /// Record-only input for a meeting, which keeps running with the screen locked (audio background mode).
+  static func activateForMeeting() throws {
+    let session = AVAudioSession.sharedInstance()
+    try session.setCategory(.record, mode: .default)
+    try session.setActive(true)
+  }
+
+  static func deactivateForMeeting() {
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
   }
 }

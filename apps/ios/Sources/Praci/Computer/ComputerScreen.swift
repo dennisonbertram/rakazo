@@ -37,16 +37,8 @@ struct ComputerScreen: View {
     .background(Color.token(.background))
     .navigationTitle(title)
     .navigationBarTitleDisplayMode(.inline)
-    .toolbar {
-      ToolbarItem(placement: .topBarTrailing) {
-        Button { model.closeComputer(app: app) } label: {
-          Label("Close", systemImage: "xmark")
-        }
-        .accessibilityIdentifier("closeComputer")
-      }
-    }
     .task { await model.start(app) }
-    .onDisappear { model.stop() }
+    .onDisappear { model.close(app: app) }
     .onChange(of: scenePhase) { _, phase in
       if phase == .active {
         Task { await model.start(app) }
@@ -177,6 +169,16 @@ struct ComputerScreen: View {
         .controlSize(.large)
         .accessibilityIdentifier("release")
       }
+    } else if model.botBlocksTakeover {
+      Button { Task { await model.stopBotAndTakeControl(app: app) } } label: {
+        Label("Stop \(status.busyBotName ?? String(localized: "the bot")) and take control", systemImage: "stop.circle")
+          .frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(Color.token(.primary))
+      .foregroundStyle(Color.token(.primaryForeground))
+      .controlSize(.large)
+      .accessibilityIdentifier("stopAndTakeControl")
     } else {
       Button { Task { await model.takeControl(app: app) } } label: {
         Label("Take control", systemImage: "hand.tap").frame(maxWidth: .infinity)

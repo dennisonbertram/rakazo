@@ -15,6 +15,7 @@ const setExclusive = vi.hoisted(() => vi.fn());
 const navigate = vi.hoisted(() => vi.fn());
 const listAssignments = vi.hoisted(() => vi.fn());
 const replaceAssignments = vi.hoisted(() => vi.fn());
+const setAgentAssignment = vi.hoisted(() => vi.fn());
 const brex = vi.hoisted(() => ({
   cards: vi.fn(),
   getControls: vi.fn(),
@@ -26,7 +27,7 @@ vi.mock("../../lib/rpc", () => ({
     brexCards: brex,
     threads: { send: vi.fn() },
     mcp: {
-      servers: { setWrites },
+      servers: { setWrites, setAgentAssignment },
       assignments: { list: listAssignments, replace: replaceAssignments },
     },
     integrationAgents: { create, setExclusive },
@@ -57,6 +58,7 @@ const root = createRoot(container);
 const refresh = vi.fn();
 listAssignments.mockResolvedValue([]);
 replaceAssignments.mockResolvedValue([]);
+setAgentAssignment.mockResolvedValue({ ok: true });
 
 async function show(
   writesEnabled: boolean,
@@ -239,17 +241,17 @@ it("asks before the agent's changes switch turns on, not off", async () => {
   expect(setWrites).toHaveBeenLastCalledWith({ id: "s1", enabled: false });
 });
 
-it("Letting other agents use it saves at once and reveals Used by only while on", async () => {
+it("Letting other agents use it saves at once and reveals Access only while on", async () => {
   setExclusive.mockResolvedValue({});
   await show(false, OTHER, { ...withAgent, agentExclusive: true });
-  expect(container.textContent).not.toContain("Used by");
+  expect(container.textContent).not.toContain("Which agents can use");
   expect(container.querySelectorAll('[role="switch"][aria-label$="can use Carta"]')).toHaveLength(
     0,
   );
   await act(async () => container.querySelector<HTMLElement>("#server-shared")?.click());
   expect(setExclusive).toHaveBeenCalledWith({ serverId: "s1", exclusive: false });
   await show(false, OTHER, { ...withAgent, agentExclusive: false });
-  expect(container.textContent).toContain("Used by");
+  expect(container.textContent).toContain("Which agents can use");
   expect(
     container.querySelectorAll('[role="switch"][aria-label$="can use Carta"]').length,
   ).toBeGreaterThan(1);
@@ -275,20 +277,16 @@ it("offers Create agent for Carta without a linked agent, with no writes switch"
   expect(navigate).toHaveBeenCalledWith("/app/bot_carta");
 });
 
-it("turning Share on lifts exclusivity before assigning every agent, and off returns to the owner alone", async () => {
+it("turning Share on grants no other agent, and off returns to the owner alone", async () => {
   setExclusive.mockResolvedValue({});
   replaceAssignments.mockClear();
   replaceAssignments.mockResolvedValue([]);
   listAssignments.mockResolvedValue([]);
   await show(false, OTHER, { ...withAgent, agentExclusive: true });
   await act(async () => container.querySelector<HTMLElement>("#server-shared")?.click());
-  const assigned = replaceAssignments.mock.calls.map(([call]) => call.botId);
-  expect(assigned.length).toBeGreaterThan(1);
   expect(setExclusive).toHaveBeenLastCalledWith({ serverId: "s1", exclusive: false });
-  // The server refuses to grant an exclusive server to other agents, so this must come first.
-  expect(setExclusive.mock.invocationCallOrder[0]).toBeLessThan(
-    replaceAssignments.mock.invocationCallOrder[0] ?? 0,
-  );
+  // Sharing starts with every other agent off; the owner adds them one by one.
+  expect(replaceAssignments).not.toHaveBeenCalled();
 
   replaceAssignments.mockClear();
   setExclusive.mockClear();
@@ -534,7 +532,7 @@ it("Brex cards: the owner sees Cards, Controls and Replace token, and no sharing
   expect(writesSwitch()).not.toBeNull();
   expect(container.querySelector("#server-shared")).toBeNull();
   expect(container.textContent).not.toContain("Let other agents use");
-  expect(container.textContent).not.toContain("Used by");
+  expect(container.textContent).not.toContain("Which agents can use");
   expect(container.textContent).not.toMatch(/unlock/i);
   // The token is pasted, not OAuth: no sign-in menu and no host line.
   expect(container.querySelector('[aria-label="Sign-in options"]')).toBeNull();
@@ -705,4 +703,67 @@ it("Brex cards: Replace token shows the API error and the cards stay as they wer
   expect(brex.cards).toHaveBeenCalledTimes(1);
   expect(navigate).not.toHaveBeenCalled();
   expect(container.textContent).toContain("Figma");
+});
+
+it("All assigns every other agent and None removes them all except the owner", async () => {
+  setAgentAssignment.mockClear();
+  listAssignments.mockResolvedValue([]);
+  await show(false, OTHER, { ...withAgent, agentExclusive: false });
+  const names = () => [...container.querySelectorAll("button")].map((b) => b.textContent);
+  expect(names()).toContain("All");
+  await press("All");
+  const given = setAgentAssignment.mock.calls.map(([call]) => call.botId);
+  expect(given.length).toBeGreaterThan(0);
+  expect(given).not.toContain("bot_ada");
+  expect(setAgentAssignment.mock.calls.every(([call]) => call.on === true)).toBe(true);
+
+  setAgentAssignment.mockClear();
+  const entry = (botId: string) => ({
+    botId,
+    serverId: "s1",
+    allowAllTools: true,
+    allowedTools: [],
+    id: `a_${botId}`,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  });
+  listAssignments.mockImplementation(async ({ botId }: { botId: string }) => [entry(botId)]);
+  const everyone = given.concat("bot_ada").map(entry);
+  await show(false, OTHER, { ...withAgent, agentExclusive: false }, everyone);
+  await press("None");
+  const removed = setAgentAssignment.mock.calls.map(([call]) => call.botId);
+  expect(removed.sort()).toEqual([...given].sort());
+  expect(setAgentAssignment.mock.calls.every(([call]) => call.on === false)).toBe(true);
+  // None never turns sharing off.
+  expect(setExclusive).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("Which agents can use");
+  listAssignments.mockResolvedValue([]);
+});
+
+it("All waits for every grant to settle, even after one fails, before the controls come back", async () => {
+  setAgentAssignment.mockReset();
+  refresh.mockClear();
+  listAssignments.mockResolvedValue([]);
+  let finishSlow: () => void = () => undefined;
+  setAgentAssignment.mockImplementationOnce(async () => {
+    throw new Error("boom");
+  });
+  setAgentAssignment.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finishSlow = resolve;
+      }),
+  );
+  setAgentAssignment.mockResolvedValue([]);
+  await show(false, OTHER, { ...withAgent, agentExclusive: false });
+  const button = (name: string) =>
+    [...container.querySelectorAll("button")].find((b) => b.textContent === name)!;
+  await act(async () => button("All").click());
+  // One grant failed at once and one is still running: nothing is re-enabled or refetched yet.
+  expect(button("All").disabled).toBe(true);
+  expect(refresh).not.toHaveBeenCalled();
+  await act(async () => finishSlow());
+  expect(refresh).toHaveBeenCalled();
+  expect(container.textContent).toContain("boom");
+  expect(button("All").disabled).toBe(false);
 });

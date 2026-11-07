@@ -1234,7 +1234,18 @@ describe("private API connectors", () => {
       createdAt: new Date(0),
     }));
     const prisma = {
-      capabilityInstall: { create },
+      capabilityInstall: {
+        create,
+        // The reply lists the new source; the agent made after install is best effort.
+        findMany: vi.fn(async () => [
+          {
+            ...((await create.mock.results[0]?.value) as Record<string, unknown>),
+            botAccess: [],
+          },
+        ]),
+        findFirst: vi.fn(async () => null),
+      },
+      bot: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       $transaction: vi.fn(async (run: (tx: unknown) => Promise<unknown>) => run(prisma)),
     } as unknown as PrismaClient;
     const deps = {
@@ -4375,6 +4386,7 @@ describe("groups.archive", () => {
     const tx = {
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       $queryRaw: vi.fn().mockResolvedValue([{ id: "group-1" }]),
       chatGroup: {
         findFirst: vi.fn().mockResolvedValue({

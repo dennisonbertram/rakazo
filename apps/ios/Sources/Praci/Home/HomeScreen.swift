@@ -45,7 +45,7 @@ struct HomeScreen: View {
     }
     // Pushed screens change agents (rename, settings, archive); reload quietly when Home returns.
     .onAppear { if model.state.value != nil { Task { await model.load(app) } } }
-    .sheet(item: $sheet) { sheet in
+    .sheet(item: $sheet, onDismiss: { Task { await model.load(app) } }) { sheet in
       switch sheet {
       case .newAgent:
         NewBotSheet(onCreated: created)
@@ -214,6 +214,12 @@ struct HomeScreen: View {
           PageRowView(title: "Data room", systemImage: "folder")
         }
         .accessibilityIdentifier("pageDataRoom")
+      }
+      if !hidden.contains("meetings") {
+        NavigationLink(value: Route.meetings) {
+          PageRowView(title: "Meetings", systemImage: "waveform")
+        }
+        .accessibilityIdentifier("pageMeetings")
       }
       if let first = boot.bots.first {
         NavigationLink(value: Route.computer(botID: first.id)) {

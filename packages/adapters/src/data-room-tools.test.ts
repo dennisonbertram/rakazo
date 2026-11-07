@@ -13,6 +13,7 @@ import {
   selectBuiltinToolsForRun,
   userTurnInstructions,
 } from "./executor.js";
+import { MEETING_AGENT_GUIDANCE } from "./meeting-tools.js";
 
 const run = {
   graphicalToolsAllowed: false,
@@ -110,7 +111,7 @@ describe("Data room guidance", () => {
 
   it("tells every agent to describe its abilities in plain words", () => {
     expect(instructions({})).toContain(PLAIN_CAPABILITY_GUIDANCE);
-    expect(PLAIN_CAPABILITY_GUIDANCE).toContain("never as raw tool names");
+    expect(PLAIN_CAPABILITY_GUIDANCE).toContain("Never name your internal tools");
   });
 
   it("appears only when add_to_data_room is offered", () => {
@@ -119,6 +120,30 @@ describe("Data room guidance", () => {
     expect(instructions({ dataRoomEnabled: true, disabled: ["add_to_data_room"] })).not.toContain(
       DATA_ROOM_GUIDANCE,
     );
+  });
+});
+
+describe("Meeting agent guidance", () => {
+  it("is added to meeting-source agent runs only", () => {
+    const base = {
+      botInstructions: "Bot",
+      computerInstruction: "Computer",
+      pageBrowserAllowed: false,
+      workspaceInstruction: "Home",
+      replyGuidance: "Reply",
+      groupContext: undefined,
+      messagingContext: undefined,
+      redactedMemoryContext: undefined,
+      redactedScratchpadContext: undefined,
+      hasHistoricalContext: false,
+      agentEnvironmentInstruction: undefined,
+      botDirectory: undefined,
+      pluginLine: undefined,
+      agentSkillsLine: undefined,
+      taughtSkillsLine: undefined,
+    };
+    expect(userTurnInstructions({ ...base, meetingAgent: true })).toContain(MEETING_AGENT_GUIDANCE);
+    expect(userTurnInstructions(base)).not.toContain(MEETING_AGENT_GUIDANCE);
   });
 });
 

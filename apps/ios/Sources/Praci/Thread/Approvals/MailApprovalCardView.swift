@@ -12,6 +12,7 @@ struct MailApprovalCardView: View {
   @Environment(AppModel.self) private var app
 
   private var canAnswer: Bool { model.canAnswerAsk(messageID) }
+  @State private var bodyExpanded = false
   private var interactive: Bool { !ask.isAnswered && approval.sentAnswer == nil && canAnswer }
 
   var body: some View {
@@ -26,8 +27,12 @@ struct MailApprovalCardView: View {
       row("Cc", mail.cc)
       row("Bcc", mail.bcc)
       if !mail.body.isEmpty {
-        Text(verbatim: mail.body).font(.subheadline).lineLimit(10)
+        Text(verbatim: mail.body).font(.subheadline).lineLimit(bodyExpanded ? nil : 10)
           .frame(maxWidth: .infinity, alignment: .leading)
+        if mail.body.count > 400 || mail.body.split(separator: "\n").count > 10 {
+          Button(bodyExpanded ? "Show less" : "Show more") { bodyExpanded.toggle() }
+            .font(.footnote)
+        }
       }
       if interactive { actions }
       if let reason = ask.approvalReason, interactive {
@@ -83,6 +88,7 @@ struct MailApprovalCardView: View {
     }
     switch answer {
     case "superseded", "expired", "stopped": return .result(Text("Not sent"), .negative)
+    case "skipped": return .result(Text("Skipped"), .neutral)
     case "deny": return .result(Text("Discarded"), .negative)
     default:
       return .result(mail.isDraftTool && ask.answer == "allow" ? Text("Saving…") : Text("Sending…"), .neutral)
@@ -100,7 +106,10 @@ struct MailApprovalCardView: View {
       }
       if mail.canSend {
         CardActionButton(
-          title: Text("Send"), style: .prominent, busy: approval.pending == "send",
+          // The server's warning that this email just went out: Send stops being the obvious press.
+          title: Text("Send"),
+          style: ask.approvalReason == "Already sent to this person a few minutes ago" ? .secondary : .prominent,
+          busy: approval.pending == "send",
           disabled: approval.pending != nil, identifier: "mailSend"
         ) {
           Task { await answer("send", edits: mail.isDraftTool ? MailAnswerEdits(send: true) : nil) }

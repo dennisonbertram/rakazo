@@ -18,6 +18,7 @@ function setup(
     disabledTools?: string[];
     write?: boolean;
     tool?: "mail_draft" | "mail_send";
+    laterUpdates?: object[];
   } = {},
 ) {
   let row: Row | null = options.record
@@ -60,6 +61,7 @@ function setup(
       },
       message: { findFirst: async () => ({ blocks: [card] }) },
       externalEffect: {
+        findMany: async () => options.laterUpdates ?? [],
         findFirst: async () => ({
           id: "effect-1",
           status: "completed",
@@ -116,6 +118,15 @@ describe("sendSavedMailDraft", () => {
       }),
     ]);
     expect(t.row()).toMatchObject({ state: "sent", draftId: "draft-9" });
+  });
+
+  it("refuses to send a draft that a later mail_draft changed since the card", async () => {
+    const t = setup({ laterUpdates: [{ id: "effect-2" }] });
+    expect(await code(t.send())).toBe("CONFLICT");
+    await expect(t.send()).rejects.toMatchObject({
+      message: "This draft changed since you approved it",
+    });
+    expect(t.sendDraft).not.toHaveBeenCalled();
   });
 
   it("does not send again on a second click or a retry", async () => {

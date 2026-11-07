@@ -634,7 +634,10 @@ function InboxMessage({
               </DropdownMenuContent>
             </DropdownMenu>
             {/* In the toolbar, so it neither covers the email nor moves the dialog. */}
-            {notice ? <div className="ms-auto flex min-w-0 max-w-full">{notice}</div> : null}
+            {/* Always present, so a notice added later is announced. */}
+            <div role="status" className="ms-auto flex min-w-0 max-w-full">
+              {notice}
+            </div>
           </div>
         ) : null}
         {askError ? (

@@ -384,6 +384,18 @@ export default function InboxCleanupScreen() {
                     ) : null}
                   </View>
                 ) : null}
+                {(sender.noReplyCount ?? 0) >= 3 ? (
+                  <View style={styles.skipping}>
+                    <Text style={styles.meta}>{t("Needs reply stopped")}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={() => void stop(sender, true)}
+                    >
+                      <Text style={styles.link}>{t("Forget")}</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
                 {sender.learnedPile ? (
                   <View style={styles.skipping}>
                     <Text style={styles.meta}>

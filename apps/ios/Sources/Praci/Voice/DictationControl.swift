@@ -15,6 +15,7 @@ final class DictationModel {
 
   func toggle(text: Binding<String>) async {
     if listening { stop(); return }
+    guard !VoiceAudio.meetingActive else { return }
     message = nil
     let started = epoch
     guard VoiceAudio.onDeviceSupported() else { message = VoiceAudio.dictationUnavailable; return }
@@ -44,14 +45,16 @@ final class DictationModel {
 struct DictationButton: View {
   let model: DictationModel
   @Binding var text: String
+  @Environment(AppModel.self) private var app
 
   var body: some View {
     Button { Task { await model.toggle(text: $text) } } label: {
-      Image(systemName: model.listening ? "stop.fill" : "mic").frame(width: 44, height: 44)
+      Image(systemName: model.listening ? "stop.fill" : "mic").frame(width: 30, height: 30)
         .foregroundStyle(Color.token(.primaryForeground))
     }
     .buttonStyle(.glassProminent)
     .buttonBorderShape(.circle)
+    .disabled(app.capture.isBusy)
     .accessibilityLabel(model.listening ? "Stop dictation" : "Dictate")
     .accessibilityIdentifier("dictate")
   }

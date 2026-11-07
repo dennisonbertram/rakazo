@@ -4,6 +4,7 @@ import {
   BOT_SECRET_VALUE_MAX_LENGTH,
   encodeLoginSecret,
 } from "@rakazo/contracts";
+import { SKIPPED_APPROVAL_ANSWER } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "./client.js";
 import { CrossSpaceCommunicationBlockedError } from "./cross-space-communication.js";
@@ -22,6 +23,7 @@ import {
   sendUserMessage,
   setApprovalWaitsFor,
   setMailApprovalOutcome,
+  skipWaitingApprovalsInTransaction,
 } from "./events.js";
 import { RunHistoryWriteError } from "./messages.js";
 import { AnswerTooLongError } from "./run-secrets.js";
@@ -101,10 +103,12 @@ describe("finalizeRun", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: { updateMany: vi.fn(async () => ({ count: 1 })) },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: { create: createEvent, deleteMany: vi.fn(async () => ({ count: 0 })) },
       steeringMessage: {
         findMany: vi.fn(async () => []),
@@ -155,6 +159,7 @@ describe("finalizeRun", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
@@ -162,6 +167,7 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "task-reply" })),
       },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: {
         create: vi.fn(async () => ({ threadId: "thread-1", seq: 0 })),
         deleteMany: vi.fn(async () => ({ count: 0 })),
@@ -225,6 +231,7 @@ describe("finalizeRun", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
@@ -232,6 +239,7 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "task-reply" })),
       },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: {
         create: vi.fn(async () => ({ threadId: "thread-1", seq: 0 })),
         deleteMany: vi.fn(async () => ({ count: 0 })),
@@ -307,6 +315,7 @@ describe("finalizeRun", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
       message: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
       task: {
@@ -314,6 +323,7 @@ describe("finalizeRun", () => {
         create: vi.fn(async () => ({ id: "task-reply" })),
       },
       thread: { update: vi.fn(async () => ({ nextEventSeq: 1 })) },
+      threadGoal: { findFirst: vi.fn(async () => null) },
       event: {
         create: vi.fn(async () => ({ threadId: "thread-1", seq: 0 })),
         deleteMany: vi.fn(async () => ({ count: 0 })),
@@ -615,6 +625,7 @@ describe("pauseRunForInput", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -690,6 +701,7 @@ describe("pauseRunForInput", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 9 }) },
       message: {
@@ -769,6 +781,7 @@ describe("pauseRunForInput", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       thread: {
         update: vi
@@ -854,6 +867,7 @@ describe("pauseRunForTakeover", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -946,6 +960,7 @@ describe("pauseRunForTakeover", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -1007,6 +1022,7 @@ describe("pauseRunForTakeover", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       computer: {
         findFirst: vi.fn().mockResolvedValue({
@@ -1055,6 +1071,84 @@ describe("pauseRunForTakeover", () => {
         }),
       }),
     );
+  });
+});
+
+describe("skipWaitingApprovalsInTransaction", () => {
+  const approval = (id: string) => ({
+    kind: "ask",
+    approvalEffectId: id,
+    text: "Send an email?",
+    status: "pending",
+    actions: [
+      { id: "allow", label: "Allow once" },
+      { id: "always", label: "Always allow this" },
+      { id: "deny", label: "Deny" },
+    ],
+  });
+  const txFor = (messages: Array<{ id: string; blocks: unknown[] }>) => ({
+    $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+    message: {
+      findMany: vi.fn().mockResolvedValue(messages),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    run: {
+      findFirst: vi.fn().mockResolvedValue({ botId: "bot-1" }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUnique: vi.fn().mockResolvedValue({ status: "queued" }),
+    },
+    externalEffect: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    approvalRule: { upsert: vi.fn(), create: vi.fn() },
+    thread: { update: vi.fn().mockResolvedValue({ nextEventSeq: 4 }) },
+    event: {
+      create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+        ...event(data.seq),
+        type: data.type,
+      })),
+    },
+  });
+  const input = { spaceId: "workspace-1", threadId: "thread-1", runId: "run-1" };
+
+  it("closes every open approval card as skipped, denies the effects and resumes the run", async () => {
+    const tx = txFor([
+      { id: "m-2", blocks: [approval("effect-2")] },
+      { id: "m-1", blocks: [approval("effect-1")] },
+    ]);
+    await expect(skipWaitingApprovalsInTransaction(tx as never, input)).resolves.toMatchObject({
+      threadId: "thread-1",
+    });
+    expect(tx.run.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "queued" } }),
+    );
+    for (const call of tx.externalEffect.updateMany.mock.calls) {
+      expect(call[0].data.status).toBe("denied");
+      expect(call[0].data.result.note).toContain("moved on without approving");
+    }
+    expect(tx.externalEffect.updateMany).toHaveBeenCalledTimes(2);
+    expect(tx.message.update).toHaveBeenCalledTimes(2);
+    expect(tx.message.update.mock.calls[0]![0].data.blocks[0]).toMatchObject({
+      status: "answered",
+      answer: "skipped",
+    });
+    expect(tx.approvalRule.upsert).not.toHaveBeenCalled();
+  });
+
+  it("leaves a secret request, a question and a run that no longer waits alone", async () => {
+    const secret = { kind: "ask", text: "Paste the key", status: "pending", input: "secret" };
+    const question = { kind: "ask", text: "Which city?", status: "pending" };
+    for (const blocks of [[secret], [question], [approval("effect-1"), secret]]) {
+      const tx = txFor([{ id: "m-1", blocks }]);
+      await expect(skipWaitingApprovalsInTransaction(tx as never, input)).resolves.toBeNull();
+      expect(tx.run.updateMany).not.toHaveBeenCalled();
+      expect(tx.externalEffect.updateMany).not.toHaveBeenCalled();
+    }
+    const gone = txFor([{ id: "m-1", blocks: [approval("effect-1")] }]);
+    gone.run.findFirst.mockResolvedValue(null);
+    await expect(skipWaitingApprovalsInTransaction(gone as never, input)).resolves.toBeNull();
+    const raced = txFor([{ id: "m-1", blocks: [approval("effect-1")] }]);
+    raced.run.updateMany.mockResolvedValue({ count: 0 });
+    await expect(skipWaitingApprovalsInTransaction(raced as never, input)).resolves.toBeNull();
+    expect(raced.externalEffect.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -1867,6 +1961,7 @@ describe("answerRunInput", () => {
         spaceId: "workspace-1",
         createdByUserId: "user-1",
         botId: null,
+        routineId: null,
         effect: "always_allow",
         matchKind: "tool",
         matchValue: "destination.write",
@@ -1949,6 +2044,7 @@ describe("answerRunInput", () => {
         spaceId: "workspace-1",
         createdByUserId: "user-1",
         botId: null,
+        routineId: null,
         effect: "always_allow",
         matchKind: "site",
         matchValue: "example.com",
@@ -1956,6 +2052,945 @@ describe("answerRunInput", () => {
     });
   });
 
+  it("saves a rule for the agent when Allow all sites is chosen on a fetch card", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_bot_sites", label: "Allow all sites for this agent" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "web_fetch",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_bot_sites",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(true);
+
+    expect(tx.actionApprovalRule.create).toHaveBeenCalledWith({
+      data: {
+        spaceId: "workspace-1",
+        createdByUserId: "user-1",
+        botId: "bot-1",
+        routineId: null,
+        effect: "always_allow",
+        matchKind: "tool",
+        matchValue: "web_fetch",
+      },
+    });
+  });
+
+  it("saves a rule for the routine when Always for this routine is chosen", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_routine", label: "Always for this routine" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          routineId: "routine-1",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "write_file",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_routine",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(true);
+
+    expect(tx.actionApprovalRule.create).toHaveBeenCalledWith({
+      data: {
+        spaceId: "workspace-1",
+        createdByUserId: "user-1",
+        botId: null,
+        routineId: "routine-1",
+        effect: "always_allow",
+        matchKind: "tool",
+        matchValue: "write_file",
+      },
+    });
+  });
+
+  it("refuses Always for this routine outside a routine run", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_routine", label: "Always for this routine" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          routineId: null,
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "write_file",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_routine",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("does not save a routine rule when the card was already skipped", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "answered",
+              answer: SKIPPED_APPROVAL_ANSWER,
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_routine", label: "Always for this routine" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          routineId: "routine-1",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "write_file",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_routine",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses Always for this routine in a webhook run", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_routine", label: "Always for this routine" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "write_file",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_routine",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses Always for this routine for a firewalled agent", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_routine", label: "Always for this routine" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          routineId: "routine-1",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: true }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "write_file",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_routine",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses Always for this routine in a thread marked as holding meeting text", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_routine", label: "Always for this routine" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          routineId: "routine-1",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "write_file",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: new Date() }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_routine",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses Allow all sites for a firewalled agent", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_bot_sites", label: "Allow all sites for this agent" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: true }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "web_fetch",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_bot_sites",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses Allow all sites in a webhook run", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_bot_sites", label: "Allow all sites for this agent" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          routineId: "routine-1",
+          trigger: "webhook",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "web_fetch",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_bot_sites",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses Allow all sites in a tainted run", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_bot_sites", label: "Allow all sites for this agent" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          externalTaint: true,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "web_fetch",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: null }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_bot_sites",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses Allow all sites in a thread marked as holding meeting text", async () => {
+    const fanout = new TestFanout();
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
+      message: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "message-1",
+          blocks: [
+            {
+              kind: "ask",
+              approvalEffectId: "effect-1",
+              text: "Review before writing",
+              status: "pending",
+              actions: [
+                { id: "allow", label: "Allow once" },
+                { id: "always", label: "Always allow" },
+                { id: "always_bot_sites", label: "Allow all sites for this agent" },
+                { id: "deny", label: "Deny" },
+              ],
+            },
+          ],
+        }),
+        update: vi.fn().mockResolvedValue({ id: "message-1" }),
+      },
+      run: {
+        findFirst: vi.fn().mockResolvedValue({
+          botId: "bot-1",
+          userId: "user-1",
+          trigger: "user",
+          externalTaint: false,
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findUnique: vi.fn().mockResolvedValue({ userId: "user-1", status: "queued" }),
+      },
+      bot: { findFirst: vi.fn().mockResolvedValue({ audience: "internal", firewall: false }) },
+      task: { updateMany: vi.fn() },
+      externalEffect: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "effect-1",
+          status: "intended",
+          kind: "web_fetch",
+          request: { url: "https://docs.example.com/guide" },
+        }),
+        update: vi.fn().mockResolvedValue({ id: "effect-1" }),
+      },
+      actionApprovalRule: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({ id: "rule-1" }),
+        upsert: vi.fn(),
+      },
+      thread: {
+        update: vi.fn().mockResolvedValue({ nextEventSeq: 10 }),
+        findFirst: vi.fn().mockResolvedValue({ meetingTaintedAt: new Date() }),
+      },
+      event: {
+        create: vi.fn(async ({ data }: { data: { seq: number; type: string } }) => ({
+          ...event(data.seq),
+          type: data.type,
+        })),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
+    } as unknown as PrismaClient;
+
+    await expect(
+      answerRunInput(
+        prisma,
+        {
+          spaceId: "workspace-1",
+          threadId: "thread-1",
+          runId: "run-1",
+          messageId: "message-1",
+          answeredByUserId: "user-1",
+          answer: "always_bot_sites",
+        },
+        fanout,
+      ),
+    ).resolves.toBe(false);
+
+    expect(tx.actionApprovalRule.create).not.toHaveBeenCalled();
+  });
   it("does not let another workspace member create an always-allow rule for the run owner", async () => {
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([{ id: "thread-1" }]),
@@ -3279,9 +4314,11 @@ describe("clearThread", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
+      mailReplyItem: { updateMany: vi.fn() },
       computer: { updateMany: vi.fn() },
       message: { deleteMany: vi.fn() },
       event: {
@@ -3292,6 +4329,7 @@ describe("clearThread", () => {
         }),
       },
       bot: { update: vi.fn() },
+      threadGoal: { findFirst: vi.fn(async () => null) },
     };
     const prisma = {
       $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
@@ -3346,9 +4384,11 @@ describe("clearThread", () => {
       secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       appControlSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+      runFragment: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       attempt: { updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: { updateMany: vi.fn() },
+      mailReplyItem: { updateMany: vi.fn() },
       computer: { updateMany: vi.fn() },
       message: { deleteMany: vi.fn() },
       event: {
@@ -3774,7 +4814,7 @@ describe("answerRunInput with a mail denial", () => {
     const blocks = tx.message.update.mock.calls[0]?.[0].data.blocks;
     expect(blocks[0]).toMatchObject({
       status: "answered",
-      answer: "deny",
+      answer: "allow",
       mail: { subject: "New subject", body: "New", connectionId: "conn-1", to: ["a@example.test"] },
     });
   });
@@ -3863,9 +4903,30 @@ describe("setMailApprovalOutcome", () => {
     );
     expect(tx.externalEffect.updateMany).toHaveBeenCalledWith({
       where: { id: "effect-1", spaceId: "workspace-1", status: "denied" },
-      data: { result: { note: "nothing was sent", outcome: "failed" } },
+      data: {
+        status: "completed",
+        result: { error: "nothing was sent", note: "nothing was sent", outcome: "failed" },
+      },
     });
     expect(tx.message.update.mock.calls[0]?.[0].data.blocks[0].mail.outcome).toBe("failed");
+    for (const [outcome, status, result] of [
+      ["sent", "completed", { ok: true, note: "n", outcome: "sent" }],
+      ["saved", "completed", { ok: true, note: "n", outcome: "saved" }],
+      ["unknown", "uncertain", { error: "n", note: "n", outcome: "unknown", uncertain: true }],
+    ] as const) {
+      await setMailApprovalOutcome(prisma, {
+        spaceId: "workspace-1",
+        threadId: "thread-1",
+        messageId: "message-1",
+        effectId: "effect-1",
+        outcome,
+        note: "n",
+      });
+      expect(tx.externalEffect.updateMany).toHaveBeenLastCalledWith({
+        where: { id: "effect-1", spaceId: "workspace-1", status: "denied" },
+        data: { status, result },
+      });
+    }
   });
 });
 

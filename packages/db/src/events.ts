@@ -23,20 +23,35 @@ import {
   CrossSpaceCommunicationBlockedError,
   crossSpaceCommunicationAllowed,
 } from "./cross-space-communication.js";
+import type { AcceptMailReplyBatchInput, AcceptMailReplyBatchResult } from "./mail-reply-batch.js";
+import {
+  acceptMailReplyBatch,
+  setMailBatchCounts,
+  settleMailReplyBatch,
+} from "./mail-reply-batch.js";
 import {
   assertRunCanWriteHistory,
   assertRunIsCancelled,
   createThreadMessageInTransaction,
   RunHistoryWriteError,
 } from "./messages.js";
+import type { AcceptPipelineImportResult } from "./pipeline-import.js";
+import {
+  acceptPipelineImport,
+  preparePipelineImportCard,
+  settlePipelineImport,
+  stagePipelineImportRows,
+} from "./pipeline-import.js";
 import { finalizeRun } from "./run-finalize.js";
 import {
   answerRunInput,
   answerWaitingRunWithTextInTransaction,
   pauseRunForInput,
   pauseRunForTakeover,
+  skipWaitingApprovalsInTransaction,
 } from "./run-pauses.js";
 import { claimSteering } from "./steering.js";
+import { clearOpenGoal } from "./thread-goals.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
 export { completedRunBlocks, finalizeRun } from "./run-finalize.js";
@@ -47,6 +62,7 @@ export {
   claimSteering,
   pauseRunForInput,
   pauseRunForTakeover,
+  skipWaitingApprovalsInTransaction,
 };
 
 const EVENT_BATCH_SIZE = 200;
@@ -68,6 +84,27 @@ export interface ThreadEvents {
   answerRunInput(input: AnswerRunInput): Promise<boolean>;
   findMailApprovalForEdit(input: FindMailApprovalInput): Promise<PendingMailApproval | null>;
   setMailApprovalOutcome(input: SetMailApprovalOutcomeInput): Promise<void>;
+  acceptMailReplyBatch(input: AcceptMailReplyBatchInput): Promise<AcceptMailReplyBatchResult>;
+  acceptPipelineImport(
+    input: Parameters<typeof acceptPipelineImport>[1],
+  ): Promise<AcceptPipelineImportResult>;
+  settlePipelineImport(
+    input: Parameters<typeof settlePipelineImport>[1],
+  ): ReturnType<typeof settlePipelineImport>;
+  stagePipelineImportRows(
+    scope: Parameters<typeof stagePipelineImportRows>[1],
+    input: Parameters<typeof stagePipelineImportRows>[2],
+  ): ReturnType<typeof stagePipelineImportRows>;
+  preparePipelineImportCard(
+    scope: Parameters<typeof preparePipelineImportCard>[1],
+    effectId: string,
+  ): ReturnType<typeof preparePipelineImportCard>;
+  setMailBatchCounts(input: { spaceId: string; userId: string; effectId: string }): Promise<void>;
+  settleMailReplyBatch(input: {
+    spaceId: string;
+    userId: string;
+    effectId: string;
+  }): Promise<{ settled: boolean; resumeRunId?: string }>;
   setApprovalWaitsFor(input: SetApprovalWaitsForInput): Promise<void>;
   append(input: AppendEventInput): Promise<ProductEvent>;
   claimSteering(input: ClaimSteeringInput): Promise<ClaimedSteeringMessage[]>;
@@ -195,17 +232,24 @@ export interface AnswerRunInput {
   /** Only for a login card; `answer` carries its password. */
   username?: string;
   /**
-   * The person edited a mail approval and sends it themselves, through the compose path, after
-   * this denial. Only a "deny" by the run's own user on a pending mail approval takes it: `note`
-   * becomes the denied tool's result, and `mail` is what the card then shows.
+   * The person edited a mail approval and sends it themselves, through the compose path. Only a
+   * "deny" by the run's own user on a pending mail approval takes it. It stops the agent's own call
+   * from running: the effect is denied only until setMailApprovalOutcome settles it, and the card
+   * records "allow". `note` is the agent's result meanwhile, and `mail` is what the card then shows.
    */
   mailDenial?: { note: string; mail: Partial<MailApproval> };
 }
 
-export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send"]);
+export const MAIL_APPROVAL_TOOLS = new Set(["mail_draft", "mail_send", "mail_reply_batch"]);
 
 /** The compose record key of an edited mail approval: one record per approval effect. */
 export const mailApprovalComposeClientId = (effectId: string) => `approval_${effectId}`;
+
+/** The compose record of one batch reply: one per row, so only one worker can move it to pending. */
+/** A row held because its thread was cleared before a worker took it. */
+export const MAIL_REPLY_CLEARED_HOLD = "thread_cleared";
+export const MAIL_REPLY_CLIENT_PREFIX = "agent:batch_";
+export const mailReplyClientId = (itemId: string) => `${MAIL_REPLY_CLIENT_PREFIX}${itemId}`;
 
 export interface SendUserMessageInput {
   spaceId: string;
@@ -272,6 +316,15 @@ export function createThreadEvents(
     answerRunInput: (input) => answerRunInput(prisma, input, realtime, options.runSecretWriter),
     findMailApprovalForEdit: (input) => findMailApprovalForEdit(prisma, input),
     setMailApprovalOutcome: (input) => setMailApprovalOutcome(prisma, input, realtime),
+    acceptMailReplyBatch: (input) => acceptMailReplyBatch(prisma, input, realtime),
+    acceptPipelineImport: (input) => acceptPipelineImport(prisma, input, realtime),
+    settlePipelineImport: (input) => settlePipelineImport(prisma, input, realtime),
+    stagePipelineImportRows: (scope, input) =>
+      stagePipelineImportRows(prisma, scope, input, realtime),
+    preparePipelineImportCard: (scope, effectId) =>
+      preparePipelineImportCard(prisma, scope, effectId, realtime),
+    setMailBatchCounts: (input) => setMailBatchCounts(prisma, input, realtime),
+    settleMailReplyBatch: (input) => settleMailReplyBatch(prisma, input, realtime),
     setApprovalWaitsFor: (input) => setApprovalWaitsFor(prisma, input, realtime),
     append: (input) => appendEvent(prisma, input, realtime),
     claimSteering: (input) => claimSteering(prisma, input),
@@ -300,8 +353,8 @@ export async function clearThread(
         spaceId: input.spaceId,
         ...(input.groupId ? { groupId: input.groupId } : { botId: input.botId }),
       },
-      data: { unread: false },
-      select: { nextMessageSeq: true, historyCompactionGeneration: true },
+      data: { unread: false, meetingTaintedAt: null },
+      select: { nextMessageSeq: true, historyCompactionGeneration: true, userId: true },
     });
     const activeRuns = await tx.run.findMany({
       where: {
@@ -315,6 +368,15 @@ export async function clearThread(
     const now = new Date();
     const runIds = activeRuns.map((run) => run.id);
     await cancelRunsInTransaction(tx, activeRuns, now);
+    // Clearing is a strong signal, and the card with its Retry is gone: replies not yet claimed stop.
+    await tx.mailReplyItem.updateMany({
+      where: {
+        spaceId: input.spaceId,
+        dispatch: "queued",
+        effect: { run: { threadId: input.threadId } },
+      },
+      data: { dispatch: "held", error: MAIL_REPLY_CLEARED_HOLD },
+    });
     // Expire as tombstones so a still-open provider screen claim cannot reset fencing to 1.
     await expireComputerExecutionLeases(tx, { runId: { in: runIds } });
     await tx.computer.updateMany({
@@ -361,13 +423,23 @@ export async function clearThread(
       type: "thread.cleared",
       payload: {},
     });
+    // The log survives with the cleared event, so clients learn the goal ended after it.
+    const goalSeq = input.groupId
+      ? null
+      : await clearOpenGoal(tx, {
+          spaceId: input.spaceId,
+          userId: thread.userId,
+          threadId: input.threadId,
+          botId: input.botId,
+        });
     return {
       event,
+      notifySeq: goalSeq ?? event.seq,
       cancelledRunIds: runIds,
       historyCompactionGeneration: thread.historyCompactionGeneration,
     };
   });
-  await notifyRealtime(realtime, committed.event.threadId, committed.event.seq);
+  await notifyRealtime(realtime, committed.event.threadId, committed.notifySeq);
   return {
     event: mapProductEvent(committed.event),
     cancelledRunIds: committed.cancelledRunIds,
@@ -712,6 +784,16 @@ export async function setApprovalWaitsFor(
   if (committed) await notifyRealtime(realtime, committed.threadId, committed.seq);
 }
 
+function cardSendSettled(outcome: SetMailApprovalOutcomeInput["outcome"], note: string) {
+  if (outcome === "sent" || outcome === "saved") {
+    return { status: "completed", result: { ok: true, note, outcome } };
+  }
+  if (outcome === "unknown") {
+    return { status: "uncertain", result: { error: note, note, outcome, uncertain: true } };
+  }
+  return { status: "completed", result: { error: note, note, outcome } };
+}
+
 /** Records how the person's own send of an edited mail approval ended, for the card to show. */
 export async function setMailApprovalOutcome(
   prisma: PrismaClient,
@@ -737,7 +819,9 @@ export async function setMailApprovalOutcome(
     if (input.note) {
       await tx.externalEffect.updateMany({
         where: { id: input.effectId, spaceId: input.spaceId, status: "denied" },
-        data: { result: { note: input.note, outcome: input.outcome } },
+        // The card send has ended, so the effect stops being a denial and says what happened: this
+        // status and result are what the agent reads, here and when it resumes from a checkpoint.
+        data: cardSendSettled(input.outcome, input.note),
       });
     }
     if (!input.messageId) return null;

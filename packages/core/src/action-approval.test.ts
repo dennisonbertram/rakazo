@@ -4,6 +4,11 @@ import {
   ACTION_TYPES,
   actionTypeForTool,
   applyJudgeDecision,
+  backgroundAutoReviewAllowed,
+  contentHasOutboundChannel,
+  mailModifyTouchesFixedLabel,
+  pageWriteAddsChannel,
+  botAllowsAllSites,
   buildApprovalTable,
   connectorKindFromToolName,
   connectorReadRequiresApproval,
@@ -15,8 +20,11 @@ import {
   newSiteOutcome,
   outboundSiteGate,
   planActionGate,
+  privateDataAreas,
+  ROUTINE_AUTO_REVIEW_READ_TOOLS,
   resolveActionApproval,
   resolveActionApprovalDetail,
+  routineAlwaysAllowable,
   toolRequiresApproval,
   toolRequiresExplicitApproval,
   toolResultTaintsRun,
@@ -39,6 +47,13 @@ describe("toolRequiresApproval", () => {
     expect(toolRequiresApproval("create_space", false)).toBe(true);
     expect(toolRequiresApproval("contacts_save", false)).toBe(true);
     expect(toolRequiresApproval("contacts_add", false)).toBe(false);
+    expect(toolRequiresApproval("fundraising_round_save", false)).toBe(true);
+    expect(toolRequiresApproval("pipeline_import_review", false)).toBe(true);
+    // Staging holds rows and changes nothing else.
+    expect(toolRequiresApproval("pipeline_import_stage", false)).toBe(false);
+    // No saved Allow rule or Auto Review may pass them: the executor's mandatory gate follows this.
+    expect(toolRequiresExplicitApproval("fundraising_round_save")).toBe(true);
+    expect(toolRequiresExplicitApproval("pipeline_import_review")).toBe(true);
     expect(toolRequiresApproval("cap_table_update", false)).toBe(false);
     expect(toolRequiresExplicitApproval("contacts_save")).toBe(false);
     expect(toolRequiresExplicitApproval("create_space")).toBe(true);
@@ -309,6 +324,33 @@ describe("resolveActionApproval", () => {
 describe("planActionGate", () => {
   const consequential = true;
 
+  it("never plans Auto Review for a goal run", () => {
+    const base = { consequential, autoReviewEnabled: true, checkerConfigured: true, goalRun: true };
+    for (const source of ["default", "action_type_default"] as const) {
+      for (const decision of ["allow", "ask"] as const) {
+        expect(planActionGate({ ...base, resolved: { decision, source, matchingRules: [] } })).toBe(
+          decision,
+        );
+      }
+    }
+    // A new site asks instead of going to the judge.
+    expect(
+      planActionGate({
+        ...base,
+        resolved: { decision: "allow", source: "default", matchingRules: [] },
+        newDestination: true,
+      }),
+    ).toBe("ask");
+    // The same call in an owner run is still judged.
+    expect(
+      planActionGate({
+        ...base,
+        goalRun: false,
+        resolved: { decision: "allow", source: "default", matchingRules: [] },
+      }),
+    ).toBe("judge");
+  });
+
   it("lets require_approval win without judging", () => {
     expect(
       planActionGate({
@@ -471,7 +513,10 @@ describe("mail write tools", () => {
     "%s needs approval, also on an unattended run",
     (name) => {
       expect(toolRequiresApproval(name, false)).toBe(true);
-      expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(true);
+      // mail_modify is reversible and cannot send or delete, so an unattended run follows its rules.
+      expect(unattendedTriggerToolRequiresApproval("webhook", name, false)).toBe(
+        name !== "mail_modify",
+      );
       expect(toolRequiresExplicitApproval(name)).toBe(false);
     },
   );
@@ -658,6 +703,19 @@ describe("block rules and per-bot rules", () => {
     expect(toolRuleAllowsAllow("imessage_send")).toBe(false);
     expect(toolRuleAllowsAllow("shell")).toBe(true);
   });
+
+  it("asks for share_meeting every time: attended or not, and no rule can allow it", () => {
+    expect(toolRequiresExplicitApproval("share_meeting")).toBe(true);
+    expect(toolRequiresApproval("share_meeting", false)).toBe(true);
+    expect(unattendedToolRequiresApproval(true, "share_meeting", false)).toBe(true);
+    expect(toolRuleAllowsAllow("share_meeting")).toBe(false);
+    expect(
+      resolveActionApprovalDetail({
+        toolName: "share_meeting",
+        rules: [rule("always_allow", "tool", "share_meeting")],
+      }),
+    ).toMatchObject({ decision: "ask" });
+  });
 });
 
 describe("planActionGate with block and unattended runs", () => {
@@ -696,6 +754,29 @@ describe("planActionGate with block and unattended runs", () => {
 });
 
 describe("unattendedToolRequiresApproval", () => {
+  it("lets a background run read the owner's finance records, but a tainted run still asks", () => {
+    for (const name of [
+      "finance_overview",
+      "finance_breakdown",
+      "finance_transactions",
+      "finance_recurring",
+      "finance_crypto",
+    ]) {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
+      expect(externalTaintAllowsTool(name)).toBe(false);
+      expect(ROUTINE_AUTO_REVIEW_READ_TOOLS.has(name)).toBe(false);
+    }
+  });
+
+  it("keeps message_bot asking in the gate; the executor lifts it for a clean own-bot relay", () => {
+    expect(unattendedToolRequiresApproval(true, "message_bot", false)).toBe(true);
+    expect(externalTaintAllowsTool("message_bot")).toBe(false);
+  });
+
+  it("lets a scheduled run read the owner's company context without a card", () => {
+    expect(unattendedToolRequiresApproval(true, "company_context_lookup", false)).toBe(false);
+  });
+
   it("never asks for an attended run", () => {
     expect(unattendedToolRequiresApproval(false, "shell", false)).toBe(false);
     expect(unattendedToolRequiresApproval(false, "github_create_issue", true)).toBe(false);
@@ -713,15 +794,21 @@ describe("unattendedToolRequiresApproval", () => {
     "contacts_add",
     "cap_table_update",
     "mail_draft",
-    "mail_modify",
     "drive_create_file",
     "drive_update_file",
     "calendar_create_event",
     "calendar_update_event",
     "calendar_delete_event",
     "contacts_save",
+    "fundraising_round_save",
+    "pipeline_import_review",
   ])("asks for %s in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+  });
+
+  it("leaves mail_modify to the rules: it cannot delete, send or mark spam, and is reversible", () => {
+    expect(unattendedToolRequiresApproval(true, "mail_modify", false)).toBe(false);
+    expect(toolRequiresApproval("mail_modify", false)).toBe(true);
   });
 
   it.each([
@@ -752,9 +839,29 @@ describe("unattendedToolRequiresApproval", () => {
     "legal_upsert_node",
     "legal_link",
     "legal_query",
+    "read_history",
+    "search_history",
+    "page_list",
+    "page_read",
+    "pins_read",
   ])("lets %s run in an unattended run", (name) => {
     expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
   });
+
+  it.each(["message_user", "show_emails"])("lets the display tool %s run unattended", (name) => {
+    expect(unattendedToolRequiresApproval(true, name, false)).toBe(false);
+  });
+
+  it("still asks for mail_send in an unattended run", () => {
+    expect(unattendedToolRequiresApproval(true, "mail_send", false)).toBe(true);
+  });
+
+  it.each(["cap_table_read", "page_source_list"])(
+    "still asks for %s in an unattended run",
+    (name) => {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+    },
+  );
 
   it("keeps an internal legal tool asking in a tainted run", () => {
     expect(externalTaintAllowsTool("legal_upsert_contract")).toBe(false);
@@ -952,5 +1059,273 @@ describe("bot approval of contact tools (unchanged by MCP writes)", () => {
     expect(add).toMatchObject({ decision: "allow", source: "default" });
     expect(toolRequiresApproval("contacts_add", false)).toBe(false);
     expect(toolRequiresApproval("contacts_save", false)).toBe(true);
+  });
+});
+
+describe("all-sites rule and private data tools", () => {
+  const rule = (botId: string | null, matchValue = "web_fetch", effect = "always_allow") =>
+    ({ effect, matchKind: "tool", matchValue, botId }) as ActionApprovalRule;
+
+  it("reads only this bot's always_allow rule for web_fetch", () => {
+    expect(botAllowsAllSites([rule("bot-1")], "bot-1")).toBe(true);
+    expect(botAllowsAllSites([rule("bot-2")], "bot-1")).toBe(false);
+    expect(botAllowsAllSites([rule(null)], "bot-1")).toBe(false);
+    expect(botAllowsAllSites([rule("bot-1", "web_search")], "bot-1")).toBe(false);
+    expect(botAllowsAllSites([rule("bot-1", "web_fetch", "require_approval")], "bot-1")).toBe(
+      false,
+    );
+  });
+
+  it("names the private data a tool list can read, and ignores web, page and agenda tools", () => {
+    expect(privateDataAreas(["mail_search", "show_emails", "drive_read"])).toEqual([
+      "mail",
+      "Drive",
+    ]);
+    expect(privateDataAreas(["finance_overview"])).toEqual(["finance"]);
+    expect(privateDataAreas(["search_data_room"])).toEqual(["Data room"]);
+    expect(privateDataAreas(["calendar_list_events"])).toEqual(["calendar"]);
+    expect(
+      privateDataAreas(["web_fetch", "web_search", "page_write", "read_file", "calendar_agenda"]),
+    ).toEqual([]);
+  });
+});
+
+describe("mail_reply_batch gates", () => {
+  const tool = "mail_reply_batch";
+
+  it("needs approval, cannot be auto-reviewed, and is a send_email action", () => {
+    expect(toolRequiresApproval(tool, false)).toBe(true);
+    expect(toolRequiresExplicitApproval(tool)).toBe(true);
+    expect(actionTypeForTool({ toolName: tool, viaConnector: false })).toBe("send_email");
+  });
+
+  it("a saved Allow leaves it asking; a saved Block, by tool or category, refuses it", () => {
+    const decide = (rules: ActionApprovalRule[]) =>
+      resolveActionApproval({ toolName: tool, rules });
+    expect(decide([{ effect: "always_allow", matchKind: "tool", matchValue: tool }])).toBe("ask");
+    expect(
+      decide([{ effect: "always_allow", matchKind: "category", matchValue: "send_email" }]),
+    ).toBe("ask");
+    expect(decide([{ effect: "block", matchKind: "tool", matchValue: tool }])).toBe("block");
+    expect(decide([{ effect: "block", matchKind: "category", matchValue: "send_email" }])).toBe(
+      "block",
+    );
+    // A rule saved before the table used this category name; the email list covers the new tool.
+    expect(decide([{ effect: "block", matchKind: "category", matchValue: "email" }])).toBe("block");
+  });
+});
+
+describe("isApprovalAskBlock with a reply batch card", () => {
+  const card = (actions: { id: string; label: string }[], mailBatch?: object) => ({
+    kind: "ask",
+    approvalEffectId: "effect-1",
+    actions,
+    ...(mailBatch ? { mailBatch } : {}),
+  });
+  const counts = { count: 2, sent: 0, failed: 0, unknown: 0 };
+
+  it("is an approval card with only Discard, so composer text cannot answer it", () => {
+    expect(isApprovalAskBlock(card([{ id: "deny", label: "Discard" }], counts))).toBe(true);
+  });
+
+  it("does not treat a deny-only card without the batch mark as an approval", () => {
+    expect(isApprovalAskBlock(card([{ id: "deny", label: "Discard" }]))).toBe(false);
+  });
+});
+
+describe("routine rules and Auto Review of routine reads", () => {
+  const base = { consequential: true, autoReviewEnabled: true, checkerConfigured: true };
+  const resolved = (decision: "ask" | "allow", source: ActionApprovalSource) => ({
+    decision,
+    source,
+    matchingRules: [],
+  });
+
+  it("judges only a routine read in an unattended run", () => {
+    const r = resolved("allow", "default");
+    expect(planActionGate({ ...base, resolved: r, unattended: true })).toBe("allow");
+    expect(planActionGate({ ...base, resolved: r, unattended: true, routineRead: true })).toBe(
+      "judge",
+    );
+  });
+
+  it("lets a rule win over the routine judge", () => {
+    const flags = { ...base, unattended: true, routineRead: true };
+    expect(planActionGate({ ...flags, resolved: resolved("ask", "require_approval") })).toBe("ask");
+  });
+
+  it("lists only reads for the routine judge, all of which ask in the background today", () => {
+    for (const name of ROUTINE_AUTO_REVIEW_READ_TOOLS) {
+      expect(unattendedToolRequiresApproval(true, name, false)).toBe(true);
+      expect(toolRequiresExplicitApproval(name)).toBe(false);
+      expect(name).not.toMatch(/send|write|save|update|upsert|create|delete|modify/);
+    }
+  });
+
+  it.each([
+    "mail_send",
+    "mail_draft",
+    "imessage_send",
+    "share_meeting",
+    "fundraising_round_save",
+    "company_fact_upsert",
+    "create_space",
+  ])("never offers Always for this routine on %s", (toolName) => {
+    expect(routineAlwaysAllowable({ toolName })).toBe(false);
+  });
+
+  it("never offers it for a payment, outside message or delete on a connector", () => {
+    for (const toolName of ["stripe_charge_card", "slack_post_message", "github_delete_branch"]) {
+      expect(routineAlwaysAllowable({ toolName, viaConnector: true })).toBe(false);
+    }
+  });
+
+  it("offers it for an ordinary background write, and accepts the answer on a card", () => {
+    expect(routineAlwaysAllowable({ toolName: "write_file" })).toBe(true);
+    expect(
+      isApprovalAskBlock({
+        kind: "ask",
+        approvalEffectId: "e",
+        actions: [
+          { id: "allow", label: "Allow once" },
+          { id: "always_routine", label: "Always for this routine" },
+          { id: "deny", label: "Deny" },
+        ],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("backgroundAutoReviewAllowed", () => {
+  const clean = {
+    enabled: true,
+    trigger: "routine",
+    tainted: false,
+    outsideContentSeen: false,
+    meetingMarked: false,
+    firewalled: false,
+    externalBot: false,
+    ownerWords: "Summarize my cap table every Monday.",
+    toolName: "cap_table_read",
+  };
+
+  it("allows a clean run's ordinary call", () => {
+    expect(backgroundAutoReviewAllowed(clean)).toBe(true);
+    expect(
+      backgroundAutoReviewAllowed({
+        ...clean,
+        toolName: "notion_create_page",
+        viaConnector: true,
+        connectorKind: "notion",
+      }),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["background off", { enabled: false }],
+    ["webhook", { trigger: "webhook" }],
+    ["tainted run", { tainted: true }],
+    ["outside content", { outsideContentSeen: true }],
+    ["meeting mark", { meetingMarked: true }],
+    ["firewalled", { firewalled: true }],
+    ["external bot", { externalBot: true }],
+    ["empty owner words", { ownerWords: "  " }],
+  ])("never judges: %s", (_label, patch) => {
+    expect(backgroundAutoReviewAllowed({ ...clean, ...patch })).toBe(false);
+  });
+
+  it.each([
+    "schedule_create",
+    "schedule_update",
+    "schedule_cancel",
+    "skill_create",
+    "skill_update",
+    "skill_delete",
+    "remember",
+    "save_memory",
+    "save_shared_memory",
+    "forget_memory",
+    "mail_send",
+    "mail_draft",
+    "message_outside",
+    "imessage_send",
+    "calendar_create_event",
+    "calendar_delete_event",
+    "gtm_post",
+    "add_mcp_server",
+    "spawn_bot",
+    "update_bot",
+    "cloud_agent_launch",
+    "share_meeting",
+    "fundraising_round_save",
+  ])("never judges %s", (toolName) => {
+    expect(backgroundAutoReviewAllowed({ ...clean, toolName })).toBe(false);
+  });
+
+  it("never judges a money, message or calendar connector call", () => {
+    for (const [toolName, connectorKind] of [
+      ["stripe_create_charge", "stripe"],
+      ["slack_post_message", "slack"],
+      ["google_calendar_create_event", "googlecalendar"],
+    ] as const) {
+      expect(
+        backgroundAutoReviewAllowed({ ...clean, toolName, viaConnector: true, connectorKind }),
+      ).toBe(false);
+    }
+  });
+});
+
+describe("contentHasOutboundChannel", () => {
+  it("accepts plain text", () => {
+    expect(
+      contentHasOutboundChannel({ page: "Notes", content: "Call Sam on Monday at 3pm." }),
+    ).toBe(false);
+  });
+  it.each([
+    "see https://evil.test/x",
+    "![pixel](https://evil.test/p.png)",
+    "[click](mailto:a@b.test)",
+    "<img src=x>",
+    "visit evil.com now",
+    "www.evil.test",
+  ])("rejects %s", (text) => {
+    expect(contentHasOutboundChannel({ content: text })).toBe(true);
+    expect(contentHasOutboundChannel({ nested: [{ deep: text }] })).toBe(true);
+  });
+});
+
+describe("mailModifyTouchesFixedLabel", () => {
+  it("flags trash and spam, not archive", () => {
+    expect(mailModifyTouchesFixedLabel({ addLabels: ["trash"] })).toBe(true);
+    expect(mailModifyTouchesFixedLabel({ addLabels: ["SPAM"] })).toBe(true);
+    expect(mailModifyTouchesFixedLabel({ id: "m", archive: true })).toBe(false);
+  });
+});
+
+describe("pageWriteAddsChannel", () => {
+  const page = "Notes\n\n![logo](https://cdn.example.test/logo.png)\n";
+  it("allows plain edits to a page without links", () => {
+    expect(pageWriteAddsChannel("Notes", "My notes")).toBe(false);
+  });
+  it("catches private text swapped into an existing image URL", () => {
+    expect(
+      pageWriteAddsChannel(page, page.replace("logo.png", "logo.png?d=PLACEHOLDER-CUSTOMER")),
+    ).toBe(true);
+  });
+  it("rejects a new link, any HTML, and any URL on a new page", () => {
+    expect(pageWriteAddsChannel(page, `${page}\nsee https://evil.test`)).toBe(true);
+    expect(pageWriteAddsChannel("", "<b>hi</b>")).toBe(true);
+    expect(pageWriteAddsChannel("", "go to https://x.test")).toBe(true);
+  });
+});
+
+describe("pageWriteAddsChannel destinations", () => {
+  it("asks for nested parentheses, reference images and any destination", () => {
+    expect(pageWriteAddsChannel("", "![x](https://evil.test/a(b)?d=PLACEHOLDER)")).toBe(true);
+    expect(
+      pageWriteAddsChannel("![x][r]\n\n[r]: https://e.test/p", "![x][r]\n\n[r]: https://e.test/p"),
+    ).toBe(true);
+    expect(pageWriteAddsChannel("", "![x][r]\n[r]: foo")).toBe(true);
+    expect(pageWriteAddsChannel("", "Plain notes.")).toBe(false);
   });
 });

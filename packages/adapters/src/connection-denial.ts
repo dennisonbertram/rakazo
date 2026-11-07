@@ -1,4 +1,4 @@
-import { connectionRowsForAudience, deniedConnectionIds } from "@rakazo/core";
+import { connectionRowsForAudience, deniedConnectionIds, nonOwnerMayWrite } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 
 export const CONNECTION_UNAVAILABLE_MESSAGE =
@@ -16,7 +16,7 @@ export async function connectionDenial(
   input: {
     spaceId: string;
     userId: string;
-    bot: { id: string; audience: string | null };
+    bot: { id: string; audience: string | null; firewall?: boolean };
     route: { connectorId: string; connectionId?: string };
     /** The connection ids of this connector that were offered to the call. */
     availableIds: string[];
@@ -24,6 +24,14 @@ export async function connectionDenial(
   },
 ): Promise<string | null> {
   const { availableIds, declaredReadOnly, route } = input;
+  // An agent-linked connection takes changes from its own agent (another path) or a granted bot with a write grant.
+  const changeAllowed = (row: {
+    agentBotId: string | null;
+    writesEnabled: boolean;
+    botAccess: { canWrite: boolean }[];
+  }) =>
+    row.agentBotId === null ||
+    (row.agentBotId !== input.bot.id && nonOwnerMayWrite(row, input.bot));
   if (availableIds.length === 0) return null;
   const currentConnections = await prisma.connection.findMany({
     where: {
@@ -39,22 +47,23 @@ export async function connectionDenial(
       status: true,
       allAgents: true,
       agentBotId: true,
+      writesEnabled: true,
       privateByDefault: true,
       botAccess: {
         where: { botId: input.bot.id, spaceId: input.spaceId, userId: input.userId },
-        select: { botId: true },
+        select: { botId: true, canWrite: true },
       },
     },
   });
   const deniedCurrentIds = deniedConnectionIds(
-    connectionRowsForAudience(currentConnections, input.bot.audience),
+    connectionRowsForAudience(currentConnections, input.bot.audience, input.bot.firewall),
   );
   if (route.connectionId) {
     const current = currentConnections.find((connection) => connection.id === route.connectionId);
     if (
       current?.status !== "connected" ||
       deniedCurrentIds.has(current.id) ||
-      (declaredReadOnly !== true && current.agentBotId !== null)
+      (declaredReadOnly !== true && !changeAllowed(current))
     ) {
       return CONNECTION_UNAVAILABLE_MESSAGE;
     }
@@ -65,7 +74,7 @@ export async function connectionDenial(
     currentConnections.length !== availableIds.length ||
     connected.length !== currentConnections.length ||
     deniedCurrentIds.size > 0 ||
-    (declaredReadOnly !== true && connected.some((connection) => connection.agentBotId !== null))
+    (declaredReadOnly !== true && connected.some((connection) => !changeAllowed(connection)))
   ) {
     return CONNECTION_UNAVAILABLE_MESSAGE;
   }

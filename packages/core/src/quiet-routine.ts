@@ -9,7 +9,7 @@ export const CHECK_IN_MANAGED_KIND = "check_in";
  * says how to end silently, so users never type the magic word.
  */
 export function quietRoutineGuidance(): string {
-  return "This routine's prompt says to stay silent when there is nothing to report. Only message the user if something needs them: a decision, an answer, a problem, or a change they would want to know about. If nothing does, stay silent as the silent-reply rule describes, with no all-clear and no summary of what you checked.";
+  return "This routine's prompt says to stay silent when there is nothing to report. Only message the user if something needs them: a decision, an answer, a problem, or a change they would want to know about. If nothing does, stay silent as the silent-reply rule describes.";
 }
 
 /** Built-in prompt of the managed check-in routine. */

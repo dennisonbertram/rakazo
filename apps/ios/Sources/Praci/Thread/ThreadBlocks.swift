@@ -6,6 +6,7 @@ import UIKit
 struct MarkdownView: View {
   let text: String
   var color: Color = Color.token(.foreground)
+  @Environment(AppModel.self) private var app
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -15,6 +16,12 @@ struct MarkdownView: View {
     }
     .foregroundStyle(color)
     .frame(maxWidth: .infinity, alignment: .leading)
+    // A link to one of the app's own paths opens its screen; web links keep the system behaviour.
+    .environment(\.openURL, OpenURLAction { url in
+      guard url.scheme == nil, url.host() == nil else { return .systemAction }
+      if let route = Route(appPath: url.relativeString) { app.open(route) }
+      return .handled
+    })
   }
 
   @ViewBuilder private func view(_ block: MarkdownBlock) -> some View {
@@ -153,6 +160,28 @@ struct SubagentRowView: View {
   }
 }
 
+/// The card an agent leaves when it creates a page. Tapping it opens the page. There is no sidebar here,
+/// so it has no add button.
+struct PageCardView: View {
+  let block: MessageBlock
+  @Environment(AppModel.self) private var app
+
+  var body: some View {
+    if let botID = block.fields["botId"]?.stringValue, let pageID = block.fields["pageId"]?.stringValue {
+      Button { app.open(.agentPage(botID: botID, pageID: pageID)) } label: {
+        Text(block.title ?? "Page").font(.body.weight(.medium))
+          .foregroundStyle(Color.token(.foreground))
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, 16).padding(.vertical, 12)
+          .background(Color.token(.muted), in: RoundedRectangle(cornerRadius: 18))
+          .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.token(.border)))
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("pageCard")
+    }
+  }
+}
+
 /// Shows an artifact image. It is fetched through the signed-in session, so a plain
 /// `AsyncImage` could not authorise the request.
 struct ImageBlockView: View {
@@ -225,18 +254,5 @@ struct FileBlockView: View {
     .background(Color.token(.card), in: RoundedRectangle(cornerRadius: 14))
     .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.token(.border)))
     .accessibilityElement(children: .combine)
-  }
-}
-
-/// Kinds this version of the app cannot draw yet.
-struct UnsupportedBlockView: View {
-  var body: some View {
-    Label("This content isn’t available in this version.", systemImage: "square.dashed")
-      .font(.footnote)
-      .foregroundStyle(Color.token(.mutedForeground))
-      .padding(12)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color.token(.card), in: RoundedRectangle(cornerRadius: 14))
-      .accessibilityIdentifier("unsupportedBlock")
   }
 }

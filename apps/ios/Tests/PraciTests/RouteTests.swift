@@ -23,6 +23,8 @@ func openURLsMapToRoutes() {
   #expect(route("rakazo://open/legal") == .legal)
   #expect(route("rakazo://open/cap-table") == .capTable)
   #expect(route("rakazo://open/data-room") == .dataRoom)
+  #expect(route("rakazo://open/meetings") == .meetings)
+  #expect(route("rakazo://open/meeting/m1") == .meeting(id: "m1"))
 }
 
 @Test
@@ -35,4 +37,16 @@ func otherURLsAreIgnored() {
   #expect(route("rakazo://open/bot") == nil)
   #expect(route("rakazo://open/bot/b1/unknown") == nil)
   #expect(route("rakazo://open/inbox/m1/extra") == nil)
+}
+
+@Test
+func appPathsFromAgentLinksMapToRoutes() {
+  #expect(Route(appPath: "/app/pages/b1/p1") == .agentPage(botID: "b1", pageID: "p1"))
+  #expect(Route(appPath: "/app/artifacts/a1") == .artifact(artifactID: "a1"))
+  #expect(Route(appPath: "/app/data-room?item=i1") == .dataRoomItem(itemID: "i1"))
+  #expect(Route(appPath: "/app/data-room") == .dataRoom)
+  #expect(Route(appPath: "/app/finance") == nil)
+  #expect(Route(appPath: "/app/pages/b1") == nil)
+  #expect(Route(appPath: "//evil.test/app/pages/b/p") == nil)
+  #expect(Route(appPath: "https://evil.test/app/pages/b/p") == nil)
 }

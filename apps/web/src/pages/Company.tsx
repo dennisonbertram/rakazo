@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import type { CompanyEntityRecord, CompanyFact } from "@rakazo/contracts";
+import type { CompanyEntityRecord, CompanyEventRecord, CompanyFact } from "@rakazo/contracts";
 import {
   Button,
   DropdownMenu,
@@ -23,8 +23,9 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AskBotButton } from "../components/AskBotButton";
+import { SeeAll, useCappedRows } from "../components/CappedList";
 import { useFinanceQuery } from "../components/finance/ui";
-import { PickFilter, SearchField } from "../components/ListControls";
+import { PickFilter, SearchField, usePhone } from "../components/ListControls";
 import { PageEmptyState } from "../components/PageEmptyState";
 import { PageHeader } from "../components/PageHeader";
 import { downloadArtifactBytes } from "../lib/artifact-open";
@@ -36,6 +37,7 @@ import { useListParams } from "../lib/list-params";
 import { rpc } from "../lib/rpc";
 import { errorText } from "../lib/user-error";
 import { CompanyCalendar } from "./CompanyCalendar";
+import { CompanyContext } from "./CompanyContext";
 import { CompanyFactDetail } from "./CompanyFactDetail";
 import { CompanyHistory } from "./CompanyHistory";
 import { CompanyPrivacy } from "./CompanyPrivacy";
@@ -279,6 +281,9 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           <TabsTrigger value="overview">
             <Trans>Overview</Trans>
           </TabsTrigger>
+          <TabsTrigger value="context">
+            <Trans>Context</Trans>
+          </TabsTrigger>
           <TabsTrigger value="people">
             <Trans>People</Trans>
           </TabsTrigger>
@@ -297,7 +302,12 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      {page.error && (
+      {view === "context" && (
+        <div className="mt-6">
+          <CompanyContext />
+        </div>
+      )}
+      {view !== "context" && page.error && (
         <p role="alert" className="mt-6 text-destructive">
           {page.error}
           <Button variant="link" onClick={reload}>
@@ -305,8 +315,8 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
           </Button>
         </p>
       )}
-      {!data && !page.error && <Skeleton className="mt-6 h-64 w-full" />}
-      {data && (
+      {view !== "context" && !data && !page.error && <Skeleton className="mt-6 h-64 w-full" />}
+      {view !== "context" && data && (
         <div className="mt-6 space-y-8">
           {view === "history" && <CompanyHistory data={data} onOpen={setFact} />}
           {view === "review" && (
@@ -434,45 +444,20 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
                   </Link>
                 )}
               </div>
-              <section>
-                <h2 className="mb-3 font-medium">
-                  <Trans>Next dates</Trans>
-                </h2>
-                {data.events
-                  .filter((event) => event.occursOn && companyDateEnd(event.occursOn) >= todayIso())
-                  .slice(0, 5)
-                  .map((event) => (
-                    <button
-                      type="button"
-                      key={event.id}
-                      className="flex w-full justify-between border-b py-3 text-start"
-                      onClick={() => setFact({ kind: "event", record: event })}
-                    >
-                      <span>{maskCurrencyWhenHidden(event.title)}</span>
-                      <span className="text-muted-foreground">{companyDate(event.occursOn)}</span>
-                    </button>
-                  ))}
-              </section>
-              <section>
-                <h2 className="mb-3 font-medium">
-                  <Trans>Latest events</Trans>
-                </h2>
-                {data.events
+              <EventList
+                title={<Trans>Next dates</Trans>}
+                events={data.events.filter(
+                  (event) => event.occursOn && companyDateEnd(event.occursOn) >= todayIso(),
+                )}
+                onOpen={(event) => setFact({ kind: "event", record: event })}
+              />
+              <EventList
+                title={<Trans>Latest events</Trans>}
+                events={data.events
                   .filter((event) => event.occursOn && companyDateEnd(event.occursOn) <= todayIso())
-                  .slice(-5)
-                  .reverse()
-                  .map((event) => (
-                    <button
-                      type="button"
-                      key={event.id}
-                      className="flex w-full justify-between border-b py-3 text-start"
-                      onClick={() => setFact({ kind: "event", record: event })}
-                    >
-                      <span>{maskCurrencyWhenHidden(event.title)}</span>
-                      <span className="text-muted-foreground">{companyDate(event.occursOn)}</span>
-                    </button>
-                  ))}
-              </section>
+                  .reverse()}
+                onOpen={(event) => setFact({ kind: "event", record: event })}
+              />
             </>
           )}
           {view === "people" && (
@@ -559,5 +544,39 @@ export function CompanyPage({ onAskAgent }: { onAskAgent?: () => void } = {}) {
         />
       )}
     </div>
+  );
+}
+
+/** Dates on the overview: the first 5, or 3 on a phone, then See all opens the Calendar tab. */
+function EventList({
+  title,
+  events,
+  onOpen,
+}: {
+  title: ReactNode;
+  events: CompanyEventRecord[];
+  onOpen: (event: CompanyEventRecord) => void;
+}) {
+  // Wide screens show the first 5, as before; a phone shows 3 and opens the rest in place.
+  const phone = usePhone();
+  const list = useCappedRows(phone ? events : events.slice(0, 5));
+  return (
+    <section>
+      <h2 className="mb-3 font-medium">{title}</h2>
+      {list.rows.map((event) => (
+        <button
+          type="button"
+          key={event.id}
+          className="flex w-full justify-between border-b py-3 text-start"
+          onClick={() => onOpen(event)}
+        >
+          <span>{maskCurrencyWhenHidden(event.title)}</span>
+          <span className="text-muted-foreground">{companyDate(event.occursOn)}</span>
+        </button>
+      ))}
+      <div className="mt-2 flex justify-end">
+        <SeeAll list={list} />
+      </div>
+    </section>
   );
 }

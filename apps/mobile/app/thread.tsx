@@ -8,8 +8,12 @@ import type {
   MessageReaction,
   Routine,
 } from "@rakazo/contracts";
-import { canReactToThreadMessage, MESSAGE_REACTIONS } from "@rakazo/contracts";
-import type { SlashActionId, ThreadItem } from "@rakazo/core";
+import {
+  canReactToThreadMessage,
+  MAIL_ALREADY_SENT_REASON,
+  MESSAGE_REACTIONS,
+} from "@rakazo/contracts";
+import type { ThreadItem } from "@rakazo/core";
 import {
   abortableDelay,
   appendNewerThreadPage,
@@ -107,6 +111,8 @@ import { ComputerCard } from "../components/ComputerCard";
 import { ComposerReplyPreview } from "../components/composer-reply-preview";
 import { FailedSendBubble } from "../components/failed-send-bubble";
 import { GlassSurface } from "../components/glass-surface";
+import { GoalCard } from "../components/goal-card";
+import { GoalLine } from "../components/goal-line";
 import type { ImageArtifactPreviewTarget } from "../components/image-artifact-viewer";
 import { InlineImageAttachment } from "../components/inline-image-attachment";
 import { McpApprovalCard } from "../components/McpApprovalCard";
@@ -171,6 +177,7 @@ import {
   resumeLiveNotifications,
   setOpenNotificationThread,
 } from "../lib/live-notifications";
+import { mailOutcomeLabel } from "../lib/mail-outcome";
 import { presentMessageActionSheet } from "../lib/message-action-sheet";
 import { buildMessageContextMenu, messageMenuReaction } from "../lib/message-context-menu";
 import {
@@ -213,13 +220,21 @@ import {
   loadVerifiedIntegrationsScope,
   subscribeSessionGeneration,
 } from "../lib/session";
+import type { MobileSlashActionId } from "../lib/slash-actions";
+import { slashActionRoute } from "../lib/slash-actions";
 import {
   applyMessageJump as applyMessageJumpAction,
   commitSnap as commitSnapAction,
   showLatest as showLatestAction,
 } from "../lib/thread-actions";
 import type { SendAttempt } from "../lib/thread-feedback";
-import { confirmEchoes, subscribeDelivered, useThreadFeedback } from "../lib/thread-feedback";
+import {
+  confirmEchoes,
+  subscribeDelivered,
+  subscribeGoalReply,
+  useThreadFeedback,
+} from "../lib/thread-feedback";
+import { applyGoalEvent, goalLineState } from "../lib/thread-goal";
 import { ThreadJumpAnchor } from "../lib/thread-jump";
 import { ThreadReadOnlyContext } from "../lib/thread-read-only";
 import type { ThreadScrollAction, ThreadScrollState } from "../lib/thread-scroll";
@@ -251,8 +266,13 @@ function formatApprovalAnswer(
   if (approval && outcome === "created") return t("Created");
   if (approval && outcome === "cancelled") return t("Cancelled");
   if (approval && answer === "allow") return t("Allowed once");
+  if (approval && answer === "always_routine") return t("Always allowed for this routine");
+  if (approval && answer === "always_bot_sites") return t("Allowed for all sites");
   if (approval && answer === "always") return t("Always allowed");
   if (approval && answer === "deny") return t("Denied");
+  if (approval && answer === "skipped") return t("Skipped");
+  // A reply batch pressed on another surface; its results are on that surface's card.
+  if (answer === "send") return t("Send selected");
   return t("Answered: {answer}", { answer: selectedAskActionLabel(answer, actions) });
 }
 
@@ -615,6 +635,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   const [replyQuote, setReplyQuote] = useState<string | null>(null);
   const [quoteTarget, setQuoteTarget] = useState<MobileMessage | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
+  const [goalNotice, setGoalNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const preparingSend = useRef(false);
   const feedback = useThreadFeedback(threadKey, newClientId);
@@ -723,6 +744,10 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     });
   }, [inGroup, snap?.activeRuns, snap?.members, snap?.run]);
   const working = inGroup ? workingGroupBots.length > 0 : isRunWorking(currentBotStatus);
+  const goalLine = goalLineState(
+    inGroup ? null : snap?.goal,
+    snap?.activeRuns ?? (snap?.run ? [snap.run] : []),
+  );
 
   const speakFinishedReply = useCallback(() => {
     if (!botId || inGroup || !currentBot) return;
@@ -1543,6 +1568,9 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
                 }
                 commitSnap(reduceThreadSnapshot(snapRef.current, event));
               }
+              if (event.type === "thread.goal.updated") {
+                commitSnap(applyGoalEvent(snapRef.current, event));
+              }
               if (event.type === "page.updated") setHasPage(true);
               if (event.type === "pins.updated") setPinsTick((n) => n + 1);
               if (event.type === "bot.updated") {
@@ -1664,16 +1692,14 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     setError(null);
   }, [threadKey]);
 
-  function runSlashAction(action: SlashActionId) {
-    if (action === "chat-settings") {
-      if (inGroup && groupId) {
-        router.push({ pathname: "/group-settings", params: { groupId } });
-      } else if (botId) {
-        router.push({ pathname: "/bot-settings", params: { botId } });
-      }
-      return;
-    }
-    router.push({ pathname: "/account" });
+  function runSlashAction(action: MobileSlashActionId) {
+    const route = slashActionRoute(action, { inGroup, groupId, botId });
+    if (route) router.push(route as never);
+  }
+
+  function clearGoal() {
+    if (!botId) return;
+    void rpc("threads/clearGoal", { botId }).catch((err) => setError(errorText(err)));
   }
 
   async function send() {
@@ -1791,6 +1817,12 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   const afterDeliveredRef = useRef(afterDelivered);
   afterDeliveredRef.current = afterDelivered;
   useEffect(() => subscribeDelivered((attempt) => afterDeliveredRef.current(attempt)), []);
+  useEffect(() => {
+    setGoalNotice(null);
+    return subscribeGoalReply((key, text) => {
+      if (key === threadKey) setGoalNotice(text);
+    });
+  }, [threadKey]);
   useEffect(() => {
     if (snap && (snap.groupId ?? snap.botId) === threadKey) {
       confirmEchoes(
@@ -2753,6 +2785,15 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
               />
             </GlassSurface>
           ) : null}
+          {goalLine ? <GoalLine goal={goalLine} onClear={clearGoal} /> : null}
+          {goalNotice ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ color: tokens.mutedForeground, marginTop: 12, fontSize: 13 }}
+            >
+              {goalNotice}
+            </Text>
+          ) : null}
           {attachmentNotice ? (
             <Text style={{ color: tokens.warning, marginTop: 12, fontSize: 13 }}>
               {attachmentNotice}
@@ -3422,6 +3463,7 @@ const MessageBubble = memo(function MessageBubble({
   onPreviewImage: (target: ImageArtifactPreviewTarget) => void;
   actionProps: MessageActionProps;
 }) {
+  const router = useRouter();
   const colorScheme = useResolvedAppearance();
   const tokens = useAccentedTokens();
   const { t } = useI18n();
@@ -3529,10 +3571,23 @@ const MessageBubble = memo(function MessageBubble({
       </Pressable>
     );
   }
+  const goalBlock = message.blocks.find(
+    (block): block is Extract<MessageBlock, { kind: "goal" }> => block.kind === "goal",
+  );
+  if (goalBlock) return <GoalCard block={goalBlock} />;
   if (
     isCenteredAgentEvent(message.blocks) &&
     message.blocks.every((block) => block.kind === "meta")
   ) {
+    // A server-written link to a Data room item; other paths show as text only.
+    const metaHref = message.blocks.flatMap((block) =>
+      block.kind === "meta" && block.link ? [block.link] : [],
+    )[0];
+    const metaItemId = metaHref?.href.match(/^\/app\/data-room\?item=([^&]+)$/)?.[1];
+    const metaLink =
+      metaHref && metaItemId
+        ? { label: metaHref.label, itemId: decodeURIComponent(metaItemId) }
+        : null;
     return (
       <Pressable
         {...actionProps}
@@ -3540,6 +3595,16 @@ const MessageBubble = memo(function MessageBubble({
       >
         <Text style={{ color: tokens.mutedForeground, fontSize: 13.5, textAlign: "center" }}>
           {message.blocks.map((block) => (block.kind === "meta" ? block.text : "")).join("\n")}
+          {metaLink ? (
+            <Text
+              style={{ textDecorationLine: "underline" }}
+              onPress={() =>
+                router.push({ pathname: "/data-room-item", params: { itemId: metaLink.itemId } })
+              }
+            >
+              {` ${metaLink.label}`}
+            </Text>
+          ) : null}
         </Text>
       </Pressable>
     );
@@ -3563,8 +3628,37 @@ const MessageBubble = memo(function MessageBubble({
   }
   const special = message.blocks.find(
     (block) =>
-      block.kind === "subagent" || block.kind === "child_bot" || block.kind === "cloud_agent",
+      block.kind === "subagent" ||
+      block.kind === "child_bot" ||
+      block.kind === "cloud_agent" ||
+      block.kind === "page",
   );
+  if (special?.kind === "page") {
+    return (
+      <Pressable
+        {...actionProps}
+        onPress={() =>
+          router.push({
+            pathname: "/agent-page",
+            params: { botId: special.botId, pageId: special.pageId },
+          })
+        }
+        style={{
+          width: "90%",
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: tokens.border,
+          backgroundColor: tokens.card,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+        }}
+      >
+        <Text style={{ color: tokens.foreground, fontSize: 15, fontWeight: "600" }}>
+          {special.title}
+        </Text>
+      </Pressable>
+    );
+  }
   if (special?.kind === "subagent") {
     const running = special.status === "running";
     const failed = special.status === "failed";
@@ -3798,22 +3892,31 @@ const MessageBubble = memo(function MessageBubble({
               {askBlock.detail}
             </Text>
           ) : null}
+          {askBlock.status !== "answered" &&
+          askBlock.approvalReason === MAIL_ALREADY_SENT_REASON ? (
+            <Text
+              style={{ color: tokens.warning, marginTop: 8, fontSize: 13.5, fontWeight: "600" }}
+            >
+              {askBlock.approvalReason}
+            </Text>
+          ) : null}
           {askBlock.status === "answered" ? (
             <Text
               {...actionProps}
               style={{
-                color: tokens.success,
+                color: askBlock.mail?.outcome === "failed" ? tokens.destructive : tokens.success,
                 marginTop: 12,
                 fontSize: 13.5,
                 fontWeight: "600",
               }}
             >
-              {formatApprovalAnswer(
-                askBlock.answer,
-                askBlock.actions,
-                isApprovalAskBlock(askBlock),
-                Boolean(askBlock.consent || askBlock.pageSource),
-              )}
+              {mailOutcomeLabel(askBlock.mail) ??
+                formatApprovalAnswer(
+                  askBlock.answer,
+                  askBlock.actions,
+                  isApprovalAskBlock(askBlock),
+                  Boolean(askBlock.consent || askBlock.pageSource),
+                )}
             </Text>
           ) : (canAnswer || askBlock.pageSource) && onAnswer ? (
             <AskActions

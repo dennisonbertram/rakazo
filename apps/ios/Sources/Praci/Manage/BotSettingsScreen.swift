@@ -13,9 +13,11 @@ struct BotSettingsScreen: View {
   @State private var speak = false
   @State private var pinned = false
   @State private var sectionID: String?
+  @State private var proactivity = "medium"
   @State private var busy = false
   @State private var error: String?
   @State private var confirmDiscard = false
+  @State private var access: AgentAccessModel?
 
   var body: some View {
     LoadableView(state: state, retry: { Task { await load() } }, content: { bot in
@@ -32,7 +34,7 @@ struct BotSettingsScreen: View {
     let dirty =
       ManageClient.clean(name) != bot.name || role != bot.title
       || color.caseInsensitiveCompare(bot.color ?? "") != .orderedSame
-      || speak != bot.autoSpeak || pinned != bot.pinned || sectionID != bot.sectionId
+      || speak != bot.autoSpeak || proactivity != bot.proactivity || pinned != bot.pinned || sectionID != bot.sectionId
     return Form {
       Section {
         TextField("Name", text: $name).accessibilityIdentifier("botName")
@@ -48,9 +50,23 @@ struct BotSettingsScreen: View {
           }
         }
       }
+      if !(bot.spawnKey?.hasPrefix("voice-agent") ?? false) {
+        Section {
+          Picker("Proactive", selection: $proactivity) {
+            Text("Low").tag("low")
+            Text("Medium").tag("medium")
+            Text("High").tag("high")
+          }
+          .disabled(bot.restricted)
+          .accessibilityIdentifier("botProactivity")
+        } footer: {
+          if bot.restricted { Text("Not used by firewalled or external agents") }
+        }
+      }
       Section("Voice") {
         Toggle("Read replies aloud", isOn: $speak).accessibilityIdentifier("botSpeak")
       }
+      if let access { AgentAccessSection(model: access) }
       if let error {
         Section {
           Text(error).foregroundStyle(Color.token(.destructive))
@@ -103,8 +119,14 @@ struct BotSettingsScreen: View {
       speak = bot.autoSpeak
       pinned = bot.pinned
       sectionID = bot.sectionId
+      proactivity = bot.proactivity
       state = .loaded(bot)
       sections = (try? await ManageClient.agents(app: app).botSections) ?? []
+      let model = AgentAccessModel(
+        agent: AccessAgent(
+          id: bot.id, name: bot.name, spawnKey: bot.spawnKey, restricted: bot.restricted))
+      access = model
+      await model.load(app)
     } catch {
       state = .failed(error.localizedDescription)
     }
@@ -120,6 +142,7 @@ struct BotSettingsScreen: View {
     if color.caseInsensitiveCompare(bot.color ?? "") != .orderedSame { input.color = color }
     if speak != bot.autoSpeak { input.autoSpeak = speak }
     if pinned != bot.pinned { input.pinned = pinned }
+    if proactivity != bot.proactivity { input.proactivity = proactivity }
     if sectionID != bot.sectionId {
       input.sectionId = sectionID
       input.clearSection = sectionID == nil

@@ -220,9 +220,9 @@ export interface ConnectionAuthProvider {
   complete(
     /** `provider` is the pending Connection's provider, for connectors whose providers need different grants. */
     request: { state: string; code?: string; redirectUrl?: string; provider?: string },
-    /** `scope`: the space-separated scopes the provider granted, when it reports them. */
+    /** `scope`: the space-separated scopes the provider granted, when it reports them. `account`: the signed-in account's address, when it reports one. */
     context: AdapterContext,
-  ): Promise<{ connectionRef: string; secretId?: string; scope?: string }>;
+  ): Promise<{ connectionRef: string; secretId?: string; scope?: string; account?: string }>;
   /** `provider` is the Connection's provider, for connectors that hold several apps per account. */
   revoke(
     connectionRef: string,
@@ -366,6 +366,8 @@ export interface MemoryStore {
   read(request: MemoryReadRequest, context: AdapterContext): Promise<MemorySnapshot>;
   search(request: MemorySearchRequest, context: AdapterContext): Promise<MemorySearchResult[]>;
   commit(request: MemoryCommitRequest, context: AdapterContext): Promise<MemoryRevision>;
+  /** Notes that these documents were loaded into a run. Stores that do not fade memories may omit it. */
+  recordUse?(documentIds: string[], context: AdapterContext): Promise<void>;
   exportMarkdown(
     request: MemoryExportRequest,
     context: AdapterContext,
@@ -827,8 +829,13 @@ export interface MeetingSource {
    * trusting a checkpoint. Throws MeetingSourceError.
    */
   list(filter: { updatedAfter?: Date; createdAfter?: Date; cursor?: string }): Promise<{
-    items: { externalId: string; updatedAt: string; deleted?: boolean }[];
+    items: { externalId: string; updatedAt: string; version?: string; deleted?: boolean }[];
     nextCursor?: string;
   }>;
   get(externalId: string, options: { includeTranscript: boolean }): Promise<SourceMeeting>;
+  /**
+   * False when reading this meeting now would exceed the source's read budget for this run; the
+   * run then stops and the next one continues. Absent: no budget.
+   */
+  canGet?(externalId: string): boolean;
 }

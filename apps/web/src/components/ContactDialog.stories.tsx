@@ -38,10 +38,12 @@ export const New: Story = {};
 export const Editing: Story = { args: { contact, onDeleted: () => {} } };
 /** A holder on the cap table: the one case that says editing does not change Carta. */
 export const OnCapTable: Story = { args: { contact, fromCapTable: true, onDeleted: () => {} } };
-/** Stage, check size and next step show for kind prospect only. */
+/** A prospect's dialog edits the person only; status, next step and amount are edited on the row. */
 export const Prospect: Story = { args: { contact: prospect, onDeleted: () => {} } };
 export const NewProspect: Story = {
-  args: { prefill: { name: "", email: null, organization: null, kind: "prospect" } },
+  args: {
+    prefill: { name: "", email: null, organization: null, kind: "prospect" },
+  },
 };
 export const PrefilledFromHolder: Story = {
   args: { prefill: { name: "Bo Sample", email: "bo@example.test", organization: null } },

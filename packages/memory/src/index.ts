@@ -10,7 +10,7 @@ import type {
   MemoryStore,
   PortableFile,
 } from "@rakazo/adapter-kit";
-import { MEMORY_REVISION_CONFLICT_ERROR } from "@rakazo/adapter-kit";
+import { MEMORY_REVISION_CONFLICT_ERROR, memoryStrength } from "@rakazo/adapter-kit";
 import type { PrismaClient } from "@rakazo/db";
 import { Prisma, withTransactionRetry } from "@rakazo/db";
 
@@ -44,8 +44,20 @@ export class MarkdownMemoryStore implements MemoryStore {
         content: doc.content,
         revision: doc.revision,
         updatedAt: doc.updatedAt.toISOString(),
+        kind: doc.kind,
+        useCount: doc.useCount,
+        lastUsedAt: doc.lastUsedAt?.toISOString(),
+        pinned: doc.pinned,
       })),
     };
+  }
+
+  async recordUse(documentIds: string[], context: AdapterContext): Promise<void> {
+    if (documentIds.length === 0) return;
+    await this.prisma.memoryDocument.updateMany({
+      where: { id: { in: documentIds }, spaceId: context.spaceId, userId: context.userId },
+      data: { useCount: { increment: 1 }, lastUsedAt: new Date() },
+    });
   }
 
   async search(
@@ -56,18 +68,21 @@ export class MarkdownMemoryStore implements MemoryStore {
       where: {
         spaceId: context.spaceId,
         userId: context.userId,
-        ...(request.scope === "all" ? {} : { scope: request.scope }),
+        scope: request.scope === "all" ? { in: ["bot", "user"] } : request.scope,
         ...(request.botId ? { botId: request.botId } : {}),
       },
     });
     const q = request.query.toLowerCase();
+    // Search never hides a faded memory; it only ranks it lower (match is 1, so score = strength).
+    const now = new Date();
     return documents
       .filter((doc) => doc.content.toLowerCase().includes(q) || doc.path.toLowerCase().includes(q))
       .map((doc) => ({
         path: doc.path,
         snippet: snippet(doc.content, q),
-        score: 1,
-      }));
+        score: memoryStrength(doc, now),
+      }))
+      .sort((a, b) => b.score - a.score);
   }
 
   async commit(request: MemoryCommitRequest, context: AdapterContext): Promise<MemoryRevision> {
@@ -92,7 +107,12 @@ export class MarkdownMemoryStore implements MemoryStore {
           const doc = existing
             ? await tx.memoryDocument.update({
                 where: { id: existing.id },
-                data: { content: request.content, revision: existing.revision + 1 },
+                data: {
+                  content: request.content,
+                  revision: existing.revision + 1,
+                  ...(request.kind ? { kind: request.kind } : {}),
+                  ...(request.byOwner ? { pinned: true } : {}),
+                },
               })
             : await tx.memoryDocument.create({
                 data: {
@@ -102,6 +122,8 @@ export class MarkdownMemoryStore implements MemoryStore {
                   scope: request.scope,
                   path: request.path,
                   content: request.content,
+                  ...(request.kind ? { kind: request.kind } : {}),
+                  ...(request.byOwner ? { pinned: true } : {}),
                 },
               });
           await tx.memoryRevision.create({

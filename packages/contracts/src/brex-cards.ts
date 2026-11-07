@@ -20,6 +20,7 @@ export const BREX_CARDS_READ_TOOLS = [
   "list_spend_limits",
   "get_spend_limit",
   "list_expenses",
+  "list_reimbursements",
   "list_card_transactions",
   "list_trips",
   "list_cash_accounts",

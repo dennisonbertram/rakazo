@@ -16,11 +16,14 @@ vi.mock("@lingui/react/macro", () => ({
 }));
 vi.mock("@lingui/core/macro", () => ({
   t: (parts: TemplateStringsArray) => parts.join(""),
+  plural: (n: number, forms: { one: string; other: string }) =>
+    (n === 1 ? forms.one : forms.other).replace("#", String(n)),
 }));
 vi.mock("../../lib/omi/useOmiSync", () => ({
   useOmiSync: () => ({ state: { kind: "idle" }, sync: () => undefined }),
 }));
 const rpc = vi.hoisted(() => ({
+  omiCloud: { status: vi.fn(async (..._args: unknown[]): Promise<unknown> => null) },
   omi: {
     status: vi.fn(),
     deleteRecordings: vi.fn(),
@@ -38,6 +41,7 @@ import { OmiPage } from "./OmiPage";
 
 let container: HTMLDivElement | undefined;
 afterEach(() => {
+  vi.useRealTimers();
   container?.remove();
   vi.clearAllMocks();
 });
@@ -106,4 +110,74 @@ it("clears Today after Delete all recordings without a reload", async () => {
   await act(async () => confirm?.click());
   expect(rpc.omi.deleteRecordings).toHaveBeenCalled();
   expect(view.textContent).not.toContain("Idea for onboarding email");
+});
+
+it("asks again every 10 seconds while the key card says Syncing, and stops once it has synced", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  const cloud = {
+    connectionId: "cc1",
+    status: "connected",
+    syncedThrough: null,
+    lastSyncedAt: null,
+    syncedCount: 0,
+    agentBotId: null,
+  };
+  rpc.omi.status.mockResolvedValue(null);
+  rpc.dataRoom.items.list.mockResolvedValue({ items: [], nextCursor: null });
+  rpc.omiCloud.status.mockResolvedValue(cloud);
+  const view = await render();
+  expect(view.textContent).toContain("Syncing");
+  const calls = rpc.omiCloud.status.mock.calls.length;
+  rpc.omiCloud.status.mockResolvedValue({
+    ...cloud,
+    syncedThrough: "2026-11-06T10:00:00Z",
+    syncedCount: 2,
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10_000);
+  });
+  expect(rpc.omiCloud.status.mock.calls.length).toBe(calls + 1);
+  expect(view.textContent).toContain("Synced 2 meetings");
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(30_000);
+  });
+  expect(rpc.omiCloud.status.mock.calls.length).toBe(calls + 1);
+});
+
+it("keeps one status request in flight and aborts it when the page goes away", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  rpc.omi.status.mockResolvedValue(null);
+  rpc.dataRoom.items.list.mockResolvedValue({ items: [], nextCursor: null });
+  const syncing = {
+    connectionId: "cc1",
+    status: "connected",
+    syncedThrough: null,
+    lastSyncedAt: null,
+    syncedCount: 0,
+    agentBotId: null,
+  };
+  // The mount load answers; every poll after it hangs.
+  rpc.omiCloud.status
+    .mockResolvedValueOnce(syncing)
+    .mockImplementation(() => new Promise(() => {}));
+  container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(
+      <MemoryRouter>
+        <OmiPage data={{ bots: [] } as unknown as IntegrationsData} />
+      </MemoryRouter>,
+    );
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(40_000);
+  });
+  // The mount load plus one poll; the hanging poll blocks the next ticks.
+  expect(rpc.omiCloud.status).toHaveBeenCalledTimes(2);
+  const options = rpc.omiCloud.status.mock.calls[1]?.[1] as { signal: AbortSignal } | undefined;
+  const signal = options?.signal as AbortSignal;
+  expect(signal.aborted).toBe(false);
+  await act(async () => root.unmount());
+  expect(signal.aborted).toBe(true);
 });

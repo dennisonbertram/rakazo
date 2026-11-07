@@ -150,7 +150,14 @@ export function ConnectAppDialog({
         provider: item.slug,
         displayName:
           accountName ??
-          nextAccountLabel(item.name, rows.filter((entry) => entry.status === "connected").length),
+          // Gmail accounts are told apart by address (the mail tools take it); Calendar and Drive
+          // tools only know the name, so those keep their number.
+          (item.connectorId === "google" && item.slug === "gmail"
+            ? item.name
+            : nextAccountLabel(
+                item.name,
+                rows.filter((entry) => entry.status === "connected").length,
+              )),
         ...(viaSystemBrowser ? { redirect: "desktop" as const } : {}),
         ...(replacesConnectionId ? { replacesConnectionId } : {}),
         ...(permission ? { permission } : {}),
@@ -213,11 +220,11 @@ export function ConnectAppDialog({
     if (finished.current) onConnected?.();
   }
 
-  async function saveAccess(botIds: string[]) {
+  async function saveAccess(botIds: string[], skipped = false) {
     if (!row) return;
     setSaving(true);
     setAccessError(null);
-    const all = botIds.length === data.bots.length;
+    const all = botIds.length > 0 && botIds.length === data.bots.length;
     try {
       await rpc.connections.setAccess({
         connectionId: row.id,
@@ -225,7 +232,10 @@ export function ConnectAppDialog({
         botIds: all ? [] : botIds,
       });
       void refresh();
-      setPhase({ kind: "done", agents: all ? "all" : botIds.length > 0 ? "some" : "none" });
+      setPhase({
+        kind: "done",
+        agents: skipped ? "skipped" : all ? "all" : botIds.length > 0 ? "some" : "none",
+      });
     } catch (err) {
       setAccessError(errorText(err, t`Could not save bot access`));
     } finally {
@@ -286,7 +296,8 @@ export function ConnectAppDialog({
             busy={saving}
             error={accessError}
             onContinue={(ids) => void saveAccess(ids)}
-            onSkip={() => setPhase({ kind: "done", agents: "skipped" })}
+            // Skip still saves least access: the database default would share it with every bot.
+            onSkip={() => void saveAccess([], true)}
           />
         ) : (
           <div>

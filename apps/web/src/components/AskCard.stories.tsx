@@ -1,7 +1,9 @@
+import { MEETING_MARK_REASON } from "@rakazo/contracts";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { userEvent, within } from "storybook/test";
 import type { AskBlock } from "./AskCard";
 import { AskCard } from "./AskCard";
+import { BotToolControlsContext } from "./BotToolControls";
 
 const ask = (overrides: Partial<AskBlock> = {}): AskBlock => ({
   kind: "ask",
@@ -17,9 +19,9 @@ const approvalActions = [
 
 const consentAsk = (overrides: Partial<AskBlock> = {}): AskBlock =>
   ask({
-    text: "Share your chats and mail with the AI model that runs your bots?",
+    text: "Let Muse Wonder (OpenRouter) see this agent's chats and mail?",
     detail:
-      "Messages, chat history, bot instructions, memories, attachments, screenshots and connected-app content are sent to run your bots, including routines. This stays on until you turn it off in Settings under Privacy and approvals.",
+      "This agent uses a model you haven't allowed yet. Models you already allowed are unaffected. Messages, chat history, bot instructions, memories, attachments, screenshots and connected-app content are sent to run your bots, including routines. This stays on until you turn it off in Settings under Privacy and approvals.",
     approvalEffectId: "effect_demo",
     consent: { version: "2026-09-14" },
     actions: [
@@ -109,6 +111,38 @@ export const ConnectorToolApproval: Story = {
   },
 };
 
+/** An agent asks for a capability the owner switched off. The Firewall line is added for a Firewall agent. */
+export const RequestAccess: Story = {
+  args: {
+    block: ask({
+      text: "Scout asks to see, add and edit your contacts",
+      detail: "Agent's reason: Save the three leads from this thread.",
+      approvalEffectId: "effect_access",
+      actions: [
+        { id: "allow", label: "Allow for this run" },
+        { id: "always", label: "Always for this agent" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
+export const RequestAccessFirewall: Story = {
+  args: {
+    block: ask({
+      text: "Scout asks to see, add and edit your contacts",
+      detail:
+        "Agent's reason: Save the three leads from this thread.\nFirewall is on, so each use will still ask you.",
+      approvalEffectId: "effect_access",
+      actions: [
+        { id: "allow", label: "Allow for this run" },
+        { id: "always", label: "Always for this agent" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
 export const Answered: Story = { args: { block: ask({ status: "answered", answer: "approved" }) } };
 
 export const NoLongerActive: Story = { args: { canAnswer: false } };
@@ -174,6 +208,36 @@ export const ApprovalWithReason: Story = {
   },
 };
 
+export const ApprovalMeetingMark: Story = {
+  args: {
+    block: ask({
+      text: "Allow the bot to send this email?",
+      approvalEffectId: "effect_demo",
+      approvalReason: MEETING_MARK_REASON,
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+  decorators: [
+    (Story) => (
+      <BotToolControlsContext.Provider
+        value={{
+          editableBotName: () => undefined,
+          disableTool: async () => undefined,
+          canSend: () => false,
+          sendDraft: async () => undefined,
+          openComposer: () => undefined,
+          clearConversation: () => undefined,
+        }}
+      >
+        <Story />
+      </BotToolControlsContext.Provider>
+    ),
+  ],
+};
+
 /** A connected-app tool: friendly title, with the exact tool id behind the chevron. */
 export const ApprovalWithToolId: Story = {
   args: {
@@ -184,6 +248,43 @@ export const ApprovalWithToolId: Story = {
       actions: [
         { id: "allow", label: "Allow once" },
         { id: "always", label: "Always allow this tool" },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
+/** A fetch to a site the run was not given: allow once, this site, or every site for this agent. */
+export const NewSiteWithAllSites: Story = {
+  args: {
+    block: ask({
+      text: "Review before Web fetch",
+      approvalEffectId: "effect_demo",
+      site: "npmjs.com",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always", label: "Always allow npmjs.com" },
+        {
+          id: "always_bot_sites",
+          label:
+            "Allow all sites for this agent (it can read Drive, calendar, Data room, contacts and records)",
+        },
+        { id: "deny", label: "Deny" },
+      ],
+    }),
+  },
+};
+
+/** A background routine card: allow once, or always for this routine only. */
+export const RoutineCardWithAlways: Story = {
+  args: {
+    block: ask({
+      text: "Review before Write file",
+      approvalEffectId: "effect_demo",
+      approvalReason: "Asked because this ran in the background.",
+      actions: [
+        { id: "allow", label: "Allow once" },
+        { id: "always_routine", label: "Always for this routine" },
         { id: "deny", label: "Deny" },
       ],
     }),

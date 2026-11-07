@@ -121,9 +121,22 @@ export function McpDetail({
       await data.refresh();
     } catch (err) {
       setError(errorText(err, fallback));
+      // Some grants may have landed before the failure: show what the server has.
+      try {
+        await data.refresh();
+      } catch {
+        // The error above is already shown.
+      }
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Runs every call to the end, so none lands after the controls re-enable, then reports the first failure. */
+  async function settleAll(calls: Promise<unknown>[]) {
+    const results = await Promise.allSettled(calls);
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed) throw failed.reason;
   }
 
   const rename = () =>
@@ -133,33 +146,8 @@ export function McpDetail({
       if (name && name !== server.name) await rpc.mcp.servers.rename({ id: server.id, name });
     }, t`Could not rename`);
 
-  const assign = async (botId: string, on: boolean) => {
-    // replace() overwrites the bot's whole list, so start from what it already has.
-    const current = await rpc.mcp.assignments.list({ botId });
-    const others = current
-      .filter((entry) => entry.serverId !== server.id)
-      .map(({ serverId: id, allowAllTools, allowedTools }) => ({
-        serverId: id,
-        allowAllTools,
-        allowedTools,
-      }));
-    const kept = current.find((entry) => entry.serverId === server.id);
-    await rpc.mcp.assignments.replace({
-      botId,
-      assignments: on
-        ? [
-            ...others,
-            kept
-              ? {
-                  serverId: server.id,
-                  allowAllTools: kept.allowAllTools,
-                  allowedTools: kept.allowedTools,
-                }
-              : { serverId: server.id, allowAllTools: true, allowedTools: [] },
-          ]
-        : others,
-    });
-  };
+  const assign = (botId: string, on: boolean) =>
+    rpc.mcp.servers.setAgentAssignment({ serverId: server.id, botId, on }).then(() => undefined);
   const toggle = (botId: string, on: boolean) =>
     run(() => assign(botId, on), t`Could not update bot access`);
 
@@ -169,11 +157,8 @@ export function McpDetail({
       const exclusive = (value: boolean) =>
         rpc.integrationAgents.setExclusive({ serverId: server.id, exclusive: value });
       if (shared) {
-        // Exclusivity must be off first: the server refuses to grant an exclusive server to other agents.
+        // Other agents start off; the owner turns on the ones they want.
         await exclusive(false);
-        await Promise.all(
-          data.bots.filter((bot) => !assigned(bot.id)).map((bot) => assign(bot.id, true)),
-        );
         return;
       }
       await exclusive(true);
@@ -205,8 +190,18 @@ export function McpDetail({
           () => rpc.mcp.servers.setWrites({ id: server.id, enabled: false }).then(() => undefined),
           t`Could not update changes`,
         );
+  /** All: every agent gets the server. None: only the owning agent keeps it. */
+  const setAllAgents = (on: boolean) =>
+    run(async () => {
+      const targets = data.bots.filter(
+        (bot) => bot.id !== server.agentBotId && assigned(bot.id) !== on,
+      );
+      await settleAll(targets.map((bot) => assign(bot.id, on)));
+    }, t`Could not update bot access`);
   const usedBy = (
     <AgentToggleList
+      key={server.id}
+      ready={data.loaded}
       bots={[...data.bots].sort(
         (a, b) => Number(b.id === server.agentBotId) - Number(a.id === server.agentBotId),
       )}
@@ -214,6 +209,9 @@ export function McpDetail({
       disabled={busy}
       isOn={assigned}
       onToggle={(botId, on) => void toggle(botId, on)}
+      onSetAll={(on) => void setAllAgents(on)}
+      ownerBotId={server.agentBotId}
+      subject="connection"
     />
   );
   return (
@@ -391,7 +389,7 @@ export function McpDetail({
         {hasAgent || bank ? null : (
           <>
             <Heading>
-              <Trans>Used by</Trans>
+              <Trans>Access</Trans>
             </Heading>
             {usedBy}
           </>

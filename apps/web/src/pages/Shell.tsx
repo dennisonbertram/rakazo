@@ -32,6 +32,7 @@ import {
   isIntegrationAgentSpawnKey,
   isMailThreadAgentSpawnKey,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
+  NEW_PAGE_INSTRUCTIONS,
   RunPhaseSchema,
   WatchSpecSchema,
 } from "@rakazo/contracts";
@@ -43,7 +44,6 @@ import {
   DEFAULT_BOT_COLOR,
   inferAttachmentMimeType,
   isActive,
-  isApprovalAskBlock,
   isRunTerminalEvent,
   latestAnswerableAskMessageId,
   matchesArtifactQuery,
@@ -144,6 +144,7 @@ import { CallCard } from "../components/call/CallCard";
 import { ComputerWorkspace } from "../components/computer/ComputerWorkspace";
 import type { SendTarget } from "../components/data-room/SendToAgent";
 import { ErrorBoundary, lazyOverlay, SectionLoadFailed } from "../components/ErrorBoundary";
+import { InstructionsUpgradeNotice } from "../components/InstructionsUpgradeNotice";
 import { AgentAvatar } from "../components/integrations/AgentAvatar";
 import { DevinConnectDialog } from "../components/integrations/DevinConnectDialog";
 import { RecordingPillHost } from "../components/meeting-capture/RecordingPillHost";
@@ -236,17 +237,18 @@ import {
   rightPanelStorageKey,
   writeRightPanelState,
 } from "../lib/right-panel-state";
-import {
-  needsAnswerLabel,
-  rosterStatusChanged,
-  waitingForApprovalLabel,
-} from "../lib/roster-status";
+import { rosterStatusChanged, waitingForApprovalLabel } from "../lib/roster-status";
 import type { MissingBotSeen } from "../lib/route-bot";
 import { resolveRouteBot, shouldClearMissingBot, useGiveUpOnMissingBot } from "../lib/route-bot";
 import { rpc, selectedSpaceId, selectSpace } from "../lib/rpc";
 import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-storage";
 import type { DataRoomRef } from "../lib/send-to-agent";
-import { planSendToAgent, sendTargets } from "../lib/send-to-agent";
+import {
+  acceptAttachments,
+  fetchMessageFiles,
+  planSendToAgent,
+  sendTargets,
+} from "../lib/send-to-agent";
 import { sharedInflight } from "../lib/shared-inflight";
 import {
   PANEL_DOCKED_QUERY,
@@ -256,6 +258,7 @@ import {
   useDrawerFocus,
   useSidebarDocked,
 } from "../lib/shell-layout";
+import { SIDEBAR_PAGES_CHANGED_EVENT } from "../lib/sidebar-pages-event";
 import { rememberThread } from "../lib/thread-cache";
 import {
   activeThreadRuns,
@@ -342,6 +345,7 @@ import {
   RenameSpaceDialog,
 } from "./shell/dialogs";
 import { GroupIntro } from "./shell/GroupIntro";
+import { GoalLine, GoalNotice, isGoalReply, snapshotWithGoal } from "./shell/goal";
 import { TOP_BAR_HEIGHT } from "./shell/sidebar-header-row";
 import {
   activeSpaceFirst,
@@ -403,8 +407,6 @@ const MOBILE_SIDEBAR_SWIPE_DISTANCE_PX = 56;
 const wideScreen = () => window.matchMedia(PANEL_DOCKED_QUERY).matches;
 /** How long "Sent to <group> · Open" stays under the composer after an @group message. */
 const FORWARDED_NOTICE_MS = 8000;
-const NEW_PAGE_INSTRUCTIONS =
-  "You build and keep this page. Ask the user what the page should show, then name yourself after the page with update_bot and write it with page_write: lead with what matters, use charts and tables where they help, and keep it current when asked. Keep chat replies short and put the substance on the page.";
 
 function threadSnapshotSignal(parent: AbortSignal): AbortSignal {
   return AbortSignal.any([parent, AbortSignal.timeout(THREAD_SNAPSHOT_TIMEOUT_MS)]);
@@ -752,6 +754,8 @@ export function ShellPage() {
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // The server's answer to a bare /goal or /goal clear: a status line, not a failure.
+  const [goalNotice, setGoalNotice] = useState<string | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   // A message that @mentioned a group went to that group; the person stays where they wrote it.
   const [forwarded, setForwarded] = useState<{ groupId: string; threadKey: string } | null>(null);
@@ -1968,6 +1972,9 @@ export function ShellPage() {
           setPageDataRemote({ pageId, seq: event.seq });
         }
         if (event.type === "pins.updated") setPinsSeq(event.seq);
+        if (event.type === "thread.goal.updated") {
+          updateSnapshot((prev) => snapshotWithGoal(prev, event.payload));
+        }
         if (event.type === "thread.cleared") {
           expandedHistoryThread.current = null;
           pinnedAroundRef.current = null;
@@ -2004,6 +2011,10 @@ export function ShellPage() {
           const blocks = (event.payload.blocks as Array<{ kind?: string }>) ?? [];
           if (blocks.some((block) => block.kind === "child_bot")) {
             void refreshBots().catch(() => undefined);
+          }
+          // An agent-created page is already in the sidebar; the card's message tells it to re-list.
+          if (blocks.some((block) => block.kind === "page")) {
+            window.dispatchEvent(new Event(SIDEBAR_PAGES_CHANGED_EVENT));
           }
         }
         if (
@@ -2770,13 +2781,6 @@ export function ShellPage() {
     () => ownerOnlyCredentialAskMessageIds(activeSnapshot, userId),
     [activeSnapshot, userId],
   );
-  const waitingOnApproval = Boolean(
-    activeSnapshot?.delegatePending?.length ||
-      (answerableAskMessageId &&
-        activeSnapshot?.messages
-          .find((message) => message.id === answerableAskMessageId)
-          ?.blocks.some((block) => block.kind === "ask" && isApprovalAskBlock(block))),
-  );
   const workingRuns = currentRuns.filter((run) =>
     ["running", "queued", "leased"].includes(run.status),
   );
@@ -3129,6 +3133,13 @@ export function ShellPage() {
           setComposerDraft(recovered.draft);
         });
       },
+      clearConversation: () => {
+        const groupId = activeGroupId.current;
+        const group = groupId ? groupsRef.current.find((item) => item.id === groupId) : undefined;
+        const bot = botsRef.current.find((item) => item.id === activeBotId.current);
+        if (group) setClearTarget({ kind: "group", chat: group });
+        else if (bot) setClearTarget({ kind: "bot", chat: bot });
+      },
       editableBotName: (botId) => botsRef.current.find((bot) => bot.id === botId)?.name,
       canSend: (botId) => {
         const bot = botsRef.current.find((item) => item.id === botId);
@@ -3190,45 +3201,53 @@ export function ShellPage() {
     { botId: inGroup ? undefined : active?.id, groupId },
     useCallback((error: unknown) => setSendError(errorText(error, t`Could not remember`)), [t]),
   );
+  const pendingAttachmentsRef = useRef(pendingAttachments);
+  pendingAttachmentsRef.current = pendingAttachments;
   const onAttachmentPick = useCallback(
-    (files: ArrayLike<File> | null, targetThreadKey?: string) => {
+    (files: ArrayLike<File> | null, targetThreadKey?: string, priorSkipped: string[] = []) => {
       const threadKey = targetThreadKey ?? activeGroupId.current ?? activeBotId.current;
-      if (!threadKey || !files?.length) return false;
-      const existing = attachmentsForThread(pendingAttachments, threadKey);
-      const next: PendingAttachment[] = [];
-      const skipped: string[] = [];
-      for (const file of Array.from(files)) {
-        if (existing.length + next.length >= ATTACHMENT_MAX_COUNT) {
-          skipped.push(t`${file.name} (max ${ATTACHMENT_MAX_COUNT} attachments)`);
-          continue;
-        }
-        if (file.size > ATTACHMENT_MAX_BYTES) {
-          skipped.push(t`${file.name} (over 10 MB)`);
-          continue;
-        }
-        const mimeType = inferAttachmentMimeType(file.name, file.type);
-        if (!mimeType) {
-          skipped.push(file.name);
-          continue;
-        }
-        next.push({
-          id: `${file.name}-${file.size}-${file.lastModified}-${next.length}`,
-          threadKey,
-          file,
-          previewUrl: mimeType.startsWith("image/") ? URL.createObjectURL(file) : undefined,
-        });
-      }
+      if (!threadKey || (!files?.length && !priorSkipped.length)) return false;
+      // Read the attachments as they are now: a forward finishes long after it started.
+      const existing = attachmentsForThread(pendingAttachmentsRef.current, threadKey);
+      const { accepted, skipped } = acceptAttachments(existing.length, files ?? [], {
+        count: (name) => t`${name} (max ${ATTACHMENT_MAX_COUNT} attachments)`,
+        size: (name) => t`${name} (over 10 MB)`,
+      });
+      const next: PendingAttachment[] = accepted.map((file, index) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+        threadKey,
+        file,
+        previewUrl: inferAttachmentMimeType(file.name, file.type)?.startsWith("image/")
+          ? URL.createObjectURL(file)
+          : undefined,
+      }));
       if (next.length) setPendingAttachments((current) => [...current, ...next]);
-      setAttachmentNotice(skipped.length ? t`Skipped ${skipped.join(", ")}` : null);
+      const notSent = [...priorSkipped, ...skipped];
+      setAttachmentNotice(notSent.length ? t`Skipped ${notSent.join(", ")}` : null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return next.length > 0;
     },
-    [pendingAttachments, t],
+    [t],
   );
   const removeAttachment = useCallback((attachment: PendingAttachment) => {
     revokePendingAttachmentPreviews([attachment]);
     setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id));
   }, []);
+  // The stored file is fetched through the same scoped artifact read the Download button uses,
+  // then attached to the other agent's composer as the owner's own upload.
+  const sendMessageFilesToAgent = useCallback(
+    async (message: ThreadMessage, agent: SendTarget) => {
+      const bot = botsRef.current.find((candidate) => candidate.id === agent.id);
+      if (!bot) return;
+      // Read the files first and stay in this chat: opening the other one early would let the
+      // owner send before the files arrive.
+      const { files, failed } = await fetchMessageFiles(transcriptArtifactTarget, message.blocks);
+      keepNoticeFor.current = bot.id;
+      navigate(`/app/${bot.id}`);
+      onAttachmentPick(files, bot.id, failed);
+    },
+    [navigate, onAttachmentPick, transcriptArtifactTarget],
+  );
   const sendFilesToAgent = useCallback(
     async (items: DataRoomApiItem[], agent: SendTarget) => {
       const bot = botsRef.current.find((candidate) => candidate.id === agent.id);
@@ -3292,6 +3311,7 @@ export function ShellPage() {
       sendingRef.current = true;
       setSending(true);
       setSendError(null);
+      setGoalNotice(null);
       setForwarded(null);
       // Keep the draft cleared once any part of the submission is confirmed accepted.
       let accepted = false;
@@ -3399,6 +3419,12 @@ export function ShellPage() {
         return true;
       } catch (error) {
         sentHere.current = false;
+        if (isGoalReply(error)) {
+          if (botTarget && activeBotId.current === botTarget) {
+            setGoalNotice(errorText(error, t`Failed to send message`));
+          }
+          return true;
+        }
         if (reroutedToGroup && groupTarget) {
           setSendError(errorText(error, t`Failed to send message`));
         } else if (groupTarget && activeGroupId.current === groupTarget) {
@@ -4227,6 +4253,7 @@ export function ShellPage() {
     if (keepNoticeFor.current === threadKey) keepNoticeFor.current = null;
     else setAttachmentNotice(null);
     setSendError(null);
+    setGoalNotice(null);
   }, [active?.id, clearReply, groupId, inGroup]);
 
   useEffect(() => {
@@ -4452,6 +4479,15 @@ export function ShellPage() {
   }, [active?.id, focusComposerBotId, sendMessage, t]);
   const threadView = (
     <>
+      {active && !inGroup ? (
+        <InstructionsUpgradeNotice
+          botId={active.id}
+          instructions={active.instructions}
+          onUpgraded={(updated) =>
+            setBots((current) => current.map((bot) => (bot.id === updated.id ? updated : bot)))
+          }
+        />
+      ) : null}
       {cartaAgentPage ? (
         <div className="shrink-0 px-4 pt-2 md:px-7">
           <Link
@@ -4568,6 +4604,8 @@ export function ShellPage() {
                   setReplyQuote(null);
                 }}
                 onMarkUnread={markMessageUnread}
+                sendTargets={sendToAgentTargets}
+                onSendFiles={(message, agent) => void sendMessageFilesToAgent(message, agent)}
                 onQuote={(message, quote) => {
                   setReplyTarget(message);
                   setReplyQuote(quote);
@@ -4615,6 +4653,7 @@ export function ShellPage() {
                   html: "",
                   text: composerDraft.body,
                 },
+                ...(composerDraft.replyToId ? { replyToId: composerDraft.replyToId } : {}),
                 forwarded: [],
                 files: [],
                 saved: false,
@@ -4703,11 +4742,7 @@ export function ShellPage() {
               attachmentNotice={attachmentNotice}
               onDismissAttachmentNotice={() => setAttachmentNotice(null)}
               placeholder={
-                activeSnapshot?.delegatePending?.length
-                  ? waitingForApprovalLabel()
-                  : waitingOnApproval
-                    ? needsAnswerLabel()
-                    : undefined
+                activeSnapshot?.delegatePending?.length ? waitingForApprovalLabel() : undefined
               }
               sendError={sendError}
               runError={displayedRunError}
@@ -4754,6 +4789,32 @@ export function ShellPage() {
               }}
               agentSkills={agentSkills}
               onSlashOpen={refreshAgentSkills}
+              goalSlot={
+                <>
+                  {!inGroup && active && activeSnapshot?.goal ? (
+                    <GoalLine
+                      goal={activeSnapshot.goal}
+                      waiting={(activeSnapshot.activeRuns ?? [activeSnapshot.run]).some(
+                        (run) => run?.status === "waiting_input",
+                      )}
+                      onClear={() => {
+                        const botId = active.id;
+                        void rpc.threads
+                          .clearGoal({ botId })
+                          .then(() =>
+                            updateSnapshot((prev) => snapshotWithGoal(prev, { goal: null })),
+                          )
+                          .catch((error: unknown) =>
+                            setSendError(errorText(error, t`Could not clear the goal`)),
+                          );
+                      }}
+                    />
+                  ) : null}
+                  {goalNotice ? (
+                    <GoalNotice message={goalNotice} onDismiss={() => setGoalNotice(null)} />
+                  ) : null}
+                </>
+              }
               sentHistory={sentHistory}
               onSlashAction={(action) => {
                 if (action === "chat-settings") {

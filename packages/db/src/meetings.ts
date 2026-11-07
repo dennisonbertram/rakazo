@@ -2,6 +2,7 @@ import type { SourceMeeting } from "@rakazo/contracts";
 import { formatMeetingTranscript } from "@rakazo/contracts";
 import type { PrismaClient } from "./client.js";
 import { Prisma } from "./client.js";
+import { deleteMeetingRecordings } from "./omi-outputs.js";
 import { IsolationError } from "./scope.js";
 
 type Scope = { spaceId: string; userId: string };
@@ -33,6 +34,7 @@ export async function upsertMeeting(
   source: MeetingSourceRef | null,
   provider: string,
   meeting: SourceMeeting,
+  options: { onRecordingBlobs?: (keys: string[]) => Promise<void> } = {},
 ): Promise<UpsertMeetingResult> {
   const owner = ownerOf(scope);
   const columns = sourceColumns(source);
@@ -50,6 +52,7 @@ export async function upsertMeeting(
     summary: meeting.summary,
     privateNotes: meeting.privateNotes,
     sourceUpdatedAt,
+    ...(meeting.version !== undefined ? { sourceVersion: meeting.version } : {}),
     deletedAt: meeting.deleted ? new Date() : null,
     // A listing-only update has no transcript; keep the one already stored.
     ...(meeting.transcript
@@ -59,7 +62,8 @@ export async function upsertMeeting(
   // Inside a caller's transaction (a capture being finalized) it joins that one.
   const inTransaction = (fn: (tx: Prisma.TransactionClient) => Promise<UpsertMeetingResult>) =>
     "$transaction" in prisma ? prisma.$transaction(fn) : fn(prisma);
-  return inTransaction(async (tx) => {
+  const dropped: string[] = [];
+  const result = await inTransaction(async (tx) => {
     await lockMeeting(tx, key);
     if (
       await tx.meetingTombstone.findUnique({ where: { spaceId_userId_provider_externalId: key } })
@@ -76,11 +80,23 @@ export async function upsertMeeting(
     }
     // The write itself is conditional, so an older update never wins even without the lock.
     const { count } = await tx.meeting.updateMany({
-      where: { ...key, sourceUpdatedAt: { lt: sourceUpdatedAt } },
+      // A versioned source updates when the version differs; the others when the date is newer.
+      where:
+        meeting.version !== undefined
+          ? {
+              ...key,
+              OR: [{ sourceVersion: null }, { sourceVersion: { not: meeting.version } }],
+            }
+          : { ...key, sourceUpdatedAt: { lt: sourceUpdatedAt } },
       data,
     });
+    // A source-side deletion takes the meeting's Recordings note with it.
+    if (count && meeting.deleted)
+      dropped.push(...(await deleteMeetingRecordings(tx, owner, [existing.id])));
     return count ? "updated" : "stale";
   });
+  if (dropped.length) await options.onRecordingBlobs?.(dropped);
+  return result;
 }
 
 /** Serializes writers of one meeting (upsert vs delete) until the transaction ends. */
@@ -154,7 +170,11 @@ export function getMeeting(prisma: PrismaClient, scope: Scope, id: string) {
  * The user deletes a meeting: it, its Inbox to-dos and a tombstone (so sync does not bring it
  * back) change together.
  */
-export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: string) {
+export async function deleteMeeting(
+  prisma: PrismaClient,
+  scope: Scope,
+  id: string,
+): Promise<string[]> {
   const owner = ownerOf(scope);
   const found = await prisma.meeting.findFirst({
     where: { id, ...owner },
@@ -162,7 +182,7 @@ export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: stri
   });
   if (!found) throw new IsolationError();
   const key = { ...owner, provider: found.provider, externalId: found.externalId };
-  await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     await lockMeeting(tx, key);
     const locked = await tx.$queryRaw<{ id: string }[]>(
       Prisma.sql`SELECT "id" FROM "meetings" WHERE "id" = ${id} AND "spaceId" = ${owner.spaceId} AND "userId" = ${owner.userId} FOR UPDATE`,
@@ -175,6 +195,7 @@ export async function deleteMeeting(prisma: PrismaClient, scope: Scope, id: stri
       update: {},
     });
     await tx.meeting.delete({ where: { id } });
+    return deleteMeetingRecordings(tx, owner, [id]);
   });
 }
 
@@ -226,4 +247,17 @@ export async function upsertMeetingSyncState(
       provider,
     },
   });
+}
+
+/** Two recordings of one call overlap by at least this share of the shorter one. */
+const DUPLICATE_SHARE = 0.5;
+
+/** Whether two time spans cover the same call: the overlap is at least half of the shorter span. */
+export function isDuplicateSpan(
+  a: { start: number; end: number },
+  b: { start: number; end: number },
+): boolean {
+  const overlap = Math.min(a.end, b.end) - Math.max(a.start, b.start);
+  const shorter = Math.min(a.end - a.start, b.end - b.start);
+  return shorter > 0 && overlap >= shorter * DUPLICATE_SHARE;
 }

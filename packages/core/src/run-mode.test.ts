@@ -2,7 +2,7 @@ import { RUN_TRIGGERS } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import { chainedRunMode, newRunExternalTaint, newRunUnattended } from "./run-mode.js";
 
-const OWNER_LIVE = ["user", "reaction", "call_end", "skill", "follow_up"];
+const OWNER_LIVE = ["user", "reaction", "call_end", "skill", "follow_up", "goal"];
 
 describe("newRunUnattended", () => {
   it.each(RUN_TRIGGERS)("%s without a source run", (trigger) => {
@@ -43,14 +43,44 @@ describe("chainedRunMode", () => {
     expect(chainedRunMode("follow_up", { unattended: false, externalTaint: false })).toEqual({
       unattended: false,
       externalTaint: false,
+      readOutsideContent: false,
     });
-    expect(chainedRunMode("spawn", { unattended: true, externalTaint: true })).toEqual({
+    expect(
+      chainedRunMode("spawn", {
+        unattended: true,
+        externalTaint: true,
+        readOutsideContent: true,
+      }),
+    ).toEqual({
       unattended: true,
       externalTaint: true,
+      readOutsideContent: true,
     });
   });
 
+  it("carries the outside-content mark alone", () => {
+    expect(
+      chainedRunMode("bot_message", {
+        unattended: true,
+        externalTaint: false,
+        readOutsideContent: true,
+      }).readOutsideContent,
+    ).toBe(true);
+  });
+
   it("fails closed when the source is unknown", () => {
-    expect(chainedRunMode("follow_up", null)).toEqual({ unattended: true, externalTaint: true });
+    expect(chainedRunMode("follow_up", null)).toEqual({
+      unattended: true,
+      externalTaint: true,
+      readOutsideContent: true,
+    });
+  });
+});
+
+describe("goal runs", () => {
+  it("get what a run started by the owner's message gets", () => {
+    expect(newRunUnattended({ trigger: "goal" })).toBe(newRunUnattended({ trigger: "user" }));
+    expect(newRunUnattended({ trigger: "goal" })).toBe(false);
+    expect(newRunExternalTaint({ trigger: "goal" })).toBe(false);
   });
 });

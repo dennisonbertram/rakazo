@@ -1,11 +1,12 @@
 import type { MenuAction } from "@expo/ui/community/menu";
 import { MenuView } from "@expo/ui/community/menu";
 import type { AgentSkillCatalogEntry } from "@rakazo/contracts";
-import type { buildComposerMentionOptions, ComposerMention, SlashActionId } from "@rakazo/core";
+import type { buildComposerMentionOptions, ComposerMention } from "@rakazo/core";
 import {
   mentionChipKey,
   rankMentionOptions,
   SLASH_ACTIONS,
+  SLASH_INSERTS,
   serializeComposerPrompt,
   truncateSlashDescription,
 } from "@rakazo/core";
@@ -16,6 +17,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useAccentedTokens } from "../lib/bot-accent";
 import { useI18n } from "../lib/i18n";
 import { useMobileTokens, useResolvedAppearance } from "../lib/native";
+import type { MobileSlashActionId } from "../lib/slash-actions";
 import type { ComposerSnapshot } from "../lib/thread-feedback";
 import { GlassSurface } from "./glass-surface";
 import { NativeSymbol } from "./native-symbol";
@@ -43,7 +45,7 @@ type ThreadComposerProps = {
   send: () => Promise<void>;
   stop: () => Promise<void>;
   startVoiceCall: () => Promise<void>;
-  onSlashAction: (action: SlashActionId) => void;
+  onSlashAction: (action: MobileSlashActionId) => void;
 };
 
 export function ThreadComposer({
@@ -110,7 +112,7 @@ export function ThreadComposer({
       : [];
   const slashActionOptions =
     slashQuery !== null && mentionQuery === null
-      ? SLASH_ACTIONS.filter((action) => {
+      ? [...SLASH_ACTIONS, ...(botId ? SLASH_INSERTS : [])].filter((action) => {
           if (!slashQueryNormalized) return true;
           const label = t(action.label);
           return (
@@ -151,9 +153,15 @@ export function ThreadComposer({
     if (selectedSkill) setSelectedSkill(null);
   }
 
-  function runSlashAction(action: SlashActionId) {
-    setDraft("");
+  function runSlashAction(action: MobileSlashActionId) {
     setSlashQuery(null);
+    // Goal is a message the server runs, so it fills the draft; the other actions open a screen.
+    const insert = SLASH_INSERTS.find((entry) => entry.id === action);
+    if (insert) {
+      setDraft(insert.text);
+      return;
+    }
+    setDraft("");
     onSlashAction(action);
   }
 
@@ -280,8 +288,8 @@ export function ThreadComposer({
               }}
             >
               <NativeSymbol
-                ios="gearshape"
-                android="settings-outline"
+                ios={action.id === "goal" ? "flag" : "gearshape"}
+                android={action.id === "goal" ? "flag-outline" : "settings-outline"}
                 size={16}
                 color={tokens.mutedForeground}
               />

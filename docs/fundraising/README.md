@@ -424,7 +424,11 @@ panel in Shell.
 Tools (`INVESTORS_AGENT_BUILTIN_TOOLS` in `packages/contracts/src/investors.ts`):
 `cap_table_read` (now also returns SAFEs), `cap_table_update` (from slice 4), `contacts_*`,
 `fundraising_read` (new, read-only: the open round, prospects with stage and check size,
-SAFEs with derived status and deposit match), `investor_update_draft` (new, one tool:
+SAFEs with derived status and deposit match), `fundraising_round_save` (starts the round or
+edits the open one by id, through `saveRound`; amounts in whole US dollars; asks first),
+`pipeline_import_stage` (holds up to 60 rows per call, changes nothing else) and
+`pipeline_import_review` (one card for the whole list, applied only by the owner's press on web and
+desktop; see `docs/crm-pipeline/PLAN.md` section 3; never creates a SAFE), `investor_update_draft` (new, one tool:
 `history` lists recent sent updates with their bodies, `get` and `save` read and edit one
 existing draft by id and refuse a sent or posted update, `create` adds a draft),
 `audit_request_upsert` (new), `finance_overview`, `finance_breakdown`, `search_data_room`,

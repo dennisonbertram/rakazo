@@ -8,6 +8,12 @@ final class AppModel {
   let authentication: AuthenticationModel
   var path: [Route] = []
   var showingSettings = false
+  /// A message archived from a screen with no Inbox list behind it; the shell offers Undo.
+  var archivedMessageID: String?
+  /// The Settings screen to open first, or nil for the top level.
+  private(set) var settingsDestination: SettingsDestination?
+  /// Counts Settings closings. Pages that Settings can change reload with `.task(id:)` on it.
+  private(set) var settingsClosings = 0
   /// Asks for AI data consent. Before any request that sends data to an AI provider (sending a
   /// thread message, running a cleanup, and so on), call
   /// `try await app.consent.ensure(procedure: "<rpc name>", app: app)`; it returns at once when
@@ -21,6 +27,9 @@ final class AppModel {
   /// confirmed by the server once per session (`confirmUser`).
   private(set) var userID: String?
   private(set) var userConfirmed = false
+
+  /// The meeting recording in progress, if any, and its uploads.
+  @ObservationIgnored private(set) lazy var capture = CaptureController(app: self)
 
   @ObservationIgnored private let rpc: RPCClient
   @ObservationIgnored private let transport: any HTTPTransport
@@ -68,6 +77,14 @@ final class AppModel {
     }
   }
 
+  /// Sends one named space and leaves the active space alone if the server rejects it. Meeting
+  /// captures use this: a recording belongs to the space it started in, whatever is selected later.
+  func call<I: Encodable & Sendable, O: Decodable>(
+    _ procedure: String, input: I, spaceID: String, timeout: TimeInterval = 8
+  ) async throws -> O {
+    try await send(procedure, input: input, spaceID: spaceID, timeout: timeout)
+  }
+
   /// Downloads a URL on the signed-in server with the session's credentials.
   func data(url: URL) async throws -> Data {
     let auth = authentication.client
@@ -98,6 +115,16 @@ final class AppModel {
     }
   }
 
+  func openSettings(_ destination: SettingsDestination? = nil) {
+    settingsDestination = destination
+    showingSettings = true
+  }
+
+  func settingsDidClose() {
+    settingsClosings += 1
+    settingsDestination = nil
+  }
+
   func open(_ url: URL) {
     if let route = Route(url: url) { open(route) }
   }
@@ -111,6 +138,7 @@ final class AppModel {
   func reset() {
     path = []
     showingSettings = false
+    archivedMessageID = nil
     spaceID = nil
     forgetUser()
   }
@@ -140,7 +168,7 @@ final class AppModel {
     }
   }
 
-  private func endSession() async {
+  func endSession() async {
     reset()
     await authentication.sync()
   }

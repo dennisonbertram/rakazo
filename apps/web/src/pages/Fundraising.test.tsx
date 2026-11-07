@@ -33,6 +33,8 @@ const rpcMock = vi.hoisted(() => ({
   roundClose: vi.fn(),
   roundReopen: vi.fn(),
   prospectSave: vi.fn(),
+  callLog: vi.fn(),
+  callUndo: vi.fn(),
   safeSave: vi.fn(),
   safeMark: vi.fn(),
   safeDelete: vi.fn(),
@@ -57,6 +59,7 @@ vi.mock("../lib/rpc", () => ({
         markWaiting: rpcMock.markWaiting,
         notSent: rpcMock.notSent,
       },
+      calls: { log: rpcMock.callLog, undo: rpcMock.callUndo },
       safes: {
         save: rpcMock.safeSave,
         mark: rpcMock.safeMark,
@@ -179,13 +182,16 @@ async function show() {
   );
   await flush();
 }
-const stageHeadings = () =>
-  [...container.querySelectorAll("h3")].map((heading) => heading.textContent);
+const menuCheckbox = (label: string) =>
+  [...document.querySelectorAll<HTMLElement>("[role=menuitemcheckbox]")].find(
+    (item) => item.textContent === label,
+  );
 
 beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
+  localStorage.clear();
   rpcMock.contacts.mockResolvedValue([]);
   rpcMock.legalSafeCount.mockResolvedValue({ count: 0 });
 });
@@ -196,37 +202,48 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-it("groups prospects under their stage with a check size column and no row chips", async () => {
+it("shows the six default columns and adds the others only from the Columns menu", async () => {
   rpcMock.overview.mockResolvedValue(
     overview(openRound, [
       prospect("p1", "Ada Fund", { stage: "intro", checkSizeCents: 2_500_000, nextStep: "Call" }),
       prospect("p2", "Bo Capital", { stage: "committed" }),
-      prospect("p3", "Cy Partners", { stage: "intro" }),
     ]),
   );
   await show();
-  // The furthest stage first, with its count; empty stages are not drawn.
-  expect(stageHeadings()).toEqual(["Committed1", "Intro2"]);
-  const rows = [...container.querySelectorAll("[data-contact-id]")];
-  expect(rows.map((row) => row.querySelector("[data-row-open]")?.textContent)).toEqual([
-    "Bo Capital",
-    "Ada FundCall",
-    "Cy Partners",
+  const headers = () =>
+    [...container.querySelectorAll("[data-testid=pipeline-table] th")].map((th) =>
+      th.textContent?.trim(),
+    );
+  expect(headers()).toEqual([
+    "Prospect",
+    "Status",
+    "Interest",
+    "Last call",
+    "Next step",
+    "Next call",
+    "Actions",
   ]);
-  const amounts = [...container.querySelectorAll("[data-testid=check-size]")].map(
-    (el) => el.textContent,
-  );
-  expect(amounts).toEqual(["—", "$25,000", "—"]);
-  expect(container.textContent).not.toMatch(/Stage:/);
+  const names = [...container.querySelectorAll("[data-testid=pipeline-table] [data-row-open]")];
+  // Sorted by Next call, and no row has one: the list's own order.
+  expect(names.map((n) => n.textContent).sort()).toEqual(["Ada Fund", "Bo Capital"]);
+  expect(container.textContent).not.toContain("$25,000");
+  await click(button("Columns"));
+  await click(menuCheckbox("Possible amount"));
+  expect(headers()).toContain("Possible amount");
+  expect(container.textContent).toContain("$25,000");
+  expect(JSON.parse(localStorage.getItem("rakazo:crm-pipeline-columns") ?? "[]")).toEqual([
+    "amount",
+  ]);
 });
 
-it("collapses Passed behind a button that expands in place", async () => {
+it("keeps Passed out of the list until Passed · n asks for it", async () => {
   rpcMock.overview.mockResolvedValue(
     overview(openRound, [prospect("p1", "Old Fund", { stage: "passed" })]),
   );
   await show();
+  expect(container.textContent).toContain("No matches");
   expect(container.textContent).not.toContain("Old Fund");
-  await click(button("Passed 1"));
+  await click(button("Passed · 1"));
   expect(container.textContent).toContain("Old Fund");
 });
 
@@ -240,24 +257,19 @@ it("shows Pipeline and SAFEs with no round, where the card only offers Start a r
   expect(container.querySelector('[aria-label="Round actions"]')).toBeNull();
 });
 
-it("Add prospect works with no round and opens the dialog with Stage", async () => {
+it("Add prospect works with no round and the dialog has no stage, amount or next step", async () => {
   rpcMock.overview.mockResolvedValue(overview(null, []));
   await show();
   await click(button("Add prospect"));
   expect(document.body.textContent).toContain("Add prospect");
-  expect(document.getElementById("contact-stage")).not.toBeNull();
+  for (const id of ["contact-stage", "contact-check-size", "contact-next-step"])
+    expect(document.getElementById(id)).toBeNull();
   await typeInto("contact-name", "New Fund");
-  await typeInto("contact-check-size", "50,000");
   rpcMock.contactSave.mockResolvedValue(prospect("p9", "New Fund"));
   await click(button("Save"));
-  expect(rpcMock.contactSave).toHaveBeenCalledWith(
-    expect.objectContaining({
-      name: "New Fund",
-      kind: "prospect",
-      stage: "target",
-      checkSizeCents: 5_000_000,
-    }),
-  );
+  const sent = rpcMock.contactSave.mock.calls[0]?.[0];
+  expect(sent).toMatchObject({ name: "New Fund", kind: "prospect" });
+  for (const key of ["stage", "checkSizeCents", "nextStep"]) expect(sent).not.toHaveProperty(key);
 });
 
 it("offers Close round only in the round menu, then Reopen on the closed card", async () => {
@@ -341,40 +353,182 @@ it("counts Pending from the overview", async () => {
   expect(container.textContent).toContain("Pending$50,000");
 });
 
-it("moves a prospect to another stage from its row menu", async () => {
+const statusButton = (name: string, status = "Not reached") =>
+  container.querySelector(`button[aria-label="Status of ${name}: ${status}"]`);
+const radioItem = (label: string) =>
+  [...document.querySelectorAll<HTMLElement>("[role=menuitemradio]")].find(
+    (item) => item.textContent === label,
+  );
+
+it("moves a prospect to another status from its Status cell", async () => {
   rpcMock.overview.mockResolvedValue(overview(openRound, [prospect("p1", "Ada Fund")]));
   await show();
-  await click(container.querySelector('button[aria-label="Actions for Ada Fund"]'));
-  await click(menuItem("Move to"));
+  await click(statusButton("Ada Fund"));
   rpcMock.prospectSave.mockResolvedValue(prospect("p1", "Ada Fund", { stage: "committed" }));
-  await click(menuItem("Committed"));
-  expect(rpcMock.prospectSave).toHaveBeenCalledWith({ id: "p1", stage: "committed" });
+  await click(radioItem("Committed"));
+  expect(rpcMock.prospectSave).toHaveBeenCalledWith({ id: "p1", status: "committed" });
 });
 
-it("offers Undo after a stage move and restores the old stage", async () => {
+it("offers Undo after a status move and restores the old status", async () => {
   rpcMock.overview.mockResolvedValue(overview(openRound, [prospect("p1", "Ada Fund")]));
   await show();
-  await click(container.querySelector('button[aria-label="Actions for Ada Fund"]'));
-  await click(menuItem("Move to"));
+  await click(statusButton("Ada Fund"));
   rpcMock.prospectSave.mockResolvedValue(prospect("p1", "Ada Fund", { stage: "committed" }));
-  await click(menuItem("Committed"));
+  await click(radioItem("Committed"));
   await flush();
   expect(document.body.textContent).toContain("Moved Ada Fund to Committed");
   await click(button("Undo"));
-  expect(rpcMock.prospectSave).toHaveBeenLastCalledWith({ id: "p1", stage: "target" });
+  // Only what the move changed, and only while the row is still at Committed.
+  expect(rpcMock.prospectSave).toHaveBeenLastCalledWith({
+    id: "p1",
+    status: "not_reached",
+    interest: null,
+    expect: { status: "committed" },
+  });
 });
 
 it("offers no Undo when restoring would move a commitment into another round", async () => {
   const old = prospect("p1", "Ada Fund", { stage: "committed", roundId: "r0" });
   rpcMock.overview.mockResolvedValue(overview(openRound, [old]));
   await show();
-  await click(container.querySelector('button[aria-label="Actions for Ada Fund"]'));
-  await click(menuItem("Move to"));
+  await click(statusButton("Ada Fund", "Committed"));
   rpcMock.prospectSave.mockResolvedValue({ ...old, stage: "passed" });
-  await click(menuItem("Passed"));
+  await click(radioItem("Passed"));
   await flush();
   expect(document.body.textContent).toContain("Moved Ada Fund to Passed");
   expect(button("Undo")).toBeUndefined();
+});
+
+it("Out moves to Passed in one write with one toast naming both, and Undo restores all of it", async () => {
+  const row = prospect("p1", "Ada Fund", {
+    pipelineRecord: {
+      id: "rec-p1",
+      name: "Ada Fund",
+      status: "met",
+      interest: "maybe",
+      nextCallAt: "2026-11-10T12:00:00.000Z",
+      nextCallHasTime: false,
+    },
+  });
+  rpcMock.overview.mockResolvedValue(overview(openRound, [row]));
+  await show();
+  const out = [
+    ...container.querySelectorAll<HTMLElement>("[data-testid=pipeline-table] [role=group] button"),
+  ].find((b) => b.textContent === "Out");
+  rpcMock.prospectSave.mockResolvedValue(row);
+  await click(out);
+  expect(rpcMock.prospectSave).toHaveBeenCalledTimes(1);
+  expect(rpcMock.prospectSave).toHaveBeenCalledWith({ id: "p1", interest: "out" });
+  await flush();
+  expect(document.body.textContent).toContain(
+    "Ada Fund: Interest set to Out, status moved to Passed",
+  );
+  await click(button("Undo"));
+  expect(rpcMock.prospectSave).toHaveBeenLastCalledWith({
+    id: "p1",
+    status: "met",
+    interest: "maybe",
+    nextCallAt: "2026-11-10T12:00:00.000Z",
+    nextCallHasTime: false,
+    expect: { status: "passed", interest: "out", nextCallAt: null },
+  });
+});
+
+describe("Log call", () => {
+  const due = prospect("p1", "Ada Fund", {
+    pipelineRecord: {
+      id: "rec-p1",
+      name: "Ada Fund",
+      status: "not_reached",
+      nextCallAt: "2020-01-02T12:00:00.000Z",
+      nextCallHasTime: false,
+    },
+  });
+  const logged = { eventId: "e1", movedToMet: false };
+  const openLog = async () => {
+    rpcMock.overview.mockResolvedValue(overview(openRound, [due]));
+    await show();
+    await click(container.querySelector('button[aria-label="Log a call with Ada Fund"]'));
+  };
+  const outcome = (label: string) =>
+    [
+      ...document.querySelectorAll<HTMLElement>(
+        "[role=dialog] button, [data-slot=popover-content] button",
+      ),
+    ].find((b) => b.textContent === label);
+
+  it("takes four actions to leave a message and try again on a named day, and the old date is not kept", async () => {
+    await openLog(); // 1: Log
+    rpcMock.callLog.mockResolvedValue(logged);
+    await click(outcome("Left message")); // 2
+    const day = [...document.querySelectorAll<HTMLElement>("button[aria-pressed]")].find((b) =>
+      /^(Mon|Tue|Wed|Thu|Fri)$/.test(b.textContent ?? ""),
+    );
+    await click(day); // 3
+    await click(outcome("Save")); // 4
+    expect(rpcMock.callLog).toHaveBeenCalledTimes(1);
+    const sent = rpcMock.callLog.mock.calls[0]?.[0];
+    expect(sent).toMatchObject({ id: "p1", outcome: "left_message", note: null });
+    expect(sent.nextCall.at).toMatch(/^\d{4}-\d\d-\d\dT12:00:00.000Z$/);
+    expect(sent.nextCall.at).not.toBe("2020-01-02T12:00:00.000Z");
+    await flush();
+    expect(document.body.textContent).toContain("Call logged");
+  });
+
+  it("Keep is the default, so the row stays due; Undo removes the call", async () => {
+    await openLog();
+    rpcMock.callLog.mockResolvedValue({ eventId: "e7", movedToMet: true });
+    rpcMock.callUndo.mockResolvedValue({ ok: true });
+    await click(outcome("Spoke"));
+    await click(outcome("Save"));
+    expect(rpcMock.callLog.mock.calls[0]?.[0].nextCall).toBe("keep");
+    await flush();
+    expect(document.body.textContent).toContain("Call logged. Ada Fund moved to Met");
+    await click(button("Undo"));
+    expect(rpcMock.callUndo).toHaveBeenCalledWith({ eventId: "e7" });
+  });
+
+  it("None clears the date", async () => {
+    await openLog();
+    rpcMock.callLog.mockResolvedValue(logged);
+    await click(outcome("No answer"));
+    await click(outcome("None"));
+    await click(outcome("Save"));
+    expect(rpcMock.callLog.mock.calls[0]?.[0].nextCall).toEqual({ at: null, hasTime: false });
+  });
+});
+
+it("a row with no person keeps its stage and asks for a first person, not a SAFE", async () => {
+  const record = { id: "rec1", name: "Sample Street Capital", status: "committed" as const };
+  const row = prospect("rec1", "Sample Street Capital", {
+    email: null,
+    stage: "committed",
+    checkSizeCents: 500_000,
+    roundId: "r1",
+    pipelineRecord: record,
+  });
+  rpcMock.overview.mockResolvedValue(overview(openRound, [row], 500_000));
+  await show();
+  await click(button("Send SAFE"));
+  expect(document.body.textContent).toContain("Save Sample Street Capital as a contact");
+  expect((document.getElementById("contact-name") as HTMLInputElement).value).toBe(
+    "Sample Street Capital",
+  );
+  // The first person joins the record as it is: no stage or amount to overwrite it.
+  expect(document.getElementById("contact-stage")).toBeNull();
+  // A different name still joins this record: the record's id travels with the dialog.
+  await typeInto("contact-name", "Riley Placeholder");
+  rpcMock.contactSave.mockResolvedValue(prospect("c9", "Riley Placeholder"));
+  await click(button("Save"));
+  const sent = rpcMock.contactSave.mock.calls[0]?.[0];
+  expect(sent).toMatchObject({
+    name: "Riley Placeholder",
+    kind: "prospect",
+    pipelineRecordId: "rec1",
+  });
+  for (const key of ["id", "stage", "checkSizeCents", "nextStep"])
+    expect(sent).not.toHaveProperty(key);
+  expect(rpcMock.safeSave).not.toHaveBeenCalled();
 });
 
 it("opens the contact that already has the typed email instead of failing", async () => {
@@ -661,8 +815,6 @@ describe("Mercury", () => {
     expect([...document.querySelectorAll("[role=menuitem]")].map((i) => i.textContent)).toEqual([
       "Open Mercury",
       "Not sent",
-      "Passed",
-      "Edit prospect",
     ]);
     rpcMock.notSent.mockResolvedValue(ada);
     await click(menuItem("Not sent"));

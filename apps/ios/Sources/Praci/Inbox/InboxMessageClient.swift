@@ -4,6 +4,7 @@ import RakazoAPI
 /// The operations of the message screen. `live` calls the server; tests supply fakes.
 struct InboxMessageClient {
   var get: @MainActor (_ messageID: String) async throws -> MailMessage
+  var markRead: @MainActor (_ messageID: String) async throws -> Void
   var archive: @MainActor (_ messageID: String) async throws -> Void
   var unarchive: @MainActor (_ messageID: String) async throws -> Void
   var askAgent: @MainActor (_ messageID: String) async throws -> AskAgentResult
@@ -16,6 +17,7 @@ struct InboxMessageClient {
 }
 
 private struct MessageInput: Encodable, Sendable { let messageId: String }
+private struct MarkReadInput: Encodable, Sendable { let messageId: String, read: Bool }
 private struct UnsubscribeInput: Encodable, Sendable {
   let connectionId: String, address: String
   let confirmMailto: Bool?
@@ -31,6 +33,9 @@ extension InboxMessageClient {
   static func live(_ app: AppModel) -> InboxMessageClient {
     InboxMessageClient(
       get: { id in try await app.call("inbox/get", input: MessageInput(messageId: id)) },
+      markRead: { id in
+        let _: OKResult = try await app.call("inbox/markRead", input: MarkReadInput(messageId: id, read: true))
+      },
       archive: { id in
         let _: OKResult = try await app.call("inbox/archive", input: MessageInput(messageId: id))
       },

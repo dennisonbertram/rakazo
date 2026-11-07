@@ -39,3 +39,11 @@ func decodesTheServerMessageForARejectedKey() throws {
   #expect(error.json.status == 400)
   #expect(error.json.message.hasPrefix("OpenAI rejected"))
 }
+
+@Test
+func decodesTranscriptionConsent() throws {
+  #expect(try decode(VoiceStatus.self, "voice-status").transcriptionConsented == false)
+  let older = Data(#"{"json":{"configured":true,"ready":true,"transcribe":true}}"#.utf8)
+  let status = try JSONDecoder().decode(RPCEnvelope<VoiceStatus>.self, from: older).json
+  #expect(status.transcriptionConsented == nil)
+}

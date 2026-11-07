@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isOutOfCredit,
   isRetryableProviderUnavailable,
   isTransientModelError,
   TransientModelError,
@@ -232,5 +233,40 @@ describe("explicit account exhaustion", () => {
         "Codex error: An error occurred while processing your request. You can retry your request.",
       ),
     ).toBe(true);
+  });
+});
+
+describe("out of credit", () => {
+  it.each([
+    ["a structured 402", Object.assign(new Error("Payment Required"), { status: 402 })],
+    [
+      "a 402 in the provider's response",
+      new Error('402 {"error":{"message":"Insufficient credits. Add more using the link"}}'),
+    ],
+    [
+      "OpenAI's insufficient_quota code",
+      Object.assign(new Error("You exceeded your current quota"), {
+        status: 429,
+        code: "insufficient_quota",
+      }),
+    ],
+    [
+      "an exhausted balance reported as 400",
+      new Error(
+        "400 invalid_request_error: Your credit balance is too low to access the API. Please go to Plans & Billing to upgrade or purchase credits.",
+      ),
+    ],
+  ])("counts %s", (_label, error) => {
+    expect(isOutOfCredit(error)).toBe(true);
+  });
+
+  it.each([
+    ["a refused key", Object.assign(new Error("Invalid API key"), { status: 401 })],
+    ["a rate limit", Object.assign(new Error("Rate limit reached"), { status: 429 })],
+    ["an overload", new Error("529 overloaded_error: Overloaded")],
+    ["a credit phrase with no status", new Error("insufficient credits")],
+    ["a bad request", new Error("400 invalid_request_error: max_tokens must be positive")],
+  ])("does not count %s", (_label, error) => {
+    expect(isOutOfCredit(error)).toBe(false);
   });
 });

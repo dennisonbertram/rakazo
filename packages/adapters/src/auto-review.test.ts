@@ -148,8 +148,10 @@ describe("isAutoReviewCheckerConfigured", () => {
 });
 
 describe("deploymentAutoReviewDefault", () => {
-  it("defaults off", () => {
-    expect(deploymentAutoReviewDefault({})).toBe(false);
+  it("defaults on, and RAKAZO_AUTO_REVIEW=off turns it off", () => {
+    expect(deploymentAutoReviewDefault({})).toBe(true);
+    expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "off" })).toBe(false);
+    expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "0" })).toBe(false);
     expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "1" })).toBe(true);
     expect(deploymentAutoReviewDefault({ RAKAZO_AUTO_REVIEW: "true" })).toBe(true);
   });
@@ -416,5 +418,29 @@ describe("runAutoReviewJudge timeout", () => {
       }),
     ).resolves.toMatchObject({ decision: "error" });
     expect(seen?.aborted).toBe(true);
+  });
+});
+
+describe("buildAutoReviewPrompt with an exfiltration flag", () => {
+  it("adds the flag rules and only kinds, lengths and hashes", () => {
+    const prompt = buildAutoReviewPrompt({
+      toolName: "web_fetch",
+      connectorKind: "web",
+      args: { url: "https://x.test/c?d=abc" },
+      userTask: "Summarize the docs",
+      botDescription: "Research",
+      matchingRules: [],
+      newSite: true,
+      exfilFlag: {
+        reason: "unusually long URL",
+        indicators: ["long_query:200:1a2b3c4d"],
+        canRead: ["mail", "finance"],
+        readOutsideContent: true,
+      },
+    });
+    expect(prompt).toContain("flagged this fetch");
+    expect(prompt).toContain("long_query:200:1a2b3c4d");
+    expect(prompt).toContain("can_read: mail, finance");
+    expect(prompt).toContain("read_outside_content: true");
   });
 });

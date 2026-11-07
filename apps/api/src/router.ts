@@ -67,6 +67,7 @@ import {
   enqueueTakeoverContinuation,
   ensureComputerWorkspaceLayout,
   expireComputerControl,
+  expireSupersededRoutineRuns,
   findBotShareEffect,
   findInvestorsAgent,
   findPageSourceApproval,
@@ -219,6 +220,7 @@ import {
   NOTIFICATION_CATCH_UP_ID,
   NOTIFICATION_HEARTBEAT_ID,
   notificationKindOf,
+  OMI_CLOUD_CONNECTOR_ID,
   OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   parseTicketRef,
@@ -243,6 +245,7 @@ import {
   messagingProviderBlocksBot,
   newRunUnattended,
   nextCronDateAcrossStrict,
+  parseGoalCommand,
   stableJsonText,
   withAppDirectory,
 } from "@rakazo/core";
@@ -326,6 +329,7 @@ import {
   listTicketComments,
   listWaitingOnYouItems,
   lockOwnedGroup,
+  logCall,
   markInvestorUpdateDelivered,
   markSafe,
   markSeen,
@@ -339,6 +343,7 @@ import {
   newestVoiceCredentialOrder,
   notSent,
   PinnedConnectionLostError,
+  PipelineInputError,
   PortalBlockedError,
   Prisma,
   ProspectEmailRequiredError,
@@ -391,6 +396,7 @@ import {
   UnshareableArtifactError,
   unassignSafe,
   unblockPortal,
+  undoCall,
   undoCapTableSource,
   unseenBotKinds,
   unseenCounts,
@@ -413,6 +419,11 @@ import {
   listArtifactVersions,
   listSpaceArtifacts,
 } from "./artifacts.js";
+import {
+  dismissInstructionsUpgrade,
+  instructionsUpgrade,
+  upgradeInstructions,
+} from "./bot-instructions-upgrade.js";
 import { botProfileLabelsChanged, commitBotUpdate } from "./bot-update.js";
 import type { BrexCardsDeps } from "./brex-cards.js";
 import {
@@ -432,6 +443,13 @@ import {
 } from "./carta-agent.js";
 import { ensureCompanyAgent, ensureCompanyImporter } from "./company-agent.js";
 import { companyCalendar } from "./company-calendar.js";
+import {
+  companyContextHistory,
+  listCompanyContext,
+  removeCompanyContext,
+  restoreCompanyContext,
+  saveCompanyContext,
+} from "./company-context.js";
 import type { CompanyImportPage } from "./company-import-page.js";
 import { companyFact, companyPage } from "./company-page.js";
 import {
@@ -483,6 +501,7 @@ import {
   financeSpend,
   financeTransaction,
   financeVendor,
+  onFinanceServerReconnected,
 } from "./finance.js";
 import {
   financeCrypto,
@@ -513,6 +532,7 @@ import {
   inboxFeedbackSet,
   inboxGet,
   inboxList,
+  inboxNoReply,
   inboxRefresh,
   inboxTodoSetDone,
   inboxTodosList,
@@ -583,6 +603,13 @@ import {
 import { answerEditedMailApproval } from "./mail-approval-edit.js";
 import { sendSavedMailDraft } from "./mail-draft-send.js";
 import {
+  mailBatchRowToComposer,
+  previewMailBatch,
+  readMailBatch,
+  retryMailBatch,
+  sendMailBatch,
+} from "./mail-reply-batch.js";
+import {
   dismissMcpServerApprovals,
   resolveMcpApprovalCards,
   revertConnectedMcpApprovals,
@@ -614,6 +641,7 @@ import {
   updateMemoryProviderDefaultScope,
 } from "./memory-provider-config.js";
 import { connectOmi, deleteOmiRecordingsFor, disconnectOmi, omiStatus } from "./omi.js";
+import { connectOmiCloud, disconnectOmiCloud, omiCloudStatus } from "./omi-cloud.js";
 import {
   chooseFocus,
   dismissFocus,
@@ -629,6 +657,7 @@ import {
   OPENROUTER_OAUTH_PROVIDER,
   OpenRouterOAuthError,
 } from "./openrouter-oauth.js";
+import { applyPipelineImport, readPipelineImport } from "./pipeline-import.js";
 import { rememberedMessageIds, rememberThreadMessage } from "./remember-message.js";
 import { createAgentSecretsRoutes } from "./routes/agent-secrets.js";
 import { createBillingRoutes } from "./routes/billing.js";
@@ -641,6 +670,17 @@ import { listPendingApprovalNotifications, listSpaceRuns } from "./runs.js";
 import { addScreenProxyCapability } from "./screen-proxy.js";
 import { querySpaceSearch } from "./search.js";
 import { withSerializableRetry } from "./serializable-retry.js";
+import {
+  ensureSourceAgent,
+  listCapabilities,
+  provisionMissingSourceAgents,
+  provisionSourceAgent,
+  renameSource,
+  setSourceAgentAccess,
+  setSourceAllAgents,
+  setSourceExclusive,
+  setSourceWrites,
+} from "./source-agent.js";
 import { requireSpaceOwner } from "./space-owner.js";
 import { spreadsheetPreview } from "./spreadsheet-preview.js";
 import { HEARTBEAT, withHeartbeat } from "./stream.js";
@@ -654,6 +694,7 @@ import {
   shouldForwardPeerThreadEvent,
 } from "./thread-message-pages.js";
 import {
+  clearThreadGoal,
   markThreadUnreadFrom,
   reactToThreadMessage,
   resolveThreadTarget,
@@ -864,9 +905,12 @@ function approvalRuleDto(row: {
   matchKind: string;
   matchValue: string;
   botId: string | null;
+  routineId?: string | null;
+  routineName?: string;
   createdAt: Date;
 }) {
   return {
+    ...(row.routineId ? { routineId: row.routineId, routineName: row.routineName } : {}),
     id: row.id,
     effect: row.effect as "always_allow" | "require_approval" | "block",
     matchKind: row.matchKind as "tool" | "connector" | "category",
@@ -940,15 +984,257 @@ async function connectionAccess(prisma: PrismaClient, actor: Actor, connectionId
     where: { id: connectionId, spaceId: actor.spaceId, userId: actor.userId },
     select: {
       allAgents: true,
+      agentShared: true,
+      agentBotId: true,
       botAccess: {
         where: { spaceId: actor.spaceId, userId: actor.userId },
-        select: { botId: true },
+        select: { botId: true, canWrite: true },
         orderBy: { createdAt: "asc" },
       },
     },
   });
   if (!row) throw new IsolationError();
-  return { allAgents: row.allAgents, botIds: row.botAccess.map((entry) => entry.botId) };
+  const botIds = row.botAccess.map((entry) => entry.botId);
+  return {
+    allAgents: row.allAgents,
+    botIds,
+    writeBotIds: row.botAccess.filter((entry) => entry.canWrite).map((entry) => entry.botId),
+    // Shared once anyone else has access, and it stays shared when they are all switched off.
+    agentShared: row.agentShared || row.allAgents || botIds.some((id) => id !== row.agentBotId),
+  };
+}
+
+type AccessConnection = {
+  allAgents: boolean;
+  agentBotId: string | null;
+  botAccess: { botId: string; canWrite?: boolean }[];
+};
+type DecidedAccess = {
+  allAgents: boolean;
+  botIds: string[];
+  /** Agents whose "allow changes" is set or cleared by this change; every other grant keeps its setting. */
+  canWrite?: Record<string, boolean>;
+};
+type AccessBot = { id: string; audience: string; firewall: boolean };
+
+/** Agents the Firewall or an external audience excludes: "all agents" never reaches them, only an explicit grant does. */
+const restrictedBot = (bot: AccessBot) => bot.audience === "external" || bot.firewall === true;
+
+/**
+ * The access after switching one agent. Turning one off while access is "all agents" lists every
+ * agent that was really on (restricted agents were not); turning a restricted agent on adds an
+ * explicit grant, since "all agents" does not reach it. The connection's own agent stays on.
+ */
+export function toggleAgentAccess(
+  connection: AccessConnection,
+  bots: AccessBot[],
+  botId: string,
+  on: boolean,
+  canWrite?: boolean,
+): DecidedAccess {
+  const target = bots.find((bot) => bot.id === botId);
+  if (!target) throw new IsolationError();
+  if (canWrite === true && on) {
+    if (connection.agentBotId === null)
+      throw new ORPCError("BAD_REQUEST", { message: "This connection has no changes to allow" });
+    if (target.audience === "external")
+      throw new ORPCError("BAD_REQUEST", { message: "External agents cannot make changes" });
+  }
+  const isOwner = botId === connection.agentBotId;
+  // The owner's changes follow the connection's own switch, and a new grant starts read-only.
+  const write: Record<string, boolean> | undefined = isOwner
+    ? undefined
+    : {
+        [botId]: on
+          ? (canWrite ??
+            connection.botAccess.some((entry) => entry.botId === botId && entry.canWrite === true))
+          : false,
+      };
+  const granted = new Set(connection.botAccess.map((entry) => entry.botId));
+  const ids = new Set(
+    connection.allAgents
+      ? [...bots.filter((bot) => !restrictedBot(bot)).map((bot) => bot.id), ...granted]
+      : granted,
+  );
+  if (on) ids.add(botId);
+  else if (botId !== connection.agentBotId) ids.delete(botId);
+  const all = bots.every((bot) => restrictedBot(bot) || ids.has(bot.id));
+  // With "all agents", only restricted agents need a row of their own.
+  return {
+    allAgents: all,
+    botIds: all
+      ? bots.filter((bot) => restrictedBot(bot) && ids.has(bot.id)).map((bot) => bot.id)
+      : [...ids],
+    ...(write ? { canWrite: write } : {}),
+  };
+}
+
+/** Saves a connection's access under its row lock; `decide` reads the locked state and returns the access to store. */
+async function saveConnectionAccess(
+  prisma: PrismaClient,
+  actor: Actor,
+  connectionId: string,
+  decide: (connection: AccessConnection, bots: AccessBot[]) => DecidedAccess,
+) {
+  await prisma.$transaction(async (tx) => {
+    // Connection row first, then bots and grants: the same order as every other path.
+    await tx.$queryRaw`SELECT id FROM connections WHERE id = ${connectionId} FOR UPDATE`;
+    const connection = await tx.connection.findFirst({
+      where: { id: connectionId, spaceId: actor.spaceId, userId: actor.userId },
+      select: {
+        id: true,
+        connectorId: true,
+        provider: true,
+        agentBotId: true,
+        privateByDefault: true,
+        agentShared: true,
+        allAgents: true,
+        botAccess: { select: { botId: true, canWrite: true } },
+      },
+    });
+    if (!connection) throw new IsolationError();
+    const scopedBots = await tx.bot.findMany({
+      where: { spaceId: actor.spaceId, userId: actor.userId, archivedAt: null },
+      select: { id: true, audience: true, firewall: true },
+    });
+    const decided = decide(connection, scopedBots);
+    let botIds = [...new Set(decided.botIds)];
+    // "Allow changes" survives every save for agents that stay on; only an explicit change or None clears it.
+    const writeIds = new Set(
+      connection.agentBotId === null
+        ? []
+        : connection.botAccess.filter((entry) => entry.canWrite).map((entry) => entry.botId),
+    );
+    for (const [id, value] of Object.entries(decided.canWrite ?? {})) {
+      if (value) writeIds.add(id);
+      else writeIds.delete(id);
+    }
+    // Under "all agents" a grant row is otherwise redundant, but it is where the write setting lives.
+    if (decided.allAgents) botIds = [...new Set([...botIds, ...writeIds])];
+    // Sharing is on once anyone besides the agent has access, and None does not turn it off.
+    const agentShared =
+      connection.agentShared ||
+      connection.allAgents ||
+      connection.botAccess.some((entry) => entry.botId !== connection.agentBotId) ||
+      decided.allAgents ||
+      botIds.some((id) => id !== connection.agentBotId);
+    const standalone = Boolean(connection.agentBotId || connection.privateByDefault);
+    if (connection.agentBotId) {
+      const activeAgent = await tx.bot.updateMany({
+        where: {
+          id: connection.agentBotId,
+          spaceId: actor.spaceId,
+          userId: actor.userId,
+          spawnKey: { in: connectionAgentSpawnKeys(actor, connection) },
+          archivedAt: null,
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (!activeAgent.count)
+        throw new ORPCError("CONFLICT", {
+          message: "The connection agent is no longer active",
+        });
+    }
+    // The connection's agent always keeps access, even when a client saved without it.
+    if (connection.agentBotId) botIds = [...new Set([...botIds, connection.agentBotId])];
+    const bots = await tx.bot.count({
+      where: { id: { in: botIds }, spaceId: actor.spaceId, userId: actor.userId },
+    });
+    if (bots !== botIds.length) throw new IsolationError();
+    const siblings = standalone
+      ? [{ id: connection.id }]
+      : await tx.connection.findMany({
+          where: {
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+            connectorId: connection.connectorId,
+            provider: connection.provider,
+            agentBotId: null,
+            privateByDefault: false,
+          },
+          select: { id: true },
+        });
+    const ids = siblings.map((row) => row.id);
+    if (ids.length === 0)
+      throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
+    const updated = await tx.connection.updateMany({
+      where: {
+        id: { in: ids },
+        spaceId: actor.spaceId,
+        userId: actor.userId,
+        agentBotId: connection.agentBotId,
+        // A sibling provisioned or archived since it was listed is never shared with it.
+        privateByDefault: connection.privateByDefault,
+      },
+      data: { allAgents: decided.allAgents, ...(connection.agentBotId ? { agentShared } : {}) },
+    });
+    if (updated.count !== ids.length)
+      throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
+    // A firewalled agent's label scope is part of its grant: keep it for every grant that stays.
+    const labels = new Map(
+      (
+        await tx.botConnectionAccess.findMany({
+          where: { connectionId: { in: ids }, spaceId: actor.spaceId, userId: actor.userId },
+          select: { connectionId: true, botId: true, supportLabel: true },
+        })
+      ).map((row) => [`${row.connectionId}:${row.botId}`, row.supportLabel]),
+    );
+    await tx.botConnectionAccess.deleteMany({
+      where: {
+        connectionId: { in: ids },
+        spaceId: actor.spaceId,
+        userId: actor.userId,
+      },
+    });
+    if (botIds.length > 0) {
+      await tx.botConnectionAccess.createMany({
+        data: ids.flatMap((connectionId) =>
+          botIds.map((botId) => ({
+            connectionId,
+            botId,
+            spaceId: actor.spaceId,
+            userId: actor.userId,
+            canWrite: writeIds.has(botId) && botId !== connection.agentBotId,
+            supportLabel: labels.get(`${connectionId}:${botId}`) ?? null,
+          })),
+        ),
+      });
+    }
+  });
+}
+
+/** The stored access of every live connection of the caller. */
+async function allConnectionAccess(prisma: PrismaClient, actor: Actor) {
+  const scope = { spaceId: actor.spaceId, userId: actor.userId };
+  const rows = await prisma.connection.findMany({
+    where: { ...scope, status: { not: "revoked" } },
+    select: {
+      id: true,
+      allAgents: true,
+      agentShared: true,
+      agentBotId: true,
+      botAccess: {
+        where: scope,
+        select: { botId: true, canWrite: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  return Object.fromEntries(
+    rows.map((row) => {
+      const botIds = row.botAccess.map((entry) => entry.botId);
+      return [
+        row.id,
+        {
+          allAgents: row.allAgents,
+          botIds,
+          writeBotIds: row.botAccess.filter((entry) => entry.canWrite).map((entry) => entry.botId),
+          agentShared:
+            row.agentShared || row.allAgents || botIds.some((id) => id !== row.agentBotId),
+        },
+      ];
+    }),
+  );
 }
 
 /** Every connection of the caller with the agents that can really use it, in one pass. */
@@ -970,7 +1256,13 @@ async function allEffectiveAccess(prisma: PrismaClient, actor: Actor) {
     }),
     prisma.bot.findMany({
       where: { ...scope, archivedAt: null },
-      select: { id: true, spawnKey: true, archivedAt: true, audience: true },
+      select: {
+        id: true,
+        spawnKey: true,
+        archivedAt: true,
+        audience: true,
+        firewall: true,
+      },
     }),
   ]);
   return effectiveAccessByConnection(rows, bots);
@@ -996,13 +1288,19 @@ function connectionDto(row: {
   createdAt: Date;
   writesEnabled: boolean;
   agentBotId: string | null;
+  metadata?: unknown;
   mailSyncState?: { needsReconnect: boolean; lastErrorAt: Date | null } | null;
 }) {
+  const stored = row.metadata as { mailAddress?: unknown; accountAddress?: unknown } | null;
+  const account = [stored?.mailAddress, stored?.accountAddress].find(
+    (value): value is string => typeof value === "string" && value !== "",
+  );
   return {
     id: row.id,
     connectorId: row.connectorId,
     provider: row.provider,
     displayName: row.displayName,
+    ...(account ? { account } : {}),
     status: row.status as "pending" | "connected" | "revoked" | "error",
     error: connectionError(row),
     ...(row.mailSyncState?.needsReconnect && row.mailSyncState.lastErrorAt
@@ -1164,7 +1462,11 @@ function fundraisingError(error: unknown): never {
   if (error instanceof SafeActiveError || error instanceof SafeStateError) {
     throw new ORPCError("CONFLICT", { message: error.message });
   }
-  if (error instanceof SafeCapRequiredError || error instanceof ProspectEmailRequiredError) {
+  if (
+    error instanceof SafeCapRequiredError ||
+    error instanceof ProspectEmailRequiredError ||
+    error instanceof PipelineInputError
+  ) {
     throw new ORPCError("BAD_REQUEST", { message: error.message });
   }
   if (error instanceof FundraiseRoundOpenError) {
@@ -1475,6 +1777,18 @@ export function createRouter(deps: RouterDeps): AppRouter {
       bot,
       computerContext(actor, bot.id, "archive"),
     );
+  };
+  const sourceAgentDeps = (actor: Actor) => ({
+    prisma: deps.prisma,
+    repos,
+    archiveBot: (botId: string) => archiveActorBot(actor, botId),
+  });
+  const oneCapability = async (actor: Actor, id: string) => {
+    const found = (await listCapabilities(sourceAgentDeps(actor), actor)).find(
+      (entry) => entry.id === id,
+    );
+    if (!found) throw new ORPCError("NOT_FOUND", { message: "Source not found" });
+    return found;
   };
   /**
    * Creates a server's integration agent and, in one step, makes the server exclusive to it and
@@ -2645,6 +2959,11 @@ export function createRouter(deps: RouterDeps): AppRouter {
             thinkingLevel: source.thinkingLevel,
             disabledBuiltinTools: source.disabledBuiltinTools,
             audience: source.audience === "external" ? "external" : "internal",
+            firewall: source.firewall,
+            proactivity:
+              source.proactivity === "low" || source.proactivity === "high"
+                ? source.proactivity
+                : "medium",
             externalMessageTargets: source.externalMessageTargets,
             externalComputerTools: source.externalComputerTools,
           })
@@ -2897,6 +3216,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
               : {}),
             ...(input.runsOn !== undefined ? { runsOn: input.runsOn } : {}),
             ...(input.audience !== undefined ? { audience: input.audience } : {}),
+            ...(input.firewall !== undefined ? { firewall: input.firewall } : {}),
+            ...(input.firewallAskCapabilities !== undefined
+              ? {
+                  // Only ids on the closed list that a firewalled agent may hold, and only to remove.
+                  firewallAskCapabilities: input.firewallAskCapabilities.filter((id) =>
+                    existing.firewallAskCapabilities.includes(id),
+                  ),
+                }
+              : {}),
+            ...(input.proactivity !== undefined ? { proactivity: input.proactivity } : {}),
             ...(messageTargets !== undefined ? { externalMessageTargets: messageTargets } : {}),
             ...(input.externalComputerTools !== undefined
               ? { externalComputerTools: input.externalComputerTools }
@@ -2941,6 +3270,21 @@ export function createRouter(deps: RouterDeps): AppRouter {
           repos.setBotComputer(context.actor, bot.id, input.mode),
         );
       }),
+      instructionsUpgrade: authed.bots.instructionsUpgrade.handler(({ context, input }) =>
+        instructionsUpgrade(deps.prisma, context.actor, input.botId),
+      ),
+      upgradeInstructions: authed.bots.upgradeInstructions.handler(async ({ context, input }) => {
+        await upgradeInstructions(deps.prisma, context.actor, input.botId, input.from);
+        const bot = (await repos.listBots(context.actor)).find((b) => b.id === input.botId);
+        if (!bot) throw new IsolationError();
+        return bot;
+      }),
+      dismissInstructionsUpgrade: authed.bots.dismissInstructionsUpgrade.handler(
+        async ({ context, input }) => {
+          await dismissInstructionsUpgrade(deps.prisma, context.actor, input.botId);
+          return { ok: true as const };
+        },
+      ),
       archive: authed.bots.archive.handler(async ({ context, input }) => {
         await archiveActorBot(context.actor, input.botId);
         return { ok: true as const };
@@ -3266,7 +3610,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
         }
       }),
       send: authed.threads.send.handler(async ({ context, input }) => {
-        if ((await modelSetup(deps, context.actor)).needsModel) {
+        // `/goal` and `/goal clear` start no run, so they work before a model is connected.
+        const goalKind = input.replyToMessageId ? null : parseGoalCommand(input.text ?? "")?.kind;
+        const startsRun = goalKind !== "show" && goalKind !== "clear";
+        if (startsRun && (await modelSetup(deps, context.actor)).needsModel) {
           throw new ORPCError("BAD_REQUEST", { message: "Connect a model to start a run." });
         }
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
@@ -3297,6 +3644,12 @@ export function createRouter(deps: RouterDeps): AppRouter {
       stop: authed.threads.stop.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         await stopThreadRuns(deps, context.actor, target);
+        return { ok: true as const };
+      }),
+      clearGoal: authed.threads.clearGoal.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new IsolationError();
+        await clearThreadGoal(deps, context.actor, target);
         return { ok: true as const };
       }),
       clear: authed.threads.clear.handler(async ({ context, input }) => {
@@ -3556,6 +3909,63 @@ export function createRouter(deps: RouterDeps): AppRouter {
           getLogger().error("call end enqueue", error);
         });
         return { ok: true as const };
+      }),
+      pipelineImport: authed.threads.pipelineImport.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return readPipelineImport(deps, context.actor, target, input);
+      }),
+      applyPipelineImport: authed.threads.applyPipelineImport.handler(
+        async ({ context, input }) => {
+          const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+          await applyPipelineImport(deps, context.actor, target, input);
+          // The card is answered, so its "needs approval" notification has nothing left to ask.
+          await markSeen(deps.prisma, {
+            ...context.actor,
+            surface: "thread",
+            threadId: target.threadId,
+          }).catch((error) => getLogger().error("thread pipeline import notification", error));
+          return { ok: true as const };
+        },
+      ),
+      mailBatch: authed.threads.mailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return readMailBatch(deps, context.actor, target, input);
+      }),
+      sendMailBatch: authed.threads.sendMailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        await sendMailBatch(
+          { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
+          context.actor,
+          target,
+          input,
+        );
+        // The card is answered, so its "needs approval" notification has nothing left to ask.
+        await markSeen(deps.prisma, {
+          ...context.actor,
+          surface: "thread",
+          threadId: target.threadId,
+        }).catch((error) => getLogger().error("thread mail batch notification", error));
+        return { ok: true as const };
+      }),
+      previewMailBatch: authed.threads.previewMailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        return previewMailBatch(deps, context.actor, target, input);
+      }),
+      mailBatchToComposer: authed.threads.mailBatchToComposer.handler(
+        async ({ context, input }) => {
+          const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+          return mailBatchRowToComposer(deps, context.actor, target, input);
+        },
+      ),
+      retryMailBatch: authed.threads.retryMailBatch.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        const count = await retryMailBatch(
+          { ...deps, mailWritesDisabled: deps.env.mailWritesDisabled },
+          context.actor,
+          target,
+          input,
+        );
+        return { ok: true as const, count };
       }),
       sendDraft: authed.threads.sendDraft.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
@@ -4395,6 +4805,23 @@ export function createRouter(deps: RouterDeps): AppRouter {
         return { ok: true as const };
       }),
     },
+    companyContext: {
+      list: authed.companyContext.list.handler(({ context }) =>
+        listCompanyContext(deps, context.actor),
+      ),
+      save: authed.companyContext.save.handler(({ context, input }) =>
+        saveCompanyContext(deps, context.actor, input),
+      ),
+      history: authed.companyContext.history.handler(({ context, input }) =>
+        companyContextHistory(deps, context.actor, input.id),
+      ),
+      restore: authed.companyContext.restore.handler(({ context, input }) =>
+        restoreCompanyContext(deps, context.actor, input),
+      ),
+      remove: authed.companyContext.remove.handler(({ context, input }) =>
+        removeCompanyContext(deps, context.actor, input),
+      ),
+    },
     memory: {
       list: authed.memory.list.handler(async ({ context, input }) => {
         const docs = await deps.prisma.memoryDocument.findMany({
@@ -4402,7 +4829,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
             ...(input.botId ? { botId: input.botId } : {}),
-            ...(input.scope ? { scope: input.scope } : {}),
+            scope: input.scope ?? { in: ["bot", "user"] },
           },
         });
         return docs.map((doc) => ({
@@ -4416,11 +4843,13 @@ export function createRouter(deps: RouterDeps): AppRouter {
         }));
       }),
       update: authed.memory.update.handler(async ({ context, input }) => {
+        // Company context sections change only through companyContext.*.
         const doc = await deps.prisma.memoryDocument.findFirst({
           where: {
             id: input.documentId,
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
+            scope: { in: ["bot", "user"] },
           },
         });
         if (!doc) throw new IsolationError();
@@ -4432,6 +4861,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
               path: doc.path,
               content: input.content,
               expectedRevision: input.expectedRevision,
+              byOwner: true,
             },
             {
               operationId: "mem",
@@ -4462,6 +4892,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           id: input.documentId,
           spaceId: context.actor.spaceId,
           userId: context.actor.userId,
+          scope: { in: ["bot", "user"] },
         };
         // Revisions go with the document (ON DELETE CASCADE).
         const { count } = await deps.prisma.memoryDocument.deleteMany({
@@ -4478,6 +4909,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           where: {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
+            scope: { in: ["bot", "user"] },
             ...(input.botId ? { botId: input.botId } : {}),
           },
         });
@@ -5192,6 +5624,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
         await deps.jobs.enqueue(runContinueJob(run.id)).catch((error) => {
           getLogger().error("routine testRun enqueue", error);
         });
+        await expireSupersededRoutineRuns(
+          { ...deps, now: new Date() },
+          { routineId: routine.id, exceptRunId: run.id },
+        ).catch(() => undefined);
         return { runId: run.id };
       }),
     },
@@ -5563,20 +5999,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
     },
     capabilities: {
       list: authed.capabilities.list.handler(async ({ context }) => {
-        const rows = await deps.prisma.capabilityInstall.findMany({
-          where: { spaceId: context.actor.spaceId, userId: context.actor.userId },
-        });
-        return rows.map((row) => ({
-          id: row.id,
-          kind: row.kind as "skill" | "plugin" | "mcp" | "api" | "connection",
-          name: row.name,
-          source: row.source,
-          version: row.version,
-          digest: row.digest,
-          secretConfigured: Boolean(row.secretId),
-          config: row.config as Record<string, unknown>,
-          createdAt: row.createdAt.toISOString(),
-        }));
+        const agentDeps = sourceAgentDeps(context.actor);
+        // Sources connected before they had agents get theirs here, once; best effort.
+        await provisionMissingSourceAgents(agentDeps, context.actor).catch(() => undefined);
+        return listCapabilities(agentDeps, context.actor);
       }),
       catalogSearch: authed.capabilities.catalogSearch.handler(async ({ context, input }) => {
         const baseUrl =
@@ -5707,20 +6133,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
             },
           });
         });
-        return {
-          id: row.id,
-          kind: row.kind as "skill" | "plugin" | "mcp" | "api" | "connection",
-          name: row.name,
-          source: row.source,
-          version: row.version,
-          digest: row.digest,
-          secretConfigured: Boolean(row.secretId),
-          config: row.config as Record<string, unknown>,
-          createdAt: row.createdAt.toISOString(),
-        };
+        // The source gets its own agent, private to it; a failure leaves Create agent as the repair.
+        if (row.kind === "mcp" || row.kind === "api" || row.kind === "graphql")
+          await provisionSourceAgent(sourceAgentDeps(context.actor), context.actor, row.id);
+        return oneCapability(context.actor, row.id);
       }),
       remove: authed.capabilities.remove.handler(async ({ context, input }) => {
+        let agentToArchive: string | null = null;
         await deps.prisma.$transaction(async (tx) => {
+          // Locked first, so provisioning cannot link an agent between this read and the delete.
+          await tx.$queryRaw`SELECT id FROM capability_installs WHERE id = ${input.id} FOR UPDATE`;
           const existing = await tx.capabilityInstall.findFirst({
             where: {
               id: input.id,
@@ -5729,6 +6151,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
             },
           });
           if (!existing) return;
+          agentToArchive = existing.agentBotId;
           await tx.capabilityInstall.delete({ where: { id: existing.id } });
           if (existing.secretId) {
             const shared = await tx.capabilityInstall.count({
@@ -5745,7 +6168,40 @@ export function createRouter(deps: RouterDeps): AppRouter {
             }
           }
         });
+        // A source's own agent goes with it, archived once the removal committed.
+        if (agentToArchive)
+          await archiveActorBot(context.actor, agentToArchive).catch((error) =>
+            getLogger().error("source agent archive failed", error),
+          );
         return { ok: true as const };
+      }),
+      createAgent: authed.capabilities.createAgent.handler(async ({ context, input }) => {
+        const { bot } = await ensureSourceAgent(
+          sourceAgentDeps(context.actor),
+          context.actor,
+          input.id,
+        );
+        return { botId: bot.id };
+      }),
+      rename: authed.capabilities.rename.handler(async ({ context, input }) => {
+        await renameSource(deps.prisma, context.actor, input.id, input.name);
+        return oneCapability(context.actor, input.id);
+      }),
+      setWrites: authed.capabilities.setWrites.handler(async ({ context, input }) => {
+        await setSourceWrites(deps.prisma, context.actor, input.id, input.enabled);
+        return oneCapability(context.actor, input.id);
+      }),
+      setExclusive: authed.capabilities.setExclusive.handler(async ({ context, input }) => {
+        await setSourceExclusive(deps.prisma, context.actor, input.id, input.exclusive);
+        return oneCapability(context.actor, input.id);
+      }),
+      setAllAgents: authed.capabilities.setAllAgents.handler(async ({ context, input }) => {
+        await setSourceAllAgents(deps.prisma, context.actor, input.id, input.on);
+        return oneCapability(context.actor, input.id);
+      }),
+      setAgentAccess: authed.capabilities.setAgentAccess.handler(async ({ context, input }) => {
+        await setSourceAgentAccess(deps.prisma, context.actor, input);
+        return oneCapability(context.actor, input.id);
       }),
     },
     integrationAgents: {
@@ -6143,6 +6599,63 @@ export function createRouter(deps: RouterDeps): AppRouter {
           if (!row) throw new IsolationError();
           return mcpServerDto(row, await mcpOAuth.statusFor(row, context.actor));
         }),
+        setAgentAssignment: authed.mcp.servers.setAgentAssignment.handler(
+          async ({ context, input }) => {
+            const { actor } = context;
+            const seqs = await deps.prisma.$transaction(async (tx) => {
+              // Server row first, so concurrent changes to one server queue up.
+              await tx.$queryRaw`SELECT id FROM mcp_servers WHERE id = ${input.serverId} FOR UPDATE`;
+              const server = await tx.mcpServer.findFirst({
+                where: { id: input.serverId, spaceId: actor.spaceId, userId: actor.userId },
+                select: { id: true, agentBotId: true, agentExclusive: true },
+              });
+              const bot = await tx.bot.findFirst({
+                where: { id: input.botId, spaceId: actor.spaceId, userId: actor.userId },
+                select: { id: true },
+              });
+              if (!server || !bot) throw new IsolationError();
+              const exclusiveOther =
+                server.agentExclusive && server.agentBotId !== null && server.agentBotId !== bot.id;
+              if (input.on) {
+                if (exclusiveOther)
+                  throw new ORPCError("BAD_REQUEST", { message: EXCLUSIVE_SERVER_MESSAGE });
+                await tx.botMcpServer.createMany({
+                  data: [
+                    {
+                      spaceId: actor.spaceId,
+                      userId: actor.userId,
+                      botId: bot.id,
+                      serverId: server.id,
+                      allowAllTools: true,
+                      allowedTools: [] as Prisma.InputJsonValue,
+                    },
+                  ],
+                  skipDuplicates: true,
+                });
+                return [];
+              }
+              // The server's own agent keeps it; an exclusive server's rows for others are kept as saved.
+              if (server.agentBotId === bot.id || exclusiveOther) return [];
+              const removed = await tx.botMcpServer.deleteMany({
+                where: {
+                  botId: bot.id,
+                  serverId: server.id,
+                  spaceId: actor.spaceId,
+                  userId: actor.userId,
+                },
+              });
+              if (!removed.count) return [];
+              return revertConnectedMcpApprovals(
+                onboardingDeps,
+                actor,
+                { botId: bot.id, serverId: server.id, status: "pending" },
+                tx,
+              );
+            });
+            for (const event of seqs) await deps.events.notify(event.threadId, event.seq);
+            return { ok: true as const };
+          },
+        ),
         setWrites: authed.mcp.servers.setWrites.handler(async ({ context, input }) => {
           const row = await setIntegrationAgentWrites(
             deps.prisma,
@@ -6456,7 +6969,10 @@ export function createRouter(deps: RouterDeps): AppRouter {
               spaceId: context.actor.spaceId,
               userId: context.actor.userId,
             });
-            if (session) await onMcpServerConnected(cartaSyncDeps, context.actor, session.serverId);
+            if (session) {
+              await onMcpServerConnected(cartaSyncDeps, context.actor, session.serverId);
+              await onFinanceServerReconnected(financeDeps, context.actor, session.serverId);
+            }
             return { ok: true as const };
           } catch (error) {
             throw new ORPCError("BAD_REQUEST", {
@@ -6650,14 +7166,33 @@ export function createRouter(deps: RouterDeps): AppRouter {
             status: { in: ["connected", "pending", "error"] },
             // The Granola key shows through meetings.status, never as a generic app.
             // Omi shows through omi.status.
-            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID, HEX_CONNECTOR_ID] },
+            connectorId: {
+              notIn: [
+                GRANOLA_API_CONNECTOR_ID,
+                OMI_CLOUD_CONNECTOR_ID,
+                OMI_CONNECTOR_ID,
+                HEX_CONNECTOR_ID,
+              ],
+            },
           },
           // Without an order Postgres returns rows in storage order, which changes when a row is
           // updated, so the accounts of one app swapped places between loads.
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           include: { mailSyncState: { select: { needsReconnect: true, lastErrorAt: true } } },
         });
-        return rows.map(connectionDto);
+        // Gmail accounts connected before the Inbox agent link existed join it now, once.
+        const unlinked = rows.filter(
+          (row) =>
+            row.status === "connected" && !row.agentBotId && row.provider.toLowerCase() === "gmail",
+        );
+        if (unlinked.length === 0) return rows.map(connectionDto);
+        for (const row of unlinked) await provisionForActor(context.actor, row.id);
+        const fresh = await deps.prisma.connection.findMany({
+          where: { id: { in: unlinked.map((row) => row.id) }, spaceId: context.actor.spaceId },
+          select: { id: true, agentBotId: true, writesEnabled: true, allAgents: true },
+        });
+        const byId = new Map(fresh.map((row) => [row.id, row]));
+        return rows.map((row) => connectionDto({ ...row, ...(byId.get(row.id) ?? {}) }));
       }),
       begin: authed.connections.begin.handler(async ({ context, input }) => {
         if (input.redirect === "desktop" && input.connectorId !== "google") {
@@ -7283,104 +7818,25 @@ export function createRouter(deps: RouterDeps): AppRouter {
       access: authed.connections.access.handler(async ({ context, input }) => {
         return connectionAccess(deps.prisma, context.actor, input.connectionId);
       }),
+      accessAll: authed.connections.accessAll.handler(async ({ context }) =>
+        allConnectionAccess(deps.prisma, context.actor),
+      ),
       setAccess: authed.connections.setAccess.handler(async ({ context, input }) => {
-        const { actor } = context;
-        let botIds = [...new Set(input.botIds)];
-        await deps.prisma.$transaction(async (tx) => {
-          // Connection row first, then bots and grants: the same order as every other path.
-          await tx.$queryRaw`SELECT id FROM connections WHERE id = ${input.connectionId} FOR UPDATE`;
-          const connection = await tx.connection.findFirst({
-            where: { id: input.connectionId, spaceId: actor.spaceId, userId: actor.userId },
-            select: {
-              id: true,
-              connectorId: true,
-              provider: true,
-              agentBotId: true,
-              privateByDefault: true,
-            },
-          });
-          if (!connection) throw new IsolationError();
-          const standalone = Boolean(connection.agentBotId || connection.privateByDefault);
-          if (connection.agentBotId) {
-            const activeAgent = await tx.bot.updateMany({
-              where: {
-                id: connection.agentBotId,
-                spaceId: actor.spaceId,
-                userId: actor.userId,
-                spawnKey: { in: connectionAgentSpawnKeys(actor, connection) },
-                archivedAt: null,
-              },
-              data: { updatedAt: new Date() },
-            });
-            if (!activeAgent.count)
-              throw new ORPCError("CONFLICT", {
-                message: "The connection agent is no longer active",
-              });
-          }
-          if (
-            connection.agentBotId &&
-            !input.allAgents &&
-            !botIds.includes(connection.agentBotId)
-          ) {
-            throw new ORPCError("BAD_REQUEST", {
-              message: "The connection's agent must keep access",
-            });
-          }
-          if (connection.agentBotId) botIds = [...new Set([...botIds, connection.agentBotId])];
-          const bots = await tx.bot.count({
-            where: { id: { in: botIds }, spaceId: actor.spaceId, userId: actor.userId },
-          });
-          if (bots !== botIds.length) throw new IsolationError();
-          const siblings = standalone
-            ? [{ id: connection.id }]
-            : await tx.connection.findMany({
-                where: {
-                  spaceId: actor.spaceId,
-                  userId: actor.userId,
-                  connectorId: connection.connectorId,
-                  provider: connection.provider,
-                  agentBotId: null,
-                  privateByDefault: false,
-                },
-                select: { id: true },
-              });
-          const ids = siblings.map((row) => row.id);
-          if (ids.length === 0)
-            throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
-          const updated = await tx.connection.updateMany({
-            where: {
-              id: { in: ids },
-              spaceId: actor.spaceId,
-              userId: actor.userId,
-              agentBotId: connection.agentBotId,
-              // A sibling provisioned or archived since it was listed is never shared with it.
-              privateByDefault: connection.privateByDefault,
-            },
-            data: { allAgents: input.allAgents },
-          });
-          if (updated.count !== ids.length)
-            throw new ORPCError("CONFLICT", { message: "The connection changed; retry" });
-          await tx.botConnectionAccess.deleteMany({
-            where: {
-              connectionId: { in: ids },
-              spaceId: actor.spaceId,
-              userId: actor.userId,
-            },
-          });
-          if (botIds.length > 0) {
-            await tx.botConnectionAccess.createMany({
-              data: ids.flatMap((connectionId) =>
-                botIds.map((botId) => ({
-                  connectionId,
-                  botId,
-                  spaceId: actor.spaceId,
-                  userId: actor.userId,
-                })),
-              ),
-            });
-          }
-        });
-        return connectionAccess(deps.prisma, actor, input.connectionId);
+        await saveConnectionAccess(deps.prisma, context.actor, input.connectionId, () => ({
+          allAgents: input.allAgents,
+          botIds: input.botIds,
+        }));
+        return connectionAccess(deps.prisma, context.actor, input.connectionId);
+      }),
+      setAgentAccess: authed.connections.setAgentAccess.handler(async ({ context, input }) => {
+        await saveConnectionAccess(
+          deps.prisma,
+          context.actor,
+          input.connectionId,
+          (connection, bots) =>
+            toggleAgentAccess(connection, bots, input.botId, input.on, input.canWrite),
+        );
+        return connectionAccess(deps.prisma, context.actor, input.connectionId);
       }),
       createAgent: authed.connections.createAgent.handler(async ({ context, input }) => {
         const { bot } = await ensureConnectedAppAgent(
@@ -7464,7 +7920,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
           ownership: {
             agentBotId: string | null;
             writesEnabled: boolean;
-            grants: { botId: string; spaceId: string; userId: string }[];
+            grants: { botId: string; spaceId: string; userId: string; canWrite: boolean }[];
           } | null;
         } = { ownership: null };
         const outcome = await retryOnDeadlock(() =>
@@ -7536,7 +7992,7 @@ export function createRouter(deps: RouterDeps): AppRouter {
                   writesEnabled: row.writesEnabled,
                   grants: await tx.botConnectionAccess.findMany({
                     where: { connectionId: row.id },
-                    select: { botId: true, spaceId: true, userId: true },
+                    select: { botId: true, spaceId: true, userId: true, canWrite: true },
                   }),
                 };
                 await tx.connection.update({
@@ -8142,7 +8598,32 @@ export function createRouter(deps: RouterDeps): AppRouter {
           spaceId: context.actor.spaceId,
           userId: context.actor.userId,
         });
-        return rows.map(approvalRuleDto);
+        // An agent's "Allow all sites" rule is listed too, so it can be removed here.
+        const allSites = await deps.prisma.actionApprovalRule.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            createdByUserId: context.actor.userId,
+            botId: { not: null },
+            matchKind: "tool",
+            matchValue: "web_fetch",
+          },
+          orderBy: { createdAt: "asc" },
+        });
+        // A routine's "Always for this routine" rules, with the routine's name, so they can be removed.
+        const routineRules = await deps.prisma.actionApprovalRule.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            createdByUserId: context.actor.userId,
+            routineId: { not: null },
+          },
+          include: { routine: { select: { name: true } } },
+          orderBy: { createdAt: "asc" },
+        });
+        return [
+          ...rows,
+          ...allSites,
+          ...routineRules.map((rule) => ({ ...rule, routineName: rule.routine?.name })),
+        ].map(approvalRuleDto);
       }),
       set: authed.approvalRules.set.handler(async ({ context, input }) => {
         // A bot rule needs a bot the caller can see.
@@ -8201,11 +8682,31 @@ export function createRouter(deps: RouterDeps): AppRouter {
           create: {
             spaceId: context.actor.spaceId,
             userId: context.actor.userId,
-            enabled: input.enabled,
+            enabled: input.enabled ?? deploymentAutoReviewDefault(process.env),
+            background: input.background ?? true,
           },
-          update: { enabled: input.enabled },
+          update: { enabled: input.enabled, background: input.background },
         });
         return loadAutoReviewSettings(deps, context.actor);
+      }),
+      // Every call the judge passed for this user in this space, newest first.
+      recent: authed.autoReview.recent.handler(async ({ context }) => {
+        const rows = await deps.prisma.externalEffect.findMany({
+          where: {
+            spaceId: context.actor.spaceId,
+            reviewDecision: "pass",
+            run: { userId: context.actor.userId, spaceId: context.actor.spaceId },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: { id: true, kind: true, reviewReason: true, createdAt: true },
+        });
+        return rows.map((row) => ({
+          id: row.id,
+          tool: row.kind,
+          reason: row.reviewReason,
+          at: row.createdAt.toISOString(),
+        }));
       }),
     },
     company: {
@@ -8515,6 +9016,17 @@ export function createRouter(deps: RouterDeps): AppRouter {
       ),
       active: authed.meetingCaptures.active.handler(({ context }) =>
         activeCapture(deps, context.actor),
+      ),
+    },
+    omiCloud: {
+      connect: authed.omiCloud.connect.handler(({ context, input }) =>
+        connectOmiCloud(meetingsFor(context.actor), context.actor, input, context.signal),
+      ),
+      status: authed.omiCloud.status.handler(({ context }) =>
+        omiCloudStatus(meetingsFor(context.actor), context.actor),
+      ),
+      disconnect: authed.omiCloud.disconnect.handler(({ context }) =>
+        disconnectOmiCloud(meetingsFor(context.actor), context.actor),
       ),
     },
     omi: {
@@ -8938,6 +9450,16 @@ export function createRouter(deps: RouterDeps): AppRouter {
           notSent(deps.prisma, actorScope(context.actor), input.id).catch(fundraisingError),
         ),
       },
+      calls: {
+        log: authed.fundraising.calls.log.handler(({ context, input }) =>
+          logCall(deps.prisma, actorScope(context.actor), input).catch(fundraisingError),
+        ),
+        undo: authed.fundraising.calls.undo.handler(({ context, input }) =>
+          undoCall(deps.prisma, actorScope(context.actor), input.eventId)
+            .then(() => ({ ok: true as const }))
+            .catch(fundraisingError),
+        ),
+      },
       safes: {
         list: authed.fundraising.safes.list.handler(({ context }) =>
           safesList(fundraisingDeps, context.actor),
@@ -9186,6 +9708,9 @@ export function createRouter(deps: RouterDeps): AppRouter {
       ),
       unreadCount: authed.inbox.unreadCount.handler(({ context }) =>
         inboxUnreadCount(deps, context.actor),
+      ),
+      noReply: authed.inbox.noReply.handler(({ context, input }) =>
+        inboxNoReply(deps, context.actor, input),
       ),
       feedback: authed.inbox.feedback.handler(({ context, input }) =>
         inboxFeedbackSet(
@@ -10027,7 +10552,7 @@ async function loadAutoReviewSettings(deps: RouterDeps, actor: Actor) {
           userId: actor.userId,
         },
       },
-      select: { enabled: true },
+      select: { enabled: true, background: true },
     }),
     requiredUserProvider
       ? deps.prisma.userModelCredential.findFirst({
@@ -10038,7 +10563,7 @@ async function loadAutoReviewSettings(deps: RouterDeps, actor: Actor) {
   ]);
   const enabled = preference?.enabled ?? deploymentAutoReviewDefault(process.env);
   const checkerAvailable = environmentAvailable || Boolean(credential);
-  return { enabled, checkerAvailable };
+  return { enabled, background: enabled && (preference?.background ?? true), checkerAvailable };
 }
 
 function hostCredentials(active: boolean, provider: string) {
@@ -10696,6 +11221,7 @@ async function assertRoutineModel(
 
 const routineInclude = {
   watchState: true,
+  connectionPause: { select: { pausedUntil: true } },
   taughtSkill: { select: { id: true, name: true } },
 } as const;
 
@@ -10744,10 +11270,12 @@ function mapRoutine(
       lastChangedAt: Date | null;
       pausedReason: string | null;
     } | null;
+    connectionPause?: { pausedUntil: Date } | null;
     createdAt: Date;
   },
   lastRunFailed = false,
 ): Routine {
+  const creditPaused = (row.connectionPause?.pausedUntil.getTime() ?? 0) > Date.now();
   const watch = WatchSpecSchema.safeParse(row.watch);
   return {
     id: row.id,
@@ -10776,7 +11304,9 @@ function mapRoutine(
       nextRunAt: row.nextRunAt?.toISOString() ?? null,
       lastCheckedAt: row.watchState?.lastCheckedAt?.toISOString() ?? null,
       lastChangedAt: row.watchState?.lastChangedAt?.toISOString() ?? null,
-      pausedReason: (row.watchState?.pausedReason as WatchPausedReason | null) ?? null,
+      pausedReason:
+        (row.watchState?.pausedReason as WatchPausedReason | null) ??
+        (creditPaused ? "credit" : null),
       lastRunFailed,
     },
     createdAt: row.createdAt.toISOString(),

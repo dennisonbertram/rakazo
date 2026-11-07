@@ -74,7 +74,7 @@ struct AskCardView: View {
   }
 }
 
-/// Raw tool arguments in an inset well, at most four lines, or behind a "Details" disclosure.
+/// Raw tool arguments in an inset well, in full, or behind a "Details" disclosure.
 private struct DetailWell: View {
   let text: String
   let folded: Bool
@@ -91,7 +91,6 @@ private struct DetailWell: View {
   private var well: some View {
     Text(text)
       .font(.footnote.monospaced())
-      .lineLimit(4)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(10)
       .background(Color.token(.muted), in: RoundedRectangle(cornerRadius: 12))
@@ -130,6 +129,8 @@ enum AskOutcomeText {
     switch outcome {
     case .allowedOnce: Text("Allowed once")
     case .alwaysAllowed: Text("Always allowed")
+    case .alwaysAllowedForRoutine: Text("Always allowed for this routine")
+    case .alwaysAllowedForSites: Text("Allowed for all sites")
     case .denied: Text("Denied")
     case .approved: Text("Approved")
     case .approvedWaiting(let service): Text("Approved here. Waiting for \(service)")
@@ -142,6 +143,7 @@ enum AskOutcomeText {
     case .superseded: Text("Replaced by a newer request")
     case .expired: Text("Expired")
     case .stopped: Text("Stopped")
+    case .skipped: Text("Skipped")
     case .saved: Text("Saved")
     case .answered(let label?): Text("Answered: \(label)")
     case .answered(nil): Text("Answered")
@@ -150,7 +152,7 @@ enum AskOutcomeText {
 
   static func tone(_ outcome: AskOutcome) -> ResolvedLine.Tone {
     switch outcome {
-    case .allowedOnce, .alwaysAllowed, .approved, .approvedWaiting, .allowed, .shared, .saved, .created:
+    case .allowedOnce, .alwaysAllowed, .alwaysAllowedForRoutine, .alwaysAllowedForSites, .approved, .approvedWaiting, .allowed, .shared, .saved, .created:
       .positive
     case .denied, .notNow, .notShared: .negative
     default: .neutral
@@ -162,6 +164,8 @@ enum AskOutcomeText {
     switch answer {
     case "allow": text(.allowedOnce)
     case "always": text(.alwaysAllowed)
+    case "always_routine": text(.alwaysAllowedForRoutine)
+    case "always_bot_sites": text(.alwaysAllowedForSites)
     case "deny": text(.denied)
     default: text(.answered(nil))
     }
@@ -169,7 +173,7 @@ enum AskOutcomeText {
 
   static func sentTone(_ answer: String) -> ResolvedLine.Tone {
     switch answer {
-    case "allow", "always": .positive
+    case "allow", "always", "always_routine", "always_bot_sites": .positive
     case "deny": .negative
     default: .neutral
     }

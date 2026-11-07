@@ -40,3 +40,28 @@ it("collapses to a count on a phone until the toggle is pressed", async () => {
   await act(async () => toggle.click());
   expect(list.className).not.toContain("max-sm:hidden");
 });
+
+it("shows 3 items on a phone once opened and the rest after See all", async () => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: true,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+  try {
+    const el = document.createElement("div");
+    document.body.append(el);
+    const drafts = Array.from(
+      { length: 5 },
+      (_, i) =>
+        ({ id: `u${i}`, subject: `Update ${i}`, createdAt: "2026-10-01T09:00:00.000Z" }) as never,
+    );
+    await act(async () => createRoot(el).render(<ActionItems drafts={drafts} onOpen={() => {}} />));
+    await act(async () => (el.querySelector("button[aria-expanded]") as HTMLElement).click());
+    expect(el.querySelectorAll("li").length).toBe(3);
+    const seeAll = [...el.querySelectorAll("button")].find((b) => b.textContent === "See all (5)");
+    await act(async () => seeAll?.click());
+    expect(el.querySelectorAll("li").length).toBe(5);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

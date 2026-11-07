@@ -1,8 +1,13 @@
 import { BREX_CARDS_WRITE_TOOLS, devinSessionUrl, INTEGRATION_PRESETS } from "@rakazo/contracts";
 import { parseSkillMd } from "@rakazo/core";
 import { expect, it } from "vitest";
-import { BUILTIN_AGENT_SKILLS, PRESENT_CLEARLY_SKILL_NAME } from "./builtin-skills.js";
-import { PRESENTATION_GUIDANCE } from "./executor.js";
+import {
+  BUILTIN_AGENT_SKILLS,
+  PAGE_DESIGN_SKILL_NAME,
+  PRESENT_CLEARLY_SKILL_NAME,
+} from "./builtin-skills.js";
+import { PRESENTATION_GUIDANCE, pagesGuidance } from "./executor.js";
+import { MEETING_AGENT_GUIDANCE } from "./meeting-tools.js";
 
 const skill = BUILTIN_AGENT_SKILLS.find((s) => s.name === "devin-sessions");
 
@@ -62,6 +67,15 @@ it("every agent is told to read present-clearly, and that skill exists", () => {
   const present = BUILTIN_AGENT_SKILLS.find((s) => s.name === PRESENT_CLEARLY_SKILL_NAME);
   expect(present?.description.length).toBeLessThanOrEqual(72);
   expect(present?.content).toContain("Lead with the point");
+});
+
+it("page guidance sends agents to the page-design skill, which is generic", () => {
+  expect(pagesGuidance()).toContain(`read the ${PAGE_DESIGN_SKILL_NAME} skill`);
+  const design = BUILTIN_AGENT_SKILLS.find((s) => s.name === PAGE_DESIGN_SKILL_NAME);
+  expect(design?.name).toBe("page-design");
+  expect(design?.description.length).toBeLessThanOrEqual(72);
+  expect(design?.content).toContain("Never put secrets");
+  expect(design?.content).not.toMatch(/Customer support|@(?!example\.test)\w+\.\w+|\/Users\//);
 });
 
 const BREX_SKILL_NAMES = [
@@ -206,7 +220,7 @@ it("brex-receipts-close finds missing receipts and memos, leaves uploads and sta
 it("brex-reimbursements-travel is read-only and names no write tool", () => {
   const text = brexText("brex-reimbursements-travel");
   expect(text).toContain("read-only");
-  expect(text).toContain("list_expenses");
+  expect(text).toContain("list_reimbursements");
   expect(text).toContain("list_trips");
   expect(text).toContain("in Brex");
   for (const write of BREX_CARDS_WRITE_TOOLS) expect(text).not.toContain(write);
@@ -230,4 +244,9 @@ it("regression: every Brex skill that names terminate_card says it is permanent 
     if (text.includes("terminate_card")) expect(text, name).toContain("permanent");
     if (name !== "brex-card-incident") expect(text, name).not.toContain("unlock");
   }
+});
+
+it("puts the meeting guidance in the meeting-notes skill", () => {
+  const skill = BUILTIN_AGENT_SKILLS.find((s) => s.name === "meeting-notes");
+  expect(skill?.content).toContain(MEETING_AGENT_GUIDANCE);
 });

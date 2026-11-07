@@ -12,8 +12,10 @@ import {
   ensureInvestorsAgent,
   INVESTOR_UPDATE_ROUTINE_NAME,
   INVESTORS_AGENT_INSTRUCTIONS,
+  OLD_INVESTORS_AGENT_INSTRUCTIONS,
   setInvestorsReminder,
 } from "./investors-agent.js";
+import { INVESTORS_DEFAULT_WITH_SOURCE_SENTENCE } from "./investors-old-default.fixture.js";
 
 const actor: Actor = {
   userId: "user-1",
@@ -133,11 +135,11 @@ describe("investor update routine", () => {
 describe("ensureInvestorsAgent", () => {
   it("upgrades stored instructions only while they are the earlier default", async () => {
     const { prisma, jobs } = routineFakes();
-    const earlier = INVESTORS_AGENT_INSTRUCTIONS.replace(
+    const earlier = OLD_INVESTORS_AGENT_INSTRUCTIONS.replace(
       / SAFEs are recorded in Mercury[^.]*\./,
       "",
     );
-    expect(earlier).not.toBe(INVESTORS_AGENT_INSTRUCTIONS);
+    expect(earlier).not.toBe(OLD_INVESTORS_AGENT_INSTRUCTIONS);
     const replaceBotInstructions = vi.fn(async () => undefined);
     const run = (instructions: string) =>
       ensureInvestorsAgent(
@@ -159,6 +161,59 @@ describe("ensureInvestorsAgent", () => {
     replaceBotInstructions.mockClear();
     await run(`${earlier} Mine.`);
     expect(replaceBotInstructions).not.toHaveBeenCalled();
+  });
+
+  it("upgrades an agent storing an old default that is in no previous list", async () => {
+    const { prisma, jobs } = routineFakes();
+    const replaceBotInstructions = vi.fn(async () => undefined);
+    await ensureInvestorsAgent(
+      {
+        prisma,
+        jobs,
+        repos: {
+          createBot: async () =>
+            ({ id: "bot-1", instructions: INVESTORS_DEFAULT_WITH_SOURCE_SENTENCE }) as Bot,
+          replaceBotInstructions,
+        },
+      } as never,
+      actor,
+    );
+    expect(replaceBotInstructions).toHaveBeenCalledWith(actor, "bot-1", {
+      from: INVESTORS_DEFAULT_WITH_SOURCE_SENTENCE,
+      to: INVESTORS_AGENT_INSTRUCTIONS,
+    });
+  });
+
+  it("upgrades an agent that still has the instructions saying it cannot add rounds or prospects", async () => {
+    const { prisma, jobs } = routineFakes();
+    const stored = OLD_INVESTORS_AGENT_INSTRUCTIONS.replace(
+      /fundraising_read gives[\s\S]*?so point to the prospect's row on that page;/,
+      "fundraising_read gives the Fundraising page (the open round, the pending amount and each prospect's stage, check size and next step), and you cannot change a stage, so point to the prospect's row on that page;",
+    );
+    expect(stored).not.toBe(OLD_INVESTORS_AGENT_INSTRUCTIONS);
+    expect(stored).not.toContain("fundraising_round_save");
+    const replaceBotInstructions = vi.fn(async () => undefined);
+    await ensureInvestorsAgent(
+      {
+        prisma,
+        jobs,
+        repos: {
+          createBot: async () => ({ id: "bot-1", instructions: stored }) as Bot,
+          replaceBotInstructions,
+        },
+      } as never,
+      actor,
+    );
+    expect(replaceBotInstructions).toHaveBeenCalledWith(actor, "bot-1", {
+      from: stored,
+      to: INVESTORS_AGENT_INSTRUCTIONS,
+    });
+    expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("fundraising_round_save");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("pipeline_import_stage");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("pipeline_import_review");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).toContain("up to 60 rows per call");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).not.toContain("fundraising_prospects_save");
+    expect(INVESTORS_AGENT_INSTRUCTIONS).not.toMatch(/wave/i);
   });
 
   it("rewrites the old default description only, scoped to the actor", async () => {
@@ -214,6 +269,7 @@ describe("ensureInvestorsAgent", () => {
     );
     expect(INVESTORS_AGENT_BUILTIN_TOOLS).not.toContain("mail_send");
     expect(INVESTORS_AGENT_BUILTIN_TOOLS).toContain("cap_table_update");
+    expect(INVESTORS_AGENT_BUILTIN_TOOLS).toContain("company_context_lookup");
     for (const name of INVESTORS_AGENT_BUILTIN_TOOLS) {
       expect(name).not.toMatch(/delete|remove|trash|^mcp__/);
     }

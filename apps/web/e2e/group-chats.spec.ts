@@ -147,7 +147,7 @@ test("create group from + and see two bots in one transcript", async ({ page }, 
   await expect(
     page.getByTestId("mention-chip").filter({ hasText: "Research Writer" }),
   ).toBeVisible();
-  await composer.fill("turn the sources into a draft. @Res");
+  await composer.fill(`${await composer.inputValue()}turn the sources into a draft. @Res`);
   await page.getByRole("option", { name: "@Researcher", exact: true }).click();
   await expect(page.getByTestId("mention-chip").filter({ hasText: "Researcher" })).toBeVisible();
   await composer.fill(`${await composer.inputValue()}gather sources.`);
@@ -179,7 +179,7 @@ test("create group from + and see two bots in one transcript", async ({ page }, 
   await expect(
     page.getByTestId("mention-chip").filter({ hasText: "Research Writer" }),
   ).toBeVisible();
-  await composer.fill("ask me which city to use");
+  await composer.fill(`${await composer.inputValue()}ask me which city to use`);
   await composer.press("Enter");
   // threads/get can observe waiting_input before the shell realtime feed paints the ask card.
   await expect
@@ -314,7 +314,5 @@ test("a newly opened group's sidebar row scrolls into view", async ({ page }) =>
     botIds: botIds.slice(0, 2),
   });
   await page.goto(`/app/g/${group.id}`);
-  await expect(
-    page.locator(`[data-roster-chat][data-roster-row="${group.id}"]`),
-  ).toBeInViewport();
+  await expect(page.locator(`[data-roster-chat][data-roster-row="${group.id}"]`)).toBeInViewport();
 });

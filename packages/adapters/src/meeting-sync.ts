@@ -1,5 +1,5 @@
 import type { JobPublisher, MeetingSource } from "@rakazo/adapter-kit";
-import { MeetingSourceError, meetingsDigestJob } from "@rakazo/adapter-kit";
+import { dataRoomBlobDeleteJob, MeetingSourceError, meetingsDigestJob } from "@rakazo/adapter-kit";
 import type { MeetingSourceRef, PrismaClient } from "@rakazo/db";
 import { upsertMeeting } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -109,17 +109,30 @@ export async function runMeetingSyncPass(
     for (const item of listed.items) {
       deps.signal?.throwIfAborted();
       if (await alreadyHave(prisma, scope, deps.provider, item)) continue;
+      // A provider with an hourly read limit stops here; the next run lists this page again.
+      if (source.canGet?.(item.externalId) === false)
+        return { done: false, lostClaim: false, fetched };
       let meeting: Awaited<ReturnType<MeetingSource["get"]>>;
       try {
         meeting = await source.get(item.externalId, { includeTranscript: true });
       } catch (error) {
         // Gone between the list and the read; nothing to store.
         if (error instanceof MeetingSourceError && error.kind === "not_found") continue;
+        if (error instanceof MeetingSourceError && error.kind === "budget")
+          return { done: false, lostClaim: false, fetched };
         throw error;
       }
       deps.signal?.throwIfAborted();
       if (!(await deps.holdsClaim())) return { done: false, lostClaim: true, fetched };
-      const outcome = await upsertMeeting(prisma, scope, deps.ref, deps.provider, meeting);
+      const outcome = await upsertMeeting(prisma, scope, deps.ref, deps.provider, meeting, {
+        // ponytail: a failed enqueue leaves an orphan blob, as dropNotes does.
+        onRecordingBlobs: async (keys) => {
+          for (const key of keys)
+            await deps.jobs
+              ?.enqueue(dataRoomBlobDeleteJob(scope.spaceId, key, new Date(Date.now() + 60_000)))
+              .catch((error: unknown) => getLogger().error("recording blob delete failed", error));
+        },
+      });
       fetched++;
       if (outcome === "created" || outcome === "updated")
         await queueDigest(deps, meeting.externalId);
@@ -140,14 +153,16 @@ async function alreadyHave(
   prisma: PrismaClient,
   scope: Scope,
   provider: string,
-  item: { externalId: string; updatedAt: string },
+  item: { externalId: string; updatedAt: string; version?: string },
 ): Promise<boolean> {
   const key = { ...scope, provider, externalId: item.externalId };
   if (await prisma.meetingTombstone.findFirst({ where: key, select: { id: true } })) return true;
   const stored = await prisma.meeting.findFirst({
     where: key,
-    select: { sourceUpdatedAt: true },
+    select: { sourceUpdatedAt: true, sourceVersion: true },
   });
+  // A source with a content version compares it, since its update time never changes on an edit.
+  if (item.version !== undefined) return stored?.sourceVersion === item.version;
   return (
     !!stored?.sourceUpdatedAt && stored.sourceUpdatedAt.getTime() >= Date.parse(item.updatedAt)
   );

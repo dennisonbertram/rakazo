@@ -1,11 +1,15 @@
 import type { Bot, DataRoomApiItem } from "@rakazo/contracts";
 import {
+  ATTACHMENT_MAX_BYTES,
   ATTACHMENT_MAX_COUNT,
   botCanReadDataRoom,
   FIRST_BOT_SPAWN_KEY,
   isMailThreadAgentSpawnKey,
 } from "@rakazo/contracts";
+import { inferAttachmentMimeType } from "@rakazo/core";
 import type { SendTarget } from "../components/data-room/SendToAgent";
+import type { ArtifactTarget } from "./artifact-open";
+import { fetchArtifactBytes } from "./artifact-open";
 
 /** A Data room file waiting in an agent's composer, sent by reference with the next message. */
 export type DataRoomRef = Pick<DataRoomApiItem, "id" | "name" | "mimeType"> & { threadKey: string };
@@ -44,4 +48,45 @@ export function planSendToAgent(
   return botCanReadDataRoom(bot)
     ? { refs: items.slice(0, ATTACHMENT_MAX_COUNT), copies: [] }
     : { refs: [], copies: items };
+}
+
+/** Reads each stored file of a message; the names of the ones that could not be read come back as `failed`. */
+export async function fetchMessageFiles(
+  target: ArtifactTarget,
+  blocks: { kind: string; artifactId?: string; name?: string; mimeType?: string }[],
+): Promise<{ files: File[]; failed: string[] }> {
+  const files: File[] = [];
+  const failed: string[] = [];
+  for (const block of blocks) {
+    if ((block.kind !== "file" && block.kind !== "image") || !block.artifactId) continue;
+    const name = block.name ?? "file";
+    try {
+      const bytes = await fetchArtifactBytes(target, block.artifactId);
+      files.push(new File([new Uint8Array(bytes)], name, { type: block.mimeType }));
+    } catch {
+      failed.push(name);
+    }
+  }
+  return { files, failed };
+}
+
+/**
+ * Which files fit in a composer that already holds `existingCount` attachments. `skipped` holds the
+ * rest with the reason, worded by `describe`.
+ */
+export function acceptAttachments(
+  existingCount: number,
+  files: ArrayLike<File>,
+  describe: { count: (name: string) => string; size: (name: string) => string },
+): { accepted: File[]; skipped: string[] } {
+  const accepted: File[] = [];
+  const skipped: string[] = [];
+  for (const file of Array.from(files)) {
+    if (existingCount + accepted.length >= ATTACHMENT_MAX_COUNT)
+      skipped.push(describe.count(file.name));
+    else if (file.size > ATTACHMENT_MAX_BYTES) skipped.push(describe.size(file.name));
+    else if (!inferAttachmentMimeType(file.name, file.type)) skipped.push(file.name);
+    else accepted.push(file);
+  }
+  return { accepted, skipped };
 }

@@ -4,6 +4,7 @@ import type {
   Bot,
   BotAppControl,
   BotAudience,
+  BotProactivity,
   ComputerHost,
   ComputerMode,
   Me,
@@ -18,6 +19,7 @@ import {
   BOT_NAME_MAX_LENGTH,
   BUILTIN_TOOL_NAMES,
   botAudienceEditable,
+  isVoiceAgentSpawnKey,
 } from "@rakazo/contracts";
 import {
   connectedModelChoices,
@@ -48,6 +50,7 @@ import { thinkingLevelLabel } from "../../lib/model-catalog";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { AvatarStudioPopover } from "./avatar-studio-popover";
+import { BotAccessSection } from "./BotAccessSection";
 import { BotSkillsSection } from "./BotSkillsSection";
 import { BotCredentialsSection } from "./bot-credentials";
 
@@ -64,6 +67,7 @@ type AudiencePatch = {
   audience?: BotAudience;
   externalMessageTargets?: string[];
   externalComputerTools?: boolean;
+  proactivity?: BotProactivity;
   /** Local desktop control; sent only when it changed. */
   appControl?: UpdateBotAppControl;
 };
@@ -171,6 +175,49 @@ export function CheckInSetting({ botId, onChange }: { botId: string; onChange?: 
   );
 }
 
+const PROACTIVITY_LEVELS = ["low", "medium", "high"] as const;
+
+/** Firewalled and external agents ignore the level, so the select is shown but cannot change. */
+export function ProactivitySetting({
+  value,
+  locked,
+  onChange,
+}: {
+  value: BotProactivity;
+  locked: boolean;
+  onChange: (value: BotProactivity) => void;
+}) {
+  const { t } = useLingui();
+  const id = useId();
+  const labels = { low: t`Low`, medium: t`Medium`, high: t`High` };
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border/20 pt-4">
+      <label htmlFor={`${id}-proactivity`} className="text-[13.5px] font-medium text-foreground">
+        <Trans>Proactive</Trans>
+      </label>
+      <NativeSelect
+        id={`${id}-proactivity`}
+        className="w-40"
+        value={value}
+        disabled={locked}
+        aria-describedby={locked ? `${id}-proactivity-note` : undefined}
+        onChange={(event) => onChange(event.target.value as BotProactivity)}
+      >
+        {PROACTIVITY_LEVELS.map((level) => (
+          <NativeSelectOption key={level} value={level}>
+            {labels[level]}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      {locked ? (
+        <span id={`${id}-proactivity-note`} className="basis-full text-[12px] text-muted-foreground">
+          <Trans>Not used by firewalled or external agents</Trans>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function BotSettings({
   bot,
   memoryProviderConfigured,
@@ -245,6 +292,10 @@ export function BotSettings({
   const savedDescriptionRef = useRef(bot.description ?? "");
   const [color, setColor] = useState(bot.color);
   const [notifyOnFinish, setNotifyOnFinish] = useState(bot.notifyOnFinish ?? true);
+  const [proactivity, setProactivity] = useState<BotProactivity>(bot.proactivity ?? "medium");
+  useEffect(() => {
+    if (pendingSavesRef.current === 0) setProactivity(bot.proactivity ?? "medium");
+  }, [bot.proactivity]);
   const [computerMode, setComputerMode] = useState(bot.computerMode);
   const [runsOn, setRunsOn] = useState<ComputerHost>(
     bot.runsOn ?? hostComputer?.defaultHost ?? "docker",
@@ -459,6 +510,9 @@ export function BotSettings({
         ...(hostComputer && runsOn !== (bot.runsOn ?? hostComputer.defaultHost) ? { runsOn } : {}),
         memoryScope,
         ...(patchOverrides?.audience !== undefined ? { audience: patchOverrides.audience } : {}),
+        ...(patchOverrides?.proactivity !== undefined
+          ? { proactivity: patchOverrides.proactivity }
+          : {}),
         ...(patchOverrides?.externalMessageTargets !== undefined
           ? { externalMessageTargets: patchOverrides.externalMessageTargets }
           : {}),
@@ -518,6 +572,7 @@ export function BotSettings({
     } catch (err) {
       setError(errorText(err, t`Could not save`));
       setAudience(bot.audience);
+      setProactivity(bot.proactivity ?? "medium");
       setAllowedTargets(bot.externalMessageTargets);
       setComputerOn(bot.externalComputerTools);
       setAppControl(bot.appControl ?? NO_APP_CONTROL);
@@ -676,6 +731,16 @@ export function BotSettings({
             />
           </label>
           <CheckInSetting botId={bot.id} onChange={onCheckInChange} />
+          {isVoiceAgentSpawnKey(bot.spawnKey) ? null : (
+            <ProactivitySetting
+              value={proactivity}
+              locked={bot.firewall || audience === "external"}
+              onChange={(next) => {
+                setProactivity(next);
+                void enqueueSave({ proactivity: next });
+              }}
+            />
+          )}
           <ErrorBoundary fallback={<SectionLoadFailed />}>
             <Suspense fallback={null}>
               <ScratchpadSection botId={bot.id} refreshKey={skillsRefreshKey} />
@@ -768,6 +833,7 @@ export function BotSettings({
             onSkillsChange={onSkillsChange}
           />
           <BotCredentialsSection botId={bot.id} />
+          <BotAccessSection bot={bot} />
           <section data-testid="bot-approvals" className="mt-6">
             <div className="mb-2 text-[13.5px] font-medium text-foreground">
               <Trans>Approvals</Trans>

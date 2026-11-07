@@ -27,9 +27,10 @@ struct BotUpdateInput: Encodable, Sendable {
   var autoSpeak: Bool?
   var sectionId: String?
   var clearSection = false
+  var proactivity: String?
 
   private enum Keys: String, CodingKey {
-    case botId, name, title, color, pinned, autoSpeak, sectionId
+    case botId, name, title, color, pinned, autoSpeak, sectionId, proactivity
   }
 
   func encode(to encoder: Encoder) throws {
@@ -40,6 +41,7 @@ struct BotUpdateInput: Encodable, Sendable {
     try box.encodeIfPresent(color, forKey: .color)
     try box.encodeIfPresent(pinned, forKey: .pinned)
     try box.encodeIfPresent(autoSpeak, forKey: .autoSpeak)
+    try box.encodeIfPresent(proactivity, forKey: .proactivity)
     if clearSection {
       try box.encodeNil(forKey: .sectionId)
     } else {
@@ -63,6 +65,17 @@ enum ManageClient {
 
   static func clean(_ name: String) -> String {
     String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxNameLength))
+  }
+
+  /// The name to save for a rename, or nil when it is blank or unchanged.
+  static func renamed(_ text: String, from current: String) -> String? {
+    let value = clean(text)
+    return value.isEmpty || value == current ? nil : value
+  }
+
+  static func archiveMessage(_ name: String) -> String {
+    let name = clean(name)
+    return name.isEmpty ? String(localized: "Archived") : String(localized: "Archived \(name)")
   }
 
   static func canCreateGroup(name: String, members: Int) -> Bool {
@@ -117,7 +130,7 @@ enum ManageClient {
     try await archived(target, true, app: app)
     app.path = []
     onChange()
-    UndoToast.show("Archived \(name)") {
+    UndoToast.show(archiveMessage(name)) {
       try? await archived(target, false, app: app)
       onChange()
     }

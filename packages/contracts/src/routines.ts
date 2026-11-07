@@ -57,7 +57,8 @@ export const WatchSpecSchema = z.discriminatedUnion("kind", [
 export type PageWatchSpec = z.infer<typeof PageWatchSpecSchema>;
 export type WatchSpec = z.infer<typeof WatchSpecSchema>;
 
-export const WatchPausedReasonSchema = z.enum(["errors", "noisy", "budget", "access"]);
+/** "credit": the routine's model connection ran out of credit; it runs again on its own. */
+export const WatchPausedReasonSchema = z.enum(["errors", "noisy", "budget", "access", "credit"]);
 export type WatchPausedReason = z.infer<typeof WatchPausedReasonSchema>;
 
 /** The one managed routine kind: a bot's check-in. */

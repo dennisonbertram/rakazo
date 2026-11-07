@@ -34,6 +34,7 @@ export function routineActivityLine(routine: Routine, now = new Date()): string 
       noisy: t("Paused: the page changes too often"),
       access: t("Paused: no access"),
       budget: t("Paused: too many checks today"),
+      credit: t("Paused: model connection out of credit"),
     }[status.pausedReason];
   }
   const failed = status.lastRunFailed && t("Last run failed");

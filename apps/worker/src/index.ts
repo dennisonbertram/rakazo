@@ -7,6 +7,7 @@ import {
 } from "@rakazo/adapters";
 import { loadRootEnv } from "@rakazo/core/node/load-root-env";
 import { createWorkerSecretStore } from "./secret-store.js";
+import { stopJobsAndRuns } from "./stop-jobs.js";
 
 loadRootEnv();
 
@@ -272,6 +273,7 @@ async function main() {
     mcpStdio,
     deploymentModelKey,
     deploymentModelConfigured,
+    fragmentKey: encryptionKey,
     dataDir,
     notificationEvents,
     jobs,
@@ -390,15 +392,9 @@ async function main() {
     stopping = true;
     try {
       await reconciler.stop();
-      // Stop claiming jobs and let in-flight runs finish. After the grace period, abort them
-      // so they requeue as interrupted; Prisma disconnects only once they have returned.
-      const drained = jobHost.stop();
-      const grace = setTimeout(() => shutdown.abort(new Error("Worker shutting down")), 10_000);
-      try {
-        await drained;
-      } finally {
-        clearTimeout(grace);
-      }
+      // Stop claiming jobs and requeue in-flight runs now; Prisma disconnects only once they
+      // have returned.
+      await stopJobsAndRuns(jobHost, shutdown);
       await jobs.close();
       await secrets.close();
       await realtime.close();

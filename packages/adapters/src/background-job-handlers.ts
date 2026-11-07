@@ -51,16 +51,19 @@ import type { FinanceSyncDeps } from "./finance-sync.js";
 import { syncFinanceForUser } from "./finance-sync.js";
 import type { GmailPushConfig } from "./gmail-push.js";
 import { ensureMailWatch, runMailWatchRenewal } from "./gmail-push.js";
+import { runGoalCheck } from "./goal-check.js";
 import { GoogleContactPhotoSource } from "./google-contact-photos.js";
 import { compactHistory } from "./history-compaction.js";
 import { createInboxClassifierProvider } from "./inbox-classifier-factory.js";
 import { runInboxTriage, triageReadiness } from "./inbox-triage.js";
 import { runMailAttachmentFiling } from "./mail-attachment-filing.js";
-import { runMailSyncJob } from "./mail-sync-job.js";
+import { runMailReplyBatch } from "./mail-reply-batch.js";
+import { runMailSyncJob, sweepMailSyncs } from "./mail-sync-job.js";
 import { expireMailSearch } from "./mail-tools.js";
 import type { McpConnector } from "./mcp-connector.js";
 import { runCaptureFinalize, runCaptureSweep, runCaptureTranscribe } from "./meeting-capture.js";
 import { runMeetingDigest } from "./meeting-digest.js";
+import { runFollowupSweep, runMeetingFollowup } from "./meeting-followup.js";
 import { createMeetingSourceRegistry } from "./meeting-source-registry.js";
 import type { MeetingSourceRegistry } from "./meeting-sync-job.js";
 import { runMeetingSyncJob } from "./meeting-sync-job.js";
@@ -72,6 +75,7 @@ import { runOmiSort } from "./omi-sort.js";
 import { runOmiTranscribe } from "./omi-transcribe.js";
 import { runPageRefreshTick, runPageSnapshotRetention } from "./page-source-tick.js";
 import { renderPdfPages } from "./pdf-render.js";
+import { runPipelineImport } from "./pipeline-import-tools.js";
 import { syncCryptoHoldings } from "./rpc-crypto-sync.js";
 import { describeTeachSteps } from "./teach-steps.js";
 import { expireTaughtSkillTeaching } from "./teaching-session.js";
@@ -181,6 +185,8 @@ export function createBackgroundJobHandlers(deps: {
     deps.prisma.computer.findUnique({ where: { id: computerId }, select: OWNER });
   const thread = ({ threadId }: { threadId: string }) =>
     deps.prisma.thread.findUnique({ where: { id: threadId }, select: OWNER });
+  const goal = ({ goalId }: { goalId: string }) =>
+    deps.prisma.threadGoal.findUnique({ where: { id: goalId }, select: OWNER });
   const skill = ({ skillId }: { skillId: string }) =>
     deps.prisma.taughtSkill.findUnique({ where: { id: skillId }, select: OWNER });
   const cloudAgent = ({ agentId }: { agentId: string }) =>
@@ -209,7 +215,11 @@ export function createBackgroundJobHandlers(deps: {
     };
   };
 
-  const meetingSources = deps.meetingSources ?? createMeetingSourceRegistry();
+  const meetingSources =
+    deps.meetingSources ??
+    createMeetingSourceRegistry(
+      deps.mcp ? { mcp: { prisma: deps.prisma, connector: deps.mcp } } : {},
+    );
 
   return {
     "run.continue": asOwner(run, async (payload) => {
@@ -290,6 +300,23 @@ export function createBackgroundJobHandlers(deps: {
     "mail.search.expire": asOwner(mailSearch, async (payload) => {
       await expireMailSearch(deps.prisma, payload.searchId);
     }),
+    "mail.reply.batch": asPayloadTenant((payload) => {
+      const { mail } = deps;
+      if (!mail) throw new Error("Mail is not configured");
+      return runMailReplyBatch(
+        {
+          prisma: deps.prisma,
+          mail,
+          jobs: deps.jobs,
+          events: deps.events,
+          mailWritesDisabled: deps.mailWritesDisabled,
+        },
+        payload,
+      );
+    }),
+    "pipeline.import": asPayloadTenant((payload) =>
+      runPipelineImport({ prisma: deps.prisma, jobs: deps.jobs, events: deps.events }, payload),
+    ),
     "mail.sync": asPayloadTenant((payload) => {
       const { mail } = deps;
       if (!mail) throw new Error("Mail sync is not configured");
@@ -341,6 +368,18 @@ export function createBackgroundJobHandlers(deps: {
         payload,
       ),
     ),
+    "meetings.followup": asPayloadTenant(async (payload) => {
+      if (!deps.artifacts) throw new Error("Artifact store is not configured");
+      await runMeetingFollowup(
+        {
+          prisma: deps.prisma,
+          jobs: deps.jobs,
+          artifacts: deps.artifacts,
+          resolveModel: deps.executor.resolveModel,
+        },
+        payload,
+      );
+    }),
     "mail.attachments": asPayloadTenant(async (payload) => {
       const { mail, artifacts } = deps;
       if (!mail || !artifacts) throw new Error("Mail attachment filing is not configured");
@@ -361,6 +400,9 @@ export function createBackgroundJobHandlers(deps: {
         payload,
       );
     }),
+    "mail.sync.sweep": async () => {
+      await sweepMailSyncs({ prisma: deps.prisma, jobs: deps.jobs });
+    },
     "audit.intake": asPayloadTenant(async (payload) => {
       const { mail, artifacts } = deps;
       if (!mail || !artifacts) throw new Error("Audit intake is not configured");
@@ -418,6 +460,7 @@ export function createBackgroundJobHandlers(deps: {
     ),
     "meetings.capture_sweep": async () => {
       await runCaptureSweep({ prisma: deps.prisma, jobs: deps.jobs });
+      await runFollowupSweep({ prisma: deps.prisma, jobs: deps.jobs });
     },
     "omi.assemble": asPayloadTenant(async (payload) => {
       if (!deps.artifacts) throw new Error("Artifact store is not configured");
@@ -577,6 +620,19 @@ export function createBackgroundJobHandlers(deps: {
     "pages.snapshots.retention": async () => {
       await runPageSnapshotRetention(deps.prisma);
     },
+    "goal.check": asOwner(goal, async (payload) => {
+      await runGoalCheck(
+        {
+          prisma: deps.prisma,
+          jobs: deps.jobs,
+          events: deps.events,
+          notificationEvents: deps.notificationEvents,
+          runtime: deps.runtime,
+          ...(deps.executor.resolveModel ? { resolveModel: deps.executor.resolveModel } : {}),
+        },
+        payload,
+      );
+    }),
     "history.compact": asOwner(thread, async (payload) => {
       // Retrieval policies use stored context without paid message-count compaction.
       // Skip legacy backlog work after a policy change.

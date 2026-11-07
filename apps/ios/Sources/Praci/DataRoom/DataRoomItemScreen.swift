@@ -45,6 +45,9 @@ struct DataRoomItemScreen: View {
         } else if item.isProcessing {
           Label("Reading…", systemImage: "hourglass")
         }
+        if item.isFailed || item.isProcessing {
+          Button("Try again") { Task { await retry() } }.accessibilityIdentifier("retryFile")
+        }
         LabeledContent("Type", value: DataRoomFormat.kind(item))
         LabeledContent("Size", value: Int64(item.size).formatted(.byteCount(style: .file)))
         if let date = InboxRow.parseDate(item.createdAt) {
@@ -90,6 +93,14 @@ struct DataRoomItemScreen: View {
         thumbnail = UIImage(data: data)
       }
     }
+    .task(id: item.status) {
+      while item.isProcessing, !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(4))
+        if let fresh: DataRoomItem = try? await app.call("dataRoom/item", input: DataRoomIDInput(id: item.id)) {
+          item = fresh
+        }
+      }
+    }
   }
 
   private func open() async {
@@ -102,12 +113,44 @@ struct DataRoomItemScreen: View {
     }
   }
 
+  /// Starts a failed or stuck file over; the server refuses one that is still being read.
+  private func retry() async {
+    do {
+      item = try await app.call("dataRoom/itemRetry", input: DataRoomIDInput(id: item.id))
+    } catch {
+      errorMessage = settingsErrorText(error)
+    }
+  }
+
   private func delete() async {
     do {
       let _: DataRoomOK = try await app.call("dataRoom/itemDelete", input: DataRoomIDInput(id: item.id))
       dismiss()
     } catch {
       errorMessage = settingsErrorText(error)
+    }
+  }
+}
+
+/// Opens a Data room file from its id, such as from a link an agent wrote.
+struct DataRoomItemLoader: View {
+  let itemID: String
+  @Environment(AppModel.self) private var app
+  @State private var state: Loadable<DataRoomItem> = .idle
+
+  var body: some View {
+    LoadableView(state: state, retry: { Task { await load() } }, content: { item in
+      DataRoomItemScreen(item: item)
+    })
+    .task { await load() }
+  }
+
+  private func load() async {
+    state = .loading
+    do {
+      state = .loaded(try await app.call("dataRoom/item", input: DataRoomIDInput(id: itemID)))
+    } catch {
+      state = .failed(error.localizedDescription)
     }
   }
 }

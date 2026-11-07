@@ -205,6 +205,20 @@ it("still asks which bots get a connection that has no agent", async () => {
   expect(text()).toContain("Which bots can use Slack?");
 });
 
+it("saves least access when the bot step is skipped, so no other bot gets the connection", async () => {
+  api.setAccess.mockResolvedValue({});
+  await connect(pendingRow("connected"));
+  await act(async () => {
+    [...document.querySelectorAll("button")].find((b) => b.textContent === "Skip")?.click();
+  });
+  expect(api.setAccess).toHaveBeenCalledWith({
+    connectionId: "conn-1",
+    allAgents: false,
+    botIds: [],
+  });
+  expect(text()).toContain("Slack connected");
+});
+
 it("does not promise a bot choice before sign-in", async () => {
   vi.spyOn(window, "open").mockReturnValue(null);
   await mount([], true);
@@ -217,4 +231,26 @@ it("shows only the title once connected, without repeating the result", async ()
   expect(text()).toContain("Slack connected");
   expect(text()).not.toContain("is ready");
   expect(text()).not.toContain("now appears under Connected");
+});
+
+it("names a second Gmail account plainly, since its address tells it apart, but numbers other apps", async () => {
+  vi.spyOn(window, "open").mockReturnValue({ closed: false, close: vi.fn() } as unknown as Window);
+  const gmail = { ...item, connectorId: "google", slug: "gmail", name: "Gmail" };
+  const connected = pendingRow("connected", {
+    connectorId: "google",
+    provider: "gmail",
+    displayName: "Gmail",
+  });
+  await mount([connected], false, { item: gmail });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(api.begin.mock.calls[0]?.[0]).toMatchObject({ displayName: "Gmail" });
+  api.begin.mockClear();
+  document.body.innerHTML = "";
+  await mount([pendingRow("connected")]);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(api.begin.mock.calls[0]?.[0]).toMatchObject({ displayName: "Slack 2" });
 });

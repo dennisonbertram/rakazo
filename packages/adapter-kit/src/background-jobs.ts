@@ -27,6 +27,7 @@ const payloadSchemas = {
   }),
   "skill.teaching-expire": z.object({ skillId: z.string().min(1) }),
   "history.compact": z.object({ threadId: z.string().min(1) }),
+  "goal.check": z.object({ goalId: z.string().min(1), runId: z.string().min(1) }),
   "messaging.deliver": z.object({ runId: z.string().min(1).optional() }),
   "notifications.deliver": z.object({}),
   "notifications.retention": z.object({}),
@@ -35,6 +36,16 @@ const payloadSchemas = {
   "account.export.cleanup": z.object({}),
   "cloud_agent.poll": z.object({ agentId: z.string().min(1) }),
   "mail.search.expire": z.object({ searchId: z.string().min(1) }),
+  "mail.reply.batch": z.object({
+    effectId: z.string().min(1),
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+  }),
+  "pipeline.import": z.object({
+    importId: z.string().min(1),
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+  }),
   "inbox.triage": z.object({ userId: z.string().min(1), spaceId: z.string().min(1) }),
   "mail.sync": z.object({
     spaceId: z.string().min(1),
@@ -59,6 +70,7 @@ const payloadSchemas = {
     messageId: z.string().min(1),
   }),
   "mail.watch.renew": z.object({}),
+  "mail.sync.sweep": z.object({}),
   "devin.refresh": z.object({ serverId: z.string().min(1).optional() }),
   "meetings.sync": z
     .object({
@@ -77,6 +89,13 @@ const payloadSchemas = {
     meetingId: z.string().min(1),
     /** Set on the last job of a batch: when it ends, the rest of the backlog is queued. */
     continue: z.boolean().optional(),
+  }),
+  "meetings.followup": z.object({
+    spaceId: z.string().min(1),
+    userId: z.string().min(1),
+    meetingId: z.string().min(1),
+    /** How many times a busy agent thread has already pushed this follow-up back. */
+    retry: z.number().int().min(0).optional(),
   }),
   "company.import.run": z.object({
     spaceId: z.string().min(1),
@@ -134,7 +153,7 @@ const payloadSchemas = {
     entries: z.number().int().positive(),
     importId: z.string().min(1),
     name: z.string().min(1),
-    source: z.enum(["upload", "gmail", "drive", "box", "chat", "omi"]),
+    source: z.enum(["upload", "gmail", "drive", "box", "chat", "omi", "meeting"]),
     folderId: z.string().min(1).nullable(),
     sourceConnectionId: z.string().min(1).optional(),
     externalId: z.string().min(1).optional(),
@@ -334,6 +353,15 @@ export function historyCompactJob(threadId: string): BackgroundJob {
   };
 }
 
+/** One queued check per goal: a newer run's end replaces an older queued check. */
+export function goalCheckJob(goalId: string, runId: string): BackgroundJob {
+  return {
+    name: "goal.check",
+    payload: { goalId, runId },
+    replaceKey: `goal:${goalId}`,
+  };
+}
+
 export function cloudAgentPollJobKey(agentId: string): string {
   return `cloud_agent.poll:${agentId}`;
 }
@@ -360,6 +388,35 @@ export function mailSearchExpireJob(searchId: string, availableAt: Date): Backgr
     payload: { searchId },
     availableAt,
     replaceKey: mailSearchExpireJobKey(searchId),
+  };
+}
+
+export function mailReplyBatchJobKey(effectId: string): string {
+  return `mail.reply.batch:${effectId}`;
+}
+
+/**
+ * Sends one batch's approved rows in order. Claims are per row, so a second job for the same batch
+ * (a retry while one still runs, or recovery after a worker died) can never send a row twice.
+ */
+export function mailReplyBatchJob(
+  payload: BackgroundJobPayloads["mail.reply.batch"],
+): BackgroundJob {
+  return {
+    name: "mail.reply.batch",
+    payload,
+    replaceKey: mailReplyBatchJobKey(payload.effectId),
+  };
+}
+
+/** Applies one import's queued rows. Rows take turns, so a second job for the import changes nothing. */
+export function pipelineImportJob(
+  payload: BackgroundJobPayloads["pipeline.import"],
+): BackgroundJob {
+  return {
+    name: "pipeline.import",
+    payload,
+    replaceKey: `pipeline.import:${payload.importId}`,
   };
 }
 
@@ -470,6 +527,32 @@ export function meetingsDigestJob(
     replaceKey: `meetings.digest:${payload.meetingId}`,
     maxAttempts: 3,
     ...(availableAt ? { availableAt } : {}),
+  };
+}
+
+/** One queued follow-up per meeting. */
+export function meetingsFollowupJob(
+  payload: BackgroundJobPayloads["meetings.followup"],
+): BackgroundJob {
+  return {
+    name: "meetings.followup",
+    payload,
+    replaceKey: `meetings.followup:${payload.meetingId}`,
+    maxAttempts: 3,
+  };
+}
+
+/** Runs the follow-up again later, because an agent's thread was busy. Its own key leaves the running job alone. */
+export function meetingsFollowupRetryJob(
+  payload: BackgroundJobPayloads["meetings.followup"],
+  availableAt: Date,
+): BackgroundJob {
+  return {
+    name: "meetings.followup",
+    payload,
+    replaceKey: `meetings.followup:${payload.meetingId}:retry`,
+    availableAt,
+    maxAttempts: 3,
   };
 }
 

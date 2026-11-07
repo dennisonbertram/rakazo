@@ -3,6 +3,7 @@ import type { NormalizedMailEdits } from "@rakazo/adapters";
 import {
   findAccount,
   inferMailAccount,
+  mailAccountsUsableBy,
   mailApprovalAgentNote,
   mailRequestIsValid,
   normalizeMailEdits,
@@ -86,25 +87,33 @@ export async function answerEditedMailApproval(
   if (deps.mailWritesDisabled) {
     throw new ORPCError("PRECONDITION_FAILED", { message: "Sending is turned off." });
   }
+  const run = await deps.prisma.run.findFirst({
+    where: { id: input.runId, spaceId: actor.spaceId, userId: actor.userId },
+    select: { botId: true, bot: { select: { disabledBuiltinTools: true } } },
+  });
+  if (!run) {
+    throw new ORPCError("CONFLICT", { message: "This prompt is no longer awaiting an answer" });
+  }
   // Send now on a draft is the person's own send, so the bot's sending switch applies to it.
   const sendNow = pending.kind === "mail_draft" && input.mail.send === true;
-  if (sendNow) {
-    const run = await deps.prisma.run.findFirst({
-      where: { id: input.runId, spaceId: actor.spaceId, userId: actor.userId },
-      select: { bot: { select: { disabledBuiltinTools: true } } },
-    });
-    if (!run || disabledBuiltinToolSet(run.bot.disabledBuiltinTools).has("mail_send")) {
-      throw new ORPCError("PRECONDITION_FAILED", { message: "Sending is turned off." });
-    }
+  if (sendNow && disabledBuiltinToolSet(run.bot.disabledBuiltinTools).has("mail_send")) {
+    throw new ORPCError("PRECONDITION_FAILED", { message: "Sending is turned off." });
   }
 
-  // The account is the caller's own connection, found from the address the agent named.
-  const accounts = await deps.mail.listAccounts(
+  // Only the accounts this agent may change are offered on the card, so only those are accepted: a
+  // stale or crafted client must not send from any other mailbox.
+  const accounts = await mailAccountsUsableBy(
+    deps.prisma,
     { spaceId: actor.spaceId, userId: actor.userId },
-    mailContext(actor, "mail.approval.edit"),
+    run.botId,
+    pending.kind,
+    await deps.mail.listAccounts(
+      { spaceId: actor.spaceId, userId: actor.userId },
+      mailContext(actor, "mail.approval.edit"),
+    ),
   );
   const wanted = typeof merged.account === "string" ? merged.account.trim() : "";
-  // The card submits the picked connection's id; it must be one of the caller's own accounts.
+  // The card submits the picked connection's id; it must be one the agent may use.
   const picked = checked.edits.account;
   const account = picked
     ? accounts.find((candidate) => candidate.id === picked)
@@ -137,6 +146,8 @@ export async function answerEditedMailApproval(
       mail: {
         ...withoutAccount(checked.edits),
         connectionId: account.id,
+        // The card names the account it really went from, which may be the one picked on the card.
+        ...(account.address ? { account: account.address } : {}),
         // The card now describes an email that is being sent, not a draft being saved.
         ...(sendNow ? { tool: "mail_send" as const } : {}),
       },
@@ -215,7 +226,10 @@ export async function answerEditedMailApproval(
       effectId: pending.effectId,
       outcome,
       providerIds: composeIds(sentRow),
-      note: mailApprovalAgentNote(send, outcome, edited),
+      note: mailApprovalAgentNote(send, outcome, edited, {
+        to: strings(merged.to),
+        from: account.address ?? undefined,
+      }),
     });
   } finally {
     await afterClaim();

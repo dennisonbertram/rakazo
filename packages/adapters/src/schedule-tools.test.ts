@@ -685,6 +685,29 @@ describe("routine from a forced skill", () => {
     expect(card?.detail).toContain("prompt: Draft the note");
   });
 
+  it("shows the prompt and the run time on the card of a one-shot schedule, without making it ask", async () => {
+    const card = await scheduleApproval(
+      { prisma: {} as never },
+      { spaceId: "s", botId: "b", userId: "u" },
+      "schedule_create",
+      { name: "Nudge", prompt: "Ping me about the board deck", runAt: "2099-01-01T15:00:00Z" },
+      "UTC",
+    );
+    expect(card?.summary).toMatch(/^Once, .*2099.*, posts here$/);
+    expect(card?.detail).toContain("prompt: Ping me about the board deck");
+    expect(card?.detail).toContain("next run:");
+    // A one-shot alone is not a reason to ask; the executor reads this flag.
+    expect(card?.oneShot).toBe(true);
+    const repeating = await scheduleApproval(
+      { prisma: {} as never },
+      { spaceId: "s", botId: "b", userId: "u" },
+      "schedule_create",
+      { name: "Note", prompt: "Draft", cron: "0 9 * * 1" },
+      "UTC",
+    );
+    expect(repeating?.oneShot).toBeUndefined();
+  });
+
   it("still asks when a watch is edited after being made one-shot, and when it is made one-shot", async () => {
     const row = (crons: string[]) => ({
       name: "W",
@@ -902,7 +925,10 @@ describe("routine from a forced skill", () => {
         { crons: ["0 9 * * 1"], timezone: "UTC", nextRunAt: new Date("2026-11-02T09:00:00Z") },
         { prompt: "New prompt" },
       );
-      expect(update.mock.calls[0]![0].data).toEqual({ prompt: "New prompt" });
+      expect(update.mock.calls[0]![0].data).toEqual({
+        prompt: "New prompt",
+        promptUpdatedAt: expect.any(Date),
+      });
     });
 
     it("does not start a watch or a one-time reminder from startAt alone", async () => {

@@ -11,6 +11,8 @@ private struct Boom: LocalizedError { var errorDescription: String? { "Mail writ
 private final class Fake {
   var pages: [InboxList] = []
   var archiveError: Error?
+  var unarchiveError: Error?
+  var onUnarchive: () -> Void = {}
   var calls: [String] = []
   var tokens: [String?] = []
 
@@ -27,7 +29,11 @@ private final class Fake {
         self.calls.append("archive \(id)")
         if let error = self.archiveError { throw error }
       },
-      unarchive: { id in self.calls.append("unarchive \(id)") },
+      unarchive: { id in
+        self.calls.append("unarchive \(id)")
+        self.onUnarchive()
+        if let error = self.unarchiveError { throw error }
+      },
       spam: { id in
         self.calls.append("spam \(id)")
         return try Self.decode(#"{"done":["\#(id)"],"failed":[],"batchId":"b1"}"#)
@@ -71,6 +77,22 @@ func archiveRemovesTheRowAndOffersUndoWhichUnarchivesAndReloads() async throws {
   await model.undo(toast)
   #expect(fake.calls.suffix(2) == ["unarchive a", "list"])
   #expect(model.toast == nil)
+}
+
+@Test @MainActor
+func undoShowsTheRowBeforeTheServerAnswersAndRemovesItAgainIfTheRestoreFails() async throws {
+  let fake = Fake()
+  fake.pages = [Fake.list(["a", "b"]), Fake.list(["a", "b"])]
+  fake.unarchiveError = Boom()
+  let model = InboxModel(client: fake.client())
+  await model.start()
+  await model.archive(model.rows[0])
+  var shownDuringCall: [String] = []
+  fake.onUnarchive = { shownDuringCall = model.rows.map(\.id) }
+  await model.undo(try #require(model.toast))
+  #expect(shownDuringCall == ["a", "b"])
+  #expect(model.rows.map(\.id) == ["b"])
+  #expect(model.actionError == "Mail writes are off.")
 }
 
 @Test @MainActor
@@ -120,4 +142,15 @@ func openingARowMarksItReadOnScreen() async {
   await model.start()
   model.didOpen(model.rows[0])
   #expect(model.rows[0].unread == false)
+}
+
+@Test @MainActor
+func aMessageArchivedOnItsScreenLeavesTheListWithAnUndoToast() async throws {
+  let fake = Fake()
+  fake.pages = [Fake.list(["a", "b"]), Fake.list(["a", "b"])]
+  let model = InboxModel(client: fake.client())
+  await model.start()
+  model.archivedElsewhere("a")
+  #expect(model.rows.map(\.id) == ["b"])
+  #expect(model.toast?.undo == .unarchive(messageID: "a"))
 }

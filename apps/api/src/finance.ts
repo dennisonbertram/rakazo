@@ -374,6 +374,40 @@ export async function financeConnect(
   }
 }
 
+/**
+ * A server finished sign-in: its old "Sign-in expired" no longer holds, so clear it (the page shows
+ * connected at once) and sync now. A sync that fails again sets the flag back. A failed enqueue only
+ * delays the sync to the next page load.
+ */
+export async function onFinanceServerReconnected(
+  deps: Pick<FinanceDeps, "prisma" | "jobs">,
+  actor: Actor,
+  serverId: string,
+): Promise<void> {
+  try {
+    const server = await deps.prisma.mcpServer.findFirst({
+      where: { id: serverId, ...actorScope(actor) },
+      select: { endpoint: true },
+    });
+    const provider = financeProviderForEndpoint(server?.endpoint);
+    if (!provider) return;
+    const clear = { needsReconnect: false, lastErrorAt: null, lastError: null };
+    await deps.prisma.financeSyncState.updateMany({
+      where: { mcpServerId: serverId, ...actorScope(actor) },
+      data: clear,
+    });
+    // The Mercury SAFE read has its own state row per user, signed in through the same server.
+    if (provider === "mercury") {
+      await deps.prisma.safeSyncState.updateMany({ where: actorScope(actor), data: clear });
+    }
+    await deps.jobs.enqueue(financeSyncJob(actor.userId, actor.spaceId));
+  } catch (error) {
+    getLogger().warn("finance reconnect follow-up failed", {
+      reason: error instanceof Error ? error.name : "error",
+    });
+  }
+}
+
 /** Syncs now (the 15-minute throttle does not apply to an explicit refresh; the claim still does). */
 export async function financeRefresh(
   deps: FinanceDeps,
@@ -422,7 +456,9 @@ async function financeSources(deps: FinanceDeps, actor: Actor, now: Date) {
       status,
       lastSyncedAt: synced?.toISOString() ?? null,
     });
-    if (status !== "ok" && status !== "error") continue;
+    // A stale needsReconnect with a working login still syncs (throttled below), or one failed sync
+    // would hide the source for good: only a successful sync clears the flag.
+    if (login === "reconnect" || login === "none") continue;
     syncedAt.push(synced);
     const old = !synced || now.getTime() - synced.getTime() > STALE_MS;
     // A source that just failed is not retried on every page load.

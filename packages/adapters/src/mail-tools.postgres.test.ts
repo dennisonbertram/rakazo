@@ -387,6 +387,24 @@ describePostgres("mail tools (PostgreSQL + Gmail emulator)", () => {
     });
   });
 
+  it("refuses a grep of a search whose account the agent can no longer use", async () => {
+    const t = await harness({ a: tied });
+    const saved = await t.call("mail_search", { queries: ["jana"] });
+    const noAccounts = { ...t.deps, accounts: async () => [] };
+    const ctx: AdapterContext = {
+      operationId: "op",
+      traceId: "t",
+      spaceId: t.scope.spaceId,
+      userId: t.scope.userId,
+      botId: t.scope.botId,
+      signal: new AbortController().signal,
+    };
+    expect(
+      await mailToolFromTool("mail_grep", noAccounts, ctx, { searchId: saved.searchId }),
+    ).toEqual({ error: expect.stringContaining("no longer") });
+    expect(await t.call("mail_grep", { searchId: saved.searchId })).not.toHaveProperty("error");
+  });
+
   it("refuses expired results, expires them by job, and deletes one user's searches in one space", async () => {
     const t = await harness({ a: tied });
     const expired = await t.call("mail_search", { queries: ["jana"] });

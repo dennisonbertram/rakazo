@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { OmiStatus } from "@rakazo/contracts";
+import type { OmiCloudStatus, OmiStatus } from "@rakazo/contracts";
 import {
   Button,
   DropdownMenu,
@@ -9,9 +9,9 @@ import {
 } from "@rakazo/ui-web";
 import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { toggleAccess } from "../../lib/integrations";
+import { setOthersAccess, toggleAccess } from "../../lib/integrations";
 import type { OmiSyncState } from "../../lib/omi/useOmiSync";
 import { useOmiSync } from "../../lib/omi/useOmiSync";
 import { formatRelativeTime } from "../../lib/relative-time";
@@ -21,6 +21,7 @@ import { Shimmer } from "../ai/primitives";
 import { ConfirmDialog } from "./AppDetail";
 import { AppLogo } from "./AppLogo";
 import { IntegrationAgentSection } from "./IntegrationAgentSection";
+import { OmiCloudKeyCard } from "./OmiCloudKeyCard";
 import { OmiSegments } from "./OmiSegments";
 import { AgentToggleList } from "./parts";
 import type { IntegrationsData } from "./useIntegrations";
@@ -28,6 +29,7 @@ import type { IntegrationsData } from "./useIntegrations";
 /** Hours with at most one decimal: 27, 3.2. */
 const hours = (minutes: number) => Math.round(minutes / 6) / 10;
 const LONG_MIN = 120;
+const CLOUD_POLL_MS = 10_000;
 
 function StatusLine({ state }: { state: OmiSyncState }) {
   const { t } = useLingui();
@@ -196,7 +198,7 @@ export function OmiView({
 }
 
 /** Who can read recordings: the Omi agent, plus any agent the owner switches on. */
-function OmiAgent({
+export function OmiAgent({
   connectionId,
   agentBotId,
   data,
@@ -209,6 +211,7 @@ function OmiAgent({
   const [access, setAccess] = useState<{
     allAgents: boolean;
     botIds: string[];
+    agentShared: boolean;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -220,16 +223,50 @@ function OmiAgent({
   const allBotIds = data.bots.map((bot) => bot.id);
   const isOn = (botId: string) =>
     botId === agentBotId || (access ? access.allAgents || access.botIds.includes(botId) : false);
-  const shared = access
-    ? !(!access.allAgents && access.botIds.every((id) => id === agentBotId))
-    : false;
-  async function save(next: { allAgents: boolean; botIds: string[] }) {
+  const shared = access?.agentShared ?? false;
+  // Each change builds on the one before it, not on the last server answer, and saves run in click order.
+  const latest = useRef(access);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const [saving, setSaving] = useState(0);
+  useEffect(() => {
+    latest.current = access;
+  }, [access]);
+  const pending = useRef(0);
+  const failed = useRef(false);
+  function save(
+    next: { allAgents: boolean; botIds: string[] },
+    send: () => Promise<typeof access> = () => rpc.connections.setAccess({ connectionId, ...next }),
+  ) {
     setError(null);
-    try {
-      setAccess(await rpc.connections.setAccess({ connectionId, ...next }));
-    } catch (err) {
-      setError(errorText(err, t`Could not update bot access`));
-    }
+    // Choosing another agent turns sharing on; switching them all off leaves it on.
+    const sharing = {
+      ...next,
+      agentShared:
+        latest.current?.agentShared === true ||
+        next.allAgents ||
+        next.botIds.some((id) => id !== agentBotId),
+    };
+    latest.current = sharing;
+    setAccess(sharing);
+    pending.current += 1;
+    setSaving((count) => count + 1);
+    queue.current = queue.current.then(async () => {
+      try {
+        const saved = await send();
+        if (latest.current === sharing) setAccess(saved);
+      } catch (err) {
+        setError(errorText(err, t`Could not update bot access`));
+        failed.current = true;
+      }
+      pending.current -= 1;
+      // A failure only rolls back to the server's answer once no newer selection is queued behind it.
+      if (pending.current === 0 && failed.current) {
+        failed.current = false;
+        const server = await rpc.connections.access({ connectionId }).catch(() => null);
+        if (server) setAccess(server);
+      }
+      setSaving((count) => count - 1);
+    });
   }
   return (
     <div className="mt-6">
@@ -259,11 +296,32 @@ function OmiAgent({
           <AgentToggleList
             bots={data.bots}
             appName="Omi"
+            ready={access !== null}
             isOn={isOn}
+            ownerBotId={agentBotId}
+            saving={saving > 0}
+            everyone={access?.allAgents ?? false}
+            onSetAll={(on) =>
+              save(
+                setOthersAccess(
+                  latest.current ?? { allAgents: false, botIds: [] },
+                  allBotIds,
+                  [agentBotId],
+                  on,
+                ),
+              )
+            }
             onToggle={(botId, on) => {
               if (botId === agentBotId) return;
-              void save(
-                toggleAccess(access ?? { allAgents: false, botIds: [] }, allBotIds, botId, on),
+              // The server changes only this agent's grant; the shown state is its guess until it answers.
+              save(
+                toggleAccess(
+                  latest.current ?? { allAgents: false, botIds: [] },
+                  allBotIds,
+                  botId,
+                  on,
+                ),
+                () => rpc.connections.setAgentAccess({ connectionId, botId, on }),
               );
             }}
           />
@@ -288,11 +346,13 @@ export function OmiPage({
 }) {
   const [status, setStatus] = useState<OmiStatus | undefined>(undefined);
   const [noKey, setNoKey] = useState(false);
+  const [cloud, setCloud] = useState<OmiCloudStatus>(null);
   const [segmentsKey, setSegmentsKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     try {
       setStatus((await rpc.omi.status()) ?? null);
+      setCloud((await rpc.omiCloud.status()) ?? null);
       // A recording without a key stays "ready" with the error, so the status is not filtered.
       const items = await rpc.dataRoom.items.list({ source: "omi", limit: 100 });
       setNoKey(
@@ -308,6 +368,31 @@ export function OmiPage({
     void reload();
   }, [reload]);
   const { state, sync } = useOmiSync(status, reload);
+  // The card shows "Syncing" until the first sync finishes; ask again until it does.
+  const cloudSyncing = cloud?.status === "connected" && !cloud.syncedThrough;
+  useEffect(() => {
+    if (!cloudSyncing) return;
+    const controller = new AbortController();
+    let pending = false;
+    const timer = setInterval(() => {
+      // One request at a time: a slow answer is not stacked under the next tick.
+      if (pending) return;
+      pending = true;
+      void rpc.omiCloud
+        .status(undefined, { signal: controller.signal })
+        .then((next) => {
+          if (!controller.signal.aborted) setCloud(next ?? null);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          pending = false;
+        });
+    }, CLOUD_POLL_MS);
+    return () => {
+      clearInterval(timer);
+      controller.abort();
+    };
+  }, [cloudSyncing]);
 
   async function deleteAll() {
     setError(null);
@@ -339,6 +424,7 @@ export function OmiPage({
       onDeleteAll={() => void deleteAll()}
       onOpenVoiceSettings={onOpenVoiceSettings}
     >
+      <OmiCloudKeyCard status={cloud} onChanged={() => void reload()} />
       {status ? (
         <>
           <OmiSegments reloadKey={segmentsKey} />

@@ -23,7 +23,7 @@ import type { DriveFilesDeps } from "./drive-files.js";
 import { DriveFileError, streamDriveFile } from "./drive-files.js";
 import type { DriveAccount } from "./drive-tools.js";
 import { mailToolsAllowed } from "./mail-tools.js";
-import { wrapMeetingNotes } from "./meeting-tools.js";
+import { MEETING_CONSENT_REQUIRED_MESSAGE, wrapMeetingNotes } from "./meeting-tools.js";
 import { streamChunks } from "./stream-chunks.js";
 
 export const DATA_ROOM_TOOL_NAMES = new Set([
@@ -44,7 +44,7 @@ export function describeDataRoomActivity(name: string): string | null {
 
 /** Shared guidance; included in a run only when add_to_data_room is offered. */
 export const DATA_ROOM_GUIDANCE =
-  "When you find, receive or create a document (an email attachment, a Drive file you opened, a file someone gave you, or a report you wrote), add it to the Data room with add_to_data_room. Do this without being asked. Don't choose a folder, name or tags; the Data room agent files it. Adding the same document again does nothing, so you don't need to check first. Add files only, not message text, and skip small inline images such as logos and signatures. If the tool says the Data room is off, don't add anything else and mention it at most once in the conversation.";
+  "When you find, receive or create a document (an email attachment, a Drive file you opened, a file someone gave you, or a report you wrote), add it to the Data room with add_to_data_room. Do this without being asked. Don't choose a folder, name or tags; the Data room files and tags it on its own. Adding the same document again does nothing, so you don't need to check first. Add files only, not message text, and skip small inline images such as logos and signatures. If the tool says the Data room is off, don't add anything else and mention it at most once in the conversation.";
 
 /**
  * The most a mail attachment can be. Unlike every other source, the mail provider contract returns
@@ -87,13 +87,18 @@ export type DataRoomToolDeps = {
    * caller can mark the run's thread as holding untrusted content.
    */
   onUntrustedContent?: () => Promise<void>;
+  /** The same AI data sharing check `meetings_*` use; a meeting's notes are read only when it passes. */
+  meetingConsentOk?: () => Promise<boolean>;
   /** The cap on one mail attachment; injectable so tests can use a small one. */
   maxBytes?: number;
 };
 
-/** Omi recording text is anyone's speech near the pendant: wrapped as untrusted data. */
+/** Omi recording and meeting text is anyone's speech: wrapped as untrusted data. */
 const untrustedIf = <T extends string | null>(omi: boolean, value: T): T =>
   omi && value ? (wrapMeetingNotes(value) as T) : value;
+
+/** Agents never find a meeting's notes by search or listing; they read one by id from a handoff. */
+const HIDE_MEETINGS = { excludeSource: "meeting" } as const;
 
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
@@ -143,6 +148,7 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
   const { docDateFrom, docDateTo, ...rest } = parsed.data;
   const filters = {
     ...rest,
+    ...HIDE_MEETINGS,
     excludeConnectionIds: [...(deps.deniedConnectionIds ?? [])],
     ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
     ...(docDateFrom ? { docDateFrom: new Date(docDateFrom) } : {}),
@@ -161,6 +167,7 @@ async function search(deps: DataRoomToolDeps, actor: Actor, args: Record<string,
   const indexing = await deps.prisma.dataRoomItem.count({
     where: {
       ...eligibleWhere(actor, {
+        ...HIDE_MEETINGS,
         excludeConnectionIds: filters.excludeConnectionIds,
         ...(deps.onlyConnectionId ? { onlyConnectionId: deps.onlyConnectionId } : {}),
       }),
@@ -252,6 +259,9 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
       throw error;
     });
   if (!item) return { error: "Item not found" };
+  const meeting = item.source === "meeting";
+  if (meeting && !(await deps.meetingConsentOk?.()))
+    return { error: MEETING_CONSENT_REQUIRED_MESSAGE };
   const folders = new Map((await repo.listFolders(actor)).map((folder) => [folder.id, folder]));
   const path: string[] = [];
   for (
@@ -263,7 +273,7 @@ async function read(deps: DataRoomToolDeps, actor: Actor, args: Record<string, u
   }
   const full = (await repo.getItemText(actor, id)) ?? "";
   const truncated = full.length > MAX_TEXT_CHARS;
-  const omi = item.source === "omi";
+  const omi = item.source === "omi" || meeting;
   if (omi) await deps.onUntrustedContent?.();
   return {
     id: item.id,

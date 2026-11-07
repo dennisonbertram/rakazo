@@ -118,6 +118,7 @@ import { DevinAgentOutputSchema, DevinKeyInputSchema, DevinSessionsOutputSchema 
 import {
   ActionApprovalEffectSchema,
   ActionApprovalRuleSchema,
+  ActionAutoReviewRecentSchema,
   ActionAutoReviewSettingsSchema,
   AgentSecretInputSchema,
   AgentSecretSchema,
@@ -139,6 +140,8 @@ import {
   BotSchema,
   BotSectionSchema,
   CapabilityInstallSchema,
+  CompanyContextRevisionSchema,
+  CompanyContextSectionSchema,
   ComputerModeSchema,
   ComputerReleaseReasonSchema,
   ComputerStatusSchema,
@@ -204,7 +207,16 @@ import {
   VoiceStatusSchema,
   WaitingOnYouItemSchema,
 } from "./domain.js";
-import { ComputerCommandSchema, MailEditsSchema, ProductEventSchema } from "./events.js";
+import {
+  ComputerCommandSchema,
+  MAX_MAIL_REPLY_BATCH,
+  MailBatchComposerDraftSchema,
+  MailBatchPressRowSchema,
+  MailBatchPreviewSchema,
+  MailBatchSchema,
+  MailEditsSchema,
+  ProductEventSchema,
+} from "./events.js";
 import {
   BalanceSeriesInputSchema,
   BalanceSeriesOutputSchema,
@@ -257,6 +269,9 @@ import {
   FundraiseRoundSaveInputSchema,
   FundraiseRoundSchema,
   FundraisingOverviewSchema,
+  PipelineCallLogInputSchema,
+  PipelineCallLogResultSchema,
+  PipelineImportCardSchema,
   ProspectSaveInputSchema,
   SafeAssignInputSchema,
   SafeMarkInputSchema,
@@ -295,12 +310,15 @@ import {
   InboxMessageSchema,
   InboxMoveInputSchema,
   InboxMoveOutputSchema,
+  InboxNoReplyInputSchema,
+  InboxNoReplyOutputSchema,
   InboxPersonContextSchema,
   InboxPersonInputSchema,
   InboxPersonSummaryOutputSchema,
   InboxRefreshInputSchema,
   InboxRefreshOutputSchema,
   InboxScopeInputSchema,
+  InboxTodoDoneSchema,
   InboxTodoSchema,
   InboxTodosOutputSchema,
   MailAccountSchema,
@@ -370,6 +388,8 @@ import {
   NotificationSignalSchema,
 } from "./notification.js";
 import {
+  OmiCloudConnectInputSchema,
+  OmiCloudStatusSchema,
   OmiConnectInputSchema,
   OmiDisconnectInputSchema,
   OmiSegmentMoveInputSchema,
@@ -480,7 +500,14 @@ const threadSendInput = threadTarget
     }
   });
 
-const ConnectionAccessSchema = z.object({ allAgents: z.boolean(), botIds: z.array(Id) });
+const ConnectionAccessSchema = z.object({
+  allAgents: z.boolean(),
+  botIds: z.array(Id),
+  /** The "Let other agents use it" switch of an agent-linked connection; stays on while no other agent has access. */
+  agentShared: z.boolean(),
+  /** Granted agents that may also make changes (each still asks the owner), while the connection's changes switch is on. */
+  writeBotIds: z.array(Id),
+});
 /** Who can really use each connection, computed by the server with the executor's rules. */
 const EffectiveAccessSchema = z.record(
   Id,
@@ -701,6 +728,11 @@ export const appContract = {
     reorder: oc.input(ReorderBotsInput).output(z.object({ ok: z.literal(true) })),
     update: oc.input(UpdateBotInput).output(BotSchema),
     setComputer: oc.input(z.object({ botId: Id, mode: ComputerModeSchema })).output(BotSchema),
+    instructionsUpgrade: oc
+      .input(botId)
+      .output(z.object({ current: z.string(), next: z.string() }).nullable()),
+    upgradeInstructions: oc.input(z.object({ botId: Id, from: z.string() })).output(BotSchema),
+    dismissInstructionsUpgrade: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     archive: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     restore: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     remove: oc
@@ -818,6 +850,8 @@ export const appContract = {
       )
       .output(z.object({ ok: z.literal(true) })),
     clear: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
+    /** End the bot thread's open goal. */
+    clearGoal: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     answer: oc
       .input(
         threadTarget.safeExtend({
@@ -833,6 +867,71 @@ export const appContract = {
         }),
       )
       .output(z.object({ ok: z.literal(true) })),
+    /** What a list import card shows, for the run's own user. */
+    pipelineImport: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id }))
+      .output(PipelineImportCardSchema),
+    /**
+     * Add on a list import card, with every question answered. A list or contact that changed since
+     * `hash` was read rejects the press and changes nothing. Only the web and desktop card sends it.
+     */
+    applyPipelineImport: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          hash: z.string().max(128),
+          answers: z.record(z.string().max(300), z.string().max(300)),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
+    /** The rows of a reply batch card, for the run's own user. Flags and hashes are the server's. */
+    mailBatch: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id }))
+      .output(MailBatchSchema),
+    /**
+     * Send selected on a reply batch card. Rows not posted are skipped. Any mismatch rejects the
+     * whole press and changes nothing.
+     */
+    sendMailBatch: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          rows: z.array(MailBatchPressRowSchema).min(1).max(MAX_MAIL_REPLY_BATCH),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true) })),
+    /** Retry failed on a settled reply batch card. Needs no waiting run and does not wake the agent. */
+    retryMailBatch: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          rows: z
+            .array(MailBatchPressRowSchema.pick({ itemId: true, seenMessageId: true }))
+            .min(1)
+            .max(MAX_MAIL_REPLY_BATCH),
+        }),
+      )
+      .output(z.object({ ok: z.literal(true), count: z.number().int().nonnegative() })),
+    /** The flags these edits would give each row. Stores nothing. */
+    previewMailBatch: oc
+      .input(
+        threadTarget.safeExtend({
+          runId: Id,
+          messageId: Id,
+          rows: z
+            .array(MailBatchPressRowSchema.pick({ itemId: true, edits: true }))
+            .min(1)
+            .max(MAX_MAIL_REPLY_BATCH),
+        }),
+      )
+      .output(MailBatchPreviewSchema),
+    /** Open in composer on a row that did not go out. Retry can no longer send that row. */
+    mailBatchToComposer: oc
+      .input(threadTarget.safeExtend({ runId: Id, messageId: Id, itemId: Id }))
+      .output(MailBatchComposerDraftSchema),
     /**
      * Sends the draft a mail_draft card saved. The draft and account come from the server's record
      * of that tool call; the client only names the card.
@@ -946,6 +1045,29 @@ export const appContract = {
       .input(z.object({ defaultMemoryScope: MemoryScopeSchema }))
       .output(SpaceMemoryConfigSchema),
     disconnectProvider: oc.output(z.object({ ok: z.literal(true) })),
+  },
+  companyContext: {
+    list: oc.output(z.array(CompanyContextSectionSchema)),
+    /** Creates a section (no id) or replaces one's text. CONFLICT when the revision moved or the name is taken. */
+    save: oc
+      .input(
+        z.object({
+          id: Id.optional(),
+          title: z.string(),
+          text: z.string(),
+          expectedRevision: z.number().int().optional(),
+        }),
+      )
+      .output(CompanyContextSectionSchema),
+    history: oc.input(z.object({ id: Id })).output(z.array(CompanyContextRevisionSchema)),
+    /** Saves an old revision's text as a new revision. */
+    restore: oc
+      .input(z.object({ id: Id, revision: z.number().int(), expectedRevision: z.number().int() }))
+      .output(CompanyContextSectionSchema),
+    /** Deletes a section and its history, only if it is still at `revision`. */
+    remove: oc
+      .input(z.object({ id: Id, revision: z.number().int() }))
+      .output(z.object({ ok: z.literal(true) })),
   },
   pages: {
     get: oc.input(BotPageGetInputSchema).output(BotPageSchema.nullable()),
@@ -1209,6 +1331,29 @@ export const appContract = {
       )
       .output(CapabilityInstallSchema),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    /** Idempotent: returns the source's agent, creating it when the install could not. */
+    createAgent: oc.input(z.object({ id: Id })).output(z.object({ botId: Id })),
+    rename: oc
+      .input(z.object({ id: Id, name: z.string().trim().min(1).max(120) }))
+      .output(CapabilityInstallSchema),
+    setWrites: oc.input(z.object({ id: Id, enabled: z.boolean() })).output(CapabilityInstallSchema),
+    /** Only the source's agent may use it, or others may be added one by one. */
+    setExclusive: oc
+      .input(z.object({ id: Id, exclusive: z.boolean() }))
+      .output(CapabilityInstallSchema),
+    /** All (every internal agent, later ones too) or None (only the source's own agent). */
+    setAllAgents: oc.input(z.object({ id: Id, on: z.boolean() })).output(CapabilityInstallSchema),
+    /** One agent's switch and "Allow changes"; the server changes only that agent's grant. */
+    setAgentAccess: oc
+      .input(
+        z.object({
+          id: Id,
+          botId: Id,
+          on: z.boolean(),
+          canWrite: z.boolean().optional(),
+        }),
+      )
+      .output(CapabilityInstallSchema),
   },
   integrationAgents: {
     /** Idempotent: returns the server's agent bot, creating it on first call. */
@@ -1239,6 +1384,10 @@ export const appContract = {
       remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
       /** Turns the server's write tools on or off (Carta, or any server that has an agent). */
       setWrites: oc.input(z.object({ id: Id, enabled: z.boolean() })).output(McpServerSchema),
+      /** Gives one agent a server or takes it away, atomically; other agents' assignments are untouched. */
+      setAgentAssignment: oc
+        .input(z.object({ serverId: Id, botId: Id, on: z.boolean() }))
+        .output(z.object({ ok: z.literal(true) })),
     },
     assignments: {
       list: oc.input(botId).output(z.array(BotMcpServerSchema)),
@@ -1356,15 +1505,32 @@ export const appContract = {
       )
       .output(ConnectionSchema),
     rename: oc
-      .input(z.object({ connectionId: Id, displayName: z.string().trim().min(1).max(80) }))
+      .input(z.object({ connectionId: Id, displayName: z.string().trim().min(1).max(60) }))
       .output(ConnectionSchema),
     revoke: oc.input(z.object({ connectionId: Id })).output(z.object({ ok: z.literal(true) })),
     /** Which agents may use this connection's tools. */
     access: oc.input(z.object({ connectionId: Id })).output(ConnectionAccessSchema),
     /** The agents that can really use each of the caller's connections, in one call. */
     effectiveAccess: oc.output(EffectiveAccessSchema),
+    /** The stored access of every live connection of the caller, in one call. */
+    accessAll: oc.output(z.record(Id, ConnectionAccessSchema)),
     setAccess: oc
       .input(z.object({ connectionId: Id, allAgents: z.boolean(), botIds: z.array(Id).max(500) }))
+      .output(ConnectionAccessSchema),
+    /**
+     * Turns one agent on or off for a connection, atomically: the server changes only that agent's
+     * grant under a row lock, so two clients cannot overwrite each other. The connection's own agent stays on.
+     */
+    setAgentAccess: oc
+      .input(
+        z.object({
+          connectionId: Id,
+          botId: Id,
+          on: z.boolean(),
+          /** "Allow changes" for this agent. Left out, an agent already on keeps its setting and a new one starts read-only. */
+          canWrite: z.boolean().optional(),
+        }),
+      )
       .output(ConnectionAccessSchema),
     createAgent: oc.input(z.object({ connectionId: Id })).output(z.object({ botId: Id })),
     setWrites: oc
@@ -1452,7 +1618,10 @@ export const appContract = {
   },
   autoReview: {
     get: oc.output(ActionAutoReviewSettingsSchema),
-    set: oc.input(z.object({ enabled: z.boolean() })).output(ActionAutoReviewSettingsSchema),
+    set: oc
+      .input(z.object({ enabled: z.boolean().optional(), background: z.boolean().optional() }))
+      .output(ActionAutoReviewSettingsSchema),
+    recent: oc.output(z.array(ActionAutoReviewRecentSchema)),
   },
   artifacts: {
     list: oc.input(botId).output(z.array(ArtifactSchema)),
@@ -1701,6 +1870,8 @@ export const appContract = {
     unreadCount: oc.output(z.object({ count: z.number().int() })),
     feedback: oc.input(InboxFeedbackInputSchema).output(InboxFeedbackOutputSchema),
     markRead: oc.input(InboxMarkReadInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** The user says this message needs no reply; the third for one sender stops Needs reply for it. `undo` takes the sender back to 2. */
+    noReply: oc.input(InboxNoReplyInputSchema).output(InboxNoReplyOutputSchema),
     /** Adds the message's thread to the Chief's Open work. Tracking a tracked thread does nothing. */
     track: oc.input(z.object({ messageId: Id })).output(z.object({ ok: z.literal(true) })),
     /** Marks the thread's open Chief item done. */
@@ -1730,7 +1901,7 @@ export const appContract = {
     },
     todos: {
       list: oc.input(InboxScopeInputSchema).output(InboxTodosOutputSchema),
-      setDone: oc.input(z.object({ id: Id, done: z.boolean() })).output(InboxTodoSchema),
+      setDone: oc.input(z.object({ id: Id, done: z.boolean() })).output(InboxTodoDoneSchema),
     },
   },
   company: {
@@ -1884,6 +2055,14 @@ export const appContract = {
     /** The caller's recording or waiting capture, for the recording indicator. */
     active: oc.output(MeetingCaptureActiveSchema),
   },
+  omiCloud: {
+    /** Checks the Omi Developer key with one list call, stores it, connects and queues a sync. Errors: "Omi rejected this key", "This is an MCP key. Create a Developer key in the Omi app.", "Could not reach Omi". */
+    connect: oc.input(OmiCloudConnectInputSchema).output(z.object({ ok: z.literal(true) })),
+    /** The caller's Developer key route; null before a key was pasted. Never returns the key. */
+    status: oc.output(OmiCloudStatusSchema),
+    /** Deletes the stored key and stops the sync; stored meetings stay. */
+    disconnect: oc.output(z.object({ ok: z.literal(true) })),
+  },
   omi: {
     /** Creates or reuses the caller's one Omi connection for this space and its agent. */
     connect: oc.input(OmiConnectInputSchema).output(z.object({ connectionId: Id })),
@@ -2023,6 +2202,12 @@ export const appContract = {
       markWaiting: oc.input(z.object({ id: Id })).output(ContactSchema),
       /** Clears Waiting for Mercury. */
       notSent: oc.input(z.object({ id: Id })).output(ContactSchema),
+    },
+    calls: {
+      /** Adds a call to the record's timeline; moves status forward only (Spoke: before Met becomes Met). */
+      log: oc.input(PipelineCallLogInputSchema).output(PipelineCallLogResultSchema),
+      /** Removes a logged call and puts back the status and next call it changed. */
+      undo: oc.input(z.object({ eventId: Id })).output(z.object({ ok: z.literal(true) })),
     },
     safes: {
       list: oc.output(z.array(SafeSchema)),

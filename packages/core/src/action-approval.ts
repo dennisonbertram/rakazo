@@ -47,6 +47,7 @@ const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "mail_draft",
   "mail_modify",
   "mail_send",
+  "mail_reply_batch",
   "calendar_create_event",
   "calendar_update_event",
   "calendar_delete_event",
@@ -55,9 +56,16 @@ const APPROVAL_REQUIRED_BUILTIN_TOOLS = new Set([
   "contacts_save",
 ]);
 /** Built-in mail tools that write; the "email" approval category covers them. */
-const BUILTIN_MAIL_WRITE_TOOLS = new Set(["mail_draft", "mail_modify", "mail_send"]);
+const BUILTIN_MAIL_WRITE_TOOLS = new Set([
+  "mail_draft",
+  "mail_modify",
+  "mail_send",
+  "mail_reply_batch",
+]);
 /** Cannot be auto-reviewed or permanently allowed. imessage_send is a message to a person from the user's agent line. */
 const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
+  // The owner grants a capability; a saved rule or Auto Review would grant every later request.
+  "request_access",
   "respond_agent_connection",
   // The owner's own card per app per run (docs/local-desktop-control); never a saved rule.
   "desktop_app_act",
@@ -65,6 +73,15 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
   "imessage_send",
   "company_fact_upsert",
   "company_import_start",
+  // Hands a meeting to another agent; a card every time, also when the owner is chatting.
+  "share_meeting",
+  // Several replies on one card, sent only by the owner's press. Its card has no Allow to save.
+  "mail_reply_batch",
+  // Writes to the owner's fundraising records. A spreadsheet or email the agent read is untrusted,
+  // so no saved Allow rule or Auto Review may pass them.
+  "fundraising_round_save",
+  // One card for a whole list, applied only by the owner's press. Its card has no Allow to save.
+  "pipeline_import_review",
 ]);
 
 const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
@@ -90,12 +107,35 @@ const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
   "calendar_query",
   "read_spreadsheet",
   "skill_read",
+  // The owner's own company sections; the executor refuses it once the run is tainted.
+  "company_context_lookup",
+  // Reads of this bot's own thread, pages and pins only (scoped by space, user, bot and thread in
+  // the handlers). The executor marks a run that reads meeting-marked history as tainted.
+  "read_history",
+  "search_history",
+  "page_list",
+  "page_read",
+  "pins_read",
+  // The owner's own stored meetings, like mail_get; the text is wrapped and marks the thread.
+  "meetings_list",
+  "meetings_search",
+  "meetings_get",
   // A pure function in a sandbox with no I/O, and only the source the owner approved (hash-checked).
   "tool_run",
   "web_fetch",
   "web_search",
+  // The owner's own finance records; the executor asks once the run is tainted.
+  "finance_overview",
+  "finance_breakdown",
+  "finance_transactions",
+  "finance_recurring",
+  "finance_crypto",
   // Write only inside Rakazo (the owner's own notifications, pages, pins and files).
+  // message_user posts a short update into the run's own thread; show_emails renders the owner's
+  // own cached mail in their chat and returns no mail text to the run.
   "notify_user",
+  "message_user",
+  "show_emails",
   "create_ui_artifact",
   "render_ui",
   "attach_file",
@@ -255,6 +295,188 @@ export const EXTERNAL_TAINT_SAFE_TOOLS: ReadonlySet<string> = new Set([
   "list_secrets",
 ]);
 
+/**
+ * Built-in reads that ask in a background run only because they are not on the safe list: they
+ * return the owner's private records, which a run holding outside text could send out. A routine
+ * run that has read nothing from outside (and was not started by a webhook) may let Auto Review
+ * judge them instead of asking. Nothing here writes, sends or reaches the network.
+ */
+export const ROUTINE_AUTO_REVIEW_READ_TOOLS: ReadonlySet<string> = new Set([
+  "cap_table_read",
+  "fundraising_read",
+  "ticket_get",
+]);
+
+const ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES: ReadonlySet<ApprovalActionType> = new Set([
+  "send_email",
+  "spend_money",
+  "message_outside",
+  "use_credentials",
+  "delete_data",
+]);
+
+/**
+ * True when a background card for the tool may offer "Always for this routine". Sends, payments,
+ * outside messages, credentials, deletes and tools that need an explicit approval never do.
+ */
+export function routineAlwaysAllowable(input: {
+  toolName: string;
+  viaConnector?: boolean;
+  connectorKind?: string;
+  readOnly?: boolean;
+}): boolean {
+  if (toolRequiresExplicitApproval(input.toolName)) return false;
+  if (input.toolName === "mail_send" || input.toolName === "mail_draft") return false;
+  const type = actionTypeForTool(input);
+  return type === null || !ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES.has(type);
+}
+
+/**
+ * Tools Auto Review never judges in a background run, whatever the owner switched on: they change
+ * what later runs do (schedules, skills, watches, memory), send, post or spend, or are mandatory.
+ */
+export const BACKGROUND_REVIEW_EXCLUDED_TOOLS: ReadonlySet<string> = new Set([
+  "mail_send",
+  "message_outside",
+  "message_bot",
+  "gtm_post",
+  "remember",
+  "save_memory",
+  "save_shared_memory",
+  "forget_memory",
+  // Change what the agents are or can reach.
+  "add_mcp_server",
+  "spawn_bot",
+  "update_bot",
+]);
+const BACKGROUND_REVIEW_EXCLUDED_PREFIXES = ["schedule_", "skill_", "watch_", "cloud_agent_"];
+const BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES: ReadonlySet<ApprovalActionType> = new Set([
+  ...ROUTINE_ALWAYS_EXCLUDED_ACTION_TYPES,
+  "calendar_changes",
+  "use_computer",
+  "files_and_commands",
+]);
+
+/**
+ * True when Auto Review may judge a call in an unattended run: the owner turned on "Also in
+ * background runs", nothing outside is in the run, a person's own words (never a webhook, bot or
+ * channel message) say what the run is for, and the tool is not one of the excluded kinds.
+ */
+export function backgroundAutoReviewAllowed(input: {
+  enabled: boolean;
+  trigger?: string;
+  tainted: boolean;
+  outsideContentSeen: boolean;
+  meetingMarked: boolean;
+  firewalled: boolean;
+  externalBot: boolean;
+  ownerWords: string;
+  toolName: string;
+  viaConnector?: boolean;
+  connectorKind?: string;
+  readOnly?: boolean;
+}): boolean {
+  if (!input.enabled || input.trigger === "webhook") return false;
+  if (
+    input.tainted ||
+    input.outsideContentSeen ||
+    input.meetingMarked ||
+    input.firewalled ||
+    input.externalBot
+  ) {
+    return false;
+  }
+  if (!input.ownerWords.trim()) return false;
+  const name = input.toolName;
+  if (toolRequiresExplicitApproval(name) || BACKGROUND_REVIEW_EXCLUDED_TOOLS.has(name)) {
+    return false;
+  }
+  if (BACKGROUND_REVIEW_EXCLUDED_PREFIXES.some((prefix) => name.startsWith(prefix))) return false;
+  const type = actionTypeForTool(input);
+  return type === null || !BACKGROUND_REVIEW_EXCLUDED_ACTION_TYPES.has(type);
+}
+
+/**
+ * Internal writes of a Firewall agent that Auto Review may pass, but only after
+ * `contentHasOutboundChannel` finds nothing in the arguments. Owner decision: this lifts the
+ * Firewall plan's rule that its asks never clear without a person, for these tools only.
+ */
+export const FIREWALL_JUDGEABLE_WRITES: ReadonlySet<string> = new Set([
+  "page_edit",
+  "page_write",
+  "page_create",
+  "pins_write",
+]);
+
+const OUTBOUND_CHANNEL_PATTERNS = [
+  /https?:\/\/|\/\/[\w-]+\.[a-z]{2,}|\bwww\./i,
+  /!?\[[^\]]*\]\([^)]*\)|!\[|\]\[/,
+  /<\/?[a-z!][^>]*>/i,
+  /\b[\w-]+\.(com|org|net|io|ai|dev|app|co|me|ly|xyz|info|gg|sh)\b/i,
+];
+
+/**
+ * True when any string in the arguments holds a URL, a Markdown image or link, an HTML tag or a
+ * bare domain: each can carry data out when a page or memory is rendered or fetched. Scans every
+ * string, including keys.
+ */
+export function contentHasOutboundChannel(value: unknown): boolean {
+  if (typeof value === "string") {
+    return OUTBOUND_CHANNEL_PATTERNS.some((pattern) => pattern.test(value));
+  }
+  if (Array.isArray(value)) return value.some(contentHasOutboundChannel);
+  if (value && typeof value === "object") {
+    return Object.entries(value).some(
+      ([key, item]) => contentHasOutboundChannel(key) || contentHasOutboundChannel(item),
+    );
+  }
+  return false;
+}
+
+const HTML_TAG = /<\/?[a-z!][^>]*>/i;
+
+const OUTBOUND_TOKEN_PATTERNS = [
+  /(?:https?:)?\/\/[^\s)>\]"']+/gi,
+  /\bwww\.[^\s)>\]"']+/gi,
+  /!?\[[^\]]*\]\([^)]*\)/g,
+  /!?\[[^\]]*\]\[[^\]]*\]/g,
+  /\b[\w-]+\.(?:com|org|net|io|ai|dev|app|co|me|ly|xyz|info|gg|sh)\b[^\s)>\]"']*/gi,
+];
+
+/** Every URL, link, image and bare domain in the text, whole, as exact strings. */
+function outboundTokens(text: string): Set<string> {
+  const found = new Set<string>();
+  for (const pattern of OUTBOUND_TOKEN_PATTERNS) {
+    for (const match of text.matchAll(pattern)) found.add(match[0]);
+  }
+  return found;
+}
+
+/**
+ * True when saving `result` over `original` would put a new or changed URL, link, image or domain
+ * on the page, or leave any HTML in it. Comparing the saved result catches an edit that swaps
+ * private text into a URL that was already there. An empty original means any URL is new.
+ */
+export function pageWriteAddsChannel(_original: string, result: string): boolean {
+  // Destinations are not compared: any link or image destination in the result asks.
+  return (
+    HTML_TAG.test(result) ||
+    /\]\(|\]\[|^\s{0,3}\[[^\]]+\]:|<|https?:|www\.|data:|mailto:/im.test(result) ||
+    outboundTokens(result).size > 0
+  );
+}
+
+const FIXED_MAIL_LABELS = new Set(["TRASH", "SPAM", "DRAFT", "SENT"]);
+
+/** A mail_modify that names a delete, report or draft label is never judged. */
+export function mailModifyTouchesFixedLabel(args: Record<string, unknown>): boolean {
+  return [args.addLabels, args.removeLabels].some(
+    (list) =>
+      Array.isArray(list) &&
+      list.some((label) => typeof label === "string" && FIXED_MAIL_LABELS.has(label.toUpperCase())),
+  );
+}
+
 /** True when a tainted run may call the tool without a card. Same scratchpad rule as unattended. */
 export function externalTaintAllowsTool(toolName: string, args?: Record<string, unknown>): boolean {
   if (!EXTERNAL_TAINT_SAFE_TOOLS.has(toolName)) return false;
@@ -265,6 +487,9 @@ export function externalTaintAllowsTool(toolName: string, args?: Record<string, 
  * In an unattended run (nobody is watching, or the input comes from outside) a call runs without
  * asking only if it is a read-only connector tool or a safe built-in. Everything else asks.
  * An Allow rule never lifts this; the executor treats the result as a mandatory ask.
+ * The one exception is mail_modify: it cannot delete, trash, send or mark spam, and every change
+ * (archive, mark read, label) is reversible, so the rules decide. No rule still asks. The executor further requires a rule for the tool
+ * itself: a category Allow (send_email) does not run it unattended.
  */
 export function unattendedToolRequiresApproval(
   unattended: boolean,
@@ -280,6 +505,7 @@ export function unattendedToolRequiresApproval(
     return !(method === undefined || method === "GET" || method === "HEAD");
   }
   if (UNATTENDED_SCRATCHPAD_TOOLS.has(toolName)) return scratchpadWriteIsGated(toolName, args);
+  if (toolName === "mail_modify") return false;
   return !UNATTENDED_SAFE_BUILTIN_TOOLS.has(toolName);
 }
 
@@ -339,6 +565,7 @@ export function actionTypeFromCategory(category: string): ApprovalActionType | n
 
 const BUILTIN_ACTION_TYPES: Record<string, ApprovalActionType> = {
   mail_send: "send_email",
+  mail_reply_batch: "send_email",
   mail_draft: "send_email",
   mail_modify: "send_email",
   calendar_create_event: "calendar_changes",
@@ -469,6 +696,7 @@ export function buildApprovalTable(
  */
 const OWN_STATE_RESULT_TOOLS = new Set([
   "ask_user",
+  "company_context_lookup",
   "attach_file",
   "end_call",
   "list_fleet",
@@ -538,6 +766,49 @@ export function newSiteOutcome(input: {
 }): "ask" | "allow" | "deny" {
   if (input.decision === "allow") return "allow";
   return input.trigger === "webhook" ? "deny" : "ask";
+}
+
+/** The action id of the card button that saves a bot's "all sites" rule, and its label. */
+export const ALL_SITES_ACTION_ID = "always_bot_sites";
+export const ALL_SITES_ACTION_LABEL = "Allow all sites for this agent";
+
+/**
+ * A rule for the bot and the tool web_fetch means: this agent fetches any site without asking.
+ * The caller still refuses it for a firewalled or external agent, a tainted run, a webhook run,
+ * and a URL that repeats private data.
+ */
+export function botAllowsAllSites(rules: ActionApprovalRule[], botId: string): boolean {
+  return rules.some(
+    (rule) =>
+      rule.botId === botId &&
+      rule.effect === "always_allow" &&
+      rule.matchKind === "tool" &&
+      rule.matchValue === "web_fetch",
+  );
+}
+
+/**
+ * What private owner data a tool list can read, in a few words for a card. Not listed: shared
+ * memory and spreadsheet tools (every agent is offered them; a spreadsheet result is tracked as
+ * private text by the URL check) and calendar_agenda (the agent's own schedule).
+ */
+const PRIVATE_DATA_AREAS: ReadonlyArray<[string, RegExp]> = [
+  ["mail", /^(mail_|inbox_|show_emails$)/],
+  ["Drive", /^drive_/],
+  ["calendar", /^calendar_(?!agenda$)/],
+  ["finance", /^(finance_|cap_table_|fundraising_|investor_)/],
+  ["Data room", /^(search_data_room|read_data_room_item|add_to_data_room)$/],
+  [
+    "contacts and records",
+    /^(contacts_|legal_|audit_|meetings_|share_meeting$|imessage_|company_|desktop_app_)/,
+  ],
+];
+
+export function privateDataAreas(toolNames: Iterable<string>): string[] {
+  const names = [...toolNames];
+  return PRIVATE_DATA_AREAS.filter(([, pattern]) => names.some((name) => pattern.test(name))).map(
+    ([area]) => area,
+  );
 }
 
 export function siteAlwaysAllowed(rules: ActionApprovalRule[], site: string): boolean {
@@ -724,8 +995,12 @@ export function planActionGate(input: {
   checkerConfigured: boolean;
   /** An unattended run never plans a judge: nobody is there to be spared the card. */
   unattended?: boolean;
+  /** Except a read of ROUTINE_AUTO_REVIEW_READ_TOOLS in a clean, non-webhook routine run. */
+  routineRead?: boolean;
   /** A fetch to a site the run was not given (see outboundSiteGate). */
   newDestination?: boolean;
+  /** A goal run (/goal) never plans a judge: the owner is not there to be spared a card, and nothing is auto-approved. */
+  goalRun?: boolean;
 }): "ask" | "allow" | "judge" | "block" {
   const { resolved } = input;
   if (resolved.decision === "block") return "block";
@@ -736,12 +1011,13 @@ export function planActionGate(input: {
   // Review, and in an unattended run, which never plans a judge, a person decides.
   if (input.newDestination) {
     if (resolved.decision === "ask" && resolved.source === "require_approval") return "ask";
-    return !input.unattended && input.autoReviewEnabled && input.checkerConfigured
+    return !input.unattended && !input.goalRun && input.autoReviewEnabled && input.checkerConfigured
       ? "judge"
       : "ask";
   }
   const judgeable =
-    !input.unattended &&
+    (!input.unattended || input.routineRead === true) &&
+    !input.goalRun &&
     input.consequential &&
     input.autoReviewEnabled &&
     input.checkerConfigured &&
@@ -776,14 +1052,31 @@ export function isApprovalAskBlock(block: {
   approvalEffectId?: string;
   /** A page source approval has no effect row; its card is still an approval card. */
   pageSource?: unknown;
+  /** A reply batch card offers only Discard; Send selected is its own request. */
+  mailBatch?: unknown;
+  /** A list import card offers only Deny; Add is its own request. */
+  pipelineImport?: unknown;
   actions?: Array<{ id: string; label: string }>;
 }): boolean {
   if (block.kind !== "ask" || !(block.approvalEffectId || block.pageSource)) return false;
   if (!block.actions?.length) return false;
   const actionIds = new Set(block.actions.map((action) => action.id));
+  if (
+    (block.mailBatch || block.pipelineImport) &&
+    block.actions.every((action) => action.id === "deny")
+  ) {
+    return true;
+  }
   return (
     actionIds.has("allow") &&
     actionIds.has("deny") &&
-    [...actionIds].every((id) => id === "allow" || id === "always" || id === "deny")
+    [...actionIds].every(
+      (id) =>
+        id === "allow" ||
+        id === "always" ||
+        id === "always_routine" ||
+        id === ALL_SITES_ACTION_ID ||
+        id === "deny",
+    )
   );
 }

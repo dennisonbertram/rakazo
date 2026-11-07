@@ -130,6 +130,8 @@ export const RECURRING_JOBS: CronItem[] = [
   { task: "pages.snapshots.retention", match: "41 3 * * *" },
   // Gmail push watches last 7 days; renew daily. Does nothing unless push is configured.
   { task: "mail.watch.renew", match: "11 4 * * *" },
+  // Background sync of every connected mailbox, and a retry after a failed sync. Push is not required.
+  { task: "mail.sync.sweep", match: "*/5 * * * *" },
   // Recordings whose device went quiet are stored with what arrived.
   { task: "meetings.capture_sweep", match: "*/5 * * * *" },
   // Devin sessions for the Devin page and its alerts.

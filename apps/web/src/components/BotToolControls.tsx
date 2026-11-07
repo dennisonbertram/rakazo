@@ -11,6 +11,8 @@ export interface BotToolControls {
   sendDraft(message: { id: string; runId?: string | null }): Promise<void>;
   /** Opens the mail composer on a message the person still needs to send themselves. */
   openComposer(draft: ComposerDraft): void;
+  /** Opens the usual confirmation to clear the open conversation. */
+  clearConversation?(): void;
 }
 
 export interface ComposerDraft {
@@ -21,6 +23,8 @@ export interface ComposerDraft {
   bcc: string[];
   subject: string;
   body: string;
+  /** The synced message answered, so the reply stays in its thread. */
+  replyToId?: string;
 }
 
 export const BotToolControlsContext = createContext<BotToolControls | null>(null);

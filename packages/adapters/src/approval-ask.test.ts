@@ -1,4 +1,5 @@
 import { cartaAgentSpawnKey, gtmAgentSpawnKey } from "@rakazo/contracts";
+import { isApprovalAskBlock } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildApprovalAskBlock,
@@ -152,6 +153,46 @@ describe("buildApprovalAskBlock schedule card", () => {
     expect(block.detailFolded).toBe(true);
     expect(block.detail).toContain(prompt);
     expect(block.actions?.map((action) => action.id)).toEqual(["allow", "always", "deny"]);
+  });
+});
+
+describe("fundraising write cards", () => {
+  it("shows the round name, target and post-money cap in dollars", () => {
+    const args = { name: "Seed", targetUsd: 3_000_000, postMoneyCapUsd: 15_000_000 };
+    expect(describeApprovalAction("fundraising_round_save", args)).toBe("Start round “Seed”");
+    expect(describeApprovalAction("fundraising_round_save", { ...args, id: "r1" })).toBe(
+      "Change round “Seed”",
+    );
+    const block = buildApprovalAskBlock("e1", "fundraising_round_save", args, []);
+    expect(block).toMatchObject({
+      text: "Review before Start round “Seed”",
+      detail: "Name: Seed\nTarget: $3,000,000.00\nPost-money cap: $15,000,000.00",
+      toolId: undefined,
+    });
+  });
+
+  it("offers no Always allow for the round", () => {
+    const block = buildApprovalAskBlock(
+      "e4",
+      "fundraising_round_save",
+      { name: "Seed", targetUsd: 1, postMoneyCapUsd: 2 },
+      [],
+    ) as { actions: { id: string }[] };
+    expect(block.actions.map((a) => a.id)).toEqual(["allow", "deny"]);
+  });
+
+  it("an import card reads plainly and offers only Deny, so a phone cannot apply it", () => {
+    const block = buildApprovalAskBlock("e5", "pipeline_import_review", {}, [], {
+      pipelineImport: { importId: "imp-1", text: "Add 3 prospects", detail: "1 new contact" },
+    });
+    expect(block).toMatchObject({
+      kind: "ask",
+      text: "Add 3 prospects",
+      detail: "1 new contact",
+      pipelineImport: { importId: "imp-1" },
+      actions: [{ id: "deny", label: "Deny" }],
+    });
+    expect(isApprovalAskBlock(block as never)).toBe(true);
   });
 });
 
@@ -460,6 +501,28 @@ describe("buildConsentAskBlock", () => {
     });
     expect(JSON.stringify(block)).not.toMatch(/openai\/|forwarded to its provider/);
   });
+
+  it("names the model and provider when the recipient is known", () => {
+    const block = buildConsentAskBlock("e1", {
+      name: "OpenRouter (https://openrouter.ai)",
+      detail: "meta/muse-wonder, forwarded to its provider",
+    });
+    expect(block).toMatchObject({
+      text: "Let Muse Wonder (OpenRouter) see this agent's chats and mail?",
+      detail: expect.stringContaining("This agent uses a model you haven't allowed yet."),
+    });
+    expect(JSON.stringify(block)).not.toContain("meta/");
+  });
+
+  it("falls back to the generic text when the model is unknown", () => {
+    const block = buildConsentAskBlock("e1", {
+      name: "OpenRouter",
+      detail: "Forwards to model providers",
+    });
+    expect(block).toMatchObject({
+      text: "Share your chats and mail with the AI model that runs your bots?",
+    });
+  });
 });
 
 describe("agent connection response cards", () => {
@@ -656,5 +719,167 @@ describe("Brex cards approval preview", () => {
     expect(other.kind === "ask" && other.detail).toBe(
       `tool: mcp__m__x\nserver tool: x\narguments: ${JSON.stringify(args, null, 2)}`,
     );
+  });
+});
+
+describe("mail_reply_batch card", () => {
+  const rows = [
+    {
+      to: ["Sam Rivera <sam@customer.example>"],
+      cc: ["Billing <billing@other.example>"],
+      bcc: [],
+      subject: "Re: one",
+      flags: ["not_on_thread", "has_link"] as const,
+    },
+    { to: ["lee@customer.example"], cc: [], bcc: [], subject: "Re: two", flags: [] },
+  ];
+
+  it("offers only Discard, even without the noAlwaysAllow option", () => {
+    const block = buildApprovalAskBlock("e1", "mail_reply_batch", {}, [], { mailBatch: rows });
+    expect(block).toMatchObject({
+      kind: "ask",
+      text: "2 replies",
+      mailBatch: { count: 2, sent: 0, failed: 0, unknown: 0 },
+      actions: [{ id: "deny", label: "Discard" }],
+    });
+    // Not the exact tool id: this card's title is written by hand.
+    expect(block).not.toHaveProperty("toolId");
+  });
+
+  it("titles a card with new emails and marks them for clients without the batch card", () => {
+    const fresh = {
+      to: ["ana@prospect.example"],
+      cc: [],
+      bcc: [],
+      subject: "Hello",
+      flags: ["new_recipient"] as const,
+      newEmail: true,
+    };
+    const titled = (mailBatch: readonly (typeof fresh | (typeof rows)[number])[]) =>
+      buildApprovalAskBlock("e1", "mail_reply_batch", {}, [], { mailBatch });
+    expect(titled([fresh])).toMatchObject({ text: "1 new email" });
+    expect(titled([fresh, fresh])).toMatchObject({ text: "2 new emails" });
+    expect(titled([fresh, ...rows])).toMatchObject({
+      text: "1 new email · 2 replies",
+      detail: expect.stringContaining("New: ana@prospect.example: Hello (New recipient)"),
+    });
+  });
+
+  it("lists every recipient as a bare address with the most serious flag", () => {
+    const block = buildApprovalAskBlock("e1", "mail_reply_batch", {}, [], { mailBatch: rows });
+    if (block.kind !== "ask") throw new Error("not an ask");
+    expect(block.detail).toBe(
+      "sam@customer.example, billing@other.example: Re: one (Not on this thread)\nlee@customer.example: Re: two",
+    );
+  });
+});
+
+describe("buildApprovalAskBlock argument summaries", () => {
+  const ask = (
+    tool: string,
+    args: Record<string, unknown>,
+    recipientBot?: string,
+    timezone?: string,
+  ) => {
+    const block = buildApprovalAskBlock("e1", tool, args, [], { recipientBot, timezone });
+    if (block.kind !== "ask") throw new Error("expected ask block");
+    return block;
+  };
+
+  it("message_bot names the recipient bot and the first line of the message", () => {
+    const block = ask(
+      "message_bot",
+      { bot_id: "bot-9", message: "What is on my calendar?\nSecond line stays out" },
+      "Inbox agent",
+    );
+    expect(block.text).toBe("Review before Message bot → Inbox agent");
+    expect(block.detail).toContain("to: Inbox agent");
+    expect(block.detail).toContain("message: What is on my calendar?");
+    expect(block.detail).not.toContain("Second line");
+  });
+
+  it("message_bot truncates a long first line", () => {
+    const block = ask("message_bot", { bot_id: "b", message: "x".repeat(500) }, "Inbox agent");
+    expect(block.detail).toContain(`message: ${"x".repeat(200)}…`);
+    expect(block.detail).not.toContain("x".repeat(201));
+  });
+
+  it("calendar reads show the range, not a recipient", () => {
+    const agenda = ask("calendar_agenda", {
+      from: "2026-11-09T00:00:00Z",
+      to: "2026-11-16T00:00:00Z",
+    });
+    expect(agenda.text).not.toMatch(/→ 2026/);
+    expect(agenda.detail).toBe("range: Nov 9, 2026, 12:00 AM UTC to Nov 16, 2026, 12:00 AM UTC");
+    expect(agenda.detail).not.toContain("to: 2026");
+    const list = ask("calendar_list_events", {
+      timeMin: "2026-11-09T09:00:00Z",
+      timeMax: "2026-11-09T17:00:00Z",
+    });
+    expect(list.detail).toBe("range: Nov 9, 2026, 9:00 AM UTC to Nov 9, 2026, 5:00 PM UTC");
+  });
+
+  it("writes the range in the owner's time zone, with a short label", () => {
+    const block = ask(
+      "calendar_agenda",
+      { from: "2026-11-09T05:00:00Z", to: "2026-11-16T05:00:00Z" },
+      undefined,
+      "America/New_York",
+    );
+    expect(block.detail).toBe("range: Nov 9, 2026, 12:00 AM EST to Nov 16, 2026, 12:00 AM EST");
+  });
+
+  it("falls back to UTC for an unknown zone", () => {
+    const block = ask("calendar_agenda", { from: "2026-11-09T05:00:00Z" }, undefined, "Nope/Zone");
+    expect(block.detail).toBe("range: from Nov 9, 2026, 5:00 AM UTC");
+  });
+
+  it("escapes Markdown and drops newlines in the recipient name", () => {
+    const block = ask("message_bot", { bot_id: "b", message: "hi" }, "Evil *bot*\n[x](http://y)");
+    expect(block.text).not.toContain("\n");
+    expect(block.text).toContain("\\*bot\\*");
+    expect(block.text).not.toContain("](");
+  });
+});
+
+describe("request_access card", () => {
+  const card = (
+    requestAccess: { agent: string; firewalled: boolean; always: boolean },
+    reason = "Save the lead",
+  ) =>
+    buildApprovalAskBlock("effect-1", "request_access", { capability: "contacts", reason }, [], {
+      requestAccess,
+    });
+
+  it("names the agent and the fixed capability words, with the agent's reason as plain text", () => {
+    const block = card(
+      { agent: "Support *Bot*", firewalled: false, always: true },
+      "Save <b>the</b>\nlead",
+    );
+    expect(block).toMatchObject({
+      text: "Support \\*Bot\\* asks to see, add and edit your contacts",
+      detail: "Agent's reason: Save <b>the</b> lead",
+      actions: [
+        { id: "allow", label: "Allow for this run" },
+        { id: "always", label: "Always for this agent" },
+        { id: "deny", label: "Deny" },
+      ],
+    });
+  });
+
+  it("adds the Firewall line, and leaves Always out when it is not offered", () => {
+    const block = card({ agent: "Scout", firewalled: true, always: false });
+    expect(block).toMatchObject({
+      detail: "Agent's reason: Save the lead\nFirewall is on, so each use will still ask you.",
+    });
+    expect((block as { actions: { id: string }[] }).actions.map((a) => a.id)).toEqual([
+      "allow",
+      "deny",
+    ]);
+  });
+
+  it("cuts a long reason to 300 characters", () => {
+    const block = card({ agent: "Scout", firewalled: false, always: true }, "x".repeat(500));
+    expect((block as { detail: string }).detail).toBe(`Agent's reason: ${"x".repeat(300)}`);
   });
 });

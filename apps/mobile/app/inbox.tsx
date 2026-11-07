@@ -1,5 +1,6 @@
 import { MenuView } from "@expo/ui/community/menu";
 import type { InboxMoveInput, InboxPile, InboxTodo, MailRow } from "@rakazo/contracts";
+import { accountTabNames } from "@rakazo/contracts";
 import type { SenderGroup } from "@rakazo/core";
 import {
   archivableIds,
@@ -24,12 +25,15 @@ import {
   Text,
   View,
 } from "react-native";
+import { CappedList } from "../components/capped-list";
 import { MailRowMenu } from "../components/mail-row-menu";
 import { MenuPicker } from "../components/menu-picker";
 import { NativeActionButton } from "../components/native-action-button";
 import { NativeSegmentedControl } from "../components/native-segmented-control";
 import { NativeSymbol } from "../components/native-symbol";
 import { mobileTokens } from "../lib/appearance";
+import type { DueFilter } from "../lib/capped-list";
+import { filterTodosByDue } from "../lib/capped-list";
 import { useI18n } from "../lib/i18n";
 import { formatThreadTime } from "../lib/inbox";
 import {
@@ -38,6 +42,7 @@ import {
   ensureMailAgent,
   listMailInbox,
   listMailTodos,
+  markNoReply,
   moveMailMessages,
   refreshMailInbox,
   todoDueLabel,
@@ -246,6 +251,33 @@ export default function InboxScreen() {
       void load(tabRef.current, false);
     }
   };
+  // The row leaves Needs reply at once; the third one for a sender says so, with Undo.
+  const announceStop = (messageId: string, sender: string) =>
+    Alert.alert(t("Stopped Needs reply for {sender}", { sender }), undefined, [
+      {
+        text: t("Undo"),
+        onPress: () =>
+          void markNoReply(messageId, true).catch((cause) => Alert.alert(errorText(cause))),
+      },
+      { text: t("Done") },
+    ]);
+  const noReplyRow = async (row: MailRow) => {
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            rows: current.rows.map((r) => (r.id === row.id ? { ...r, needsReply: false } : r)),
+          }
+        : current,
+    );
+    try {
+      const { stopped } = await markNoReply(row.id);
+      if (stopped) announceStop(row.id, stopped);
+    } catch (cause) {
+      Alert.alert(errorText(cause));
+    }
+    void load(tabRef.current, false);
+  };
   const confirmArchiveGroup = (group: SenderGroup<MailRow>) => {
     const count = archivableIds(group.rows, pileRef.current === "spam").length;
     if (count === 0) return;
@@ -277,14 +309,20 @@ export default function InboxScreen() {
   const completeTodo = (todo: InboxTodo) => {
     const index = todos.indexOf(todo);
     setTodos((current) => current.filter((item) => item.id !== todo.id));
-    completeMailTodo(todo.id).catch((cause: unknown) => {
-      setTodos((current) =>
-        current.some((item) => item.id === todo.id)
-          ? current
-          : [...current.slice(0, index), todo, ...current.slice(index)],
-      );
-      Alert.alert(errorText(cause));
-    });
+    completeMailTodo(todo.id)
+      .then(({ stoppedSender }) => {
+        if (stoppedSender && todo.messageId) announceStop(todo.messageId, stoppedSender);
+        // The server also took the mail out of Needs reply; list it again.
+        if (todo.messageId) void load(tabRef.current, false);
+      })
+      .catch((cause: unknown) => {
+        setTodos((current) =>
+          current.some((item) => item.id === todo.id)
+            ? current
+            : [...current.slice(0, index), todo, ...current.slice(index)],
+        );
+        Alert.alert(errorText(cause));
+      });
   };
 
   const accounts = data?.accounts ?? [];
@@ -415,9 +453,10 @@ export default function InboxScreen() {
     ].filter((section) => section.data.length > 0);
   }, [pile, rows, expanded, digestOn, digestList, t]);
 
+  const accountNames = accountTabNames(accounts);
   const choices = [
     { key: ALL, label: t("All") },
-    ...accounts.map((account) => ({ key: account.connectionId, label: account.label })),
+    ...accounts.map((account, i) => ({ key: account.connectionId, label: accountNames[i] ?? "" })),
   ];
   const picker =
     accounts.length < 2 ? null : accounts.length <= 3 ? (
@@ -539,6 +578,9 @@ export default function InboxScreen() {
           ) : (
             <MailRowMenu
               onArchive={() => void archiveRows([item.row])}
+              {...(item.row.needsReply === true
+                ? { onNoReply: () => void noReplyRow(item.row) }
+                : {})}
               {...(item.row.pile === "spam"
                 ? { onNotSpam: () => void moveRows("notSpam", [item.row]) }
                 : item.row.inInbox
@@ -582,49 +624,65 @@ function TodoCard({
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{t("To do")}</Text>
-      {todos.map((todo) => {
-        const days = todo.dueOn ? localDaysUntil(todo.dueOn, now) : null;
-        const tone = dueTone(days, todo.priority);
-        const detail = [todo.from, todo.detail].filter(Boolean).join(" · ");
-        return (
-          <View key={todo.id} style={styles.todoRow}>
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: false }}
-              accessibilityLabel={todo.text}
-              // The 22 pt circle plus 11 pt each side is the 44 pt target; the rest of the row does nothing.
-              hitSlop={11}
-              onPress={() => onComplete(todo)}
-            >
-              <NativeSymbol
-                ios="circle"
-                android="ellipse-outline"
-                size={22}
-                color={native.secondaryLabel}
-              />
-            </Pressable>
-            <View style={styles.todoBody}>
-              <Text style={styles.todoText}>{todo.text}</Text>
-              {detail ? (
-                <Text style={styles.meta} numberOfLines={1}>
-                  {detail}
+      <CappedList
+        items={todos}
+        title={t("To do")}
+        keyOf={(todo) => todo.id}
+        searchFields={(todo) => [todo.text, todo.detail ?? "", todo.from ?? ""]}
+        filter={{
+          label: t("To do"),
+          options: [
+            { value: "all", label: t("All") },
+            { value: "overdue", label: t("Overdue") },
+            { value: "upcoming", label: t("Upcoming") },
+            { value: "none", label: t("No date") },
+          ],
+          apply: (list, value) => filterTodosByDue(list, value as DueFilter),
+        }}
+        renderItem={(todo) => {
+          const days = todo.dueOn ? localDaysUntil(todo.dueOn, now) : null;
+          const tone = dueTone(days, todo.priority);
+          const detail = [todo.from, todo.detail].filter(Boolean).join(" · ");
+          return (
+            <View key={todo.id} style={styles.todoRow}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: false }}
+                accessibilityLabel={todo.text}
+                // The 22 pt circle plus 11 pt each side is the 44 pt target; the rest of the row does nothing.
+                hitSlop={11}
+                onPress={() => onComplete(todo)}
+              >
+                <NativeSymbol
+                  ios="circle"
+                  android="ellipse-outline"
+                  size={22}
+                  color={native.secondaryLabel}
+                />
+              </Pressable>
+              <View style={styles.todoBody}>
+                <Text style={styles.todoText}>{todo.text}</Text>
+                {detail ? (
+                  <Text style={styles.meta} numberOfLines={1}>
+                    {detail}
+                  </Text>
+                ) : null}
+              </View>
+              {todo.dueOn && days !== null ? (
+                <Text
+                  style={[
+                    styles.meta,
+                    tone === "crit" && { color: tokens.destructive },
+                    tone === "warn" && { color: tokens.warning },
+                  ]}
+                >
+                  {todoDueLabel(todo.dueOn, days)}
                 </Text>
               ) : null}
             </View>
-            {todo.dueOn && days !== null ? (
-              <Text
-                style={[
-                  styles.meta,
-                  tone === "crit" && { color: tokens.destructive },
-                  tone === "warn" && { color: tokens.warning },
-                ]}
-              >
-                {todoDueLabel(todo.dueOn, days)}
-              </Text>
-            ) : null}
-          </View>
-        );
-      })}
+          );
+        }}
+      />
       {syncing ? (
         <View style={styles.todoRow}>
           <ActivityIndicator />

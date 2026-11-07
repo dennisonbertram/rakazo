@@ -3,19 +3,21 @@ import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { ThreadMessage } from "@rakazo/contracts";
-import { commandVariableName, connectorToolLabel } from "@rakazo/contracts";
+import { commandVariableName, connectorToolLabel, MEETING_MARK_REASON } from "@rakazo/contracts";
 import {
   formatMessageTime,
   isApprovalAskBlock,
   isClosedApprovalAnswer,
   isSecretAskBlock,
   resolveAskChoice,
+  SKIPPED_APPROVAL_ANSWER,
 } from "@rakazo/core";
 import { Button, Input } from "@rakazo/ui-web";
 import { Check, ChevronDown, KeyRound, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { maskCurrencyWhenHidden, useHideAmounts } from "../lib/hide-amounts-preference";
 import { errorText } from "../lib/user-error";
+import { useBotToolControls } from "./BotToolControls";
 import { SecretRequestDialog } from "./SecretRequestDialog";
 
 export type AskBlock = Extract<ThreadMessage["blocks"][number], { kind: "ask" }>;
@@ -35,6 +37,7 @@ function formatAnsweredState(
   // A card the server closed itself reads the same whatever kind of approval it was.
   if (approval && answer === "superseded") return t`Replaced by a newer request`;
   if (approval && answer === "expired") return t`Expired`;
+  if (approval && answer === SKIPPED_APPROVAL_ANSWER) return t`Skipped`;
   if (share && approval) return answer === "allow" ? t`Shared` : t`Not shared`;
   if (consent && approval) return answer === "allow" ? t`Allowed` : t`Not now`;
   // A typed answer is already the user's own bubble; only a chosen option is named here.
@@ -49,6 +52,8 @@ function formatAnsweredState(
   if (outcome === "cancelled") return t`Cancelled`;
   if (answer === "allow") return waitsFor ? t`Approved here. Waiting for ${waitsFor}` : t`Approved`;
   if (answer === "always") return t`Always allowed`;
+  if (answer === "always_bot_sites") return t`Allowed for all sites`;
+  if (answer === "always_routine") return t`Always allowed for this routine`;
   if (answer === "deny") return t`Denied`;
   return t`Answered: ${answer}`;
 }
@@ -61,13 +66,33 @@ function answeredTone(
   outcome?: "created" | "cancelled",
 ): { className: string; Icon?: typeof Check } {
   if (secret || outcome === "created") return { className: "text-success" };
-  if (!approval || outcome === "cancelled" || isClosedApprovalAnswer(answer))
+  if (
+    !approval ||
+    outcome === "cancelled" ||
+    isClosedApprovalAnswer(answer) ||
+    answer === SKIPPED_APPROVAL_ANSWER
+  )
     return { className: "text-muted-foreground" };
   if (answer === "deny") return { className: "text-destructive", Icon: X };
-  if (answer === "allow" || answer === "always")
+  if (
+    answer === "allow" ||
+    answer === "always" ||
+    answer === "always_bot_sites" ||
+    answer === "always_routine"
+  )
     return { className: "text-foreground", Icon: Check };
   return { className: "text-muted-foreground" };
 }
+
+/** Answers that save a standing permission; shown as quiet links under the one-off answers. */
+/** The server's label for Always on a request_access card. */
+const ACCESS_ALWAYS_LABEL = "Always for this agent";
+
+const STANDING_ACTIONS: ReadonlySet<string> = new Set([
+  "always",
+  "always_bot_sites",
+  "always_routine",
+]);
 
 function approvalActionLabel(
   id: string,
@@ -87,8 +112,13 @@ function approvalActionLabel(
   if (id === "allow" && fallback === "Allow for this run") return t`Allow for this run`;
   if (id === "allow")
     return fallback.startsWith("Send ") ? maskCurrencyWhenHidden(fallback) : t`Allow once`;
+  // A request-access card's Always changes one agent's settings, not a space-wide rule.
+  if (id === "always" && fallback === ACCESS_ALWAYS_LABEL) return t`Always for this agent`;
   if (id === "always") return site ? t`Always allow ${site}` : t`Always allow this`;
   if (id === "deny") return t`Deny`;
+  if (id === "always_routine") return t`Always for this routine`;
+  if (id === "always_bot_sites" && fallback === "Allow all sites for this agent")
+    return t`Allow all sites for this agent`;
   return fallback;
 }
 
@@ -121,6 +151,7 @@ export function AskCard({
   const { t } = useLingui();
   // Re-render when Hide amounts changes: a payment button carries its amount.
   useHideAmounts();
+  const botToolControls = useBotToolControls();
   const [editing, setEditing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [answer, setAnswer] = useState("");
@@ -271,7 +302,24 @@ export function AskCard({
         </p>
       ) : null}
       {block.approvalReason ? (
-        <p className="mt-2 text-[13px] text-muted-foreground">{block.approvalReason}</p>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          {block.approvalReason}
+          {block.approvalReason === MEETING_MARK_REASON &&
+          block.status !== "answered" &&
+          canAnswer &&
+          botToolControls?.clearConversation ? (
+            <>
+              {" "}
+              <Button
+                variant="link"
+                className="h-auto p-0 text-[13px]"
+                onClick={() => botToolControls.clearConversation?.()}
+              >
+                <Trans>Clear conversation</Trans>
+              </Button>
+            </>
+          ) : null}
+        </p>
       ) : null}
       {block.status === "answered" ? (
         (() => {
@@ -317,16 +365,16 @@ export function AskCard({
           {[...askActions]
             .sort(
               (a, b) =>
-                Number(approvalActions && a.id === "always") -
-                Number(approvalActions && b.id === "always"),
+                Number(approvalActions && STANDING_ACTIONS.has(a.id)) -
+                Number(approvalActions && STANDING_ACTIONS.has(b.id)),
             )
             .map((action) =>
               // A standing permission is a quiet text action under the one-off answers.
-              approvalActions && action.id === "always" ? (
+              approvalActions && STANDING_ACTIONS.has(action.id) ? (
                 <div key={action.id} className="flex flex-wrap items-baseline gap-x-2 px-1 pt-1">
                   <Button
                     variant="link"
-                    className="h-auto p-0"
+                    className="h-auto min-w-0 shrink whitespace-normal p-0 text-start"
                     disabled={submitting || settling}
                     onClick={() => void submitAnswer(action.id)}
                   >
@@ -343,9 +391,11 @@ export function AskCard({
                       )
                     )}
                   </Button>
-                  <span className="text-[13px] text-muted-foreground">
-                    <Trans>Won't ask again anywhere in this space.</Trans>
-                  </span>
+                  {action.id === "always" && action.label !== ACCESS_ALWAYS_LABEL ? (
+                    <span className="text-[13px] text-muted-foreground">
+                      <Trans>Won't ask again anywhere in this space.</Trans>
+                    </span>
+                  ) : null}
                 </div>
               ) : (
                 <Button

@@ -324,7 +324,7 @@ export interface ConnectorCapabilities {
 export type ConnectorCatalogItem = Omit<ConnectionCatalogItem, "description" | "category">;
 
 export interface MemoryReadRequest {
-  scope: "bot" | "user";
+  scope: "bot" | "user" | "company";
   botId?: string;
   path?: string;
 }
@@ -336,12 +336,18 @@ export interface MemorySnapshot {
     content: string;
     revision: number;
     updatedAt?: string;
+    /** Fading inputs (see memory-strength.ts); absent from stores that do not track them. */
+    kind?: string;
+    useCount?: number;
+    lastUsedAt?: string;
+    pinned?: boolean;
   }>;
 }
 
 export interface MemorySearchRequest {
   query: string;
-  scope: "bot" | "user" | "all";
+  /** "all" means bot and user memory; company context is searched only by naming it. */
+  scope: "bot" | "user" | "company" | "all";
   botId?: string;
 }
 
@@ -356,12 +362,16 @@ export const MEMORY_REVISION_CONFLICT_ERROR =
   "Shared memory changed since it was read. Read the latest version and save again.";
 
 export interface MemoryCommitRequest {
-  scope: "bot" | "user";
+  scope: "bot" | "user" | "company";
   botId?: string;
   path: string;
   content: string;
   /** When set, commit fails if the live document revision is no longer this value. */
   expectedRevision?: number;
+  /** How fast the memory fades; kept as is when omitted (new documents are facts). */
+  kind?: "preference" | "fact" | "task";
+  /** The owner wrote this by hand: the memory is pinned and never fades. */
+  byOwner?: boolean;
   sourceRunId?: string;
   sourceThreadId?: string;
 }
@@ -569,6 +579,12 @@ export interface AgentRunRequest {
    * the thread's meeting mark and the model's data-sharing consent.
    */
   beforeModelRequest?: () => Promise<void>;
+  /**
+   * Awaited with the raw output (stdout and stderr, unformatted) of a shell command that finished
+   * after its turn, before it is handed to the model. A rejection stops the run: the executor
+   * records the texts in the run's read record.
+   */
+  recordLateOutput?: (texts: string[]) => Promise<void>;
   executeTool?: (
     name: string,
     args: Record<string, unknown>,
@@ -616,7 +632,8 @@ export type UsageOperationKind =
   | "subagent"
   | "compaction"
   | "triage"
-  | "company_import";
+  | "company_import"
+  | "goal_check";
 
 export interface ModelCallObserver {
   beforeCall(call: {
@@ -765,6 +782,8 @@ export interface BackgroundJobPayloads {
   "computer.control-expire": { computerId: string; leaseId: string };
   "skill.teaching-expire": { skillId: string };
   "history.compact": { threadId: string };
+  /** Judges a goal after the run `runId` of its thread ended. */
+  "goal.check": { goalId: string; runId: string };
   "messaging.deliver": { runId?: string };
   /** Sends due external notification deliveries; run every minute by the worker's cron. */
   "notifications.deliver": Record<string, never>;
@@ -780,6 +799,10 @@ export interface BackgroundJobPayloads {
   "cloud_agent.poll": { agentId: string };
   /** Deletes a saved mail search (and its rows) once it has expired. */
   "mail.search.expire": { searchId: string };
+  /** Sends the approved rows of one reply batch; one queued job per batch. */
+  "mail.reply.batch": { effectId: string; spaceId: string; userId: string };
+  /** Applies the rows of one approved list import; one queued job per import. */
+  "pipeline.import": { importId: string; spaceId: string; userId: string };
   /** Classifies a user's new inbox mail and syncs their to-dos; one queued job per user and space. */
   "inbox.triage": { userId: string; spaceId: string };
   /** Syncs one mail connection into the cache; one queued job per connection. */
@@ -804,6 +827,7 @@ export interface BackgroundJobPayloads {
   };
   /** Renews the Gmail push watches that are close to expiring; run daily by the worker's cron. */
   "mail.watch.renew": Record<string, never>;
+  "mail.sync.sweep": Record<string, never>;
   /** Refreshes the space's Devin sessions; run every two minutes by cron without a payload (every connection), or for the one server named. */
   "devin.refresh": { serverId?: string };
   "company.import.run": { spaceId: string; userId: string; runId: string };
@@ -825,6 +849,8 @@ export interface BackgroundJobPayloads {
   };
   /** Extracts commitments from a stored meeting; the handler is filled in by the digest slice. */
   "meetings.digest": { spaceId: string; userId: string; meetingId: string; continue?: boolean };
+  /** Files a freshly digested meeting in Data room > Recordings. Ids only. */
+  "meetings.followup": { spaceId: string; userId: string; meetingId: string; retry?: number };
   "finance.sync": { userId: string; spaceId: string };
   /** Turns a pendant connection's uploaded records into audio recordings in the Data room. Ids only. */
   /** Transcribes one chunk of a meeting capture. Ids only. */
@@ -861,7 +887,7 @@ export interface BackgroundJobPayloads {
     /** The import that reports progress. */
     importId: string;
     name: string;
-    source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi";
+    source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
     folderId: string | null;
     sourceConnectionId?: string;
     externalId?: string;
@@ -1494,7 +1520,9 @@ export type MeetingSourceErrorKind =
   | "mapping"
   | "rate_limit"
   | "unavailable"
-  | "not_found";
+  | "not_found"
+  /** The source's read budget for this run is spent; the run stops and the next continues. */
+  | "budget";
 
 /** A meeting source failed. The message is a short reason, never a vendor payload. */
 export class MeetingSourceError extends Error {
@@ -1595,6 +1623,8 @@ export interface WebFetchResult {
   title: string;
   text: string;
   truncated: boolean;
+  /** Set when the site served a bot wall instead of the page; `text` is then empty. */
+  wall?: { kind: "transient" | "needs_person"; status: number; reason: string };
 }
 
 /** Page-level browser on the bot computer (DOM refs), not a hosted browser vendor. */
@@ -1780,6 +1810,19 @@ export interface AutoReviewRequest {
    * tool results or inbound messages, so injected text cannot argue for the site.
    */
   newSite?: boolean;
+  /** An internal write of content an agent that read outside text produced; `args` holds it. */
+  untrustedContent?: boolean;
+  /**
+   * A fetch the deterministic exfiltration check flagged (with `newSite`, so `args` is only the
+   * URL). `indicators` are kinds, lengths and short hashes, never private text. The review may
+   * only clear the flag; it never sees what the run read, only an outline of what it can read.
+   */
+  exfilFlag?: {
+    reason: string;
+    indicators: string[];
+    canRead: string[];
+    readOutsideContent: boolean;
+  };
 }
 
 export interface AutoReviewResult {
