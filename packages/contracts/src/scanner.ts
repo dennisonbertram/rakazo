@@ -1,4 +1,22 @@
+import { DataRoomApiName } from "./data-room-api.js";
+
 export type ScannerKind = "sane-missing" | "not-found" | "busy" | "ready" | "scanning" | "error";
+
+export const SCANNER_DEFAULT_FOLDER = ["Scans"] as const;
+
+export function isScannerFolderPath(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= 32 &&
+    value.every(
+      (part) =>
+        typeof part === "string" &&
+        part !== "." &&
+        part !== ".." &&
+        DataRoomApiName.safeParse(part).success,
+    )
+  );
+}
 
 export interface ScannerState {
   kind: ScannerKind;

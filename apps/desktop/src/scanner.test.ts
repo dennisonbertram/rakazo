@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   access,
@@ -14,9 +15,10 @@ import {
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ScannerService } from "./scanner.js";
 import { createScanner } from "./scanner.js";
+import * as setupStore from "./setup-store.js";
 
 const fixtureBin = fileURLToPath(new URL("./fixtures/bin/", import.meta.url));
 const scope = { userId: "user-one", spaceId: "space-one" };
@@ -36,6 +38,7 @@ interface Harness {
 }
 
 const harnesses: Harness[] = [];
+let unblockOutboxWrite: (() => void) | null = null;
 
 async function makeHarness(
   scenario: Record<string, unknown> = {},
@@ -120,6 +123,9 @@ async function countLines(file: string) {
 }
 
 afterEach(async () => {
+  unblockOutboxWrite?.();
+  unblockOutboxWrite = null;
+  vi.restoreAllMocks();
   await Promise.all(
     harnesses.splice(0).map(async ({ service, root }) => {
       await service.close();
@@ -130,11 +136,13 @@ afterEach(async () => {
 
 describe("offline SANE scanner service", () => {
   it("drives the fake scanimage, writes a two-page PDF, and persists its digest privately", async () => {
-    const harness = await makeHarness();
+    const scanTime = new Date(2026, 6, 15, 9, 7).getTime();
+    const harness = await makeHarness({}, { now: () => scanTime });
     const delivered: unknown[] = [];
     harness.service.onDocument((document) => delivered.push(document));
     await harness.service.start();
     await useScope(harness.service);
+    expect(harness.service.state().folder).toEqual(["Scans"]);
     await harness.service.setFolder(["folder_one"]);
     expect(harness.service.state().kind).toBe("ready");
 
@@ -143,7 +151,7 @@ describe("offline SANE scanner service", () => {
     expect(document).toBeDefined();
     expect(delivered).toHaveLength(1);
     expect(document?.id).toMatch(/^[0-9a-f-]{36}$/i);
-    expect(document?.name).toBe(`scan-${document?.id}.pdf`);
+    expect(document?.name).toBe("Scan 2026-07-15 09.07.pdf");
     expect(document?.pages).toBe(2);
     expect(document?.folder).toEqual(["folder_one"]);
     expect(Object.keys(harness.service.state())).not.toContain("documents");
@@ -162,12 +170,15 @@ describe("offline SANE scanner service", () => {
     expect(pdf.subarray(xrefOffset, xrefOffset + 4).toString("ascii")).toBe("xref");
     expect(await harness.scanCalls()).toBe(1);
 
-    const pdfPath = join(harness.outboxDir, `${document?.id}.pdf`);
-    const metadataPath = join(harness.outboxDir, `${document?.id}.json`);
+    const bundleDir = join(harness.outboxDir, document!.id);
+    const pdfPath = join(bundleDir, `${document?.id}.pdf`);
+    const metadataPath = join(bundleDir, `${document?.id}.json`);
     expect((await stat(harness.userDataDir)).mode & 0o777).toBe(0o700);
     expect((await stat(harness.outboxDir)).mode & 0o777).toBe(0o700);
+    expect((await stat(bundleDir)).mode & 0o777).toBe(0o700);
     expect((await stat(pdfPath)).mode & 0o777).toBe(0o600);
     expect((await stat(metadataPath)).mode & 0o777).toBe(0o600);
+    expect(await readdir(harness.outboxDir)).toEqual([document!.id]);
   });
 
   it("does not scan or auto-scan until a signed-in scope is selected", async () => {
@@ -217,6 +228,75 @@ describe("offline SANE scanner service", () => {
 
     expect(harness.service.state().kind).toBe("error");
     expect(harness.service.state().error).toContain("No pages");
+    expect(await harness.service.pending()).toEqual([]);
+  });
+
+  it("keeps the latched scan error until the feeder clears", async () => {
+    const harness = await makeHarness({
+      pageLoaded: "on",
+      pages: ["page-one.jpg.b64"],
+      scan: { exitCode: 1, stderr: "Paper jam" },
+    });
+    await harness.service.start();
+    await useScope(harness.service);
+    await harness.service.scan();
+    const failed = harness.service.state().error;
+    expect(failed).toContain("Clear the feeder");
+
+    await harness.service.pollNow();
+    expect(harness.service.state().kind).toBe("error");
+    expect(harness.service.state().error).toBe(failed);
+
+    await harness.setScenario({ pageLoaded: "off" });
+    await harness.service.pollNow();
+    expect(harness.service.state().kind).toBe("ready");
+  });
+
+  it("emits SANE's normal feeder-exhaustion diagnostic from the fake executable", async () => {
+    const harness = await makeHarness({ pages: [] });
+    const batch = join(harness.root, "page%03d.jpg");
+    const child = spawn(
+      join(fixtureBin, "scanimage"),
+      [
+        "-d",
+        "fujitsu:ScanSnap iX1600:synthetic",
+        "--source",
+        "ADF Duplex",
+        "--mode",
+        "Color",
+        "--resolution",
+        "300",
+        "--format=jpeg",
+        `--batch=${batch}`,
+        "--swskip=1",
+      ],
+      {
+        env: {
+          ...process.env,
+          PATH: `${fixtureBin}${delimiter}${process.env.PATH ?? ""}`,
+          RAKAZO_FAKE_SCANIMAGE_SCENARIO: harness.scenarioPath,
+        },
+        stdio: ["ignore", "ignore", "pipe"],
+      },
+    );
+    const stderr: Buffer[] = [];
+    child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+    expect(code).toBe(0);
+    expect(Buffer.concat(stderr).toString("utf8")).toContain("Document feeder out of documents");
+  });
+
+  it("ignores unpublished staging bundles", async () => {
+    const harness = await makeHarness();
+    await harness.service.start();
+    await useScope(harness.service);
+    const stagingDir = join(harness.outboxDir, ".staging-incomplete");
+    await mkdir(stagingDir, { mode: 0o700 });
+    await writeFile(join(stagingDir, "partial.pdf"), "incomplete", { mode: 0o600 });
+
     expect(await harness.service.pending()).toEqual([]);
   });
 
@@ -310,11 +390,53 @@ describe("offline SANE scanner service", () => {
 
     expect(harness.service.state().kind).toBe("ready");
     expect(await harness.service.pending()).toEqual([]);
-    expect((await readdir(harness.outboxDir)).filter((name) => name.endsWith(".pdf"))).toEqual([
-      `${retained!.id}.pdf`,
-    ]);
+    expect(await readdir(harness.outboxDir)).toEqual([retained!.id]);
     await useScope(harness.service);
     expect(await harness.service.pending()).toMatchObject([{ id: retained!.id }]);
+  });
+
+  it("finishes an atomic bundle under its captured scope when scope changes during commit", async () => {
+    const harness = await makeHarness();
+    const delivered: unknown[] = [];
+    harness.service.onDocument((document) => delivered.push(document));
+    await harness.service.start();
+    await useScope(harness.service);
+
+    let enteredWrite!: () => void;
+    let releaseWrite!: () => void;
+    const writeEntered = new Promise<void>((resolve) => {
+      enteredWrite = resolve;
+    });
+    const writeBarrier = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    unblockOutboxWrite = releaseWrite;
+    const originalWritePrivateFile = setupStore.writePrivateFile;
+    vi.spyOn(setupStore, "writePrivateFile").mockImplementation(async (destination, contents) => {
+      if (destination.includes(".staging-") && destination.endsWith(".json")) {
+        enteredWrite();
+        await writeBarrier;
+      }
+      await originalWritePrivateFile(destination, contents);
+    });
+
+    const scanning = harness.service.scan();
+    await writeEntered;
+    const switching = harness.service.setScope(
+      { userId: "user-two", spaceId: "space-two" },
+      origin,
+    );
+    releaseWrite();
+    unblockOutboxWrite = null;
+    await Promise.all([scanning, switching]);
+
+    expect(delivered).toEqual([]);
+    expect(await harness.service.pending()).toEqual([]);
+    expect(await readdir(harness.outboxDir)).toHaveLength(1);
+    await useScope(harness.service);
+    const [retained] = await harness.service.pending();
+    expect(retained?.name).toMatch(/^Scan \d{4}-\d{2}-\d{2} \d{2}\.\d{2}\.pdf$/);
+    expect(delivered).toHaveLength(1);
   });
 
   it("captures the selected folder when a scan begins", async () => {
@@ -383,10 +505,11 @@ describe("offline SANE scanner service", () => {
     expect(await harness.service.confirm("../outside", document!.sha256)).toEqual({ ok: false });
     expect(await harness.service.confirm(document!.id, "not-a-hash")).toEqual({ ok: false });
     expect(await harness.service.confirm(document!.id, "0".repeat(64))).toEqual({ ok: false });
-    await expect(access(join(harness.outboxDir, `${document!.id}.pdf`))).resolves.toBeUndefined();
+    const bundleDir = join(harness.outboxDir, document!.id);
+    await expect(access(join(bundleDir, `${document!.id}.pdf`))).resolves.toBeUndefined();
     expect(await harness.service.confirm(document!.id, document!.sha256)).toEqual({ ok: true });
     expect(await harness.service.pending()).toEqual([]);
-    await expect(access(join(harness.outboxDir, `${document!.id}.pdf`))).rejects.toThrow();
+    await expect(access(bundleDir)).rejects.toThrow();
   });
 
   it("does not follow a symlink substituted for an outbox PDF", async () => {
@@ -396,13 +519,52 @@ describe("offline SANE scanner service", () => {
     await harness.service.scan();
     const [document] = await harness.service.pending();
     const victim = join(harness.root, "outside.pdf");
-    const pdfPath = join(harness.outboxDir, `${document!.id}.pdf`);
+    const pdfPath = join(harness.outboxDir, document!.id, `${document!.id}.pdf`);
     await writeFile(victim, "keep this file", { mode: 0o600 });
     await unlink(pdfPath);
     await symlink(victim, pdfPath);
 
     expect(await harness.service.confirm(document!.id, document!.sha256)).toEqual({ ok: false });
     expect(await readFile(victim, "utf8")).toBe("keep this file");
+  });
+
+  it("does not follow a symlink substituted for a ready outbox bundle", async () => {
+    const harness = await makeHarness();
+    await harness.service.start();
+    await useScope(harness.service);
+    await harness.service.scan();
+    const [document] = await harness.service.pending();
+    const bundleDir = join(harness.outboxDir, document!.id);
+    const outsideDir = join(harness.root, "outside-bundle");
+    const pdf = await readFile(join(bundleDir, `${document!.id}.pdf`));
+    const metadata = await readFile(join(bundleDir, `${document!.id}.json`));
+    await mkdir(outsideDir);
+    await writeFile(join(outsideDir, `${document!.id}.pdf`), pdf, { mode: 0o600 });
+    await writeFile(join(outsideDir, `${document!.id}.json`), metadata, { mode: 0o600 });
+    await rm(bundleDir, { recursive: true });
+    await symlink(outsideDir, bundleDir, "dir");
+
+    expect(await harness.service.pending()).toEqual([]);
+    expect(await harness.service.confirm(document!.id, document!.sha256)).toEqual({ ok: false });
+    await expect(access(join(outsideDir, `${document!.id}.pdf`))).resolves.toBeUndefined();
+  });
+
+  it("validates user-visible metadata names independently of UUID storage paths", async () => {
+    const harness = await makeHarness();
+    await harness.service.start();
+    await useScope(harness.service);
+    await harness.service.scan();
+    const [document] = await harness.service.pending();
+    const metadataPath = join(harness.outboxDir, document!.id, `${document!.id}.json`);
+    const metadata = JSON.parse(await readFile(metadataPath, "utf8")) as Record<string, unknown>;
+    metadata.name = "../outside.pdf";
+    await writeFile(metadataPath, JSON.stringify(metadata), { mode: 0o600 });
+
+    expect(await harness.service.pending()).toEqual([]);
+    expect(await harness.service.confirm(document!.id, document!.sha256)).toEqual({ ok: false });
+    await expect(
+      access(join(harness.outboxDir, document!.id, `${document!.id}.pdf`)),
+    ).resolves.toBeUndefined();
   });
 
   it("does not create or write through a symlinked outbox directory", async () => {
@@ -472,7 +634,23 @@ describe("offline SANE scanner service", () => {
 
   it("rejects unsafe folder and scope values", async () => {
     const harness = await makeHarness();
-    await expect(harness.service.setFolder(["../escape"])).rejects.toThrow();
+    await harness.service.setFolder(["Legal", "Employment Contracts", "Résumé.v2 (final)"]);
+    expect(harness.service.state().folder).toEqual([
+      "Legal",
+      "Employment Contracts",
+      "Résumé.v2 (final)",
+    ]);
+    for (const folder of [
+      [""],
+      ["   "],
+      ["."],
+      [".."],
+      ["Legal/Work"],
+      ["Legal\\Work"],
+      ["bad\nname"],
+    ]) {
+      await expect(harness.service.setFolder(folder)).rejects.toThrow();
+    }
     await expect(
       harness.service.setScope({ userId: "../user", spaceId: "space" }, origin),
     ).rejects.toThrow();

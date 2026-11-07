@@ -53,11 +53,11 @@ The user plugs the scanner into the Mac by USB and opens the Praci desktop app. 
 
 - **Find SANE.** Look for `scanimage` on the usual paths (`/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`). Missing → state `sane-missing`.
 - **Find the scanner.** `scanimage -L`, keep `fujitsu:` devices. None → `not-found`. "Device busy" → `busy` (another app has it).
-- **Watch the feeder.** While the app is open and auto-scan is on, read `page-loaded` once a second with `scanimage -d <dev> -A`. When it has been on for 2 s, scan. After a scan, wait for `page-loaded` to go off before arming again, so a jam does not cause a loop.
-- **Scan.** `scanimage -d <dev> --source "ADF Duplex" --mode Color --resolution 300 --format=jpeg --batch=<tmp>/page%03d.jpg --swskip <n>` into a fresh temporary directory. Exit 0 with at least one page → success. Any other end (jam, double feed, cover open, cancelled) → no upload, pages deleted, state `error` with the reason; the user reloads and scans again. A partial document is never filed.
+- **Watch the feeder.** While the app is open and auto-scan is on, read `page-loaded` once a second with `scanimage -d <dev> -A`. When it has been on for 2 s, scan. After a scan, wait for `page-loaded` to go off before arming again, so a jam does not cause a loop; keep a failed-scan error visible until the feeder clears or the user explicitly scans again.
+- **Scan.** `scanimage -d <dev> --source "ADF Duplex" --mode Color --resolution 300 --format=jpeg --batch=<tmp>/page%03d.jpg --swskip <n>` into a fresh temporary directory. Exit 0 with at least one page → success, named `Scan YYYY-MM-DD HH.mm.pdf` in local time. Any other end (jam, double feed, cover open, cancelled) → no upload, pages deleted, state `error` with the reason; the user reloads and scans again. A partial document is never filed.
 - **Make the PDF.** A dependency-free writer embeds each JPEG unchanged as a DCTDecode image on its own page, sized from the JPEG's frame header at the scan resolution. Unit-tested against fixture JPEGs.
-- **Outbox.** The PDF and its SHA-256 metadata are written privately under `<userData>/scan-outbox/` before delivery. Metadata binds each file to its user, space and server origin; after the renderer sets the signed-in scope, only matching pending files are replayed or returned by `pending()`. The local PDF is deleted only after `confirm(id, storedSha256)` verifies the recomputed local hash, stored hash and unchanged scope.
-- **Settings.** Auto-scan on/off and target folder are machine-local in a separate private `scanner-settings.json`, written with the private-file primitives in `apps/desktop/src/setup-store.ts`. Resolution and color mode are fixed at 300 dpi and Color for v1.
+- **Outbox.** The PDF and its SHA-256 metadata are fsynced together in a private staging directory under `<userData>/scan-outbox/`, then atomically published as a UUID-named ready bundle. Metadata binds each bundle to its user, space and server origin; staging entries are never replayed. After the renderer sets the signed-in scope, only matching pending bundles are replayed or returned by `pending()`. The local PDF is deleted only after `confirm(id, storedSha256)` verifies the recomputed local hash, stored hash and unchanged scope.
+- **Settings.** Auto-scan on/off and target folder are machine-local in a separate private `scanner-settings.json`, written with the private-file primitives in `apps/desktop/src/setup-store.ts`. The default folder is `Scans`; folder segments use Data Room names such as `Legal/Employment Contracts`. Resolution and color mode are fixed at 300 dpi and Color for v1.
 
 ### IPC
 
@@ -65,7 +65,7 @@ Exposed on `window.rakazoDesktop.scanner` in `apps/desktop/src/preload.cjs`, onl
 
 - `state()` and `onState(listener)`: `{ kind: "sane-missing" | "not-found" | "busy" | "ready" | "scanning" | "error", device?, error?, autoScan, folder }`.
 - `scan()`: start a scan now. `cancel()`: stop a running scan; nothing is filed.
-- `setAutoScan(on)`, `setFolder(path)`.
+- `setAutoScan(on)`, `setFolder(path)` using Data Room folder names.
 - `onDocument(listener)` and `pending()`: deliver/recover `{ id, name, bytes, sha256, pages, folder, userId, spaceId }`.
 - `setScope({ userId, spaceId } | null)`: main adds the trusted server origin; sign-out or scope changes cancel an active scan and stop delivery.
 - `confirm(id, storedSha256)`: main deletes the outbox file only when local and stored hashes match the unchanged scope.

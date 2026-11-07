@@ -106,7 +106,11 @@ async function main() {
   }
   if (scenario.scan?.hold) await new Promise(() => setInterval(() => {}, 1000));
   if (scenario.scan?.stderr) process.stderr.write(`${scenario.scan.stderr}\n`);
-  process.exitCode = Number.isInteger(scenario.scan?.exitCode) ? scenario.scan.exitCode : 0;
+  const exitCode = Number.isInteger(scenario.scan?.exitCode) ? scenario.scan.exitCode : 0;
+  if (exitCode === 0) {
+    process.stderr.write("scanimage: sane_start: Document feeder out of documents\n");
+  }
+  process.exitCode = exitCode;
 }
 
 void main().catch(() => {

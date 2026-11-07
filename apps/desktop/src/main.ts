@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
+import { isScannerFolderPath } from "@rakazo/contracts";
 import { LOCAL_SETTINGS_PAGE } from "@rakazo/contracts/local-settings";
 import type { Session } from "electron";
 import {
@@ -198,14 +199,6 @@ function sendScannerEvent(channel: string, payload: unknown) {
   ) {
     win.webContents.send(channel, payload);
   }
-}
-
-function validScannerFolder(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) &&
-    value.length <= 32 &&
-    value.every((part) => typeof part === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(part))
-  );
 }
 
 function scannerUserScope(value: unknown) {
@@ -1227,7 +1220,7 @@ app.whenReady().then(async () => {
       "desktop.scanner.setFolder",
       async (event, folder: unknown, ...args: unknown[]) => {
         const service = requireScanner(event);
-        if (args.length !== 0 || !validScannerFolder(folder))
+        if (args.length !== 0 || !isScannerFolderPath(folder))
           throw new Error("Invalid scanner folder.");
         await service.setFolder(folder);
       },

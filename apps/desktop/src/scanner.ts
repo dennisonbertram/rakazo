@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Stats } from "node:fs";
-import { constants as fsConstants, unlinkSync } from "node:fs";
+import { constants as fsConstants, rmdirSync, unlinkSync } from "node:fs";
 import {
   access,
   chmod,
@@ -13,10 +13,10 @@ import {
   realpath,
   rename,
   rm,
-  unlink,
 } from "node:fs/promises";
 import { delimiter, join, resolve, sep } from "node:path";
 import type { ScannerDocument, ScannerState } from "@rakazo/contracts";
+import { isScannerFolderPath, SCANNER_DEFAULT_FOLDER } from "@rakazo/contracts";
 import { scannedPdf } from "./scanner-pdf.js";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
 
@@ -141,20 +141,6 @@ function sameScope(left: ScannerScope | null, right: ScannerScope | null) {
   );
 }
 
-function validFolder(folder: unknown): folder is string[] {
-  return (
-    Array.isArray(folder) &&
-    folder.length <= 32 &&
-    folder.every(
-      (part) =>
-        typeof part === "string" &&
-        part.length > 0 &&
-        part.length <= 128 &&
-        SAFE_SEGMENT_PATTERN.test(part),
-    )
-  );
-}
-
 function digest(bytes: Uint8Array) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -196,6 +182,34 @@ function safeError(stderr: string, timedOut: boolean, spawnError: boolean) {
   return "The scan failed. Check the feeder and scanner, then try again.";
 }
 
+function scanDocumentName(timestamp: number) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) throw new Error("Invalid scan time.");
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `Scan ${String(date.getFullYear()).padStart(4, "0")}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}.${pad(date.getMinutes())}.pdf`;
+}
+
+function validDocumentName(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = value.match(/^Scan (\d{4})-(\d{2})-(\d{2}) (\d{2})\.(\d{2})\.pdf$/);
+  if (!match) return false;
+  const [, yearText, monthText, dayText, hourText, minuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    year >= 1000 &&
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    hour <= 23 &&
+    minute <= 59
+  );
+}
+
 function scopedMetadata(value: unknown, filename: string): OutboxMetadata | null {
   if (typeof value !== "object" || value === null) return null;
   const metadata = value as Partial<OutboxMetadata>;
@@ -203,13 +217,13 @@ function scopedMetadata(value: unknown, filename: string): OutboxMetadata | null
     typeof metadata.id !== "string" ||
     !ID_PATTERN.test(metadata.id) ||
     filename !== `${metadata.id}.json` ||
-    metadata.name !== `scan-${metadata.id}.pdf` ||
+    !validDocumentName(metadata.name) ||
     typeof metadata.sha256 !== "string" ||
     !HASH_PATTERN.test(metadata.sha256) ||
     !Number.isInteger(metadata.pages) ||
     (metadata.pages ?? 0) < 1 ||
     (metadata.pages ?? 0) > 500 ||
-    !validFolder(metadata.folder) ||
+    !isScannerFolderPath(metadata.folder) ||
     typeof metadata.userId !== "string" ||
     !SAFE_SEGMENT_PATTERN.test(metadata.userId) ||
     typeof metadata.spaceId !== "string" ||
@@ -248,6 +262,15 @@ async function ensurePrivateDirectory(directory: string) {
   }
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Unsafe scanner directory.");
   await chmod(directory, 0o700);
+}
+
+async function syncDirectory(directory: string) {
+  const handle = await open(directory, fsConstants.O_RDONLY);
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
 }
 
 async function readPrivateBytes(file: string, maxBytes: number) {
@@ -401,10 +424,14 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
   const pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
   const stateListeners = new Set<(state: ScannerState) => void>();
   const documentListeners = new Set<(document: ScannerDocument) => void>();
-  let settings: ScannerSettings = { autoScan: true, folder: [] };
+  let settings: ScannerSettings = { autoScan: true, folder: [...SCANNER_DEFAULT_FOLDER] };
   let currentDevice: string | null = null;
   let currentScope: ScannerScope | null = null;
-  let currentState: ScannerState = { kind: "not-found", autoScan: true, folder: [] };
+  let currentState: ScannerState = {
+    kind: "not-found",
+    autoScan: true,
+    folder: [...SCANNER_DEFAULT_FOLDER],
+  };
   let loadedSince: number | null = null;
   let autoLatch = false;
   let pollTimer: NodeJS.Timeout | null = null;
@@ -452,10 +479,12 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
       const parsed = JSON.parse(contents) as Partial<ScannerSettings>;
       settings = {
         autoScan: typeof parsed.autoScan === "boolean" ? parsed.autoScan : true,
-        folder: validFolder(parsed.folder) ? parsed.folder : [],
+        folder: isScannerFolderPath(parsed.folder)
+          ? [...parsed.folder]
+          : [...SCANNER_DEFAULT_FOLDER],
       };
     } catch {
-      settings = { autoScan: true, folder: [] };
+      settings = { autoScan: true, folder: [...SCANNER_DEFAULT_FOLDER] };
     }
     currentState = { ...currentState, autoScan: settings.autoScan, folder: [...settings.folder] };
   };
@@ -474,6 +503,17 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
     await ensurePrivateDirectory(outboxDir);
   };
 
+  const readyBundleDirectory = async (id: string) => {
+    if (!ID_PATTERN.test(id)) return null;
+    const directory = join(outboxDir, id);
+    try {
+      const info = await lstat(directory);
+      return info.isDirectory() && !info.isSymbolicLink() ? directory : null;
+    } catch {
+      return null;
+    }
+  };
+
   const setSafeError = (message: string) => {
     publish({
       kind: "error",
@@ -488,7 +528,9 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
   ): Promise<ScannerDocument | null> => {
     if (!sameScope(currentScope, scope)) return null;
     try {
-      const bytes = await readPrivateBytes(join(outboxDir, `${metadata.id}.pdf`), MAX_PDF_BYTES);
+      const bundleDir = await readyBundleDirectory(metadata.id);
+      if (!bundleDir) return null;
+      const bytes = await readPrivateBytes(join(bundleDir, `${metadata.id}.pdf`), MAX_PDF_BYTES);
       if (digest(bytes) !== metadata.sha256 || !sameScope(currentScope, scope)) return null;
       return {
         id: metadata.id,
@@ -510,11 +552,17 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
     try {
       await outboxReady();
       const names = await readdir(outboxDir);
-      const metadataNames = names.filter((name) => name.endsWith(".json")).sort();
+      const bundleIds = names.filter((name) => ID_PATTERN.test(name)).sort();
       const documents: ScannerDocument[] = [];
-      for (const name of metadataNames) {
+      for (const id of bundleIds) {
         if (!sameScope(currentScope, scope)) return [];
-        const metadataContents = await readPrivateFile(join(outboxDir, name), MAX_METADATA_BYTES);
+        const bundleDir = await readyBundleDirectory(id);
+        if (!bundleDir) continue;
+        const metadataName = `${id}.json`;
+        const metadataContents = await readPrivateFile(
+          join(bundleDir, metadataName),
+          MAX_METADATA_BYTES,
+        );
         if (!metadataContents) continue;
         let parsed: unknown;
         try {
@@ -522,7 +570,7 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
         } catch {
           continue;
         }
-        const metadata = scopedMetadata(parsed, name);
+        const metadata = scopedMetadata(parsed, metadataName);
         if (
           !metadata ||
           metadata.userId !== scope.userId ||
@@ -633,7 +681,8 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
       if (control.cancelled || !sameScope(currentScope, control.scope)) return snapshot();
 
       const id = randomUUID();
-      const name = `scan-${id}.pdf`;
+      const createdAt = now();
+      const name = scanDocumentName(createdAt);
       const sha256 = digest(pdf);
       const metadata: OutboxMetadata = {
         id,
@@ -644,40 +693,38 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
         userId: capturedScope.userId,
         spaceId: capturedScope.spaceId,
         serverOrigin: capturedScope.serverOrigin,
-        createdAt: now(),
+        createdAt,
       };
       await outboxReady();
       if (control.cancelled || !sameScope(currentScope, control.scope)) return snapshot();
-      const pdfPath = join(outboxDir, `${id}.pdf`);
-      const tempPath = join(outboxDir, `.${id}.${randomUUID()}.tmp`);
-      let handle: Awaited<ReturnType<typeof open>> | null = null;
+      const bundleDir = join(outboxDir, id);
+      const stagingDir = join(outboxDir, `.staging-${id}-${randomUUID()}`);
+      let stagingCreated = false;
       try {
-        handle = await open(tempPath, "wx", 0o600);
-        await handle.writeFile(pdf);
-        await handle.sync();
-        await handle.close();
-        handle = null;
-        if (control.cancelled || !sameScope(currentScope, control.scope)) return snapshot();
-        await rename(tempPath, pdfPath);
-        await chmod(pdfPath, 0o600);
-        if (control.cancelled || !sameScope(currentScope, control.scope)) {
-          await unlink(pdfPath).catch(() => undefined);
-          return snapshot();
+        await mkdir(stagingDir, { mode: 0o700 });
+        stagingCreated = true;
+        await ensurePrivateDirectory(stagingDir);
+        const pdfPath = join(stagingDir, `${id}.pdf`);
+        const handle = await open(pdfPath, "wx", 0o600);
+        try {
+          await handle.writeFile(pdf);
+          await chmod(pdfPath, 0o600);
+          await handle.sync();
+        } finally {
+          await handle.close();
         }
-        const metadataPath = join(outboxDir, `${id}.json`);
+        const metadataPath = join(stagingDir, `${id}.json`);
         await writePrivateFile(metadataPath, JSON.stringify(metadata));
-        if (control.cancelled || !sameScope(currentScope, control.scope)) {
-          await unlink(metadataPath).catch(() => undefined);
-          await unlink(pdfPath).catch(() => undefined);
-          return snapshot();
-        }
+        await syncDirectory(stagingDir);
+        await rename(stagingDir, bundleDir);
+        stagingCreated = false;
+        await syncDirectory(outboxDir);
       } catch (error) {
-        if (handle) await handle.close().catch(() => undefined);
-        await unlink(tempPath).catch(() => undefined);
-        await unlink(pdfPath).catch(() => undefined);
+        if (stagingCreated)
+          await rm(stagingDir, { recursive: true, force: true }).catch(() => undefined);
         throw error;
       }
-      if (!sameScope(currentScope, control.scope)) return snapshot();
+      if (control.cancelled || !sameScope(currentScope, control.scope)) return snapshot();
       publish({ kind: "ready", device: "Fujitsu scanner" });
       const document = await readDocument(metadata, control.scope);
       if (document && sameScope(currentScope, control.scope)) emitDocument(document);
@@ -824,7 +871,7 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
     },
 
     async setFolder(folder) {
-      if (!validFolder(folder)) throw new Error("Invalid scanner folder.");
+      if (!isScannerFolderPath(folder)) throw new Error("Invalid scanner folder.");
       settings = { ...settings, folder: [...folder] };
       currentState = { ...currentState, folder: [...folder] };
       await persistSettings();
@@ -869,10 +916,12 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
       if (!HASH_PATTERN.test(suppliedHash)) return { ok: false };
       const scope = currentScope;
       if (!validScope(scope)) return { ok: false };
-      const metadataPath = join(outboxDir, `${id}.json`);
-      const pdfPath = join(outboxDir, `${id}.pdf`);
       try {
         await outboxReady();
+        const bundleDir = await readyBundleDirectory(id);
+        if (!bundleDir) return { ok: false };
+        const metadataPath = join(bundleDir, `${id}.json`);
+        const pdfPath = join(bundleDir, `${id}.pdf`);
         const contents = await readPrivateFile(metadataPath, MAX_METADATA_BYTES);
         if (!contents) return { ok: false };
         const metadata = scopedMetadata(JSON.parse(contents), `${id}.json`);
@@ -894,8 +943,10 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
         ) {
           return { ok: false };
         }
+        if ((await readyBundleDirectory(id)) !== bundleDir) return { ok: false };
         unlinkSync(pdfPath);
         unlinkSync(metadataPath);
+        rmdirSync(bundleDir);
         return { ok: true };
       } catch {
         return { ok: false };
@@ -964,6 +1015,16 @@ export function createScanner(options: ScannerServiceOptions): ScannerService {
         }
         const timestamp = now();
         if (loadedSince === null) loadedSince = timestamp;
+        if (autoLatch && currentState.kind === "error") {
+          publish({
+            kind: "error",
+            device: "Fujitsu scanner",
+            error:
+              currentState.error ??
+              "The scan failed. Check the feeder and scanner, then try again.",
+          });
+          return;
+        }
         publish({ kind: "ready", device: "Fujitsu scanner" });
         if (
           settings.autoScan &&
