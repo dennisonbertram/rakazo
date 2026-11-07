@@ -44,7 +44,7 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
-import { createBluetoothPicker, originKeyedStore } from "./bluetooth-picker.js";
+import { createBluetoothPicker, createPairingHandler, originKeyedStore } from "./bluetooth-picker.js";
 import { installSessionPermissions, isAppWebContents } from "./session-permissions.js";
 import {
   DEFAULT_LOCAL_WEB_URL,
@@ -145,7 +145,10 @@ function permissionTarget() {
   return url === undefined ? null : { webContents: mainWindow.webContents, url };
 }
 
+const bluetoothPickers = new WeakMap<BrowserWindow, ReturnType<typeof createBluetoothPicker>>();
+
 function installBluetooth(win: BrowserWindow) {
+  const origin = safeOrigin(appWindowTargets.get(win) ?? "");
   const file = path.join(app.getPath("userData"), "bluetooth-device.json");
   const store = originKeyedStore(
     () => {
@@ -163,7 +166,9 @@ function installBluetooth(win: BrowserWindow) {
         // Not remembering the device only means the chooser shows again.
       }
     },
-    () => safeOrigin(permissionTarget()?.url ?? ""),
+    // Fixed when the window is created: a later server switch must not change which origin a
+    // pending choice is saved under.
+    () => origin,
   );
   const picker = createBluetoothPicker({
     ...store,
@@ -188,19 +193,26 @@ function installBluetooth(win: BrowserWindow) {
     else picker.select(devices, callback);
   });
   win.once("closed", () => picker.cancel());
-  win.webContents.session.setBluetoothPairingHandler((details, callback) => {
-    const origin = safeOrigin(permissionTarget()?.url ?? "");
-    const frame = details.frame;
-    if (
-      details.pairingKind !== "confirm" ||
-      !isAppWebContents(win.webContents, permissionTarget) ||
-      (frame && (frame.parent !== null || safeOrigin(frame.url) !== origin))
-    ) {
-      callback({ confirmed: false });
-      return;
-    }
-    void picker.confirmPairing(details.deviceId).then((confirmed) => callback({ confirmed }));
-  });
+  bluetoothPickers.set(win, picker);
+  win.webContents.session.setBluetoothPairingHandler(
+    createPairingHandler<Electron.BluetoothPairingHandlerHandlerDetails>(() => {
+      const active = mainWindow;
+      const activePicker = active === null ? undefined : bluetoothPickers.get(active);
+      if (active === null || active.isDestroyed() || activePicker === undefined) return null;
+      return {
+        picker: activePicker,
+        allows: (details) => {
+          const activeOrigin = safeOrigin(permissionTarget()?.url ?? "");
+          const frame = details.frame;
+          return (
+            details.pairingKind === "confirm" &&
+            isAppWebContents(active.webContents, permissionTarget) &&
+            !(frame && (frame.parent !== null || safeOrigin(frame.url) !== activeOrigin))
+          );
+        },
+      };
+    }),
+  );
 }
 
 function markOnce(name: string) {
@@ -338,6 +350,8 @@ function createWindow(url: string, partition: string | null) {
     },
   });
   restrictWebRtc(win.webContents);
+  // A chooser still open in the window being replaced must not outlive it.
+  if (mainWindow !== null) bluetoothPickers.get(mainWindow)?.cancel();
   mainWindow = win;
   appWindowTargets.set(win, url);
   installBluetooth(win);

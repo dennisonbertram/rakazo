@@ -1,6 +1,6 @@
 import type { BluetoothDevice, WebContents } from "electron";
 import { describe, expect, it, vi } from "vitest";
-import { createBluetoothPicker, originKeyedStore } from "./bluetooth-picker.js";
+import { createBluetoothPicker, createPairingHandler, originKeyedStore } from "./bluetooth-picker.js";
 import { isAppWebContents } from "./session-permissions.js";
 
 const omi = { deviceId: "a", deviceName: "Omi" } as BluetoothDevice;
@@ -175,5 +175,62 @@ describe("Bluetooth app-origin rule", () => {
       isAppWebContents(away, () => ({ webContents: away, url: "https://app.example.test/" })),
     ).toBe(false);
     expect(isAppWebContents(app, () => null)).toBe(false);
+  });
+});
+
+describe("window replacement", () => {
+  it("saves a late choice under the origin the request started with", async () => {
+    let saved: Record<string, string> = {};
+    const store = originKeyedStore(
+      () => saved,
+      (all) => {
+        saved = all;
+      },
+      () => "https://a.example",
+    );
+    let collect = () => {};
+    const choose = vi.fn<(names: string[]) => Promise<number>>().mockResolvedValue(0);
+    const picker = createBluetoothPicker({
+      ...store,
+      choose,
+      setTimer: (fn, ms) => {
+        if (ms === 3000) collect = fn;
+        return 1;
+      },
+      clearTimer: () => {},
+    });
+    picker.select([omi], vi.fn());
+    collect();
+    await flush();
+    expect(saved).toEqual({ "https://a.example": "a" });
+  });
+
+  it("cancels a pending request once, without saving", () => {
+    const f = fixture();
+    const cb = vi.fn();
+    f.picker.select([omi], cb);
+    f.picker.cancel();
+    f.picker.cancel();
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith("");
+    expect(f.writeSaved).not.toHaveBeenCalled();
+  });
+
+  it("pairing handler follows the active window after a rollback", async () => {
+    let active: "replacement" | "restored" | null = "replacement";
+    const confirm = vi.fn().mockResolvedValue(true);
+    const handler = createPairingHandler<{ deviceId: string }>(() =>
+      active === null ? null : { allows: () => true, picker: { confirmPairing: confirm } },
+    );
+    active = "restored";
+    const cb = vi.fn();
+    handler({ deviceId: "Omi" }, cb);
+    await flush();
+    expect(confirm).toHaveBeenCalledWith("Omi");
+    expect(cb).toHaveBeenCalledWith({ confirmed: true });
+    active = null;
+    const denied = vi.fn();
+    handler({ deviceId: "Omi" }, denied);
+    expect(denied).toHaveBeenCalledWith({ confirmed: false });
   });
 });

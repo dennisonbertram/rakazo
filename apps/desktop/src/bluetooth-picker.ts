@@ -122,3 +122,25 @@ export function originKeyedStore(
     },
   };
 }
+
+type PairingTarget<D> = {
+  allows: (details: D) => boolean;
+  picker: { confirmPairing: (deviceName: string) => Promise<boolean> };
+};
+
+/**
+ * Session-wide pairing handler. It looks up the active window on every request, so a window
+ * that was replaced, destroyed or rolled back is never consulted.
+ */
+export function createPairingHandler<D extends { deviceId: string }>(
+  active: () => PairingTarget<D> | null,
+) {
+  return (details: D, callback: (response: { confirmed: boolean }) => void) => {
+    const target = active();
+    if (target === null || !target.allows(details)) {
+      callback({ confirmed: false });
+      return;
+    }
+    void target.picker.confirmPairing(details.deviceId).then((confirmed) => callback({ confirmed }));
+  };
+}
