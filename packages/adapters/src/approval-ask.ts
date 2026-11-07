@@ -16,6 +16,7 @@ import {
   isZernioEndpoint,
   MAIL_REPLY_BATCH_TOOL,
   MAX_COMPOSE_BODY,
+  modelLabel,
   PIPELINE_IMPORT_REVIEW_TOOL,
 } from "@rakazo/contracts";
 import {
@@ -379,13 +380,24 @@ function webFetchSite(toolName: string, args: Record<string, unknown>): string |
  * run and the owner's answer resumes it. "Allow" records consent for the recipient named in the
  * effect (never the card), at this disclosure version.
  */
-export function buildConsentAskBlock(effectId: string): MessageBlock {
+export function buildConsentAskBlock(
+  effectId: string,
+  recipient?: { name: string; detail?: string },
+): MessageBlock {
+  // "OpenRouter (https://...)" -> "OpenRouter"; a gateway with no model id has nothing to name.
+  const provider = recipient?.name.replace(/ \(.*\)$/, "").trim();
+  const model = recipient?.detail?.startsWith("Forwards")
+    ? ""
+    : modelLabel(recipient?.detail ?? "");
+  const named = Boolean(provider && model);
   return {
     kind: "ask",
     approvalEffectId: effectId,
-    text: "Share your chats and mail with the AI model that runs your bots?",
+    text: named
+      ? `Let ${model} (${provider}) see this agent's chats and mail?`
+      : "Share your chats and mail with the AI model that runs your bots?",
     // The clause says the permission is standing, not for this one read.
-    detail: `${AI_DATA_DISCLOSURES.model} This stays on until you turn it off in Settings under Privacy and approvals.`,
+    detail: `${named ? "This agent uses a model you haven't allowed yet. Models you already allowed are unaffected. " : ""}${AI_DATA_DISCLOSURES.model} This stays on until you turn it off in Settings under Privacy and approvals.`,
     consent: { version: AI_DISCLOSURE_VERSION },
     status: "pending",
     actions: [

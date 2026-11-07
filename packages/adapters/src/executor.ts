@@ -3255,7 +3255,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             attemptId: attempt.id,
             leaseOwner: workerId,
             leaseFence: fence,
-            blocks: [buildConsentAskBlock(recorded.effect.id)],
+            blocks: [buildConsentAskBlock(recorded.effect.id, chatRecipient)],
           });
           if (!paused) throw new Error("Could not pause this run for consent; try sending again.");
           return;
@@ -7062,7 +7062,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               if (current?.status === "waiting_input") return pauseForApproval();
             }
             return pauseForAsk(
-              buildConsentAskBlock(recorded.effect.id),
+              buildConsentAskBlock(recorded.effect.id, recipient),
               "Allow access to your mail",
               executionId,
             );

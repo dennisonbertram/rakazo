@@ -501,6 +501,28 @@ describe("buildConsentAskBlock", () => {
     });
     expect(JSON.stringify(block)).not.toMatch(/openai\/|forwarded to its provider/);
   });
+
+  it("names the model and provider when the recipient is known", () => {
+    const block = buildConsentAskBlock("e1", {
+      name: "OpenRouter (https://openrouter.ai)",
+      detail: "meta/muse-wonder, forwarded to its provider",
+    });
+    expect(block).toMatchObject({
+      text: "Let Muse Wonder (OpenRouter) see this agent's chats and mail?",
+      detail: expect.stringContaining("This agent uses a model you haven't allowed yet."),
+    });
+    expect(JSON.stringify(block)).not.toContain("meta/");
+  });
+
+  it("falls back to the generic text when the model is unknown", () => {
+    const block = buildConsentAskBlock("e1", {
+      name: "OpenRouter",
+      detail: "Forwards to model providers",
+    });
+    expect(block).toMatchObject({
+      text: "Share your chats and mail with the AI model that runs your bots?",
+    });
+  });
 });
 
 describe("agent connection response cards", () => {
