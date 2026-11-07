@@ -40,7 +40,7 @@ export interface FileDataRoomInput {
   mimeType: string;
   folderId: string | null;
   importId?: string;
-  source: "upload" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
+  source: "upload" | "scan" | "gmail" | "drive" | "box" | "chat" | "omi" | "meeting";
   sourceConnectionId?: string;
   externalId?: string;
   sourceUrl?: string;
@@ -234,7 +234,10 @@ export function createFileDataRoomItem(
         });
       } else {
         importId = (
-          await createDataRoomImport(prisma, actor, { source: "upload", total: entryCount })
+          await createDataRoomImport(prisma, actor, {
+            source: input.source === "scan" ? "scan" : "upload",
+            total: entryCount,
+          })
         ).id;
       }
       await deps.jobs.enqueue(

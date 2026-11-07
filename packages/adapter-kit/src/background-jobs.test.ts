@@ -152,6 +152,9 @@ describe("background job contracts", () => {
     };
     const target = handlers();
     await dispatchBackgroundJob(target, "dataroom.zip.unpack", payload);
+    expect(
+      parseBackgroundJob("dataroom.zip.unpack", { ...payload, source: "scan" }).payload,
+    ).toMatchObject({ source: "scan" });
     expect(target["dataroom.zip.unpack"]).toHaveBeenCalledWith(payload);
     expect(dataRoomZipUnpackJob(payload)).toEqual({
       name: "dataroom.zip.unpack",
