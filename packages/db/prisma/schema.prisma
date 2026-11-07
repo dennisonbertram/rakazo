@@ -875,6 +875,8 @@ model Bot {
   hiddenAt               DateTime?
   parentBotId            String?
   spawnKey               String?
+  // sha256 of the default system prompt the owner chose to keep their own text over; a new default shows the upgrade notice again.
+  instructionsUpgradeDismissedHash String?
   memoryScope            String?
   parent                 Bot?                  @relation("BotChildren", fields: [parentBotId], references: [id], onDelete: SetNull)
   children               Bot[]                 @relation("BotChildren")

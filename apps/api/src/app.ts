@@ -157,6 +157,7 @@ import { loadEnv } from "./env.js";
 import type { GtmQueueReader } from "./gtm.js";
 import { healthRoutes } from "./health.js";
 import { mountInboxAttachment } from "./inbox-attachment.js";
+import { upgradeIntegrationAgentInstructions } from "./integration-agent-upgrades.js";
 import {
   mountInvestorPortal,
   PORTAL_PATH,
@@ -316,6 +317,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     (counts) => logger.info("built-in agent instructions upgraded", counts),
     (error: unknown) =>
       logger.warn("built-in agent instruction upgrade failed", {
+        reason: error instanceof Error ? error.name : "error",
+      }),
+  );
+  void upgradeIntegrationAgentInstructions(prisma).then(
+    (upgraded) => logger.info("integration agent instructions upgraded", { upgraded }),
+    (error: unknown) =>
+      logger.warn("integration agent instruction upgrade failed", {
         reason: error instanceof Error ? error.name : "error",
       }),
   );

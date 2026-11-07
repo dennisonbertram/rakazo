@@ -27,6 +27,10 @@ const LEGAL_INSTRUCTIONS_OFFER =
 
 /** How to answer: the answer first, a short list, and any uncertainty once at the end. */
 const LEGAL_INSTRUCTIONS_REPLY =
+  ' Lead your first sentence with the answer, such as "Two things need you: the office lease notice by Dec 1 and the insurance renewal on Jan 15." Then list at most five items, soonest first, one line each: what it is, the date, what to do. State what the records show as fact. Put any gap or doubt in one closing line (for example that some documents are not analyzed yet or a date is missing), never in the opening and never on every item. Do not open with "I can\'t confirm" or a list of what you could not check; if nothing is due, say "Nothing is due then." Leave out quotes, ids and graph details unless asked, and offer them. After analyzing documents, report in a line or two how many contracts and deadlines you recorded, then only what needs the founder: confirmations, missing documents and files to add.';
+
+/** The reply instructions before the wording pass; kept so an agent still holding that default is upgraded. */
+const OLD_LEGAL_INSTRUCTIONS_REPLY =
   ' Lead your first sentence with the answer, such as "Two things need you: the office lease notice by Dec 1 and the insurance renewal on Jan 15." Then list at most five items, soonest first, one line each: what it is, the date, what to do; say how many more there are. State what the records show as fact. Put any gap or doubt in one closing line (for example that some documents are not analyzed yet or a date is missing), never in the opening and never on every item. Do not open with "I can\'t confirm" or a list of what you could not check; if nothing is due, say "Nothing is due then." Leave out quotes, ids and graph details unless asked, and offer them. After analyzing documents, report in a line or two how many contracts and deadlines you recorded, then only what needs the founder: confirmations, missing documents and files to add.';
 
 const LEGAL_INSTRUCTIONS_BEFORE_REPLY =
@@ -37,7 +41,9 @@ export const LEGAL_AGENT_INSTRUCTIONS = LEGAL_INSTRUCTIONS_BEFORE_REPLY + LEGAL_
 /** The previous default, before the instruction about not sending mail; an agent still holding it is updated. */
 const NEVER_DISMISS =
   " You never dismiss a deadline and never lower a stored value unless a document date or figure contradicts it. If a deadline seems not to apply any more, the tools mark it for the founder to confirm; list each one in your reply.";
-const OLDER_AGENT_INSTRUCTIONS = [
+/** Earlier defaults. An agent whose instructions still equal one is upgraded; an edited agent is left alone. */
+export const PREVIOUS_LEGAL_AGENT_INSTRUCTIONS = [
+  LEGAL_INSTRUCTIONS_BEFORE_REPLY + OLD_LEGAL_INSTRUCTIONS_REPLY,
   LEGAL_INSTRUCTIONS_BEFORE_REPLY,
   LEGAL_INSTRUCTIONS_BASE + LEGAL_INSTRUCTIONS_EXTRA,
   LEGAL_INSTRUCTIONS_BASE,
@@ -151,7 +157,8 @@ export async function ensureLegalAgent(
   // Instructions are set only at creation; one still equal to an older default moves to the current
   // one, and a user's edit never matches, so it is left alone.
   const oldInstructions =
-    OLDER_AGENT_INSTRUCTIONS.includes(bot.instructions) || isPastDefault("legal", bot.instructions);
+    PREVIOUS_LEGAL_AGENT_INSTRUCTIONS.includes(bot.instructions) ||
+    isPastDefault("legal", bot.instructions);
   if (oldInstructions) {
     await deps.prisma.bot.updateMany({
       where: { ...owner, instructions: bot.instructions },

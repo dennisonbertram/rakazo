@@ -9,6 +9,7 @@ import { MEETING_AGENT_GUIDANCE } from "./meeting-tools.js";
  */
 export const INBOX_SEARCH_SKILL_NAME = "inbox-search";
 export const PRESENT_CLEARLY_SKILL_NAME = "present-clearly";
+export const PAGE_DESIGN_SKILL_NAME = "page-design";
 
 const SKILLS: Array<{ name: string; description: string; body: string }> = [
   {
@@ -36,6 +37,48 @@ const SKILLS: Array<{ name: string; description: string; body: string }> = [
    Bold only the few words a reader would scan for. Use headings only in long reports.
 7. End with at most one next step: a single offer or question, such as "Want me to draft the reply to Priya?". Do not end with a menu of options.
 8. A report to another agent is the exception to steps 4 and 5: include every fact it needs to act, ids and reference numbers included, still ordered most important first and with shared details said once. Name a missing item once, in one line, without listing each search you tried.`,
+  },
+  {
+    name: PAGE_DESIGN_SKILL_NAME,
+    description: "Short, scannable pages that lead with what needs the owner.",
+    body: `Use this before page_create or a full page_write, and when you rewrite a page that has grown messy. The owner opens a page to see what needs them, not to read a document. A page that looks like a database dump gets ignored.
+
+1. Give the page one job, and open with what needs the owner now. Put the things waiting on them first, then what is in progress, then what is done.
+2. Start with a one-line summary, such as "3 issues need you, 2 are waiting on customers." When a live source exists, use metric blocks for the counts instead of typing them.
+3. Keep tables narrow: at most 4 or 5 short columns, and one short line per cell. No paragraphs, no bold and no lists inside a cell. If a cell needs a sentence, shorten it or move the detail to a line under the table.
+4. Leave out a column that is mostly empty, and leave out identifiers such as full email addresses, ids and URLs unless contacting people is the page's job. Name people by their name or company.
+5. Show each person, deal or item in one table only. If a second section needs the same item, link to the first section or leave it out, rather than repeating the row.
+6. Write dates the way a person says them: "Nov 4", or "Tue Nov 4" when the weekday matters. Never show raw ISO dates or timestamps. Round numbers ($48k, about 3 weeks) unless the exact figure matters. For numbers that come from data, use metric, table and chart blocks, never typed figures.
+7. Use a small fixed set of status words instead of sentences: Needs you, Waiting, Sent, Done, the same words everywhere on the page. When the sections already group items by status, leave the Status column out.
+8. Use a few short sentence-case ## headings, never deeper than ###, and no emoji. Put the section that needs the owner first. A short page of three or four sections beats a long one.
+9. Do not explain the page. Leave out "How to use this page", descriptions of what each section is for, and notes about who edited what or when ("marked by you on ..."). Say how it works in chat if the owner asks.
+10. Never put secrets, credentials, internal-only notes or private instructions on a page, because the owner may share it. Keep those in your memory or instructions.
+11. When you update a page, edit it in place and keep it short. Move finished items into one short Done section, or drop them. Do not append dated notes or a running log.
+12. Use the default blocks kind. Choose kind "html" only when the page needs a real visual or interactive design that blocks cannot give.
+
+Before and after, with invented data:
+
+Before: a heading "Open issues" over a 5-column table of Customer, Email, Issue, Last reply and Next step. Email holds full addresses. Issue holds a four-sentence paragraph with bold text in it. Last reply reads "2026-11-04". The same customers appear again in a "Customers" table with a mostly empty Joined column, and again in "Feedback outreach" with a status cell reading "Sent 2026-11-06 from ana@example.test". The page ends with a bold "Internal only" policy bullet and a "How to use this page" section.
+
+After:
+
+Support: 2 need you, 3 waiting on customers.
+
+## Needs you
+| Customer | Issue | Last reply |
+| --- | --- | --- |
+| Northwind | Refund not received | Nov 4 |
+| Acme Co | Export fails on large files | Nov 5 |
+
+## Waiting on customers
+| Customer | Issue | Last reply |
+| --- | --- | --- |
+| Globex | Login loop | Nov 3 |
+| Initech | Invoice question | Nov 3 |
+| Umbrella | Feedback request sent | Nov 6 |
+
+## Done
+Hooli, Stark Ltd`,
   },
   {
     name: "Interrogate",

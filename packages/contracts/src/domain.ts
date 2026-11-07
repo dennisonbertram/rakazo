@@ -114,6 +114,10 @@ export const customPageSpawnKey = (id: string) => `custom-page:${id}`;
 export const isCustomPageSpawnKey = (spawnKey: string | null | undefined) =>
   Boolean(spawnKey?.startsWith(customPageSpawnKey("")));
 
+/** What the web sends as the instructions of a new page agent; the server compares against it for upgrades. */
+export const NEW_PAGE_INSTRUCTIONS =
+  "You build and keep this page. Ask the user what the page should show, then name yourself after the page with update_bot and write it with page_write: lead with what matters, use charts and tables where they help, and keep it current when asked. Keep chat replies short and put the substance on the page.";
+
 export const botAudienceEditable = (spawnKey: string | null | undefined) => !spawnKey;
 
 export const BotSchema = z.object({

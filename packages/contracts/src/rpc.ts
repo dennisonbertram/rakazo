@@ -728,6 +728,11 @@ export const appContract = {
     reorder: oc.input(ReorderBotsInput).output(z.object({ ok: z.literal(true) })),
     update: oc.input(UpdateBotInput).output(BotSchema),
     setComputer: oc.input(z.object({ botId: Id, mode: ComputerModeSchema })).output(BotSchema),
+    instructionsUpgrade: oc
+      .input(botId)
+      .output(z.object({ current: z.string(), next: z.string() }).nullable()),
+    upgradeInstructions: oc.input(z.object({ botId: Id, from: z.string() })).output(BotSchema),
+    dismissInstructionsUpgrade: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     archive: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     restore: oc.input(botId).output(z.object({ ok: z.literal(true) })),
     remove: oc

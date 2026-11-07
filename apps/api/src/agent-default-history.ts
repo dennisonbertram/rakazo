@@ -12,8 +12,9 @@ import { createHash } from "node:crypto";
  */
 export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: string[] }> = {
   carta: {
-    current: "efad8c04aaccbd157aad647461d0a5605613e0dba2216fc586ecf3119be7439a",
+    current: "cafda7d46465064d8df3f26bad7ec4bf6f87861db28c1dceb5fe50e4c835f48b",
     past: [
+      "efad8c04aaccbd157aad647461d0a5605613e0dba2216fc586ecf3119be7439a",
       "9c95c29e553466590b7993a001f99873c7bc1c1a689e395ad58df74564a57ff3",
       "a3792c6375371d1101d18f987e611c036db380a52331522e504f23a08d38fc41",
       "c7342384ac7bc13db68435f9af15f34443924c5f3b3391d71e508a769770c8bb",
@@ -26,12 +27,16 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   company: {
-    current: "b39ea7f575ab3167756ee9ac8b0154c3503953d351e58d63c32aeb18e8173f07",
-    past: ["e32f87da6062f722cedc9151d613e2b0e7cb08e86276131395cb4130542e8f95"],
+    current: "fa87188dff2cd9e5dd8fe2d27f6d5d03c88f6d99112e52114ebf5d9fe29b76fc",
+    past: [
+      "b39ea7f575ab3167756ee9ac8b0154c3503953d351e58d63c32aeb18e8173f07",
+      "e32f87da6062f722cedc9151d613e2b0e7cb08e86276131395cb4130542e8f95",
+    ],
   },
   "data-room": {
-    current: "6ed5416f7b61f228f59f0805c1a199603bcab08ba0a20504d081fd72aedfea9a",
+    current: "437ad50f94b178061ce7e2cef37bb40564dd067b1e550eb8f53603e8bf5359ff",
     past: [
+      "6ed5416f7b61f228f59f0805c1a199603bcab08ba0a20504d081fd72aedfea9a",
       "a2fd66577cd93056741c32297535bf8c752e90b6327eea6af825d41df254625c",
       "dd5c95445266951b6bee9de21800000b3e01ca219535398f05a26abfc3121ffa",
       "3a5f97b681a85f53f526b9af16b43802c479e8b0cdf0d0e160044562d80ee162",
@@ -39,8 +44,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   finance: {
-    current: "80ba1f4d7bfa596e321d1e5f3cc3a2a74dbc7837a838c3128de9bb1763574677",
+    current: "acd2a733db926f96916b098df1041c5037a3988ba87f8b6caa35c73e4d67c84b",
     past: [
+      "80ba1f4d7bfa596e321d1e5f3cc3a2a74dbc7837a838c3128de9bb1763574677",
       "96fd0b7345d04dcdf0a7cdb0a8723a9fffd1647cce46b5fdeb8616fe1494be25",
       "bfd12c5769877a3e70c54aafed4eff9f8397cacf3b0cf16cc2a768aa588cd66e",
       "52a1403922ff92697f4df0e166211c40188749ceea8e3865904e9e9cabd006a8",
@@ -57,15 +63,17 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   gtm: {
-    current: "7bf878b17c4b5c666b7a12788a97591ee5bb1f0cc0bf89982346852069142c0c",
+    current: "ae8b52feb9e042cd0acb32e843984336751a33cf370e4d3d90a25f1ac0c644e0",
     past: [
+      "7bf878b17c4b5c666b7a12788a97591ee5bb1f0cc0bf89982346852069142c0c",
       "6798cc163ef3f57b9c9b937a3e194ce99096c179d88fc9b99bca6cb3563c9850",
       "cf98649335031c2ef6088da54922dd4aaf7d865dd9592df6d54960de0a76c023",
     ],
   },
   inbox: {
-    current: "c430e7fc5991562b36ba90e8b1cc991776c6f5cd1ffb64617eb2166ccdca37c1",
+    current: "d85d1998610f2a0c7acdb934eeeff17b093ddf1ae7c942ef203d9ed3320679a5",
     past: [
+      "c430e7fc5991562b36ba90e8b1cc991776c6f5cd1ffb64617eb2166ccdca37c1",
       "43a7f661d2303292e61d9842a9dfa72d41281ee6fd41bab12ddd97ff2ec2672c",
       "db1c1ed3a35ee4ac50f3d14f7906e9a318dfba7064129da2d5cb2678d77c574a",
       "f6e825ecfc390c474393396e2975976771440a3758cee9b8cdf31c10a34e489e",
@@ -84,8 +92,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   investors: {
-    current: "cae501926de7ef9e354077e02247c398db716da05475ab0b9c2b5440a46844c4",
+    current: "a7fc574d41867c3ad74e8da90be9838483db2199c79cf8043fc8876df165d8c0",
     past: [
+      "cae501926de7ef9e354077e02247c398db716da05475ab0b9c2b5440a46844c4",
       "9bbc2eff839fb9bb44f8cf30ede1297838a9256eda58b1e97d1f05fcbaff116a",
       "37f7a321ad300f58bf82ea048444b47e259d0b4035a00d46f67b5b04063fb677",
       "cb8966528abe3e84f1331998b19259240efe100cf42750c3d1340cb2617a6b87",
@@ -102,8 +111,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   legal: {
-    current: "2c6e80842e3eda409c0faec7e3a9f659bc66d6858c44a9ef5f334d14eaf94fee",
+    current: "5eab7b0830aabfbf4eecd07316bbfa2f6359c762e75f94708548dba9270252f8",
     past: [
+      "2c6e80842e3eda409c0faec7e3a9f659bc66d6858c44a9ef5f334d14eaf94fee",
       "37d7a6b2620b2bd1bcfc54d0c8540fc30bf5231427c10aa74af69b4cb76df025",
       "9fd34f46830609ddce30661942fa06a2de7be4d40faec243cf7212b5a817bd50",
       "6586882767e604dd103bb895ba129fdf0888bc14762b88db1a4836fd12f42228",

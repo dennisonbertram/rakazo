@@ -27,13 +27,13 @@ import {
   INVESTORS_AGENT_INSTRUCTIONS,
   PREVIOUS_INVESTORS_AGENT_INSTRUCTIONS,
 } from "./investors-agent.js";
-import { LEGAL_AGENT_INSTRUCTIONS } from "./legal-agent.js";
+import { LEGAL_AGENT_INSTRUCTIONS, PREVIOUS_LEGAL_AGENT_INSTRUCTIONS } from "./legal-agent.js";
 
 /**
  * Every built-in agent kind with a current default and a list of earlier defaults. Integration and mail-thread
  * agents are not listed: their text is built per connection or per thread.
  */
-const BUILT_IN_AGENTS = [
+export const BUILT_IN_AGENTS = [
   {
     kind: "inbox",
     spawnKey: inboxAgentSpawnKey,
@@ -44,7 +44,7 @@ const BUILT_IN_AGENTS = [
     kind: "carta",
     spawnKey: cartaAgentSpawnKey,
     current: CARTA_AGENT_INSTRUCTIONS,
-    previous: [PREVIOUS_CARTA_AGENT_INSTRUCTIONS],
+    previous: PREVIOUS_CARTA_AGENT_INSTRUCTIONS,
   },
   {
     kind: "company",
@@ -80,7 +80,7 @@ const BUILT_IN_AGENTS = [
     kind: "legal",
     spawnKey: legalAgentSpawnKey,
     current: LEGAL_AGENT_INSTRUCTIONS,
-    previous: [],
+    previous: PREVIOUS_LEGAL_AGENT_INSTRUCTIONS,
   },
 ];
 

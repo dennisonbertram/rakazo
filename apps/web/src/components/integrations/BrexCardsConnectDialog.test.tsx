@@ -62,13 +62,21 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-it("asks for one password field with the scope hint, and Connect waits for a token", async () => {
+it("asks for one password field with the permissions hidden until opened, and Connect waits for a token", async () => {
   await mount();
   const text = document.body.textContent ?? "";
   expect(text).toContain("Connect Brex cards");
-  expect(text).toContain(
-    "In Brex, Settings → Developer, create a user token with the scopes cards, budgets, companies.readonly, users.readonly, expenses.card, transactions.card.readonly, travel.trips.readonly, accounts.cash.readonly, statements.cash.readonly. Do not add cards.pan.",
-  );
+  expect(text).toContain("Every change waits for your approval.");
+  const details = document.querySelector("details")!;
+  expect(details.textContent).toContain("Permissions for the token");
+  expect(details.open).toBe(false);
+  expect(text).not.toContain("cards.pan");
+  await act(async () => {
+    details.open = true;
+  });
+  expect(details.open).toBe(true);
+  expect(details.textContent).toContain("Cards");
+  expect(details.textContent).toContain("Leave Card Numbers Read and Send off.");
   expect(document.querySelectorAll("input")).toHaveLength(1);
   expect(field().type).toBe("password");
   expect(submit().textContent).toBe("Connect");

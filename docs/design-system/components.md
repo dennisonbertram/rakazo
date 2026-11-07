@@ -3,8 +3,8 @@
 
 Rendered React components and native SwiftUI views, grouped by area. A web or shared component file is covered when it has a sibling `<name>.stories.tsx` or a stories file that imports it. Run `pnpm design-system` after adding or moving a component.
 
-- Web and shared component files with stories: 347 of 347
-- Web and shared components: 882
+- Web and shared component files with stories: 348 of 348
+- Web and shared components: 885
 - Mobile components: 155 in 104 files, mobile — native story pending
 - SwiftUI views: 141 in 77 files, native story pending
 
@@ -102,6 +102,7 @@ Rendered React components and native SwiftUI views, grouped by area. A web or sh
 | HiddenBotsList | [apps/web/src/components/HiddenBotsList.tsx](../../apps/web/src/components/HiddenBotsList.tsx) | [HiddenBotsList.stories.tsx](../../apps/web/src/components/HiddenBotsList.stories.tsx) | web |
 | HideAmountsMenuItem, ShowAmountsButton | [apps/web/src/components/HideAmountsToggle.tsx](../../apps/web/src/components/HideAmountsToggle.tsx) | [HideAmountsToggle.stories.tsx](../../apps/web/src/components/HideAmountsToggle.stories.tsx) | web |
 | I18nBootstrap | [apps/web/src/components/I18nBootstrap.tsx](../../apps/web/src/components/I18nBootstrap.tsx) | [I18nBootstrap.stories.tsx](../../apps/web/src/components/I18nBootstrap.stories.tsx) | web |
+| Prompt, InstructionsUpgradeDialog, InstructionsUpgradeNotice | [apps/web/src/components/InstructionsUpgradeNotice.tsx](../../apps/web/src/components/InstructionsUpgradeNotice.tsx) | [InstructionsUpgradeNotice.stories.tsx](../../apps/web/src/components/InstructionsUpgradeNotice.stories.tsx) | web |
 | PhoneSlot, FilterSheet, Tip, SearchField, PickFilter, PhoneDateRange, SortControl | [apps/web/src/components/ListControls.tsx](../../apps/web/src/components/ListControls.tsx) | [ListControls.stories.tsx](../../apps/web/src/components/ListControls.stories.tsx), [CrmPipeline.stories.tsx](../../apps/web/src/pages/CrmPipeline.stories.tsx) | web |
 | Row, MailApprovalCard | [apps/web/src/components/MailApprovalCard.tsx](../../apps/web/src/components/MailApprovalCard.tsx) | [MailApprovalCard.stories.tsx](../../apps/web/src/components/MailApprovalCard.stories.tsx) | web |
 | MailOutbox | [apps/web/src/components/MailOutbox.tsx](../../apps/web/src/components/MailOutbox.tsx) | [MailOutbox.stories.tsx](../../apps/web/src/components/MailOutbox.stories.tsx) | web |
