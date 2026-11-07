@@ -19,9 +19,9 @@ const approvalActions = [
 
 const consentAsk = (overrides: Partial<AskBlock> = {}): AskBlock =>
   ask({
-    text: "Share your chats and mail with the AI model that runs your bots?",
+    text: "Let Muse Wonder (OpenRouter) see this agent's chats and mail?",
     detail:
-      "Messages, chat history, bot instructions, memories, attachments, screenshots and connected-app content are sent to run your bots, including routines. This stays on until you turn it off in Settings under Privacy and approvals.",
+      "This agent uses a model you haven't allowed yet. Models you already allowed are unaffected. Messages, chat history, bot instructions, memories, attachments, screenshots and connected-app content are sent to run your bots, including routines. This stays on until you turn it off in Settings under Privacy and approvals.",
     approvalEffectId: "effect_demo",
     consent: { version: "2026-09-14" },
     actions: [
