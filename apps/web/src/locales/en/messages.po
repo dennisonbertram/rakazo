@@ -2225,6 +2225,10 @@ msgstr "Auto-renews"
 msgid "Auto-renews, {notice} days notice"
 msgstr "Auto-renews, {notice} days notice"
 
+#: src/pages/Scanner.tsx
+msgid "Auto-scan"
+msgstr "Auto-scan"
+
 #: src/components/data-room/AutoSortDialog.tsx
 #: src/components/data-room/FilterBar.tsx
 #: src/components/data-room/FolderTree.tsx
@@ -2703,6 +2707,10 @@ msgstr "Cancel reply"
 #: src/components/fundraising/SafeList.tsx
 msgid "Cancel SAFE"
 msgstr "Cancel SAFE"
+
+#: src/pages/Scanner.tsx
+msgid "Cancel scan"
+msgstr "Cancel scan"
 
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Cancel teaching"
@@ -3372,6 +3380,10 @@ msgstr "Collapse Investors agent"
 #: src/pages/Shell.tsx
 msgid "Collapse Legal agent"
 msgstr "Collapse Legal agent"
+
+#: src/pages/Shell.tsx
+msgid "Collapse Scanner agent"
+msgstr "Collapse Scanner agent"
 
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Color"
@@ -4121,6 +4133,10 @@ msgstr "Could not create the Legal agent"
 msgid "Could not create the link."
 msgstr "Could not create the link."
 
+#: src/pages/Shell.tsx
+msgid "Could not create the Scanner agent"
+msgstr "Could not create the Scanner agent"
+
 #: src/pages/McpTokenDialog.tsx
 msgid "Could not create the token"
 msgstr "Could not create the token"
@@ -4475,6 +4491,10 @@ msgstr "Could not reach the pendant"
 #: src/pages/Auth.tsx
 msgid "Could not reach the server"
 msgstr "Could not reach the server"
+
+#: src/pages/Scanner.tsx
+msgid "Could not read scanner status"
+msgstr "Could not read scanner status"
 
 #: src/pages/Investors.tsx
 msgid "Could not read the sheet"
@@ -5017,6 +5037,10 @@ msgstr "Create Inbox agent"
 msgid "Create Legal agent"
 msgstr "Create Legal agent"
 
+#: src/pages/Shell.tsx
+msgid "Create Scanner agent"
+msgstr "Create Scanner agent"
+
 #: src/components/AskCard.tsx
 #: src/pages/shell/dialogs.tsx
 msgid "Create space"
@@ -5433,6 +5457,10 @@ msgstr "Desktop update"
 #: src/pages/gtm/GtmPlan.tsx
 msgid "Destination"
 msgstr "Destination"
+
+#: src/pages/Scanner.tsx
+msgid "Destination…"
+msgstr "Destination…"
 
 #: src/components/AskCard.tsx
 #: src/components/data-room/ProcessingStrip.tsx
@@ -6091,6 +6119,10 @@ msgstr "Enter a valid date and time."
 #: src/lib/user-error.ts
 msgid "Enter a valid email"
 msgstr "Enter a valid email"
+
+#: src/pages/Scanner.tsx
+msgid "Enter a valid folder path"
+msgstr "Enter a valid folder path"
 
 #: src/pages/ModelSettingsOverlay.tsx
 #: src/pages/Onboarding.tsx
@@ -7083,6 +7115,10 @@ msgstr "I checked: this post is not in the queue"
 #: src/components/PageAgentIntro.tsx
 msgid "I keep your cap table and investor contacts up to date from Carta."
 msgstr "I keep your cap table and investor contacts up to date from Carta."
+
+#: src/components/PageAgentIntro.tsx
+msgid "I name and classify scans, and answer questions about them."
+msgstr "I name and classify scans, and answer questions about them."
 
 #: src/components/PageAgentIntro.tsx
 msgid "I read your bank and card accounts and answer questions about cash, spending and runway."
@@ -8780,6 +8816,10 @@ msgstr "Mute"
 msgid "Name"
 msgstr "Name"
 
+#: src/lib/scanner-agent.ts
+msgid "Name and type my latest scan"
+msgstr "Name and type my latest scan"
+
 #: src/pages/CompanyReview.tsx
 msgid "Name or title"
 msgstr "Name or title"
@@ -9461,6 +9501,10 @@ msgstr "No runs yet"
 #: src/pages/Fundraising.tsx
 msgid "No SAFEs yet"
 msgstr "No SAFEs yet"
+
+#: src/pages/Scanner.tsx
+msgid "No scanner found"
+msgstr "No scanner found"
 
 #: src/components/gtm/GtmCalendar.tsx
 msgid "No scheduled items in this view."
@@ -11899,6 +11943,10 @@ msgstr "Retry failed"
 msgid "Retry now"
 msgstr "Retry now"
 
+#: src/pages/Scanner.tsx
+msgid "Retry pending scans"
+msgstr "Retry pending scans"
+
 #: src/pages/Shell.tsx
 msgid "Retry screen"
 msgstr "Retry screen"
@@ -12141,6 +12189,10 @@ msgstr "Sample ready"
 msgid "Sandbox"
 msgstr "Sandbox"
 
+#: src/pages/Scanner.tsx
+msgid "SANE not installed"
+msgstr "SANE not installed"
+
 #: src/components/ContactDialog.tsx
 #: src/components/data-room/ItemDialogs.tsx
 #: src/components/finance/charts.tsx
@@ -12302,9 +12354,21 @@ msgstr "Saving…"
 msgid "Say yes or no, or answer in a sentence."
 msgstr "Say yes or no, or answer in a sentence."
 
+#: src/pages/Scanner.tsx
+msgid "Scan"
+msgstr "Scan"
+
 #: src/pages/Legal.tsx
 msgid "Scan cancelled."
 msgstr "Scan cancelled."
+
+#: src/pages/Scanner.tsx
+msgid "Scan destination"
+msgstr "Scan destination"
+
+#: src/pages/Scanner.tsx
+msgid "Scan failed"
+msgstr "Scan failed"
 
 #: src/pages/Legal.tsx
 msgid "Scan finished: {contractsChanged, plural, one {# contract} other {# contracts}} and {deadlinesAdded, plural, one {# deadline} other {# deadlines}} added or updated."
@@ -12318,9 +12382,34 @@ msgstr "Scan finished: nothing changed."
 msgid "Scan is still running. Check back shortly."
 msgstr "Scan is still running. Check back shortly."
 
+#: src/lib/scanner-delivery.ts
+msgid "Scan kept on this device: the server did not confirm its checksum."
+msgstr "Scan kept on this device: the server did not confirm its checksum."
+
+#: src/lib/scanner-delivery.ts
+msgid "Scan kept on this device. Retry when the server is available."
+msgstr "Scan kept on this device. Retry when the server is available."
+
 #: src/pages/Legal.tsx
 msgid "Scan now"
 msgstr "Scan now"
+
+#: src/components/data-room/FilterBar.tsx
+#: src/pages/Shell.tsx
+msgid "Scanner"
+msgstr "Scanner"
+
+#: src/pages/Scanner.tsx
+msgid "Scanner busy"
+msgstr "Scanner busy"
+
+#: src/pages/Scanner.tsx
+msgid "Scanner request failed"
+msgstr "Scanner request failed"
+
+#: src/pages/Scanner.tsx
+msgid "Scanner settings"
+msgstr "Scanner settings"
 
 #: src/pages/Legal.tsx
 msgid "Scanning for {minutes} min"
@@ -12329,6 +12418,10 @@ msgstr "Scanning for {minutes} min"
 #: src/pages/Legal.tsx
 msgid "Scanning now"
 msgstr "Scanning now"
+
+#: src/pages/Scanner.tsx
+msgid "Scanning pages…"
+msgstr "Scanning pages…"
 
 #: src/pages/Legal.tsx
 msgid "Scanning…"
@@ -15403,6 +15496,10 @@ msgstr "What deadlines are coming up?"
 #: src/pages/Shell.tsx
 msgid "What did Devin do this week?"
 msgstr "What did Devin do this week?"
+
+#: src/lib/scanner-agent.ts
+msgid "What did I scan recently?"
+msgstr "What did I scan recently?"
 
 #: src/components/PageAgentIntro.tsx
 msgid "What did we spend last month?"
