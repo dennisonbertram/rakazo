@@ -18,6 +18,7 @@ describe("brexSpendBucket", () => {
     expect(brexSpendBucket({ category: "RESTAURANTS", mcc: "5734" })).toBe("meals");
     expect(brexSpendBucket({ category: "NOT_A_BREX_CATEGORY", mcc: "5734" })).toBe("software");
     expect(brexSpendBucket({ category: null, mcc: "5812" })).toBe("meals");
+    expect(brexSpendBucket({ category: null, mcc: "5912" })).toBe("other");
     expect(brexSpendBucket({ category: "NOT_A_BREX_CATEGORY", mcc: "9999" })).toBe("other");
     expect(brexSpendBucket({})).toBe("other");
   });

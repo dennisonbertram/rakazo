@@ -140,7 +140,7 @@ export const BREX_MCC_BUCKETS: Record<string, BrexSpendBucket> = {
   "5814": "meals", // fast food restaurants
   "5817": "software", // digital goods: large digital goods merchants
   "5818": "software", // digital goods: multi-category
-  "5912": "meals", // drug stores and pharmacies
+  "5912": "other", // drug stores and pharmacies
   "5921": "meals", // package stores and beer
   "5999": "other", // miscellaneous retail stores
   "7011": "travel", // hotels and motels
