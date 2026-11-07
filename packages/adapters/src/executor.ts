@@ -567,6 +567,7 @@ import { threadHasProtectedSender } from "./mail-protected-senders.js";
 import type { PreparedMailReply } from "./mail-reply-batch.js";
 import {
   mailBatchStepSummary,
+  mailReplyFlags,
   prepareMailReplyBatch,
   priorBatchRows,
 } from "./mail-reply-batch.js";
@@ -6799,6 +6800,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
             !firewalled &&
             runTainted &&
             !externalTaintAllowsTool(name, policyArgs);
+          // A tainted run's card would not show a stored draft either, as for a Firewall run.
+          if (
+            externalTaintedCall &&
+            name === "mail_send" &&
+            typeof args.draftId === "string" &&
+            args.draftId.trim()
+          ) {
+            return {
+              error:
+                "Send the full message: pass to, subject and body, not a draftId, so the card shows exactly what is sent.",
+            };
+          }
           // A search query is an outbound channel that site gating does not cover, so once the
           // run has read an app on the owner's computer, every search asks.
           const desktopReadSearch =
@@ -7467,6 +7480,47 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     },
                   )?.name
                 : undefined;
+            // The batch card's own check: an address the owner never mailed, or off the thread. An
+            // account or address that cannot be checked counts as new.
+            const addressList = (value: unknown): string[] =>
+              Array.isArray(value)
+                ? value.filter((v): v is string => typeof v === "string")
+                : [];
+            let newRecipient = true;
+            if (fullMail && name === "mail_send") {
+              try {
+                const accounts = await accountsAllowedNow(mailAccounts(), name);
+                const named =
+                  typeof args.account === "string"
+                    ? args.account.toLowerCase()
+                    : "";
+                const account =
+                  accounts.find((a) => a.address?.toLowerCase() === named) ??
+                  (accounts.length === 1 ? accounts[0] : undefined);
+                if (account) {
+                  const [checked] = await mailReplyFlags(
+                    deps.prisma,
+                    { spaceId: run.spaceId, userId: run.userId },
+                    [
+                      {
+                        connectionId: account.id,
+                        providerThreadId: null,
+                        to: addressList(args.to),
+                        cc: addressList(args.cc),
+                        bcc: addressList(args.bcc),
+                        subject: String(args.subject ?? ""),
+                        body: String(args.body ?? ""),
+                        seenMessageId: null,
+                      },
+                    ],
+                  );
+                  newRecipient =
+                    checked?.flags.includes("new_recipient") ?? true;
+                }
+              } catch {
+                // keeps the cautious default
+              }
+            }
             const block = buildApprovalAskBlock(
               applied!.effect.id,
               name,
@@ -7486,6 +7540,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         .join("\n")
                     : reviewReason,
                 fullMail,
+                newRecipient,
                 fullCompany:
                   (name === "company_fact_upsert" ||
                     name === "company_import_start") &&
@@ -13563,7 +13618,7 @@ function offeredBuiltinClause(
 
 /** For every agent offered mail_reply_batch, custom bots included; its instructions may not say this. */
 export const MAIL_BATCH_GUIDANCE =
-  "For two or more emails, new or replies, call mail_reply_batch once with one row per email, so the user reviews them on one card. Never call mail_send one at a time for these, including when the user says to send them all at once. The one exception: if the batch refuses new emails, send each new email with mail_send, one at a time. Send from the connected account the mail tools name; if your instructions name another address, say so once and use the connected account.";
+  "For two or more emails, new or replies, call mail_reply_batch once with one row per email, so the user reviews them on one card. Never call mail_send one at a time for these, including when the user says to send them all at once. Send from the connected account the mail tools name; if your instructions name another address, say so once and use the connected account.";
 
 export const MAIL_NOTE_GUIDANCE =
   "When the user asks you to make a note or to-do, call scratchpad_add; it is linked to this email automatically. If the work belongs to another agent's area (Carta, finance, legal, data room, investors, company, GTM), set forAgent to that area so the to-do goes to that agent instead of staying here, and tell the user plainly where it went, for example \"Added to the Carta agent's to-dos.\" If the result has no addedTo, say it was added to this chat's to-dos.";

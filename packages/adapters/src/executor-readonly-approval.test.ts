@@ -8190,6 +8190,82 @@ describe("agent firewall", () => {
       expect(mail.sendDraft).toHaveBeenCalledOnce();
     });
 
+    it("shows every address behind one recipient entry, as the sender parses them", async () => {
+      const f = fixture({
+        name: "mail_send",
+        builtin: true,
+        firewall: true,
+        mail: supportMail(),
+        connectionRows: granted(),
+      });
+      f.setCalls([
+        {
+          args: {
+            to: ["attacker@x.example, Trusted <trusted@y.example>"],
+            subject: "S",
+            body: "b",
+          },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      const card = cardOf(f);
+      expect(card.detail).toContain(
+        "to: attacker@x.example, trusted@y.example",
+      );
+      expect(card.mail).toMatchObject({
+        to: ["attacker@x.example", "trusted@y.example"],
+      });
+    });
+
+    it("drops the New recipient flag for an address the owner has mailed before", async () => {
+      const f = fixture({
+        name: "mail_send",
+        builtin: true,
+        firewall: true,
+        mail: supportMail(),
+        connectionRows: granted(),
+      });
+      f.prisma.cachedMailMessage.findMany.mockResolvedValue([] as never);
+      f.prisma.$queryRaw.mockResolvedValue([
+        { connectionId: "acct-1", address: "pat@old.example" },
+      ] as never);
+      f.setCalls([
+        {
+          args: {
+            account: "support@us.example",
+            to: ["pat@old.example"],
+            subject: "S",
+            body: "b",
+          },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(cardOf(f).detail).not.toContain("New recipient");
+    });
+
+    it("refuses a draftId from a tainted run that is not a Firewall run", async () => {
+      const f = fixture({
+        name: "mail_send",
+        builtin: true,
+        externalTaint: true,
+        mail: supportMail(),
+        connectionRows: granted(),
+      });
+      f.setCalls([
+        {
+          args: { draftId: "d1", to: ["a@x.example"], subject: "S", body: "b" },
+          executionId: "c1",
+        },
+      ]);
+      await f.run();
+      expect(f.pauseRunForInput).not.toHaveBeenCalled();
+      expect(f.results[0]).toEqual({
+        error: expect.stringContaining("draftId"),
+      });
+    });
+
     it("shows the full mail card to a tainted run that is not a Firewall run", async () => {
       const f = fixture({
         name: "mail_send",
