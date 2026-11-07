@@ -1514,7 +1514,9 @@ export type MeetingSourceErrorKind =
   | "mapping"
   | "rate_limit"
   | "unavailable"
-  | "not_found";
+  | "not_found"
+  /** The source's read budget for this run is spent; the run stops and the next continues. */
+  | "budget";
 
 /** A meeting source failed. The message is a short reason, never a vendor payload. */
 export class MeetingSourceError extends Error {

@@ -2672,6 +2672,9 @@ export function demoCalendar(now = new Date()): CalendarApiEmulator {
 
 export const DEMO_GRANOLA_KEY = "grn_demo_fake_key_0000";
 
+/** The one key the demo's Omi cloud emulator accepts. It is fake and works nowhere else. */
+export const DEMO_OMI_CLOUD_KEY = "omi_dev_demo_fake_key_0000";
+
 /** Meetings the demo's Granola emulator serves, so Connect has something to sync. Invented. */
 export function demoGranolaMeetings(now = new Date()): SourceMeeting[] {
   const at = (daysAgo: number, hour: number) =>

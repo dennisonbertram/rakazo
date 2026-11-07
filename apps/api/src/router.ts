@@ -220,6 +220,7 @@ import {
   NOTIFICATION_CATCH_UP_ID,
   NOTIFICATION_HEARTBEAT_ID,
   notificationKindOf,
+  OMI_CLOUD_CONNECTOR_ID,
   OMI_CONNECTOR_ID,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   parseTicketRef,
@@ -635,6 +636,7 @@ import {
   updateMemoryProviderDefaultScope,
 } from "./memory-provider-config.js";
 import { connectOmi, deleteOmiRecordingsFor, disconnectOmi, omiStatus } from "./omi.js";
+import { connectOmiCloud, disconnectOmiCloud, omiCloudStatus } from "./omi-cloud.js";
 import {
   chooseFocus,
   dismissFocus,
@@ -7136,7 +7138,14 @@ export function createRouter(deps: RouterDeps): AppRouter {
             status: { in: ["connected", "pending", "error"] },
             // The Granola key shows through meetings.status, never as a generic app.
             // Omi shows through omi.status.
-            connectorId: { notIn: [GRANOLA_API_CONNECTOR_ID, OMI_CONNECTOR_ID, HEX_CONNECTOR_ID] },
+            connectorId: {
+              notIn: [
+                GRANOLA_API_CONNECTOR_ID,
+                OMI_CLOUD_CONNECTOR_ID,
+                OMI_CONNECTOR_ID,
+                HEX_CONNECTOR_ID,
+              ],
+            },
           },
           // Without an order Postgres returns rows in storage order, which changes when a row is
           // updated, so the accounts of one app swapped places between loads.
@@ -8959,6 +8968,17 @@ export function createRouter(deps: RouterDeps): AppRouter {
       ),
       active: authed.meetingCaptures.active.handler(({ context }) =>
         activeCapture(deps, context.actor),
+      ),
+    },
+    omiCloud: {
+      connect: authed.omiCloud.connect.handler(({ context, input }) =>
+        connectOmiCloud(meetingsFor(context.actor), context.actor, input, context.signal),
+      ),
+      status: authed.omiCloud.status.handler(({ context }) =>
+        omiCloudStatus(meetingsFor(context.actor), context.actor),
+      ),
+      disconnect: authed.omiCloud.disconnect.handler(({ context }) =>
+        disconnectOmiCloud(meetingsFor(context.actor), context.actor),
       ),
     },
     omi: {
