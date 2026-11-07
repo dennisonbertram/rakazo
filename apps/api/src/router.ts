@@ -419,6 +419,11 @@ import {
   listArtifactVersions,
   listSpaceArtifacts,
 } from "./artifacts.js";
+import {
+  dismissInstructionsUpgrade,
+  instructionsUpgrade,
+  upgradeInstructions,
+} from "./bot-instructions-upgrade.js";
 import { botProfileLabelsChanged, commitBotUpdate } from "./bot-update.js";
 import type { BrexCardsDeps } from "./brex-cards.js";
 import {
@@ -3265,6 +3270,21 @@ export function createRouter(deps: RouterDeps): AppRouter {
           repos.setBotComputer(context.actor, bot.id, input.mode),
         );
       }),
+      instructionsUpgrade: authed.bots.instructionsUpgrade.handler(({ context, input }) =>
+        instructionsUpgrade(deps.prisma, context.actor, input.botId),
+      ),
+      upgradeInstructions: authed.bots.upgradeInstructions.handler(async ({ context, input }) => {
+        await upgradeInstructions(deps.prisma, context.actor, input.botId, input.from);
+        const bot = (await repos.listBots(context.actor)).find((b) => b.id === input.botId);
+        if (!bot) throw new IsolationError();
+        return bot;
+      }),
+      dismissInstructionsUpgrade: authed.bots.dismissInstructionsUpgrade.handler(
+        async ({ context, input }) => {
+          await dismissInstructionsUpgrade(deps.prisma, context.actor, input.botId);
+          return { ok: true as const };
+        },
+      ),
       archive: authed.bots.archive.handler(async ({ context, input }) => {
         await archiveActorBot(context.actor, input.botId);
         return { ok: true as const };

@@ -33,7 +33,7 @@ import { LEGAL_AGENT_INSTRUCTIONS, PREVIOUS_LEGAL_AGENT_INSTRUCTIONS } from "./l
  * Every built-in agent kind with a current default and a list of earlier defaults. Integration and mail-thread
  * agents are not listed: their text is built per connection or per thread.
  */
-const BUILT_IN_AGENTS = [
+export const BUILT_IN_AGENTS = [
   {
     kind: "inbox",
     spawnKey: inboxAgentSpawnKey,
