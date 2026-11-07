@@ -1,6 +1,6 @@
 # Document scanner: paper in, PDF in the Data room
 
-Status: plan only, no product code. Epic #1051 (#1045–#1050, #1065). File references were read at `origin/main` (c2be84f24). Format follows `docs/omi/README.md`. Mockups: `docs/scanner/page-mockup/index.html` (screenshots and HTML snapshots edited from the running app).
+Status: S2 desktop scanner service implemented; Scanner page and agent remain later slices. Epic #1051 (#1045–#1050, #1065). File references were read at `origin/main` (c2be84f24). Format follows `docs/omi/README.md`. Mockups: `docs/scanner/page-mockup/index.html` (screenshots and HTML snapshots edited from the running app).
 
 ## Decisions
 
@@ -55,19 +55,20 @@ The user plugs the scanner into the Mac by USB and opens the Praci desktop app. 
 - **Find the scanner.** `scanimage -L`, keep `fujitsu:` devices. None → `not-found`. "Device busy" → `busy` (another app has it).
 - **Watch the feeder.** While the app is open and auto-scan is on, read `page-loaded` once a second with `scanimage -d <dev> -A`. When it has been on for 2 s, scan. After a scan, wait for `page-loaded` to go off before arming again, so a jam does not cause a loop.
 - **Scan.** `scanimage -d <dev> --source "ADF Duplex" --mode Color --resolution 300 --format=jpeg --batch=<tmp>/page%03d.jpg --swskip <n>` into a fresh temporary directory. Exit 0 with at least one page → success. Any other end (jam, double feed, cover open, cancelled) → no upload, pages deleted, state `error` with the reason; the user reloads and scans again. A partial document is never filed.
-- **Make the PDF.** A small writer in the same module embeds each JPEG unchanged as a DCTDecode image on its own page, sized from the JPEG's frame header at the scan resolution. About 80 lines, no new dependency (none of the repo's packages has a PDF library today). Unit-tested against fixture JPEGs.
-- **Outbox.** The PDF is written to `<userData>/scan-outbox/` with its SHA-256 before upload, and deleted only after the renderer confirms a matching stored hash. On app start and whenever the window becomes ready, anything left in the outbox is offered again. The server already returns the existing item for a file with the same SHA-256 in the same space (`packages/db/src/data-room.ts`, upload dedupe), so a repeat send never makes a second copy.
-- **Settings.** Auto-scan on/off, target folder path, resolution and color mode live in the desktop's local settings (`apps/desktop/src/setup-store.ts`). They are per machine because the scanner is per machine.
+- **Make the PDF.** A dependency-free writer embeds each JPEG unchanged as a DCTDecode image on its own page, sized from the JPEG's frame header at the scan resolution. Unit-tested against fixture JPEGs.
+- **Outbox.** The PDF and its SHA-256 metadata are written privately under `<userData>/scan-outbox/` before delivery. Metadata binds each file to its user, space and server origin; after the renderer sets the signed-in scope, only matching pending files are replayed or returned by `pending()`. The local PDF is deleted only after `confirm(id, storedSha256)` verifies the recomputed local hash, stored hash and unchanged scope.
+- **Settings.** Auto-scan on/off and target folder are machine-local in a separate private `scanner-settings.json`, written with the private-file primitives in `apps/desktop/src/setup-store.ts`. Resolution and color mode are fixed at 300 dpi and Color for v1.
 
 ### IPC
 
 Exposed on `window.rakazoDesktop.scanner` in `apps/desktop/src/preload.cjs`, only on macOS and Linux:
 
-- `state()` and `onState(listener)`: `{ kind: "sane-missing" | "not-found" | "busy" | "ready" | "scanning" | "error", device?, error? }`.
+- `state()` and `onState(listener)`: `{ kind: "sane-missing" | "not-found" | "busy" | "ready" | "scanning" | "error", device?, error?, autoScan, folder }`.
 - `scan()`: start a scan now. `cancel()`: stop a running scan; nothing is filed.
 - `setAutoScan(on)`, `setFolder(path)`.
-- `onDocument(listener)`: delivers `{ id, name, bytes, sha256 }` for each PDF in the outbox.
-- `confirm(id, storedSha256)`: main deletes the outbox file only when the hashes match.
+- `onDocument(listener)` and `pending()`: deliver/recover `{ id, name, bytes, sha256, pages, folder, userId, spaceId }`.
+- `setScope({ userId, spaceId } | null)`: main adds the trusted server origin; sign-out or scope changes cancel an active scan and stop delivery.
+- `confirm(id, storedSha256)`: main deletes the outbox file only when local and stored hashes match the unchanged scope.
 
 ### Scanner page (`/app/scanner`)
 
@@ -97,7 +98,7 @@ A page agent like the Legal agent: spawn key `scanner-agent:<userId>` (one per u
 ### Security and tenancy
 
 - The upload uses the signed-in session and the selected space, exactly like "Add files". No token is stored by the scanner service.
-- The outbox holds documents on the user's own disk until confirmed; a confirmed file is deleted. Signing out or switching space stops delivery (the renderer's upload scope already refuses cross-scope retries) and the outbox waits for the same user and space. `ponytail:` the outbox does not record which space a PDF was meant for; add that if users switch spaces mid-scan.
+- The outbox holds documents on the user's own disk until confirmed; a confirmed file is deleted. Signing out or switching space stops delivery, and files wait until the same user, space and server origin are selected again.
 - No scanned content in logs or error strings.
 
 ### Surfaces
@@ -140,6 +141,25 @@ Research summary (2026-11-01, from source; nothing run on hardware):
 | **S6 Scanner agent** | Spawn key, provisioning on first visit, docked chat, naming and typing each new scan, scan-only Data room tools, untrusted wrapping, hand-off to another page agent. Tests: exact tool set, an injection line in a scan cannot act beyond rename and type, a run per new scan. | S1, S3 |
 | **S4 Wi-Fi gate** | Run scansnack against the owner's iX1600; record the result here. Not merged code. | owner's scanner |
 | **S5 Wi-Fi client** | TypeScript client in the main process, pairing flow, button listener, same outbox and IPC. | S2, S4 passing |
+
+### Offline S2 scanner fixture
+
+The desktop unit tests and later cloud Electron acceptance can use
+`apps/desktop/src/fixtures/bin/scanimage` without SANE hardware. Put that directory
+first on `PATH` and set `RAKAZO_FAKE_SCANIMAGE_SCENARIO` to a JSON scenario file:
+
+```json
+{
+  "pageLoaded": "on",
+  "pages": ["page-one.jpg.b64", "page-two.jpg.b64"]
+}
+```
+
+Use `"pages": []` for an empty feeder, `"busy": true` for a device held by another
+app, or `"scan": { "exitCode": 1, "stderr": "Paper jam" }` for a failed batch
+that leaves a partial page. `"scan": { "hold": true }` holds a scan until the
+service cancels it. Fixtures are invented JPEG test patterns, not scanned
+documents.
 
 Hand test for S2 and S3: the owner's iX1600 on USB with the desktop app pointed at a demo stack (`DEMO_SLOT=<n> pnpm demo:up`), never the live stack. Load paper, see the in-progress row and the toast, see the Scanner agent name the scan, open the PDF in the Data room, check both sides are there. Unplug mid-scan and check nothing partial is filed. Stop the API mid-upload and check the PDF is sent again after it returns.
 

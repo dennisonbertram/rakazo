@@ -1,6 +1,34 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+const scanner =
+  process.platform === "darwin" || process.platform === "linux"
+    ? {
+        scanner: {
+          state: () => ipcRenderer.invoke("desktop.scanner.state"),
+          scan: () => ipcRenderer.invoke("desktop.scanner.scan"),
+          cancel: () => ipcRenderer.invoke("desktop.scanner.cancel"),
+          setAutoScan: (enabled) => ipcRenderer.invoke("desktop.scanner.setAutoScan", enabled),
+          setFolder: (folder) => ipcRenderer.invoke("desktop.scanner.setFolder", folder),
+          setScope: (scope) => ipcRenderer.invoke("desktop.scanner.setScope", scope),
+          pending: () => ipcRenderer.invoke("desktop.scanner.pending"),
+          confirm: (id, storedSha256) =>
+            ipcRenderer.invoke("desktop.scanner.confirm", id, storedSha256),
+          onState: (listener) => {
+            const handler = (_event, state) => listener(state);
+            ipcRenderer.on("desktop.scanner.state.changed", handler);
+            return () => ipcRenderer.off("desktop.scanner.state.changed", handler);
+          },
+          onDocument: (listener) => {
+            const handler = (_event, document) => listener(document);
+            ipcRenderer.on("desktop.scanner.document", handler);
+            return () => ipcRenderer.off("desktop.scanner.document", handler);
+          },
+        },
+      }
+    : {};
+
 contextBridge.exposeInMainWorld("rakazoDesktop", {
+  ...scanner,
   platform: process.platform,
   localSettings: {
     request: (pathname, body) =>

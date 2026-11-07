@@ -44,6 +44,9 @@ import {
   forwardedRendererRequestInit,
   isRendererAssetMiss,
 } from "./renderer-assets.js";
+import type { ScannerService } from "./scanner.js";
+import { createScanner } from "./scanner.js";
+import { scannerIpcAuthorized } from "./scanner-security.js";
 import { installSessionPermissions } from "./session-permissions.js";
 import {
   DEFAULT_LOCAL_WEB_URL,
@@ -78,6 +81,7 @@ const PROBE_TIMEOUT_MS = 8_000;
 const DESKTOP_STACK_PROBE_PATH = "/.well-known/rakazo-desktop-stack";
 const DESKTOP_STACK_TOKEN_HEADER = "x-rakazo-desktop-stack-token";
 let mainWindow: BrowserWindow | null = null;
+let scannerService: ScannerService | null = null;
 const appWindowTargets = new WeakMap<BrowserWindow, string>();
 let setupWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -154,6 +158,70 @@ function windowFrom(event: Electron.IpcMainInvokeEvent) {
 
 function fromMainWindow(event: Electron.IpcMainInvokeEvent) {
   return mainWindow !== null && windowFrom(event) === mainWindow;
+}
+
+function trustedScannerOrigin() {
+  if (currentTargetUrl === null || mainWindow === null || mainWindow.isDestroyed()) return null;
+  const origin = safeOrigin(currentTargetUrl);
+  const windowTarget = appWindowTargets.get(mainWindow);
+  if (origin === null || windowTarget === undefined || safeOrigin(windowTarget) !== origin)
+    return null;
+  try {
+    const url = new URL(currentTargetUrl);
+    return url.protocol === "http:" || url.protocol === "https:" ? origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function scannerRequestAuthorized(event: Electron.IpcMainInvokeEvent) {
+  return scannerIpcAuthorized(
+    scannerService !== null && fromMainWindow(event),
+    event.senderFrame,
+    event.sender.mainFrame,
+    trustedScannerOrigin(),
+  );
+}
+
+function clearScannerScope() {
+  if (scannerService) void scannerService.setScope(null).catch(() => undefined);
+}
+
+function sendScannerEvent(channel: string, payload: unknown) {
+  const win = mainWindow;
+  const origin = trustedScannerOrigin();
+  if (
+    win !== null &&
+    !win.isDestroyed() &&
+    origin !== null &&
+    safeOrigin(win.webContents.mainFrame.url) === origin
+  ) {
+    win.webContents.send(channel, payload);
+  }
+}
+
+function validScannerFolder(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= 32 &&
+    value.every((part) => typeof part === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(part))
+  );
+}
+
+function scannerUserScope(value: unknown) {
+  if (value === null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return undefined;
+  const scope = value as Record<string, unknown>;
+  if (
+    Object.keys(scope).sort().join(",") !== "spaceId,userId" ||
+    typeof scope.userId !== "string" ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(scope.userId) ||
+    typeof scope.spaceId !== "string" ||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(scope.spaceId)
+  ) {
+    return undefined;
+  }
+  return { userId: scope.userId, spaceId: scope.spaceId };
 }
 
 /** Dock/taskbar icon for unpackaged launches; packaged builds get theirs from electron-builder. */
@@ -299,10 +367,16 @@ function createWindow(url: string, partition: string | null) {
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (event, navigationUrl) => {
-    if (targetOrigin !== null && safeOrigin(navigationUrl) === targetOrigin) return;
+    if (targetOrigin !== null && safeOrigin(navigationUrl) === targetOrigin) {
+      if (mainWindow === win) clearScannerScope();
+      return;
+    }
     event.preventDefault();
     const external = safeExternalUrl(navigationUrl);
     if (external !== null) void shell.openExternal(external);
+  });
+  win.webContents.on("did-navigate", () => {
+    if (mainWindow === win) clearScannerScope();
   });
   // The popup has no address bar, so a loopback redirect would otherwise strand
   // the user on a blank window holding the authorization code in a URL they
@@ -343,7 +417,10 @@ function createWindow(url: string, partition: string | null) {
   });
   win.once("closed", () => {
     clearTimeout(warmWindowTimer);
-    if (mainWindow === win) mainWindow = null;
+    if (mainWindow === win) {
+      mainWindow = null;
+      clearScannerScope();
+    }
   });
   markOnce("rk:main:window-created");
   if (win.isVisible()) markOnce("rk:main:window-shown");
@@ -784,6 +861,7 @@ function openFailureDetail(error: unknown): string {
 }
 
 async function openAppOnce(targetUrl: string, switching: boolean) {
+  if (currentTargetUrl !== null && currentTargetUrl !== targetUrl) clearScannerScope();
   const target = await resolveSessionForTarget(targetUrl);
   const previous = mainWindow;
   let win: BrowserWindow | null = null;
@@ -1110,6 +1188,89 @@ app.whenReady().then(async () => {
       : { state: "not_found" },
   );
   // On-device speech needs Hex's helper, so it is macOS on Apple silicon only.
+  if (process.platform === "darwin" || process.platform === "linux") {
+    const scanner = createScanner({ userDataDir: app.getPath("userData") });
+    scannerService = scanner;
+    scanner.onState((state) => sendScannerEvent("desktop.scanner.state.changed", state));
+    scanner.onDocument((document) => sendScannerEvent("desktop.scanner.document", document));
+    void scanner.start();
+
+    const requireScanner = (event: Electron.IpcMainInvokeEvent) => {
+      if (!scannerRequestAuthorized(event)) throw new Error("Scanner request is not authorized.");
+      return scanner;
+    };
+    ipcMain.handle("desktop.scanner.state", (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      return service.state();
+    });
+    ipcMain.handle("desktop.scanner.scan", async (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      await service.scan();
+    });
+    ipcMain.handle("desktop.scanner.cancel", async (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      await service.cancel();
+    });
+    ipcMain.handle(
+      "desktop.scanner.setAutoScan",
+      async (event, value: unknown, ...args: unknown[]) => {
+        const service = requireScanner(event);
+        if (args.length !== 0 || typeof value !== "boolean")
+          throw new Error("Invalid scanner settings.");
+        await service.setAutoScan(value);
+      },
+    );
+    ipcMain.handle(
+      "desktop.scanner.setFolder",
+      async (event, folder: unknown, ...args: unknown[]) => {
+        const service = requireScanner(event);
+        if (args.length !== 0 || !validScannerFolder(folder))
+          throw new Error("Invalid scanner folder.");
+        await service.setFolder(folder);
+      },
+    );
+    ipcMain.handle(
+      "desktop.scanner.setScope",
+      async (event, value: unknown, ...args: unknown[]) => {
+        const service = requireScanner(event);
+        if (args.length !== 0) throw new Error("Invalid scanner scope.");
+        const scope = scannerUserScope(value);
+        if (scope === undefined) throw new Error("Invalid scanner scope.");
+        if (scope === null) await service.setScope(null);
+        else {
+          const origin = trustedScannerOrigin();
+          if (origin === null) throw new Error("Scanner request is not authorized.");
+          await service.setScope(scope, origin);
+        }
+      },
+    );
+    ipcMain.handle("desktop.scanner.pending", (event, ...args: unknown[]) => {
+      const service = requireScanner(event);
+      if (args.length !== 0) throw new Error("Invalid scanner request.");
+      return service.pending();
+    });
+    ipcMain.handle(
+      "desktop.scanner.confirm",
+      (event, id: unknown, storedSha256: unknown, ...args: unknown[]) => {
+        const service = requireScanner(event);
+        if (
+          args.length !== 0 ||
+          typeof id !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ||
+          typeof storedSha256 !== "string" ||
+          !/^[0-9a-f]{64}$/i.test(storedSha256)
+        ) {
+          throw new Error("Invalid scanner confirmation.");
+        }
+        return service.confirm(id, storedSha256);
+      },
+    );
+    app.on("will-quit", () => void scanner.close());
+  }
+
   const speech = createDeviceSpeech({
     userDataDir: app.getPath("userData"),
     supported: process.platform === "darwin" && process.arch === "arm64",
