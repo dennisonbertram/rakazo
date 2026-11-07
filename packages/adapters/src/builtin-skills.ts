@@ -49,7 +49,7 @@ const SKILLS: Array<{ name: string; description: string; body: string }> = [
 4. Leave out a column that is mostly empty, and leave out identifiers such as full email addresses, ids and URLs unless contacting people is the page's job. Name people by their name or company.
 5. Show each person, deal or item in one table only. If a second section needs the same item, link to the first section or leave it out, rather than repeating the row.
 6. Write dates the way a person says them: "Nov 4", or "Tue Nov 4" when the weekday matters. Never show raw ISO dates or timestamps. Round numbers ($48k, about 3 weeks) unless the exact figure matters. For numbers that come from data, use metric, table and chart blocks, never typed figures.
-7. Use a small fixed set of status words in a Status column instead of sentences: Needs you, Waiting, Sent, Done. Use the same words everywhere on the page.
+7. Use a small fixed set of status words instead of sentences: Needs you, Waiting, Sent, Done, the same words everywhere on the page. When the sections already group items by status, leave the Status column out.
 8. Use a few short sentence-case ## headings, never deeper than ###, and no emoji. Put the section that needs the owner first. A short page of three or four sections beats a long one.
 9. Do not explain the page. Leave out "How to use this page", descriptions of what each section is for, and notes about who edited what or when ("marked by you on ..."). Say how it works in chat if the owner asks.
 10. Never put secrets, credentials, internal-only notes or private instructions on a page, because the owner may share it. Keep those in your memory or instructions.
@@ -65,17 +65,17 @@ After:
 Support: 2 need you, 3 waiting on customers.
 
 ## Needs you
-| Customer | Issue | Last reply | Status |
-| --- | --- | --- | --- |
-| Northwind | Refund not received | Nov 4 | Needs you |
-| Acme Co | Export fails on large files | Nov 5 | Needs you |
+| Customer | Issue | Last reply |
+| --- | --- | --- |
+| Northwind | Refund not received | Nov 4 |
+| Acme Co | Export fails on large files | Nov 5 |
 
 ## Waiting on customers
-| Customer | Issue | Last reply | Status |
-| --- | --- | --- | --- |
-| Globex | Login loop | Nov 3 | Waiting |
-| Initech | Invoice question | Nov 3 | Waiting |
-| Umbrella | Feedback request | Nov 6 | Sent |
+| Customer | Issue | Last reply |
+| --- | --- | --- |
+| Globex | Login loop | Nov 3 |
+| Initech | Invoice question | Nov 3 |
+| Umbrella | Feedback request sent | Nov 6 |
 
 ## Done
 Hooli, Stark Ltd`,
