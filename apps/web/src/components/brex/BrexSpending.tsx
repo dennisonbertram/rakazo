@@ -22,7 +22,7 @@ import { sortBy, useListParams } from "../../lib/list-params";
 import { rpc } from "../../lib/rpc";
 import { ErrorNotice, Section, useFinanceQuery } from "../finance/ui";
 import { PhoneDateRange, PickFilter, SearchField, SortControl } from "../ListControls";
-import { isSpendBucket, spendBucketLabel } from "./brex-utils";
+import { isSpendBucket, isSpendCents, spendBucketLabel } from "./brex-utils";
 
 type SpendSort = "date" | "merchant" | "card" | "person" | "category" | "amount";
 const SPEND_SORTS: readonly SpendSort[] = [
@@ -108,18 +108,32 @@ export function BrexSpending() {
     });
   }, [data]);
 
+  const spendTransactions = useMemo(
+    () => (data?.transactions ?? []).filter((row) => isSpendCents(row.amountCents)),
+    [data],
+  );
   const rows = useMemo(
-    () => sortBy(data?.transactions ?? [], (row) => sortValue(row, list.sort.field), list.sort.dir),
-    [data, list.sort.field, list.sort.dir],
+    () => sortBy(spendTransactions, (row) => sortValue(row, list.sort.field), list.sort.dir),
+    [spendTransactions, list.sort.field, list.sort.dir],
   );
   const categories = useMemo(() => {
-    const byBucket = new Map(data?.categories.map((row) => [row.bucket, row]) ?? []);
+    const byBucket = new Map<string, { cents: number; count: number }>();
+    for (const row of spendTransactions) {
+      const value = byBucket.get(row.bucket) ?? { cents: 0, count: 0 };
+      value.cents += row.amountCents;
+      value.count += 1;
+      byBucket.set(row.bucket, value);
+    }
     return BREX_SPEND_BUCKETS.map((bucket) => ({
       bucket,
       cents: byBucket.get(bucket)?.cents ?? 0,
       count: byBucket.get(bucket)?.count ?? 0,
     }));
-  }, [data]);
+  }, [spendTransactions]);
+  const spendTotalCents = useMemo(
+    () => spendTransactions.reduce((sum, row) => sum + row.amountCents, 0),
+    [spendTransactions],
+  );
   const duplicates = (data?.duplicates ?? []).filter(
     (row) => !dismissed.has(`${row.month}:${row.merchant.toLowerCase()}`),
   );
@@ -198,7 +212,7 @@ export function BrexSpending() {
             <Input
               type="date"
               aria-label={t`To`}
-              min={from ?? data.range.from}
+              min={data.range.from}
               max={data.range.to}
               value={to ?? ""}
               onChange={(event) => list.setParam("to", event.target.value || undefined)}
@@ -300,11 +314,11 @@ export function BrexSpending() {
           </Table>
         </div>
       </Section>
-      {data.transactions.length > 0 ? (
+      {spendTransactions.length > 0 ? (
         <Section title={<Trans>By category</Trans>}>
           <ul className="flex flex-col gap-2.5">
             {categories.map(({ bucket, cents, count }) => {
-              const share = data.totalCents > 0 ? (cents / data.totalCents) * 100 : 0;
+              const share = spendTotalCents > 0 ? (cents / spendTotalCents) * 100 : 0;
               return (
                 <li
                   key={bucket}
@@ -321,7 +335,7 @@ export function BrexSpending() {
                     />
                   </span>
                   <span className="col-span-2 text-xs text-muted-foreground">
-                    {count > 0 ? shareText(cents, data.totalCents) : ""}
+                    {count > 0 ? shareText(cents, spendTotalCents) : ""}
                   </span>
                 </li>
               );
@@ -352,16 +366,18 @@ export function BrexSpending() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() =>
+                      onClick={() => {
+                        const monthStart = `${row.month}-01`;
+                        const monthFinish = monthEnd(row.month);
                         list.setParams({
                           merchant: row.merchant,
-                          from: `${row.month}-01`,
-                          to: monthEnd(row.month),
+                          from: monthStart < data.range.from ? data.range.from : monthStart,
+                          to: monthFinish > data.range.to ? data.range.to : monthFinish,
                           card: undefined,
                           person: undefined,
                           category: undefined,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Trans>Review</Trans>
                     </Button>

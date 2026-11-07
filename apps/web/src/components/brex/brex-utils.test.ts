@@ -1,6 +1,6 @@
 import type { BrexPerson } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
-import { offboardMessage, offboardPlan } from "./brex-utils";
+import { isSpendCents, offboardMessage, offboardPlan } from "./brex-utils";
 
 const person = (overrides: Partial<BrexPerson> = {}): BrexPerson => ({
   userId: "user_ada",
@@ -19,6 +19,14 @@ const person = (overrides: Partial<BrexPerson> = {}): BrexPerson => ({
   windowSpendCents: 0,
   partial: false,
   ...overrides,
+});
+
+describe("isSpendCents", () => {
+  it("counts only positive amounts as spend", () => {
+    expect(isSpendCents(-100)).toBe(false);
+    expect(isSpendCents(0)).toBe(false);
+    expect(isSpendCents(100)).toBe(true);
+  });
 });
 
 describe("offboardPlan", () => {

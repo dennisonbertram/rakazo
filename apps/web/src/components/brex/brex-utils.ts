@@ -6,6 +6,8 @@ export function isSpendBucket(value: string | undefined): value is BrexSpendBuck
   return BREX_SPEND_BUCKETS.includes(value as BrexSpendBucket);
 }
 
+export const isSpendCents = (cents: number) => cents > 0;
+
 export function spendBucketLabel(bucket: BrexSpendBucket): string {
   switch (bucket) {
     case "software":

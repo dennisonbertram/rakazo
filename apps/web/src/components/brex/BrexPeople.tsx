@@ -21,6 +21,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { money } from "../../lib/finance-format";
+import { useHideAmounts } from "../../lib/hide-amounts-preference";
 import { sortBy, useListParams } from "../../lib/list-params";
 import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
@@ -140,6 +141,7 @@ function OffboardDialog({
 
 export function BrexPeople() {
   const navigate = useNavigate();
+  useHideAmounts();
   const query = useFinanceQuery(() => rpc.brexCards.people(), []);
   const data = query.data;
   const list = useListParams(PEOPLE_SORTS, DEFAULT_PEOPLE_SORT);
