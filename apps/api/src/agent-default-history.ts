@@ -34,8 +34,9 @@ export const AGENT_DEFAULT_HASHES: Record<string, { current: string; past: strin
     ],
   },
   "data-room": {
-    current: "6ed5416f7b61f228f59f0805c1a199603bcab08ba0a20504d081fd72aedfea9a",
+    current: "437ad50f94b178061ce7e2cef37bb40564dd067b1e550eb8f53603e8bf5359ff",
     past: [
+      "6ed5416f7b61f228f59f0805c1a199603bcab08ba0a20504d081fd72aedfea9a",
       "a2fd66577cd93056741c32297535bf8c752e90b6327eea6af825d41df254625c",
       "dd5c95445266951b6bee9de21800000b3e01ca219535398f05a26abfc3121ffa",
       "3a5f97b681a85f53f526b9af16b43802c479e8b0cdf0d0e160044562d80ee162",

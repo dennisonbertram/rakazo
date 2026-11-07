@@ -1802,7 +1802,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "add_to_data_room",
     description:
-      "Add a document to the user's Data room: an email attachment (message_id and attachment_id, as listed by mail_get), a Drive file (drive_file_id), or an artifact (artifact_id). Files only, not message text. Don't choose a folder, name or tags; the Data room agent files it. Adding the same document again does nothing. Small inline images, calendar invites and contact cards return \"Not a document.\"",
+      "Add a document to the user's Data room: an email attachment (message_id and attachment_id, as listed by mail_get), a Drive file (drive_file_id), or an artifact (artifact_id). Files only, not message text. Don't choose a folder, name or tags; the Data room files and tags it on its own. Adding the same document again does nothing. Small inline images, calendar invites and contact cards return \"Not a document.\"",
     inputSchema: {
       type: "object",
       properties: {
