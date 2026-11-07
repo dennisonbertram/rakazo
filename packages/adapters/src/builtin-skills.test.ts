@@ -1,8 +1,12 @@
 import { BREX_CARDS_WRITE_TOOLS, devinSessionUrl, INTEGRATION_PRESETS } from "@rakazo/contracts";
 import { parseSkillMd } from "@rakazo/core";
 import { expect, it } from "vitest";
-import { BUILTIN_AGENT_SKILLS, PRESENT_CLEARLY_SKILL_NAME } from "./builtin-skills.js";
-import { PRESENTATION_GUIDANCE } from "./executor.js";
+import {
+  BUILTIN_AGENT_SKILLS,
+  PAGE_DESIGN_SKILL_NAME,
+  PRESENT_CLEARLY_SKILL_NAME,
+} from "./builtin-skills.js";
+import { pagesGuidance, PRESENTATION_GUIDANCE } from "./executor.js";
 import { MEETING_AGENT_GUIDANCE } from "./meeting-tools.js";
 
 const skill = BUILTIN_AGENT_SKILLS.find((s) => s.name === "devin-sessions");
@@ -63,6 +67,15 @@ it("every agent is told to read present-clearly, and that skill exists", () => {
   const present = BUILTIN_AGENT_SKILLS.find((s) => s.name === PRESENT_CLEARLY_SKILL_NAME);
   expect(present?.description.length).toBeLessThanOrEqual(72);
   expect(present?.content).toContain("Lead with the point");
+});
+
+it("page guidance sends agents to the page-design skill, which is generic", () => {
+  expect(pagesGuidance()).toContain(`read the ${PAGE_DESIGN_SKILL_NAME} skill`);
+  const design = BUILTIN_AGENT_SKILLS.find((s) => s.name === PAGE_DESIGN_SKILL_NAME);
+  expect(design?.name).toBe("page-design");
+  expect(design?.description.length).toBeLessThanOrEqual(72);
+  expect(design?.content).toContain("Never put secrets");
+  expect(design?.content).not.toMatch(/Customer support|@(?!example\.test)\w+\.\w+|\/Users\//);
 });
 
 const BREX_SKILL_NAMES = [
