@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { userEvent, within } from "storybook/test";
 import { mockRpc } from "../../lib/__mocks__/rpc";
 import { BrexCards } from "./BrexCards";
-import { cardsViewFixture } from "./fixtures";
+import { brexCardsControlsFixture, cardsViewFixture } from "./fixtures";
 
 const meta = {
   title: "Brex/Cards",
@@ -21,7 +21,11 @@ type Story = StoryObj<typeof meta>;
 const load =
   (data: unknown = cardsViewFixture) =>
   () =>
-    mockRpc({ "brexCards.cardsView": data, "threads.send": { ok: true } });
+    mockRpc({
+      "brexCards.cardsView": data,
+      "brexCards.getControls": brexCardsControlsFixture,
+      "threads.send": { ok: true },
+    });
 
 export const Tiles: Story = { beforeEach: load() };
 
@@ -89,5 +93,6 @@ export const Failed: Story = {
   beforeEach: () =>
     mockRpc({
       "brexCards.cardsView": () => Promise.reject(new Error("Could not load cards")),
+      "brexCards.getControls": brexCardsControlsFixture,
     }),
 };

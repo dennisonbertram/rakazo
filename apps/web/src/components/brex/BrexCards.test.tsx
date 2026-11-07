@@ -28,17 +28,17 @@ function view(extra: Partial<BrexCardsView> = {}): BrexCardsView {
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
-async function mount(data: BrexCardsView) {
+async function mount(data: BrexCardsView, oneTimeRequiresLock = true) {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  await render(data);
+  await render(data, oneTimeRequiresLock);
 }
-const render = (data: BrexCardsView) =>
+const render = (data: BrexCardsView, oneTimeRequiresLock = true) =>
   act(async () =>
     root.render(
       <MemoryRouter>
-        <CardsBoard data={data} />
+        <CardsBoard data={data} oneTimeRequiresLock={oneTimeRequiresLock} />
       </MemoryRouter>,
     ),
   );
@@ -170,6 +170,21 @@ it("requires a lock date for a one-time card", async () => {
   expect(send).toHaveBeenCalledWith(
     expect.objectContaining({
       text: "Create a vendor card named Launch for Figma, $500 per one time, locked to Figma, lock after 2026-12-31.",
+    }),
+  );
+});
+
+it("sends a one-time card without a lock date when the policy allows it", async () => {
+  await mount(view(), false);
+  await click(buttonIn(container, "New card"));
+  await typeInto(field("brex-new-card-name"), "Launch");
+  await typeInto(field("brex-new-card-merchant"), "Figma");
+  await typeInto(field("brex-new-card-limit"), "500");
+  await click(buttonIn(dialog(), "One time"));
+  await click(buttonIn(dialog(), "Request card"));
+  expect(send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      text: "Create a vendor card named Launch for Figma, $500 per one time, locked to Figma.",
     }),
   );
 });

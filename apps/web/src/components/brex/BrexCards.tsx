@@ -48,6 +48,7 @@ import { SearchField } from "../ListControls";
 /** Fetches the owner-only cards read model and renders the Cards section. */
 export function BrexCards() {
   const view = useFinanceQuery(() => rpc.brexCards.cardsView(), []);
+  const controls = useFinanceQuery(() => rpc.brexCards.getControls(), []);
   if (view.error) return <ErrorNotice message={view.error} onRetry={view.retry} />;
   if (!view.data) {
     return (
@@ -57,7 +58,12 @@ export function BrexCards() {
       </div>
     );
   }
-  return <CardsBoard data={view.data} />;
+  return (
+    <CardsBoard
+      data={view.data}
+      oneTimeRequiresLock={controls.data ? controls.data.oneTimeMaxDays !== null : true}
+    />
+  );
 }
 
 export type NewCardDetails = {
@@ -227,7 +233,14 @@ function CardTile({ card, onOpen }: { card: BrexCardView; onOpen: () => void }) 
 }
 
 /** The cards read model as tiles or a list, with search, a status filter and a New card form. */
-export function CardsBoard({ data }: { data: BrexCardsView }) {
+export function CardsBoard({
+  data,
+  oneTimeRequiresLock = true,
+}: {
+  data: BrexCardsView;
+  /** Brex policy: a ONE_TIME card must lock within N days; false when the owner turned the rule off. */
+  oneTimeRequiresLock?: boolean;
+}) {
   const navigate = useNavigate();
   const amountsHidden = useHideAmounts();
   const [query, setQuery] = useState("");
@@ -566,6 +579,7 @@ export function CardsBoard({ data }: { data: BrexCardsView }) {
         <NewCardDialog
           enabled={enabled}
           busy={busy}
+          oneTimeRequiresLock={oneTimeRequiresLock}
           error={sendError}
           onClose={() => {
             setNewCardOpen(false);
@@ -598,6 +612,7 @@ export function CardsBoard({ data }: { data: BrexCardsView }) {
 function NewCardDialog({
   enabled,
   busy,
+  oneTimeRequiresLock,
   error,
   onClose,
   onSend,
@@ -605,6 +620,8 @@ function NewCardDialog({
   /** Allow changes as it is now; a form opened before it turned off cannot send. */
   enabled: boolean;
   busy: boolean;
+  /** Whether Brex policy requires a lock date on a one-time card. */
+  oneTimeRequiresLock: boolean;
   error: string;
   onClose: () => void;
   onSend: (details: NewCardDetails) => void;
@@ -620,8 +637,8 @@ function NewCardDialog({
     event.preventDefault();
     const amountCents = dollarsToCents(limit);
     const fieldsValid = name.trim() !== "" && merchant.trim() !== "" && amountCents !== null;
-    // Brex refuses a ONE_TIME card without a lock date, so the form does too.
-    const lockMissing = duration === "ONE_TIME" && lockAfterDate === "";
+    // Brex refuses a ONE_TIME card without a lock date when the policy has the rule on.
+    const lockMissing = duration === "ONE_TIME" && oneTimeRequiresLock && lockAfterDate === "";
     setInvalid(!fieldsValid ? "fields" : lockMissing ? "lock" : null);
     if (!fieldsValid || lockMissing || amountCents === null || !enabled) return;
     onSend({

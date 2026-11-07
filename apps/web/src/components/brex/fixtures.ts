@@ -1,6 +1,7 @@
 import type {
   BrexAccounts,
   BrexActivity,
+  BrexCardsControls,
   BrexCardsOverview,
   BrexCardsView,
   BrexCardView,
@@ -9,6 +10,7 @@ import type {
   BrexSpendSankey,
   BrexTrips,
 } from "@rakazo/contracts";
+import { BREX_CARDS_CONTROLS_DEFAULTS } from "@rakazo/contracts";
 
 const merchant = (name: string, cents: number) => ({
   merchant: name,
@@ -271,6 +273,11 @@ export const cardsViewFixture: BrexCardsView = {
       usage: null,
     }),
   ],
+};
+
+export const brexCardsControlsFixture: BrexCardsControls = {
+  ...BREX_CARDS_CONTROLS_DEFAULTS,
+  allowedDurations: [...BREX_CARDS_CONTROLS_DEFAULTS.allowedDurations],
 };
 
 const expense = (
