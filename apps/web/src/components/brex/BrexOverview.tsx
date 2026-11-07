@@ -20,7 +20,9 @@ function TopVendors({
   vendors: BrexCardsOverview["topVendors"];
   totalCents: number;
 }) {
-  if (vendors.length === 0) {
+  const amountsHidden = useHideAmounts();
+  const visible = vendors.filter((vendor) => vendor.cents > 0).slice(0, 5);
+  if (visible.length === 0) {
     return (
       <p className="py-4 text-sm text-muted-foreground">
         <Trans>No card spend yet.</Trans>
@@ -29,7 +31,7 @@ function TopVendors({
   }
   return (
     <ul className="flex flex-col gap-2.5">
-      {vendors.slice(0, 5).map((vendor) => {
+      {visible.map((vendor) => {
         const share = totalCents > 0 ? (vendor.cents / totalCents) * 100 : 0;
         return (
           <li
@@ -41,7 +43,7 @@ function TopVendors({
             <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-muted">
               <span
                 className="block h-full rounded-full bg-foreground/70"
-                style={{ width: `${share}%` }}
+                style={{ width: `${amountsHidden ? 0 : share}%` }}
               />
             </span>
           </li>
@@ -52,6 +54,7 @@ function TopVendors({
 }
 
 function NearLimit({ items }: { items: BrexCardsOverview["nearLimit"]["items"] }) {
+  const amountsHidden = useHideAmounts();
   if (items.length === 0) {
     return (
       <p className="py-4 text-sm text-muted-foreground">
@@ -67,11 +70,13 @@ function NearLimit({ items }: { items: BrexCardsOverview["nearLimit"]["items"] }
           className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-sm"
         >
           <span className="truncate">{item.name}</span>
-          <span className="tabular-nums text-muted-foreground">{Math.round(item.percent)}%</span>
+          <span className="tabular-nums text-muted-foreground">
+            {amountsHidden ? "" : `${Math.round(item.percent)}%`}
+          </span>
           <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-muted">
             <span
               className="block h-full rounded-full bg-foreground/70"
-              style={{ width: `${Math.min(100, Math.max(0, item.percent))}%` }}
+              style={{ width: `${amountsHidden ? 0 : Math.min(100, Math.max(0, item.percent))}%` }}
             />
           </span>
         </li>
@@ -81,7 +86,7 @@ function NearLimit({ items }: { items: BrexCardsOverview["nearLimit"]["items"] }
 }
 
 export function BrexOverview({ data }: { data: BrexCardsOverview }) {
-  useHideAmounts();
+  const amountsHidden = useHideAmounts();
   const spend = data.cardSpend;
   return (
     <div className="flex flex-col gap-3">
@@ -106,7 +111,9 @@ export function BrexOverview({ data }: { data: BrexCardsOverview }) {
                 label={t`Card spend trend`}
                 neutral
               />
-              <Trans>{changeText(spend.changePercent)} vs last month</Trans>
+              {amountsHidden ? null : (
+                <Trans>{changeText(spend.changePercent)} vs last month</Trans>
+              )}
             </span>
           }
         />

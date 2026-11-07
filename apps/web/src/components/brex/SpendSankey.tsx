@@ -309,14 +309,26 @@ function WideSankey({
 export function SpendSankey({ data }: { data: BrexSpendSankey }) {
   const phone = usePhone();
   useHideAmounts();
-  const categories = data.categories.filter((category) => category.cents > 0);
-  if (data.totalCents <= 0 || categories.length === 0) {
+  const categories = data.categories
+    .map((category) => {
+      const merchants = category.merchants.filter((merchant) => merchant.cents > 0);
+      return {
+        ...category,
+        merchants,
+        cents: merchants.reduce((sum, merchant) => sum + merchant.cents, 0),
+      };
+    })
+    .filter((category) => category.cents > 0)
+    .sort((a, b) => b.cents - a.cents || a.bucket.localeCompare(b.bucket));
+  const totalCents = categories.reduce((sum, category) => sum + category.cents, 0);
+  if (totalCents <= 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
         <Trans>No card spend yet.</Trans>
       </p>
     );
   }
+  const spend = { ...data, totalCents, categories };
   const height = phone ? 260 : 360;
   return (
     <Chart
@@ -326,9 +338,9 @@ export function SpendSankey({ data }: { data: BrexSpendSankey }) {
     >
       {(width) =>
         phone ? (
-          <PhoneSankey data={data} categories={categories} width={width} height={height} />
+          <PhoneSankey data={spend} categories={categories} width={width} height={height} />
         ) : (
-          <WideSankey data={data} categories={categories} width={width} height={height} />
+          <WideSankey data={spend} categories={categories} width={width} height={height} />
         )
       }
     </Chart>
