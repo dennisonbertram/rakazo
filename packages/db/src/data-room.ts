@@ -597,7 +597,16 @@ export function createDataRoomRepos(prisma: PrismaClient) {
     async createItem(
       actor: Actor,
       input: {
-        source: "upload" | "drive" | "box" | "gmail" | "chat" | "finance" | "omi" | "meeting";
+        source:
+          | "upload"
+          | "scan"
+          | "drive"
+          | "box"
+          | "gmail"
+          | "chat"
+          | "finance"
+          | "omi"
+          | "meeting";
         sha256: string;
         name: string;
         mimeType: string;
@@ -619,9 +628,9 @@ export function createDataRoomRepos(prisma: PrismaClient) {
     ): Promise<{ item: DataRoomItemRecord; created: boolean }> {
       const findExisting = () =>
         prisma.dataRoomItem.findFirst({
-          where: { ...eligibleWhere(actor), source: "upload", sha256: input.sha256 },
+          where: { ...eligibleWhere(actor), source: input.source, sha256: input.sha256 },
         });
-      if (input.source === "upload") {
+      if (input.source === "upload" || input.source === "scan") {
         const existing = await findExisting();
         if (existing) return { item: existing, created: false };
       }
@@ -644,7 +653,7 @@ export function createDataRoomRepos(prisma: PrismaClient) {
         if (isUniqueViolation(error)) {
           // An upload repeats by bytes; an import repeats by its source id.
           const existing =
-            input.source === "upload"
+            input.source === "upload" || input.source === "scan"
               ? await findExisting()
               : input.externalId
                 ? await prisma.dataRoomItem.findFirst({
