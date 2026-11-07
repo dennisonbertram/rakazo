@@ -13,6 +13,30 @@ export interface ScannerSessionVerification {
   isCurrent: () => boolean;
 }
 
+export interface ScannerScopeClaim {
+  userId: string;
+  spaceId: string;
+}
+
+export interface VerifiedScannerScope extends ScannerScopeClaim {
+  serverOrigin: string;
+}
+
+export type ScannerScopeReauthenticationResult = "accepted" | "rejected" | "stale" | "cleared";
+
+export interface ScannerScopeCoordinatorOptions<TWindow extends object> {
+  currentWindow: () => TWindow | null;
+  originForWindow: (window: TWindow) => string | null;
+  clearScope: () => Promise<void>;
+  verifyScope: (
+    window: TWindow,
+    origin: string,
+    claim: ScannerScopeClaim,
+    isCurrent: () => boolean,
+  ) => Promise<boolean>;
+  setScope: (claim: ScannerScopeClaim, origin: string) => Promise<void>;
+}
+
 function isTrustedOrigin(origin: string) {
   try {
     const url = new URL(origin);
@@ -59,6 +83,104 @@ export async function verifyScannerSessionScope(
   } catch {
     return false;
   }
+}
+
+export function createScannerScopeCoordinator<TWindow extends object>(
+  options: ScannerScopeCoordinatorOptions<TWindow>,
+) {
+  const claims = new WeakMap<TWindow, ScannerScopeClaim>();
+  let generation = 0;
+  let verifiedScope: VerifiedScannerScope | null = null;
+
+  function sameScope(left: VerifiedScannerScope | null, right: VerifiedScannerScope) {
+    return (
+      left !== null &&
+      left.userId === right.userId &&
+      left.spaceId === right.spaceId &&
+      left.serverOrigin === right.serverOrigin
+    );
+  }
+
+  function invalidate() {
+    generation++;
+    verifiedScope = null;
+    return options.clearScope();
+  }
+
+  function isCurrent(attempt: number, window: TWindow, origin: string, claim: ScannerScopeClaim) {
+    return (
+      generation === attempt &&
+      options.currentWindow() === window &&
+      options.originForWindow(window) === origin &&
+      claims.get(window) === claim
+    );
+  }
+
+  async function authenticate(window: TWindow, claim: ScannerScopeClaim | undefined) {
+    const attempt = generation + 1;
+    const clearing = invalidate();
+    await clearing;
+    if (generation !== attempt) return "stale" as const;
+    if (claim === undefined) return "rejected" as const;
+
+    const origin = options.originForWindow(window);
+    if (origin === null || options.currentWindow() !== window) return "stale" as const;
+    const stillCurrent = () => isCurrent(attempt, window, origin, claim);
+    if (!stillCurrent()) return "stale" as const;
+
+    let authorized = false;
+    try {
+      authorized = await options.verifyScope(window, origin, claim, stillCurrent);
+    } catch {
+      authorized = false;
+    }
+    if (!stillCurrent()) return "stale" as const;
+    if (!authorized) return "rejected" as const;
+
+    const nextScope = { ...claim, serverOrigin: origin };
+    verifiedScope = nextScope;
+    try {
+      await options.setScope(claim, origin);
+    } catch {
+      if (stillCurrent() && sameScope(verifiedScope, nextScope)) {
+        await invalidate().catch(() => undefined);
+      }
+      return "rejected" as const;
+    }
+
+    if (stillCurrent() && sameScope(verifiedScope, nextScope)) return "accepted" as const;
+    if (generation === attempt && sameScope(verifiedScope, nextScope)) {
+      await invalidate().catch(() => undefined);
+    }
+    return "stale" as const;
+  }
+
+  return {
+    generation: () => generation,
+    scope: () => (verifiedScope === null ? null : { ...verifiedScope }),
+    matches: (scope: VerifiedScannerScope) => sameScope(verifiedScope, scope),
+    isCurrent: (attempt: number, window: TWindow, origin: string) =>
+      generation === attempt &&
+      options.currentWindow() === window &&
+      options.originForWindow(window) === origin,
+    invalidate,
+    remember(window: TWindow, claim: ScannerScopeClaim | null) {
+      if (claim === null) {
+        claims.delete(window);
+        return invalidate().then(() => "cleared" as const);
+      }
+      const savedClaim = { ...claim };
+      claims.set(window, savedClaim);
+      return authenticate(window, savedClaim);
+    },
+    reauthenticate(window: TWindow) {
+      return authenticate(window, claims.get(window));
+    },
+    forgetWindow(window: TWindow) {
+      claims.delete(window);
+      return options.currentWindow() === window ? invalidate() : Promise.resolve();
+    },
+  };
 }
 
 export function isScannerSessionCookie(cookie: { domain?: string; name: string }, origin: string) {

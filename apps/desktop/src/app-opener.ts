@@ -18,15 +18,3 @@ export function createAppOpener(openOnce: OpenOnce) {
     },
   };
 }
-
-export function reloadRestoredAppWindow(window: {
-  isDestroyed(): boolean;
-  webContents: {
-    isDestroyed(): boolean;
-    reload(): void;
-  };
-}) {
-  if (window.isDestroyed() || window.webContents.isDestroyed()) return false;
-  window.webContents.reload();
-  return true;
-}

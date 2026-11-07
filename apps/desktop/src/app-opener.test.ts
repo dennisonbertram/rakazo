@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAppOpener, reloadRestoredAppWindow } from "./app-opener.js";
+import { createAppOpener } from "./app-opener.js";
 
 function deferred() {
   let resolve!: (opened: boolean) => void;
@@ -45,27 +45,5 @@ describe("app opener", () => {
 
     await expect(opener.open("https://new.example.test", { switching: true })).resolves.toBe(true);
     expect(openOnce).toHaveBeenCalledExactlyOnceWith("https://new.example.test", true);
-  });
-
-  it("reloads a live restored app window so it can re-register its session scope", () => {
-    const reload = vi.fn();
-    const window = {
-      isDestroyed: () => false,
-      webContents: { isDestroyed: () => false, reload },
-    };
-
-    expect(reloadRestoredAppWindow(window)).toBe(true);
-    expect(reload).toHaveBeenCalledOnce();
-  });
-
-  it("does not reload a destroyed restored app window", () => {
-    const reload = vi.fn();
-    const window = {
-      isDestroyed: () => false,
-      webContents: { isDestroyed: () => true, reload },
-    };
-
-    expect(reloadRestoredAppWindow(window)).toBe(false);
-    expect(reload).not.toHaveBeenCalled();
   });
 });

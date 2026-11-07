@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ScannerSessionResponse } from "./scanner-session.js";
-import { isScannerSessionCookie, verifyScannerSessionScope } from "./scanner-session.js";
+import {
+  createScannerScopeCoordinator,
+  isScannerSessionCookie,
+  verifyScannerSessionScope,
+} from "./scanner-session.js";
 
 const origin = "https://server.example.test";
 const scope = { userId: "user-one", spaceId: "space-one" };
@@ -145,5 +149,73 @@ describe("scanner session authorization", () => {
     expect(
       isScannerSessionCookie({ domain: "server.example.test", name: "analytics" }, origin),
     ).toBe(false);
+  });
+
+  it("reauthenticates a saved claim when its window is restored without reloading it", async () => {
+    const restoredWindow = { reload: vi.fn() };
+    const newWindow = {};
+    let currentWindow: object | null = restoredWindow;
+    const verifyScope = vi.fn(async () => true);
+    const setScope = vi.fn(async () => undefined);
+    const coordinator = createScannerScopeCoordinator<object>({
+      currentWindow: () => currentWindow,
+      originForWindow: (window) =>
+        window === restoredWindow ? origin : "https://new-server.example.test",
+      clearScope: async () => undefined,
+      verifyScope,
+      setScope,
+    });
+
+    await expect(coordinator.remember(restoredWindow, scope)).resolves.toBe("accepted");
+    currentWindow = newWindow;
+    await expect(
+      coordinator.remember(newWindow, { userId: "user-two", spaceId: "space-two" }),
+    ).resolves.toBe("accepted");
+
+    currentWindow = restoredWindow;
+    await expect(coordinator.reauthenticate(restoredWindow)).resolves.toBe("accepted");
+
+    expect(coordinator.scope()).toEqual({ ...scope, serverOrigin: origin });
+    expect(verifyScope).toHaveBeenLastCalledWith(
+      restoredWindow,
+      origin,
+      scope,
+      expect.any(Function),
+    );
+    expect(restoredWindow.reload).not.toHaveBeenCalled();
+  });
+
+  it("does not restore a cleared claim when its earlier verification completes", async () => {
+    const window = {};
+    let finishVerification!: (authorized: boolean) => void;
+    let verificationStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      verificationStarted = resolve;
+    });
+    const verifyScope = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishVerification = resolve;
+          verificationStarted();
+        }),
+    );
+    const setScope = vi.fn(async () => undefined);
+    const coordinator = createScannerScopeCoordinator<object>({
+      currentWindow: () => window,
+      originForWindow: () => origin,
+      clearScope: async () => undefined,
+      verifyScope,
+      setScope,
+    });
+
+    const pendingVerification = coordinator.remember(window, scope);
+    await started;
+    await expect(coordinator.remember(window, null)).resolves.toBe("cleared");
+    finishVerification(true);
+
+    await expect(pendingVerification).resolves.toBe("stale");
+    await expect(coordinator.reauthenticate(window)).resolves.toBe("rejected");
+    expect(coordinator.scope()).toBeNull();
+    expect(setScope).not.toHaveBeenCalled();
   });
 });
