@@ -10,8 +10,12 @@ import { BrexCardsConnectDialog } from "../integrations/BrexCardsConnectDialog";
 import { PageEmptyState } from "../PageEmptyState";
 import { PageHeader } from "../PageHeader";
 import { StillLoading } from "../ShellSkeleton";
+import { BrexAccounts } from "./BrexAccounts";
+import { BrexActivity } from "./BrexActivity";
 import { BrexCards } from "./BrexCards";
+import { BrexExpenses } from "./BrexExpenses";
 import { BrexOverview } from "./BrexOverview";
+import { BrexTravel } from "./BrexTravel";
 
 const SECTIONS = [
   { key: "overview", path: "/app/brex" },
@@ -122,6 +126,14 @@ export function BrexPage({ spaceName }: { spaceName?: string }) {
               <BrexOverview data={overview.data} />
             ) : section === "cards" ? (
               <BrexCards />
+            ) : section === "expenses" ? (
+              <BrexExpenses />
+            ) : section === "accounts" ? (
+              <BrexAccounts />
+            ) : section === "travel" ? (
+              <BrexTravel />
+            ) : section === "activity" ? (
+              <BrexActivity />
             ) : (
               <PageEmptyState
                 icon={<AppLogo name="Brex" size="lg" />}
